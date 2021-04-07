@@ -1,0 +1,16 @@
+apiVersion: renku.io/v1
+kind: Session
+metadata:
+  name: ## ADD NAME
+  namespace: ## ADD NAMESPACE
+spec:
+  notebookImage: jupyter/minimal-notebook:latest
+  host: ## Add hostname
+  auth:
+    kind: oidc
+    oidc:
+      issuerUrl: ## Issuer URL of OIDC provider
+      clientId: ## Client ID of registered application
+      clientSecret: ## Client secret of registered application
+      userId: ## ADD THE USER_ID OF THE USER WHO WILL HAVE ACCESS TO THE SERVER
+

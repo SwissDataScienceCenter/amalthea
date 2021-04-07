@@ -1,0 +1,10 @@
+apiVersion: renku.io/v1
+kind: Session
+metadata:
+  name: ## ADD NAME
+  namespace: ## ADD NAMESPACE
+spec:
+  notebookImage: jupyter/minimal-notebook:latest
+  host: ## Add hostname
+  auth:
+    token: ## Add a token here
