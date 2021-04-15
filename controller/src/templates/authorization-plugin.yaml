@@ -1,0 +1,16 @@
+name: authorization-plugin
+image: ableuler/auth-test:0.0.0-1
+env:
+  - name: USER_ID
+    value: "{oidc_user_id}"
+ports:
+  - name: http
+    containerPort: 3000
+    protocol: TCP
+resources:
+  requests:
+    cpu: 20m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 32Mi

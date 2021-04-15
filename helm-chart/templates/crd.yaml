@@ -1,12 +1,18 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: sessions.renku.io
+  name: jupyterservers.renku.io
 spec:
   scope: Namespaced
   group: renku.io
+  names:
+    kind: JupyterServer
+    plural: jupyterservers
+    singular: jupyterserver
+    shortNames:
+      - js
   versions:
-    - name: v1
+    - name: v1alpha1
       served: true
       storage: true
       schema:
@@ -16,31 +22,50 @@ spec:
             spec:
               type: object
               properties:
-                notebookImage:
-                  type: string
-                  default: jupyter/minimal-notebook:latest
 
-                notebookDefaultPath:
-                  type: string
-                  default: /lab
-
-                # TODO: Automatically fetch and inline schema
-                # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
-                resources:
-                  description: "Regular resource requests, will be set on the main notebook container."
+                jupyterServer:
                   type: object
-                  x-kubernetes-preserve-unknown-fields: true
+                  properties:
+                    image:
+                      type: string
+                      default: jupyter/minimal-notebook:latest
+                    defaultUrl:
+                      type: string
+                      default: /lab
+                    notebookDir:
+                      type: string
+                      default: /home/jovyan/work/
 
-                host:
-                  type: string
-                path:
-                  type: string
-                  default: "/"
+                    # TODO: Automatically fetch and inline schema
+                    # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
+                    resources:
+                      description: "Regular resource requests, will be set on the main notebook container."
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+
+                routing:
+                  type: object
+                  properties:
+                    host:
+                      type: string
+                    path:
+                      type: string
+                      default: "/"
+
+                volume:
+                  type: object
+                  properties:
+                    size:
+                      type: string
+                      default: 100Mi
+                    storageClass:
+                      type: string
+                      default: default
 
                 auth:
                   type: object
                   properties:
-                    # Accepted values are token and OIDC
+                    # Accepted values are token and oidc
                     kind:
                       type: string
                       default: token
@@ -58,75 +83,33 @@ spec:
                           type: string
                         userId:
                           type: string
-                        cookieSecret:
-                          type: string
 
-                # TODO: Automatically fetch and inline schemas for the below sections.
 
-                # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
-                extraInitContainers:
-                  description: "Extra init container specs, will be added to statefulset pod template."
+                resourceModifications:
+                  description: "Modifications to be applied to the resources which are part of this custom object OR containers in the statefulset component. We use python deepmerge."
                   type: array
                   default: []
                   items:
                     type: object
-                    x-kubernetes-preserve-unknown-fields: true
+                    properties:
+                      resource:
+                        type: string
+                      modification:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
 
-                # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
-                extraContainers:
-                  description: "Extra container specs, will be added to statefulset pod template."
+                extraResources:
+                  description: "Extra Resources to be created with the custom resource object."
                   type: array
                   default: []
                   items:
                     type: object
-                    x-kubernetes-preserve-unknown-fields: true
+                    properties:
+                      api:
+                        type: string
+                      creationMethod:
+                        type: string
+                      resourceSpec:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
 
-                # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
-                extraVolumes:
-                  description: "Extra volume specs, will be added to the statefulset pod template."
-                  type: array
-                  default: []
-                  items:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-
-                # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
-                extraImagePullSecrets:
-                  description: "Extra image pull sedret specs, will be added to the notebook container template."
-                  type: array
-                  default: []
-                  items:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-
-                # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
-                extraVolumeMounts:
-                  description: "Extra volume mount specs, will be added to the notebook container template."
-                  type: array
-                  default: []
-                  items:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-
-                # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
-                extraEnv:
-                  description: "Extra env variables, will be added to the notebook container template."
-                  type: array
-                  default: []
-                  items:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-
-                # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
-                extraPVCs:
-                  description: "Extra PVC specs, will be part of the custom resource object."
-                  type: array
-                  default: []
-                  items:
-                    type: object
-                    x-kubernetes-preserve-unknown-fields: true
-
-  names:
-    kind: Session
-    plural: sessions
-    singular: session

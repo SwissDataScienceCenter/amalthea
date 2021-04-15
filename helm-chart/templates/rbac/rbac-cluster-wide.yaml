@@ -1,0 +1,30 @@
+{{- if .Values.serviceAccount.create -}}
+{{- if .Values.scope.clusterWide }}
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "jupyter-server-operator.fullname" . }}
+  labels:
+    {{- include "jupyter-server-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "jupyter-server-operator.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "jupyter-server-operator.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "jupyter-server-operator.fullname" . }}
+  labels:
+    {{- include "jupyter-server-operator.labels" . | nindent 4 }}
+{{- template "jupyter-server-operator.rules" }}
+
+{{- end }}
+{{- end }}
+
+

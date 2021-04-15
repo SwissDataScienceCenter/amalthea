@@ -1,0 +1,25 @@
+name: jupyter-server
+image: {jupyter_image}
+command:
+  - "jupyter"
+  - "server"
+args:
+  - "--ServerApp.ip=0.0.0.0"
+  - "--ServerApp.port=8888"
+  - "--ServerApp.token={jupyter_token}"
+  - "--ServerApp.allow_origin=https://{host}"
+  - "--ServerApp.root_dir={jupyter_notebook_dir}"
+  - "--ServerApp.base_url={path}"
+  - "--ServerApp.default_url={jupyter_default_url}"
+workingDir: {jupyter_notebook_dir}
+volumeMounts:
+  - name: workspace
+    mountPath: "/home/jovyan/work"
+    subPath: work
+ports:
+  - name: notebook-port
+    containerPort: 8888
+    protocol: TCP
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 100

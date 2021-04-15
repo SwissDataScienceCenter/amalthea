@@ -31,6 +31,16 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "--verbose"
+            - "--log-format json"
+            {{- if .Values.scope.clusterWide }}
+            - "--all-namespaces"
+            {{- else }}
+            {{- range .Values.scope.namespaces }}
+            - "--namespace {{ . }}"
+            {{- end }}
+            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

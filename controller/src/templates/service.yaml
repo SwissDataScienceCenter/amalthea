@@ -1,0 +1,16 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: {name}
+  namespace: {namespace}
+  labels:
+    app: {name}
+spec:
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: {target_port}
+  selector:
+    app: {name}
+  ClusterIP: None

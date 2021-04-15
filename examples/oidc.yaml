@@ -1,5 +1,5 @@
-apiVersion: renku.io/v1
-kind: Session
+apiVersion: renku.io/v1alpha1
+kind: JupyterServer
 metadata:
   name: ## ADD NAME
   namespace: ## ADD NAMESPACE

@@ -2,6 +2,15 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Indicate the scope which this operator watches for
+# JupyterServer resources.
+scope:
+  clusterWide: false
+  # Namespaces are ignored if clusterWide is set to true.
+  namespaces:
+    - default
+    - my-namespace
+
 image:
   repository: ableuler/jupyter-server-operator
   pullPolicy: IfNotPresent
