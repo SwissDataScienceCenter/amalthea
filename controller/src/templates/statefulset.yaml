@@ -1,0 +1,30 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  namespace: {namespace}
+  name: {name}
+spec:
+  selector:
+    matchLabels:
+      app: {name}
+  serviceName: {name}
+  replicas: 1 # Don't change this
+  template:
+    metadata:
+      labels:
+        app: {name}
+    spec:
+      initContainers: []
+      containers: []
+      volumes:
+        - name: traefik-configmap
+          configMap:
+            name: {name}
+            defaultMode: 420
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: {name}
+      terminationGracePeriodSeconds: 30
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 100

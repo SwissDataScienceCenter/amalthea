@@ -1,0 +1,28 @@
+name: authentication-plugin
+image: "bitnami/oauth2-proxy:7.1.2"
+args:
+  - "--provider=oidc"
+  - "--client-id={oidc_client_id}"
+  - "--client-secret={oidc_client_secret}"
+  - "--oidc-issuer-url={oidc_issuer_url}"
+  - "--session-cookie-minimal"
+  - "--set-xauthrequest"
+  - "--cookie-secret={authentication_cookie_secret}"
+  - "--email-domain=*"
+  - "--http-address=:4180"
+  - "--skip-provider-button"
+  - "--reverse-proxy"
+  - "--upstream=static://202"
+  - "--redirect-url={full_url}/oauth2/callback"
+ports:
+  - name: http
+    containerPort: 4180
+    protocol: TCP
+resources:
+  requests:
+    cpu: 20m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 32Mi
+env: []

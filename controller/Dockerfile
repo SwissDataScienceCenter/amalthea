@@ -11,4 +11,4 @@ WORKDIR /app
 RUN pipenv install --system --deploy
 
 COPY src /app/src
-CMD kopf run /app/src/server_controller.py --verbose
+CMD ["kopf", "run", "/app/src/server_controller.py"]

@@ -1,0 +1,38 @@
+{{- if .Values.serviceAccount.create -}}
+{{- if eq .Values.scope.clusterWide false }}
+
+{{- /* We store the full scope because . is overwritten when in the loop. */}}
+{{- $fullTemplateScope := . }}
+
+{{- range .Values.scope.namespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "jupyter-server-operator.fullname" $fullTemplateScope }}
+  namespace: {{ . }}
+  labels:
+    {{- include "jupyter-server-operator.labels" $fullTemplateScope | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "jupyter-server-operator.fullname" $fullTemplateScope }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "jupyter-server-operator.serviceAccountName" $fullTemplateScope }}
+    namespace: {{ $fullTemplateScope.Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "jupyter-server-operator.fullname" $fullTemplateScope }}
+  namespace: {{ . }}
+  labels:
+    {{- include "jupyter-server-operator.labels" $fullTemplateScope | nindent 4 }}
+{{- template "jupyter-server-operator.rules" }}
+
+{{- end }}
+{{- end }}
+{{- end }}
+
+
