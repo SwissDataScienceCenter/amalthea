@@ -25,6 +25,7 @@ spec:
 
                 jupyterServer:
                   type: object
+                  default: {} # Stupid, but necessary for the inner defaults do work
                   properties:
                     image:
                       type: string
@@ -32,7 +33,7 @@ spec:
                     defaultUrl:
                       type: string
                       default: /lab
-                    notebookDir:
+                    rootDir:
                       type: string
                       default: /home/jovyan/work/
 
@@ -45,6 +46,7 @@ spec:
 
                 routing:
                   type: object
+                  default: {} # Stupid, but necessary for the inner defaults do work
                   properties:
                     host:
                       type: string
@@ -54,27 +56,26 @@ spec:
 
                 volume:
                   type: object
+                  default: {} # Stupid, but necessary for the inner defaults do work
                   properties:
                     size:
                       type: string
                       default: 100Mi
                     storageClass:
                       type: string
-                      default: default
 
                 auth:
                   type: object
+                  default: {} # Stupid, but necessary for the inner defaults do work
                   properties:
-                    # Accepted values are token and oidc
-                    kind:
-                      type: string
-                      default: token
                     token:
                       type: string
-                      default: ""
                     oidc:
                       type: object
                       properties:
+                        enabled:
+                          type: boolean
+                          default: False
                         issuerUrl:
                           type: string
                         clientId:

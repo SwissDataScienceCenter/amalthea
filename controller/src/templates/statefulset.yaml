@@ -1,14 +1,14 @@
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  namespace: {namespace}
   name: {name}
 spec:
   selector:
     matchLabels:
       app: {name}
   serviceName: {name}
-  replicas: 1 # Don't change this
+  # Scaling up is not intended and won't work
+  replicas: 1
   template:
     metadata:
       labels:

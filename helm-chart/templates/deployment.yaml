@@ -33,16 +33,19 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - "--verbose"
-            - "--log-format json"
+            - "--log-format=json"
             {{- if .Values.scope.clusterWide }}
             - "--all-namespaces"
             {{- else }}
             {{- range .Values.scope.namespaces }}
-            - "--namespace {{ . }}"
+            - "--namespace={{ . }}"
             {{- end }}
             {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: RESCHEDULE_ON_NODE_FAILURE
+              value: {{ .Values.rescheduleOnNodeFailure | quote }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

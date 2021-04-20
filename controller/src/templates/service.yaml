@@ -2,7 +2,6 @@ kind: Service
 apiVersion: v1
 metadata:
   name: {name}
-  namespace: {namespace}
   labels:
     app: {name}
 spec:
@@ -10,7 +9,7 @@ spec:
     - name: http
       protocol: TCP
       port: 80
-      targetPort: {target_port}
+      targetPort: 8000
   selector:
     app: {name}
   ClusterIP: None

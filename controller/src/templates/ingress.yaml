@@ -2,7 +2,6 @@ kind: Ingress
 apiVersion: extensions/v1beta1
 metadata:
   name: {name}
-  namespace: {namespace}
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-production
     kubernetes.io/ingress.class: nginx
