@@ -9,7 +9,8 @@ scope:
   # Namespaces are ignored if clusterWide is set to true.
   namespaces:
     - default
-    - my-namespace
+
+rescheduleOnNodeFailure: false
 
 image:
   repository: ableuler/jupyter-server-operator

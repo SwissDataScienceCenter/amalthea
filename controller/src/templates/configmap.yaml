@@ -2,9 +2,8 @@ kind: ConfigMap
 apiVersion: v1
 metadata:
   name: {name}
-  namespace: {namespace}
 data:
-  proxy-rules.yaml: |
+  proxy-rules.yaml:
     http:
       routers:
         proxy:
@@ -47,7 +46,7 @@ data:
   # to /oauth2 could go from the ingress directly to the oidc
   # plugin.
 
-  oidc-plugin-rules.yaml: |
+  oidc-plugin-rules.yaml:
     http:
       routers:
         oidcPlugin:
@@ -83,7 +82,7 @@ data:
               - url: 'http://localhost:4180/'
                 weight: 1
 
-  traefik.yaml: |
+  traefik.yaml:
     log:
       level: debug
     api:

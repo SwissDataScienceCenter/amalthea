@@ -6,6 +6,7 @@ rules:
       - extensions
     resources:
       - statefulsets
+      - pods
       - ingresses
       - services
       - secrets
@@ -22,7 +23,7 @@ rules:
   - apiGroups:
       - "renku.io"
     resources:
-      - jupyterserver
+      - jupyterservers
     verbs:
       - get
       - list
