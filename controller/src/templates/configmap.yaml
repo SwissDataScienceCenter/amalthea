@@ -13,6 +13,7 @@ data:
           middlewares:
             - oidcPlugin
             - customAuthorization
+            - cookieCleaner
           service: notebook
 
       middlewares:
@@ -30,7 +31,11 @@ data:
         customAuthorization:
           forwardAuth:
             address: 'http://localhost:3000'
-            trustForwardHeader: true
+        cookieCleaner:
+          forwardAuth:
+            address: 'http://localhost:3001'
+            authResponseHeaders:
+              - Cookie
 
       services:
         notebook:
