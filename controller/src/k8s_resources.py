@@ -2,6 +2,7 @@ import base64
 from deepmerge import always_merger
 import os
 import yaml
+import json
 from urllib.parse import urljoin
 
 
@@ -48,6 +49,7 @@ def get_resource_configs(oidc_enabled=False, api_only=False):
         # These containers will be added to the statefulset.
         "jupyter-server": {"template": "jupyter-server.yaml"},
         "auth-proxy": {"template": "auth-proxy.yaml"},
+        "cookie-cleaner": {"template": "cookie-cleaner.yaml"},
     }
 
     if oidc_enabled:
@@ -89,6 +91,9 @@ def create_template_values(metadata, spec):
         # Volume
         "volume_size": spec["volume"]["size"],
         "volume_storage_class": spec["volume"]["storageClass"],
+        # Cookie cleaner
+        "cookie_whitelist": json.dumps(spec["auth"]["cookieWhiteList"]),
+        "cookie_blacklist": json.dumps(spec["auth"].get("cookieBlackList", None)),
     }
     if spec["auth"]["oidc"]["enabled"]:
         template_values.update(
