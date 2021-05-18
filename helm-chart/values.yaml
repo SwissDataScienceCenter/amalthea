@@ -10,6 +10,8 @@ scope:
   namespaces:
     - default
 
+deployCrd: true  # whether to deploy the jupyterserver CRD
+
 rescheduleOnNodeFailure: false
 
 image:
