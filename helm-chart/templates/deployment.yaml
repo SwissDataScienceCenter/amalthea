@@ -5,7 +5,11 @@ metadata:
   labels:
     {{- include "jupyter-server-operator.labels" . | nindent 4 }}
 spec:
+  # There must be only one instance of the kopf operator handling the
+  # same custom resource object at a time.
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "jupyter-server-operator.selectorLabels" . | nindent 6 }}
@@ -51,6 +55,13 @@ spec:
           env:
             - name: RESCHEDULE_ON_NODE_FAILURE
               value: {{ .Values.rescheduleOnNodeFailure | quote }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "jupyter-server-operator.fullname" . }}-config
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

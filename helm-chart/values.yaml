@@ -14,6 +14,16 @@ deployCrd: true  # whether to deploy the jupyterserver CRD
 
 rescheduleOnNodeFailure: false
 
+# Configure the kopf operator settings by providing
+# a yaml object as multiline string. See
+# https://kopf.readthedocs.io/en/stable/configuration/
+# for configuraiton options.
+kopfOperatorSettings: |
+  watching:
+    # This can fix a problem of a watch stream suddenly falling
+    # silent, see https://github.com/nolar/kopf/issues/762#issuecomment-838423267
+    client_timeout: 600
+
 image:
   repository: ableuler/jupyter-server-operator
   pullPolicy: IfNotPresent
