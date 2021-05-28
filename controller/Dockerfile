@@ -11,4 +11,4 @@ WORKDIR /app
 RUN pipenv install --system --deploy
 
 COPY src /app/src
-ENTRYPOINT ["kopf", "run", "/app/src/server_controller.py"]
+ENTRYPOINT ["kopf", "run", "--liveness=http://0.0.0.0:8080/healthz", "/app/src/server_controller.py"]
