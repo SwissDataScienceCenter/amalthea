@@ -8,6 +8,20 @@ from k8s_resources import get_resources_specs, get_resource_configs
 import config
 
 
+@kopf.on.startup()
+def configure(settings, **kwargs):
+    """
+    Configure the operator - see https://kopf.readthedocs.io/en/stable/configuration/
+    for options.
+    """
+    if config.kopf_operator_settings:
+        try:
+            for key, val in config.kopf_operator_settings.items():
+                getattr(settings, key).__dict__.update(val)
+        except AttributeError(e):
+            print(f"Problem when configuring the Operator: {e}")
+
+
 def create_namespaced_resource(client, api, method, **kwargs):
     """
     Create a k8s resource given and api, the right method for creation
