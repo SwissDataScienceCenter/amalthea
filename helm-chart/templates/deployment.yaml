@@ -35,6 +35,7 @@ spec:
             httpGet:
               path: /healthz
               port: 8080
+            initialDelaySeconds: 300
           args:
             - "--verbose"
             - "--log-format=json"
