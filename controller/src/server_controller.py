@@ -1,5 +1,7 @@
+import json
 import yaml
 import kopf
+from kubernetes import dynamic
 import kubernetes.client as k8s_client
 from kubernetes.client.rest import ApiException
 from datetime import datetime, timezone, timedelta
@@ -36,7 +38,7 @@ def create_namespaced_resource(client, api, method, **kwargs):
 
 
 @kopf.on.create("renku.io/v1alpha1", "JupyterServer")
-def create_fn(spec, **kwargs):
+def create_fn(spec, meta, **kwargs):
     """
     Watch the creation of jupyter server objects and create all
     the necessary k8s resources which implement the jupyter server.
@@ -49,32 +51,134 @@ def create_fn(spec, **kwargs):
         oidc_enabled=spec["auth"]["oidc"]["enabled"], api_only=True
     )
 
-    resources = []
-    for resource_key, resource_spec in resources_specs.items():
-        kopf.adopt(resource_spec)
-        resources.append(
-            create_namespaced_resource(
-                k8s_client,
-                resource_configs[resource_key]["api"],
-                resource_configs[resource_key]["creation_method"],
-                namespace=metadata["namespace"],
-                body=resource_spec,
-            )
+    children = {"extraResources": []}
+    kopf.label(
+        resources_specs["statefulset"]["spec"]["template"],
+        labels={"renku.io/jupyterserver": metadata["name"]},
+    )
+    if "labels" in meta:
+        kopf.label(
+            resources_specs["statefulset"]["spec"]["template"], labels=meta["labels"]
         )
+
+    for resource_key, resource_spec in resources_specs.items():
+        kopf.label(resource_spec, labels={"renku.io/jupyterserver": metadata["name"]})
+        kopf.adopt(resource_spec)
+        children[resource_key] = create_namespaced_resource(
+            k8s_client,
+            resource_configs[resource_key]["api"],
+            resource_configs[resource_key]["creation_method"],
+            namespace=metadata["namespace"],
+            body=resource_spec,
+        ).metadata.uid
 
     for extra_resource in spec["extraResources"]:
         kopf.adopt(extra_resource["resourceSpec"])
-        resources.append(
+        kopf.label(resource_spec, labels={"renku.io/jupyterserver": metadata["name"]})
+        children["extraResources"].append(
             create_namespaced_resource(
                 k8s_client,
                 extra_resource["api"],
                 extra_resource["creationMethod"],
                 namespace=metadata["namespace"],
                 body=extra_resource["resourceSpec"],
-            )
+            ).metadata.uid
         )
 
-    return {"children": [resource.metadata.uid for resource in resources]}
+    return {"created_resources": children}
+
+
+@kopf.on.delete("renku.io/v1alpha1", "JupyterServer")
+def delete_fn(namespace, spec, body, **kwargs):
+    """
+    A deletion handler who's only job is to trigger deletion of pvc and pod
+    and then fail until both and pvc are gone.
+    """
+    pod_alive = True
+    pvc_alive = True
+
+    try:
+        k8s_client.CoreV1Api().delete_namespaced_persistent_volume_claim(
+            name=body["children"]["PersistentVolumeClaim"]["name"],
+            namespace=namespace,
+        )
+    except (ApiException, KeyError):
+        pass
+
+    try:
+        k8s_client.AppsV1Api().delete_namespaced_stateful_set(
+            name=body["children"]["StatefulSet"]["name"],
+            namespace=namespace,
+        )
+    except (ApiException, KeyError):
+        pass
+
+    try:
+        k8s_client.CoreV1Api().read_namespaced_pod(
+            name=body["children"]["Pod"]["name"],
+            namespace=namespace,
+        )
+    except (ApiException, KeyError):
+        pod_alive = False
+
+    try:
+        k8s_client.CoreV1Api().read_namespaced_persistent_volume_claim(
+            name=body["children"]["PersistentVolumeClaim"]["name"],
+            namespace=namespace,
+        )
+    except (ApiException, KeyError):
+        pvc_alive = False
+
+    if pvc_alive or pod_alive:
+        raise Exception("Waiting for pod and pvc destruction")
+
+
+@kopf.on.event("statefulset", labels={"renku.io/jupyterserver": kopf.PRESENT})
+@kopf.on.event("pod", labels={"renku.io/jupyterserver": kopf.PRESENT})
+@kopf.on.event("persistentvolumeclaim", labels={"renku.io/jupyterserver": kopf.PRESENT})
+@kopf.on.event("ingress", labels={"renku.io/jupyterserver": kopf.PRESENT})
+@kopf.on.event("service", labels={"renku.io/jupyterserver": kopf.PRESENT})
+def child_monitoring(meta, name, namespace, body, event, status, **kwargs):
+    """
+    Update the custom object with the child status.
+    """
+    # We should only receive CRUD events...
+    try:
+        op = {"MODIFIED": "replace", "ADDED": "add", "DELETED": "remove"}[event["type"]]
+    except KeyError:
+        return
+
+    parent_name = meta["labels"]["renku.io/jupyterserver"]
+
+    # TODO: This extra query should be done only once and avoided later
+    dynamic_client = dynamic.DynamicClient(k8s_client.api_client.ApiClient())
+    jupyter_server_api = dynamic_client.resources.get(
+        api_version="v1alpha1", kind="JupyterServer"
+    )
+
+    # We use the dynamic client for patching since we need
+    # content_type="application/json-patch+json"
+
+    json_patch = [
+        {
+            "op": op,
+            "path": f"/children/{body['kind']}",
+        }
+    ]
+    if op in ["add", "replace"]:
+        json_patch[0]["value"] = {
+            "uid": body["metadata"]["uid"],
+            "name": body["metadata"]["name"],
+            "status": body["status"],
+        }
+
+    jupyter_server_api.patch(
+        namespace=namespace,
+        name=parent_name,
+        body=json_patch,
+        content_type="application/json-patch+json",
+    )
+    # TODO: catch the case where we're trying to update a deleted object for cleaner logs
 
 
 # Note: This is a very experimental feature and it's implementation is likely
