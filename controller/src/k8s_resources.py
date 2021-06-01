@@ -88,6 +88,9 @@ def create_template_values(metadata, spec):
         "full_url": urljoin(
             f"https://{spec['routing']['host']}", spec["routing"]["path"].rstrip("/")
         ),
+        # Session ingress
+        "ingress_tls_secret": spec["routing"]["tlsSecret"],
+        "ingress_annotations": spec["routing"]["ingressAnnotations"],
         # Volume
         "volume_size": spec["volume"]["size"],
         "volume_storage_class": spec["volume"]["storageClass"],
