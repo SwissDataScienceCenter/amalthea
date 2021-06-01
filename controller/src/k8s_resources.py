@@ -82,14 +82,6 @@ def create_template_values(metadata, spec):
         "jupyter_default_url": spec["jupyterServer"]["defaultUrl"],
         "jupyter_root_dir": spec["jupyterServer"]["rootDir"],
         "jupyter_token": spec["auth"]["token"],
-        # Session ingress
-        "session_ingress_tls_secret_name": (
-            metadata["name"] + "-js-tls"
-            if os.environ.get("SESSION_INGRESS_TLS_SECRET_NAME") is None 
-            or os.environ.get("SESSION_INGRESS_TLS_SECRET_NAME") == ""
-            else os.environ.get("SESSION_INGRESS_TLS_SECRET_NAME")
-        ),
-        "session_ingress_annotations": os.environ.get("SESSION_INGRESS_ANNOTATIONS"),
         # Routing
         "host": spec["routing"]["host"],
         "path": spec["routing"]["path"].rstrip("/"),

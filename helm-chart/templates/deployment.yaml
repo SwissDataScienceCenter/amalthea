@@ -55,11 +55,6 @@ spec:
           env:
             - name: RESCHEDULE_ON_NODE_FAILURE
               value: {{ .Values.rescheduleOnNodeFailure | quote }}
-            - name: SESSION_INGRESS_TLS_SECRET_NAME 
-              value: {{ .Values.sessionIngress.tlsSecretName | quote }}
-            - name: SESSION_INGRESS_ANNOTATIONS
-              value: |
-{{ .Values.sessionIngress.annotations | indent 16 }}
           volumeMounts:
             - name: config
               mountPath: /app/config
