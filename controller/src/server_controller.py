@@ -48,6 +48,7 @@ def create_fn(spec, meta, **kwargs):
 
     resources_specs = get_resources_specs(metadata, spec)
     resource_configs = get_resource_configs(
+        storage_type=next(iter(spec["storage"].keys())),
         oidc_enabled=spec["auth"]["oidc"]["enabled"], api_only=True
     )
 

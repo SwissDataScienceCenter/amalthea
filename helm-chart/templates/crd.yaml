@@ -66,15 +66,26 @@ spec:
                     ingressAnnotations: 
                       type: string
 
-                volume:
+                storage:
                   type: object
-                  default: {} # Stupid, but necessary for the inner defaults do work
                   properties:
-                    size:
-                      type: string
-                      default: 100Mi
-                    storageClass:
-                      type: string
+                    volume:
+                      type: object
+                      properties:
+                        size:
+                          type: string
+                          default: 100Mi
+                        storageClass:
+                          type: string
+                    emptyDir:
+                      type: object
+                      properties:
+                        sizeLimit:
+                          type: string
+                          default: 100Mi
+                  oneOf:
+                    - required: ["emptyDir"]
+                    - required: ["volume"]
 
                 auth:
                   type: object

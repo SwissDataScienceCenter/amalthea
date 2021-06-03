@@ -12,7 +12,7 @@ TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 # A List defining the api and api methods for creation for each resource.
 # This could be inferred by looking at the manifest, would have to verify
 # how this could work in the case of custom resources.
-def get_resource_configs(oidc_enabled=False, api_only=False):
+def get_resource_configs(storage_type, oidc_enabled=False, api_only=False):
     """
     Get a dictionary with all resources that should be created. For each
     resource we return the api, the api method and the resource manifest
@@ -26,20 +26,10 @@ def get_resource_configs(oidc_enabled=False, api_only=False):
             "creation_method": "create_namespaced_service",
             "template": "service.yaml",
         },
-        "pvc": {
-            "api": "CoreV1Api",
-            "creation_method": "create_namespaced_persistent_volume_claim",
-            "template": "pvc.yaml",
-        },
         "ingress": {
             "api": "ExtensionsV1beta1Api",
             "creation_method": "create_namespaced_ingress",
             "template": "ingress.yaml",
-        },
-        "statefulset": {
-            "api": "AppsV1Api",
-            "creation_method": "create_namespaced_stateful_set",
-            "template": "statefulset.yaml",
         },
         "configmap": {
             "api": "CoreV1Api",
@@ -58,6 +48,33 @@ def get_resource_configs(oidc_enabled=False, api_only=False):
                 # These containers will be added to the statefulset.
                 "authorization-plugin": {"template": "authorization-plugin.yaml"},
                 "authentication-plugin": {"template": "authentication-plugin.yaml"},
+            }
+        )
+
+    if storage_type == "volume":
+        resource_configs.update(
+            {
+                "pvc": {
+                    "api": "CoreV1Api",
+                    "creation_method": "create_namespaced_persistent_volume_claim",
+                    "template": "pvc.yaml",
+                },
+                "statefulset": {
+                    "api": "AppsV1Api",
+                    "creation_method": "create_namespaced_stateful_set",
+                    "template": "statefulset_pvc.yaml",
+                },
+            }
+        )
+    
+    if storage_type == "emptyDir":
+        resource_configs.update(
+            {
+                "statefulset": {
+                    "api": "AppsV1Api",
+                    "creation_method": "create_namespaced_stateful_set",
+                    "template": "statefulset_empty_dir.yaml",
+                },
             }
         )
 
@@ -91,9 +108,6 @@ def create_template_values(metadata, spec):
         # Session ingress
         "ingress_tls_secret": spec["routing"]["tlsSecret"],
         "ingress_annotations": spec["routing"]["ingressAnnotations"],
-        # Volume
-        "volume_size": spec["volume"]["size"],
-        "volume_storage_class": spec["volume"]["storageClass"],
         # Cookie cleaner
         "cookie_whitelist": json.dumps(spec["auth"]["cookieWhiteList"]),
         "cookie_blacklist": json.dumps(spec["auth"].get("cookieBlackList", None)),
@@ -108,6 +122,19 @@ def create_template_values(metadata, spec):
                 "authentication_cookie_secret": base64.urlsafe_b64encode(
                     os.urandom(32)
                 ).decode(),
+            }
+        )
+    if "volume" in spec["storage"].keys():
+        template_values.update(
+            {
+                "volume_size": spec["storage"]["volume"]["size"],
+                "volume_storage_class": spec["storage"]["volume"]["storageClass"],
+            }
+        )
+    if "emptyDir" in spec["storage"].keys():
+        template_values.update(
+            {
+                "empty_dir_size_limit": spec["storage"]["emptyDir"]["sizeLimit"],
             }
         )
     return template_values
@@ -136,6 +163,7 @@ def get_resources_specs(metadata, spec):
     template_values = create_template_values(metadata, spec)
 
     resource_configs = get_resource_configs(
+        storage_type=next(iter(spec["storage"].keys())),
         oidc_enabled=spec["auth"]["oidc"]["enabled"], api_only=False
     )
 
