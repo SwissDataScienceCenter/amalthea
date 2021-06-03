@@ -65,6 +65,11 @@ def create_fn(spec, meta, **kwargs):
     for resource_key, resource_spec in resources_specs.items():
         kopf.label(resource_spec, labels={"renku.io/jupyterserver": metadata["name"]})
         kopf.adopt(resource_spec)
+        if resource_key == "pvc":
+            resource_spec["metadata"]["annotations"] = {
+                **resource_spec["metadata"].get("annotations", {}),
+                **metadata["annotations"],
+            }
         children[resource_key] = create_namespaced_resource(
             k8s_client,
             resource_configs[resource_key]["api"],
