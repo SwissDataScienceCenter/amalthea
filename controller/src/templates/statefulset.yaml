@@ -21,9 +21,6 @@ spec:
           configMap:
             name: {name}
             defaultMode: 420
-        - name: workspace
-          persistentVolumeClaim:
-            claimName: {name}
       terminationGracePeriodSeconds: 30
       automountServiceAccountToken: false
       securityContext:

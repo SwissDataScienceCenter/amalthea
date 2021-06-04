@@ -12,7 +12,7 @@ TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 # A List defining the api and api methods for creation for each resource.
 # This could be inferred by looking at the manifest, would have to verify
 # how this could work in the case of custom resources.
-def get_resource_configs(storage_type, oidc_enabled=False, api_only=False):
+def get_resource_configs(pvc_enabled=False, oidc_enabled=False, api_only=False):
     """
     Get a dictionary with all resources that should be created. For each
     resource we return the api, the api method and the resource manifest
@@ -30,6 +30,11 @@ def get_resource_configs(storage_type, oidc_enabled=False, api_only=False):
             "api": "ExtensionsV1beta1Api",
             "creation_method": "create_namespaced_ingress",
             "template": "ingress.yaml",
+        },
+        "statefulset": {
+            "api": "AppsV1Api",
+            "creation_method": "create_namespaced_stateful_set",
+            "template": "statefulset.yaml",
         },
         "configmap": {
             "api": "CoreV1Api",
@@ -51,29 +56,13 @@ def get_resource_configs(storage_type, oidc_enabled=False, api_only=False):
             }
         )
 
-    if storage_type == "volume":
+    if pvc_enabled:
         resource_configs.update(
             {
                 "pvc": {
                     "api": "CoreV1Api",
                     "creation_method": "create_namespaced_persistent_volume_claim",
                     "template": "pvc.yaml",
-                },
-                "statefulset": {
-                    "api": "AppsV1Api",
-                    "creation_method": "create_namespaced_stateful_set",
-                    "template": "statefulset_pvc.yaml",
-                },
-            }
-        )
-    
-    if storage_type == "emptyDir":
-        resource_configs.update(
-            {
-                "statefulset": {
-                    "api": "AppsV1Api",
-                    "creation_method": "create_namespaced_stateful_set",
-                    "template": "statefulset_empty_dir.yaml",
                 },
             }
         )
@@ -124,19 +113,8 @@ def create_template_values(metadata, spec):
                 ).decode(),
             }
         )
-    if "volume" in spec["storage"].keys():
-        template_values.update(
-            {
-                "volume_size": spec["storage"]["volume"]["size"],
-                "volume_storage_class": spec["storage"]["volume"]["storageClass"],
-            }
-        )
-    if "emptyDir" in spec["storage"].keys():
-        template_values.update(
-            {
-                "empty_dir_size_limit": spec["storage"]["emptyDir"]["sizeLimit"],
-            }
-        )
+    if spec["storage"]["pvc"]["enabled"]:
+        template_values.update({"volume_size": spec["storage"]["size"]})
     return template_values
 
 
@@ -163,7 +141,7 @@ def get_resources_specs(metadata, spec):
     template_values = create_template_values(metadata, spec)
 
     resource_configs = get_resource_configs(
-        storage_type=next(iter(spec["storage"].keys())),
+        pvc_enabled=spec["storage"]["pvc"]["enabled"],
         oidc_enabled=spec["auth"]["oidc"]["enabled"], api_only=False
     )
 
@@ -171,6 +149,32 @@ def get_resources_specs(metadata, spec):
     resources_specs = {}
     for key, config in resource_configs.items():
         resources_specs[key] = render_template(config["template"], template_values)
+
+    # Add pvc or emptyDir to statefulset volumes
+    if spec["storage"]["pvc"]["enabled"]:
+        resources_specs["statefulset"]["spec"]["template"]["spec"]["volumes"].append(
+            {
+                "name": "workspace",
+                "persistentVolumeClaim": {
+                    "claimName": metadata["name"]
+                }
+            }
+        )
+        # If the storage class is provided update the manifests, else without specifying
+        # anything the default storage class is used automatically
+        if spec["storage"]["pvc"].get("storageClassName") is not None:
+            resources_specs["pvc"]["spec"]["storageClassName"] = (
+                spec["storage"]["pvc"].get("storageClassName")
+            )
+    else:
+        resources_specs["statefulset"]["spec"]["template"]["spec"]["volumes"].append(
+            {
+                "name": "workspace",
+                "emptyDir": {
+                    "sizeLimit": spec["storage"]["size"]
+                }
+            }
+        )
 
     # Adapt traefik rules to non-oidc case
     cm_data = resources_specs["configmap"]["data"]

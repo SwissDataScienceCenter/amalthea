@@ -5,6 +5,7 @@ from kubernetes import dynamic
 import kubernetes.client as k8s_client
 from kubernetes.client.rest import ApiException
 from datetime import datetime, timezone, timedelta
+import logging
 
 from k8s_resources import get_resources_specs, get_resource_configs
 import config
@@ -21,7 +22,7 @@ def configure(settings, **kwargs):
             for key, val in config.kopf_operator_settings.items():
                 getattr(settings, key).__dict__.update(val)
         except AttributeError(e):
-            print(f"Problem when configuring the Operator: {e}")
+            logging.error(f"Problem when configuring the Operator: {e}")
 
 
 def create_namespaced_resource(client, api, method, **kwargs):
@@ -34,7 +35,7 @@ def create_namespaced_resource(client, api, method, **kwargs):
     try:
         return api_method(**kwargs)
     except ApiException as e:
-        print(f"Exception when calling {api}.{method}: {e}\n")
+        logging.error(f"Exception when calling {api}.{method}: {e}\n")
 
 
 @kopf.on.create("renku.io/v1alpha1", "JupyterServer")
@@ -48,7 +49,7 @@ def create_fn(spec, meta, **kwargs):
 
     resources_specs = get_resources_specs(metadata, spec)
     resource_configs = get_resource_configs(
-        storage_type=next(iter(spec["storage"].keys())),
+        pvc_enabled=spec["storage"]["pvc"]["enabled"],
         oidc_enabled=spec["auth"]["oidc"]["enabled"], api_only=True
     )
 
@@ -206,7 +207,6 @@ if config.reschedule_on_node_failure:
 
         # Would be nice if this came as a boolean already...
         if not (ready_cond.status == "False" and pod_status.status.phase == "Running"):
-            print("all good...")
             return
 
         status_age = (
