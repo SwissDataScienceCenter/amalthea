@@ -1,5 +1,5 @@
 charts:
-  - name: jupyter-server-operator
+  - name: amalthea
     # the prefix to use for built images
     imagePrefix: renku/
     # An empty tag means that the appVersion specified in Chart.yaml is used.
@@ -9,7 +9,7 @@ charts:
       published: https://swissdatasciencecenter.github.io/helm-charts/
 
     images:
-      jupyter-server-operator:
+      amalthea:
         contextPath: ../controller
         dockerfilePath: ../controller/Dockerfile
         valuesPath:

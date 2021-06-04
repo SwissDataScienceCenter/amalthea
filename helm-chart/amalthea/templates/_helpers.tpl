@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "jupyter-server-operator.name" -}}
+{{- define "amalthea.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "jupyter-server-operator.fullname" -}}
+{{- define "amalthea.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "jupyter-server-operator.chart" -}}
+{{- define "amalthea.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "jupyter-server-operator.labels" -}}
-helm.sh/chart: {{ include "jupyter-server-operator.chart" . }}
-{{ include "jupyter-server-operator.selectorLabels" . }}
+{{- define "amalthea.labels" -}}
+helm.sh/chart: {{ include "amalthea.chart" . }}
+{{ include "amalthea.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,17 +45,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "jupyter-server-operator.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "jupyter-server-operator.name" . }}
+{{- define "amalthea.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "amalthea.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "jupyter-server-operator.serviceAccountName" -}}
+{{- define "amalthea.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "jupyter-server-operator.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "amalthea.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
