@@ -25,10 +25,10 @@ kopfOperatorSettings: |
     client_timeout: 600
 
 image:
-  repository: ableuler/jupyter-server-operator
+  repository: renku/amalthea
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.0.1-n018.h524da0c"
+  tag: "0.0.1-n018.hcebe511"
 
 imagePullSecrets: []
 nameOverride: ""
