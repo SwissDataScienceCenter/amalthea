@@ -1,0 +1,16 @@
+charts:
+  - name: amalthea
+    # the prefix to use for built images
+    imagePrefix: renku/
+    # An empty tag means that the appVersion specified in Chart.yaml is used.
+    resetTag: ""
+    repo:
+      git: SwissDataScienceCenter/helm-charts
+      published: https://swissdatasciencecenter.github.io/helm-charts/
+
+    images:
+      amalthea:
+        contextPath: ../controller
+        dockerfilePath: ../controller/Dockerfile
+        valuesPath:
+          - image

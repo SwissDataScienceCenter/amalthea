@@ -1,6 +1,6 @@
 apiVersion: v2
-name: jupyter-server-operator
-description: A Helm chart for Kubernetes
+name: amalthea
+description: A helm chart for deploying the amalthea jupyter server operator
 
 # A chart can be either an 'application' or a 'library' chart.
 #
@@ -15,9 +15,12 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.0.1
+version: 0.0.1-n018.hcebe511
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
-# follow Semantic Versioning. They should reflect the version the application is using.
-appVersion: 0.0.1-rc8
+# follow Semantic Versioning. They should reflect the version the application is using. Note
+# that the appVersion is used as image tag if that is not specified in the values file. For
+# the time being appVersion should match the chart version for each released version of this
+# chart.
+appVersion: 0.0.1

@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "jupyter-server-operator.fullname" . }}
+  name: {{ include "amalthea.fullname" . }}
   labels:
-    {{- include "jupyter-server-operator.labels" . | nindent 4 }}
+    {{- include "amalthea.labels" . | nindent 4 }}
 spec:
   # There must be only one instance of the kopf operator handling the
   # same custom resource object at a time.
@@ -12,7 +12,7 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      {{- include "jupyter-server-operator.selectorLabels" . | nindent 6 }}
+      {{- include "amalthea.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -20,13 +20,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "jupyter-server-operator.selectorLabels" . | nindent 8 }}
+        {{- include "amalthea.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "jupyter-server-operator.serviceAccountName" . }}
+      serviceAccountName: {{ include "amalthea.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -61,7 +61,7 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ include "jupyter-server-operator.fullname" . }}-config
+            name: {{ include "amalthea.fullname" . }}-config
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

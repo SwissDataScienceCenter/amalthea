@@ -1,24 +1,29 @@
-# Jupyter Server Operator
+## Amalthea - A Kubernetes operator for Jupyter servers
 
-**This project is still in a very early stage. It might be dropped or take radical changes in direction.**
+This project defines a `JupyterServer` custom resoure for Kubernetes and implements a kubernetes operator which controls the lifecycle of custom JupyterServer objects.
 
-The goal of this project is to run jupyter servers in a kubernetes cluster as custom resources.
+**Warning: This project is still in a very early stage.**
 
-The custom resource object handles the following aspects of the jupyter server:
- - fault tolerance by using a statefulset to run the server and backing it with a PVC
- - exposing it through the creation of an ingress object and a service to expose the jupyter server
- - access control through a pre-defined token or through an existing OIDC provider
 
-The `/helm-chart` directory contains a chart which installs the custom resource definiton and a controller watching the custom resource. The `controller` directory contains the logic of that controller which is based on the kopf framework. Finally, the `/authorization` directory contains a very simple service which can be used in combination with an off-the-shelf authentication plugin to protect the servers.
+The JupyterServer custom resource defines a bundle of standard kubernetes resources that handle the following aspects of running a jupyter server in a k8s cluster:
+ - Routing through the creation of an ingress object and a service to expose the jupyter server
+ - Access control through easy integration with an OIDC provider
+ - Resilience against failures through a StatefulSet controller which runs the server and backing it with a PVC (optional).
 
-## Access control
+## What's in the repo
 
-There are two access control modes, `oidc` and `token`.
+The [helm-chart/amalthea](https://github.com/SwissDataScienceCenter/amalthea/tree/main/helm-chart/amalthea) directory contains a chart which installs the custom resource definiton (optional) and the controller. The [controller](https://github.com/SwissDataScienceCenter/amalthea/tree/main/controller) directory contains the logic of that operator which is based on the very nice [kopf framework](https://github.com/nolar/kopf). Finally, the [authorization](https://github.com/SwissDataScienceCenter/amalthea/tree/main/authorization) directory contains a very simple service which checks that id of the authenticated user.
 
-### Access control through a token
+## Access control using an OIDC provider
 
-In this mode we simply define the token to be passed to the jupyter server as part of the custom resource and establish connection to the jupyter server. Whoever has the token can access the jupyter server.
+We run traefik as a reverse proxy inside the main pod together with the jupyter server. This traefik proxy uses two [forward-auth middlewares](https://doc.traefik.io/traefik/middlewares/forwardauth/), one for [authentication](https://github.com/oauth2-proxy/oauth2-proxy) and one for [authorization](https://github.com/SwissDataScienceCenter/jupyter-server-operator/tree/main/authorization), which both run as seperate conatiners in the main pod alongside the jupyter server too. The authentication plugin uses any configured OIDC provider to authenticate the incoming request. At the first request, this will trigger a redirection to the OIDC provider. The authentication pluging then creates a session with the browser that holds the information about the authenticated user. The authentication plugin adds this information to the request headers before handing the request back to traefik. Traefik then forwards the request headers to the authorization pluging checks that the authenticated user matches some criteria which are specified in the spec of the custom resource (currently only a pre-defined user id) and thus authorizes (or denies) access. If access is authorized, traefik finally forwards the request to the jupyter server container.
 
-### Access control using an OIDC provider
+## Why Amalthea?
 
-In this mode we run traefik as a reverse proxy inside the pod together with the jupyter server. This traefik proxy uses two [forward-auth middlewares](https://doc.traefik.io/traefik/middlewares/forwardauth/), one for [authentication](https://github.com/oauth2-proxy/oauth2-proxy) and one for [authorization](https://github.com/SwissDataScienceCenter/jupyter-server-operator/tree/main/authorization), which both run as seperate conatiners in the main pod too. The first plugin uses any configured OIDC provider to authenticates the incoming request. At the first request, this will trigger a redirection to the OIDC provider. The authentication has a session with the browser which holds the information about the authenticated user. The authentication plugin adds this information to the request headers before handing the request back to traefik. Traefik then forwards the request headers to the authorization pluging which checks that the user information matches some criteria which are specified in the spec of the custom resource (currently only a pre-defined user id) and thus authorizes (or denies) access. If access is authorized, traefik finally forwards the request to the jupyter server container which is running without any access control in this mode.
+According to [Wikipedia](https://en.wikipedia.org/wiki/Amalthea), the name Amalthea stands for:
+- one of Jupiters many moons
+- the foster-mother of Zeus (ie Jupiter)
+- a unicorn
+- a container ship
+
+Also, it's another Greek name for something Kubernetes related.

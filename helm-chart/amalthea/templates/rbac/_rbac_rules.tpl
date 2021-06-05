@@ -1,4 +1,4 @@
-{{- define "jupyter-server-operator.rules" }}
+{{- define "amalthea.rules" }}
 rules:
   - apiGroups:
       - ""
