@@ -12,7 +12,7 @@ TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 # A List defining the api and api methods for creation for each resource.
 # This could be inferred by looking at the manifest, would have to verify
 # how this could work in the case of custom resources.
-def get_resource_configs(oidc_enabled=False, api_only=False):
+def get_resource_configs(pvc_enabled=False, oidc_enabled=False, api_only=False):
     """
     Get a dictionary with all resources that should be created. For each
     resource we return the api, the api method and the resource manifest
@@ -25,11 +25,6 @@ def get_resource_configs(oidc_enabled=False, api_only=False):
             "api": "CoreV1Api",
             "creation_method": "create_namespaced_service",
             "template": "service.yaml",
-        },
-        "pvc": {
-            "api": "CoreV1Api",
-            "creation_method": "create_namespaced_persistent_volume_claim",
-            "template": "pvc.yaml",
         },
         "ingress": {
             "api": "ExtensionsV1beta1Api",
@@ -58,6 +53,17 @@ def get_resource_configs(oidc_enabled=False, api_only=False):
                 # These containers will be added to the statefulset.
                 "authorization-plugin": {"template": "authorization-plugin.yaml"},
                 "authentication-plugin": {"template": "authentication-plugin.yaml"},
+            }
+        )
+
+    if pvc_enabled:
+        resource_configs.update(
+            {
+                "pvc": {
+                    "api": "CoreV1Api",
+                    "creation_method": "create_namespaced_persistent_volume_claim",
+                    "template": "pvc.yaml",
+                },
             }
         )
 
@@ -91,9 +97,6 @@ def create_template_values(metadata, spec):
         # Session ingress
         "ingress_tls_secret": spec["routing"]["tlsSecret"],
         "ingress_annotations": spec["routing"]["ingressAnnotations"],
-        # Volume
-        "volume_size": spec["volume"]["size"],
-        "volume_storage_class": spec["volume"]["storageClass"],
         # Cookie cleaner
         "cookie_whitelist": json.dumps(spec["auth"]["cookieWhiteList"]),
         "cookie_blacklist": json.dumps(spec["auth"].get("cookieBlackList", None)),
@@ -110,6 +113,8 @@ def create_template_values(metadata, spec):
                 ).decode(),
             }
         )
+    if spec["storage"]["pvc"]["enabled"]:
+        template_values.update({"volume_size": spec["storage"]["size"]})
     return template_values
 
 
@@ -136,6 +141,7 @@ def get_resources_specs(metadata, spec):
     template_values = create_template_values(metadata, spec)
 
     resource_configs = get_resource_configs(
+        pvc_enabled=spec["storage"]["pvc"]["enabled"],
         oidc_enabled=spec["auth"]["oidc"]["enabled"], api_only=False
     )
 
@@ -143,6 +149,32 @@ def get_resources_specs(metadata, spec):
     resources_specs = {}
     for key, config in resource_configs.items():
         resources_specs[key] = render_template(config["template"], template_values)
+
+    # Add pvc or emptyDir to statefulset volumes
+    if spec["storage"]["pvc"]["enabled"]:
+        resources_specs["statefulset"]["spec"]["template"]["spec"]["volumes"].append(
+            {
+                "name": "workspace",
+                "persistentVolumeClaim": {
+                    "claimName": metadata["name"]
+                }
+            }
+        )
+        # If the storage class is provided update the manifests, else without specifying
+        # anything the default storage class is used automatically
+        if spec["storage"]["pvc"].get("storageClassName") is not None:
+            resources_specs["pvc"]["spec"]["storageClassName"] = (
+                spec["storage"]["pvc"].get("storageClassName")
+            )
+    else:
+        resources_specs["statefulset"]["spec"]["template"]["spec"]["volumes"].append(
+            {
+                "name": "workspace",
+                "emptyDir": {
+                    "sizeLimit": spec["storage"]["size"]
+                }
+            }
+        )
 
     # Adapt traefik rules to non-oidc case
     cm_data = resources_specs["configmap"]["data"]

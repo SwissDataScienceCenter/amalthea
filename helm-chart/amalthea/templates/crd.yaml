@@ -66,15 +66,23 @@ spec:
                     ingressAnnotations: 
                       type: string
 
-                volume:
+                storage:
                   type: object
-                  default: {} # Stupid, but necessary for the inner defaults do work
                   properties:
                     size:
+                      description: "Size of the PVC or sizeLimit of the emptyDir volume which backs the session respectively."
                       type: string
                       default: 100Mi
-                    storageClass:
-                      type: string
+                    pvc:
+                      type: object
+                      properties:
+                        enabled:
+                          description: "Wether a PVC should be used to back the session. Defaults to 'false' in which case an emptyDir volume will be used."
+                          type: boolean
+                          default: false
+                        storageClassName:
+                          type: string
+                          description: "Storage class to be used for the PVC. If left empty, the default storage class defined for the cluster will be used."
 
                 auth:
                   type: object
