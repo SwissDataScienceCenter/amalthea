@@ -115,32 +115,17 @@ spec:
                         userId:
                           type: string
 
-
-                resourceModifications:
-                  description: "Modifications to be applied to the resources which are part of this custom object OR containers in the statefulset component. We use python deepmerge."
+                patches:
+                  description: "JSONpatches to be applied. Will be yaml loaded and json-dumped before applying."
                   type: array
                   default: []
                   items:
                     type: object
                     properties:
-                      resource:
+                      op:
                         type: string
-                      modification:
-                        type: object
-                        x-kubernetes-preserve-unknown-fields: true
-
-                extraResources:
-                  description: "Extra Resources to be created with the custom resource object."
-                  type: array
-                  default: []
-                  items:
-                    type: object
-                    properties:
-                      api:
+                      path:
                         type: string
-                      creationMethod:
-                        type: string
-                      resourceSpec:
-                        type: object
+                      value:
                         x-kubernetes-preserve-unknown-fields: true
 {{- end }}
