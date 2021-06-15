@@ -14,8 +14,8 @@ spec:
       labels:
         app: {name}
     spec:
+      imagePullSecrets: []
       initContainers: []
-      containers: []
       volumes:
         - name: traefik-configmap
           configMap:
@@ -25,3 +25,98 @@ spec:
       automountServiceAccountToken: false
       securityContext:
         fsGroup: 100
+
+      containers:
+        - name: jupyter-server
+          image: {jupyter_image}
+          entrypoint: ["tini", "-g", "--"]
+          command:
+            - start-notebook.sh
+          args:
+          # TODOs:
+          # - Move these configurations to a configmap and mount it as jupyter_notebook_config.py and
+          #   jupyter_server_config.py respectively.
+          # - Drop support for jupyter notebook.
+            - "--ServerApp.ip=0.0.0.0"
+            - "--NotebookApp.ip=0.0.0.0"
+            - "--ServerApp.port=8888"
+            - "--NotebookApp.port=8888"
+            - "--ServerApp.token={jupyter_token}"
+            - "--NotebookApp.token={jupyter_token}"
+            - "--ServerApp.allow_origin=https://{host}"
+            - "--NotebookApp.allow_origin=https://{host}"
+            - "--ServerApp.base_url={path}"
+            - "--NotebookApp.base_url={path}"
+            - "--ServerApp.root_dir={jupyter_root_dir}"
+            - "--NotebookApp.notebook_dir={jupyter_root_dir}"
+            - "--ServerApp.default_url={jupyter_default_url}"
+            - "--NotebookApp.default_url={jupyter_default_url}"
+          workingDir: {jupyter_root_dir}
+          volumeMounts:
+            - name: workspace
+              mountPath: {jupyter_root_dir}
+              subPath: work
+          ports:
+            - name: notebook-port
+              containerPort: 8888
+              protocol: TCP
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 100
+            fsGroup: 100
+            allowPrivilegeEscalation: false
+
+        - name: auth-proxy
+          image: "traefik:2.1.4"
+          args:
+            - "--configfile=/config/traefik.yaml"
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 20m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+          volumeMounts:
+            - name: traefik-configmap
+              mountPath: /config
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 10
+            timeoutSeconds: 2
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 10
+            timeoutSeconds: 2
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 1
+
+        - name: cookie-cleaner
+          image: ableuler/cookie-cleaner:0.0.0-8
+          env:
+            - name: WHITELIST
+              value: '{cookie_whitelist}'
+            - name: BLACKLIST
+              value: '{cookie_blacklist}'
+          ports:
+            - name: http
+              containerPort: 3001
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 20m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+

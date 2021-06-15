@@ -7,7 +7,7 @@ from kubernetes.client.rest import ApiException
 from datetime import datetime, timezone, timedelta
 import logging
 
-from k8s_resources import get_resources_specs, get_resource_configs
+from k8s_resources import get_resources
 import config
 
 
@@ -17,6 +17,7 @@ def configure(settings, **kwargs):
     Configure the operator - see https://kopf.readthedocs.io/en/stable/configuration/
     for options.
     """
+
     if config.kopf_operator_settings:
         try:
             for key, val in config.kopf_operator_settings.items():
@@ -25,17 +26,23 @@ def configure(settings, **kwargs):
             logging.error(f"Problem when configuring the Operator: {e}")
 
 
-def create_namespaced_resource(client, api, method, **kwargs):
+def create_namespaced_resource(namespace, body):
     """
     Create a k8s resource given and api, the right method for creation
     and the specs of the resource.
     """
-    api_class = getattr(client, api)()
-    api_method = getattr(api_class, method)
+
+    # TODO: this creates overhead and unnecessary API calls
+    dynamic_client = dynamic.DynamicClient(k8s_client.api_client.ApiClient())
+    api = dynamic_client.resources.get(
+        api_version=body["apiVersion"], kind=body["kind"]
+    )
     try:
-        return api_method(**kwargs)
+        return api.create(namespace=namespace, body=body)
     except ApiException as e:
-        logging.error(f"Exception when calling {api}.{method}: {e}\n")
+        logging.error(
+            f"Exception when creating a {body['kind']} by calling {api}: {e}\n"
+        )
 
 
 @kopf.on.create("renku.io/v1alpha1", "JupyterServer")
@@ -47,13 +54,9 @@ def create_fn(spec, meta, **kwargs):
     metadata = kwargs["body"]["metadata"]
     spec = kwargs["body"]["spec"]
 
-    resources_specs = get_resources_specs(metadata, spec)
-    resource_configs = get_resource_configs(
-        pvc_enabled=spec["storage"]["pvc"]["enabled"],
-        oidc_enabled=spec["auth"]["oidc"]["enabled"], api_only=True
-    )
+    resources_specs = get_resources(metadata, spec)
 
-    children = {"extraResources": []}
+    children = {}
     kopf.label(
         resources_specs["statefulset"]["spec"]["template"],
         labels={"renku.io/jupyterserver": metadata["name"]},
@@ -67,25 +70,9 @@ def create_fn(spec, meta, **kwargs):
         kopf.label(resource_spec, labels={"renku.io/jupyterserver": metadata["name"]})
         kopf.adopt(resource_spec)
         children[resource_key] = create_namespaced_resource(
-            k8s_client,
-            resource_configs[resource_key]["api"],
-            resource_configs[resource_key]["creation_method"],
             namespace=metadata["namespace"],
             body=resource_spec,
         ).metadata.uid
-
-    for extra_resource in spec["extraResources"]:
-        kopf.adopt(extra_resource["resourceSpec"])
-        kopf.label(resource_spec, labels={"renku.io/jupyterserver": metadata["name"]})
-        children["extraResources"].append(
-            create_namespaced_resource(
-                k8s_client,
-                extra_resource["api"],
-                extra_resource["creationMethod"],
-                namespace=metadata["namespace"],
-                body=extra_resource["resourceSpec"],
-            ).metadata.uid
-        )
 
     return {"created_resources": children}
 
@@ -135,11 +122,7 @@ def delete_fn(namespace, spec, body, **kwargs):
         raise Exception("Waiting for pod and pvc destruction")
 
 
-@kopf.on.event("statefulset", labels={"renku.io/jupyterserver": kopf.PRESENT})
-@kopf.on.event("pod", labels={"renku.io/jupyterserver": kopf.PRESENT})
-@kopf.on.event("persistentvolumeclaim", labels={"renku.io/jupyterserver": kopf.PRESENT})
-@kopf.on.event("ingress", labels={"renku.io/jupyterserver": kopf.PRESENT})
-@kopf.on.event("service", labels={"renku.io/jupyterserver": kopf.PRESENT})
+@kopf.on.event(kopf.EVERYTHING, labels={"renku.io/jupyterserver": kopf.PRESENT})
 def child_monitoring(meta, name, namespace, body, event, status, **kwargs):
     """
     Update the custom object with the child status.
@@ -171,7 +154,7 @@ def child_monitoring(meta, name, namespace, body, event, status, **kwargs):
         json_patch[0]["value"] = {
             "uid": body["metadata"]["uid"],
             "name": body["metadata"]["name"],
-            "status": body["status"],
+            "status": body.get("status", None),
         }
 
     jupyter_server_api.patch(

@@ -1,5 +1,5 @@
 import base64
-from deepmerge import always_merger
+from jsonpatch import apply_patch
 import os
 import yaml
 import json
@@ -8,71 +8,38 @@ from urllib.parse import urljoin
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
-# TODO: The APIs are currently defined here AND in the YAML manifests.
-# A List defining the api and api methods for creation for each resource.
-# This could be inferred by looking at the manifest, would have to verify
-# how this could work in the case of custom resources.
-def get_resource_configs(pvc_enabled=False, oidc_enabled=False, api_only=False):
+
+def get_resource_list(pvc_enabled=False):
     """
-    Get a dictionary with all resources that should be created. For each
-    resource we return the api, the api method and the resource manifest
-    as dictionary. An exception to this are containers which we add to
-    the statefulset pod spec. We treat those as individual resources at
-    this point to simplify their modification.
+    Define a list of all resources that should be created.
     """
-    resource_configs = {
-        "service": {
-            "api": "CoreV1Api",
-            "creation_method": "create_namespaced_service",
+    resources = [
+        {
+            "name": "service",
             "template": "service.yaml",
         },
-        "ingress": {
-            "api": "ExtensionsV1beta1Api",
-            "creation_method": "create_namespaced_ingress",
+        {
+            "name": "ingress",
             "template": "ingress.yaml",
         },
-        "statefulset": {
-            "api": "AppsV1Api",
-            "creation_method": "create_namespaced_stateful_set",
+        {
+            "name": "statefulset",
             "template": "statefulset.yaml",
         },
-        "configmap": {
-            "api": "CoreV1Api",
-            "creation_method": "create_namespaced_config_map",
+        {
+            "name": "configmap",
             "template": "configmap.yaml",
         },
-        # These containers will be added to the statefulset.
-        "jupyter-server": {"template": "jupyter-server.yaml"},
-        "auth-proxy": {"template": "auth-proxy.yaml"},
-        "cookie-cleaner": {"template": "cookie-cleaner.yaml"},
-    }
-
-    if oidc_enabled:
-        resource_configs.update(
-            {
-                # These containers will be added to the statefulset.
-                "authorization-plugin": {"template": "authorization-plugin.yaml"},
-                "authentication-plugin": {"template": "authentication-plugin.yaml"},
-            }
-        )
+    ]
 
     if pvc_enabled:
-        resource_configs.update(
+        resources.append(
             {
-                "pvc": {
-                    "api": "CoreV1Api",
-                    "creation_method": "create_namespaced_persistent_volume_claim",
-                    "template": "pvc.yaml",
-                },
+                "name": "pvc",
+                "template": "pvc.yaml",
             }
         )
-
-    if api_only:
-        return {
-            key: config for (key, config) in resource_configs.items() if "api" in config
-        }
-    else:
-        return resource_configs
+    return resources
 
 
 def create_template_values(metadata, spec):
@@ -131,7 +98,7 @@ def render_template(template_file, template_values):
     return resource_spec
 
 
-def get_resources_specs(metadata, spec):
+def get_resources(metadata, spec):
     """
     Create the resource specifications (as nested python dictionaries) that
     make up the custom resource object. No input validation happens here, we
@@ -140,43 +107,47 @@ def get_resources_specs(metadata, spec):
 
     template_values = create_template_values(metadata, spec)
 
-    resource_configs = get_resource_configs(
+    resources = get_resource_list(
         pvc_enabled=spec["storage"]["pvc"]["enabled"],
-        oidc_enabled=spec["auth"]["oidc"]["enabled"], api_only=False
     )
 
     # Create a list of the resources to be created (as dictionaries)
     resources_specs = {}
-    for key, config in resource_configs.items():
-        resources_specs[key] = render_template(config["template"], template_values)
+    for resource in resources:
+        resources_specs[resource["name"]] = render_template(
+            resource["template"], template_values
+        )
 
     # Add pvc or emptyDir to statefulset volumes
     if spec["storage"]["pvc"]["enabled"]:
         resources_specs["statefulset"]["spec"]["template"]["spec"]["volumes"].append(
             {
                 "name": "workspace",
-                "persistentVolumeClaim": {
-                    "claimName": metadata["name"]
-                }
+                "persistentVolumeClaim": {"claimName": metadata["name"]},
             }
         )
         # If the storage class is provided update the manifests, else without specifying
         # anything the default storage class is used automatically
         if spec["storage"]["pvc"].get("storageClassName") is not None:
-            resources_specs["pvc"]["spec"]["storageClassName"] = (
-                spec["storage"]["pvc"].get("storageClassName")
-            )
+            resources_specs["pvc"]["spec"]["storageClassName"] = spec["storage"][
+                "pvc"
+            ].get("storageClassName")
     else:
         resources_specs["statefulset"]["spec"]["template"]["spec"]["volumes"].append(
-            {
-                "name": "workspace",
-                "emptyDir": {
-                    "sizeLimit": spec["storage"]["size"]
-                }
-            }
+            {"name": "workspace", "emptyDir": {"sizeLimit": spec["storage"]["size"]}}
         )
 
-    # Adapt traefik rules to non-oidc case
+    # Adapt statefulset containers for OIDC being case
+    if spec["auth"]["oidc"]["enabled"]:
+        for template_file in [
+            "authentication-plugin.yaml",
+            "authorization-plugin.yaml",
+        ]:
+            resources_specs["statefulset"]["spec"]["template"]["spec"][
+                "containers"
+            ].append(render_template(template_file, template_values))
+
+    # Adapt traefik rules for non-OIDC case.
     cm_data = resources_specs["configmap"]["data"]
     if not spec["auth"]["oidc"]["enabled"]:
         proxy_middlewares = cm_data["proxy-rules.yaml"]["http"]["routers"]["proxy"][
@@ -190,19 +161,5 @@ def get_resources_specs(metadata, spec):
     for key, value in cm_data.items():
         cm_data[key] = yaml.safe_dump(value)
 
-    # Go through the list of modifications and apply them to the right resource.
-    # Note that deepmerge modifies the resource_dict in-place
-    for mod in spec["resourceModifications"]:
-        always_merger.merge(resources_specs[mod["resource"]], mod["modification"])
-
-    container_keys = [
-        key for key, config in resource_configs.items() if not "api" in config
-    ]
-
-    for container_key in container_keys:
-        resources_specs["statefulset"]["spec"]["template"]["spec"]["containers"].append(
-            resources_specs[container_key]
-        )
-        resources_specs.pop(container_key, None)
-
-    return resources_specs
+    # Finally, apply all patches and return the result
+    return apply_patch(resources_specs, json.dumps(spec["patches"]))
