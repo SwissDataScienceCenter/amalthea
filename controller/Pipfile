@@ -8,6 +8,7 @@ kopf = "*"
 pyyaml = "*"
 kubernetes = "*"
 jsonpatch = "*"
+json-merge-patch = "*"
 
 [dev-packages]
 ipython = "*"

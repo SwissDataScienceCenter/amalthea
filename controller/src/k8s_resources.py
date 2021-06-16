@@ -1,5 +1,7 @@
 import base64
-from jsonpatch import apply_patch
+import jsonpatch
+import json_merge_patch
+import logging
 import os
 import yaml
 import json
@@ -161,5 +163,19 @@ def get_resources(metadata, spec):
     for key, value in cm_data.items():
         cm_data[key] = yaml.safe_dump(value)
 
-    # Finally, apply all patches and return the result
-    return apply_patch(resources_specs, json.dumps(spec["patches"]))
+    # Finally, apply all the patches and return the result
+    # TODO: Enable strategic merge patches if possible
+    for patch in spec["patches"]:
+        if patch["type"] == "jsonPatch":
+            resources_specs = jsonpatch.apply_patch(
+                resources_specs, json.dumps(patch["patch"])
+            )
+        elif patch["type"] == "jsonMergePatch":
+            resources_specs = json_merge_patch.merge(resources_specs, patch["patch"])
+        else:
+            # This should actually already be caught at the CRD validation level.
+            logging.debug(
+                f"Invalid patch type - ignoring this patch: {json.dumps(patch)}"
+            )
+
+    return resources_specs
