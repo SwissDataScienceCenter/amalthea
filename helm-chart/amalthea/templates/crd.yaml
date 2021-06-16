@@ -116,16 +116,17 @@ spec:
                           type: string
 
                 patches:
-                  description: "JSONpatches to be applied. Will be yaml loaded and json-dumped before applying."
+                  description: "Patches to be applied. Currently only json patches and json merge patches are supported."
                   type: array
                   default: []
                   items:
                     type: object
                     properties:
-                      op:
+                      type:
                         type: string
-                      path:
-                        type: string
-                      value:
+                        enum:
+                          - jsonPatch
+                          - jsonMergePatch
+                      patch:
                         x-kubernetes-preserve-unknown-fields: true
 {{- end }}
