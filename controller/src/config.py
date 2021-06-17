@@ -1,6 +1,10 @@
 import yaml
 import os
 
+api_group = "renku.io"
+api_version = "v1alpha1"
+custom_resource_name = "JupyterServer"
+
 # Strings which will be evaluated as true on env variables.
 TRUE_STRINGS = ["True", "true", "1"]
 

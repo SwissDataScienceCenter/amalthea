@@ -9,6 +9,7 @@ pyyaml = "*"
 kubernetes = "*"
 jsonpatch = "*"
 json-merge-patch = "*"
+expiringdict = "*"
 
 [dev-packages]
 ipython = "*"
