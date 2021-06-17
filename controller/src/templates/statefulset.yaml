@@ -1,26 +1,35 @@
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: {name}
+  name: {{ name }}
 spec:
   selector:
     matchLabels:
-      app: {name}
-  serviceName: {name}
+      app: {{ name }}
+  serviceName: {{ name }}
   # Scaling up is not intended and won't work
   replicas: 1
   template:
     metadata:
       labels:
-        app: {name}
+        app: {{ name }}
     spec:
       imagePullSecrets: []
       initContainers: []
       volumes:
         - name: traefik-configmap
           configMap:
-            name: {name}
+            name: {{ name }}
             defaultMode: 420
+        {% if pvc["enabled"] %}
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: {{ name }}
+        {% else %}
+        - name: workspace
+          emptyDir:
+            sizeLimit: {{ storage["size"] }}
+        {% endif %}
       terminationGracePeriodSeconds: 30
       automountServiceAccountToken: false
       securityContext:
@@ -28,7 +37,7 @@ spec:
 
       containers:
         - name: jupyter-server
-          image: {jupyter_image}
+          image: {{ jupyter_server["image"] }}
           entrypoint: ["tini", "-g", "--"]
           command:
             - start-notebook.sh
@@ -41,20 +50,20 @@ spec:
             - "--NotebookApp.ip=0.0.0.0"
             - "--ServerApp.port=8888"
             - "--NotebookApp.port=8888"
-            - "--ServerApp.token={jupyter_token}"
-            - "--NotebookApp.token={jupyter_token}"
-            - "--ServerApp.allow_origin=https://{host}"
-            - "--NotebookApp.allow_origin=https://{host}"
-            - "--ServerApp.base_url={path}"
-            - "--NotebookApp.base_url={path}"
-            - "--ServerApp.root_dir={jupyter_root_dir}"
-            - "--NotebookApp.notebook_dir={jupyter_root_dir}"
-            - "--ServerApp.default_url={jupyter_default_url}"
-            - "--NotebookApp.default_url={jupyter_default_url}"
-          workingDir: {jupyter_root_dir}
+            - "--ServerApp.token={{ auth["token"] }}"
+            - "--NotebookApp.token={{ auth["token"] }}"
+            - "--ServerApp.allow_origin={{ host_url }}"
+            - "--NotebookApp.allow_origin={{ host_url }}"
+            - "--ServerApp.base_url={{ path }}"
+            - "--NotebookApp.base_url={{ path }}"
+            - "--ServerApp.root_dir={{ jupyter_server["rootDir"] }}"
+            - "--NotebookApp.notebook_dir={{ jupyter_server["rootDir"] }}"
+            - "--ServerApp.default_url={{ jupyter_server["defaultUrl"] }}"
+            - "--NotebookApp.default_url={{ jupyter_server["defaultUrl"] }}"
+          workingDir: {{ jupyter_server["rootDir"] }}
           volumeMounts:
             - name: workspace
-              mountPath: {jupyter_root_dir}
+              mountPath: {{ jupyter_server["rootDir"] }}
               subPath: work
           ports:
             - name: notebook-port
@@ -65,6 +74,7 @@ spec:
             runAsGroup: 100
             fsGroup: 100
             allowPrivilegeEscalation: false
+
 
         - name: auth-proxy
           image: "traefik:2.1.4"
@@ -102,12 +112,12 @@ spec:
             failureThreshold: 1
 
         - name: cookie-cleaner
-          image: ableuler/cookie-cleaner:0.0.0-8
+          image: ableuler/cookie-cleaner:0.0.0-9
           env:
-            - name: WHITELIST
-              value: '{cookie_whitelist}'
-            - name: BLACKLIST
-              value: '{cookie_blacklist}'
+            - name: ALLOWLIST
+              value: '{{ cookie_allowlist }}'
+            - name: BLOCKLIST
+              value: '{{ cookie_blocklist }}'
           ports:
             - name: http
               containerPort: 3001
@@ -120,3 +130,49 @@ spec:
               cpu: 100m
               memory: 32Mi
 
+        {% if oidc["enabled"] %}
+        - name: authorization-plugin
+          image: ableuler/auth-test:0.0.0-1
+          env:
+            - name: USER_ID
+              value: {{ oidc["userId"] }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 20m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+
+        - name: authentication-plugin
+          image: "bitnami/oauth2-proxy:7.1.2"
+          args:
+            - "--provider=oidc"
+            - "--client-id={{ oidc["clientId"] }}"
+            - "--client-secret={{ oidc["clientSecret"] }}"
+            - "--oidc-issuer-url={{ oidc["issuerUrl"] }}"
+            - "--session-cookie-minimal"
+            - "--set-xauthrequest"
+            - "--cookie-secret={{ cookie_secret }}"
+            - "--email-domain=*"
+            - "--http-address=:4180"
+            - "--skip-provider-button"
+            - "--reverse-proxy"
+            - "--upstream=static://202"
+            - "--redirect-url={{ full_url }}/oauth2/callback"
+          ports:
+            - name: http
+              containerPort: 4180
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 20m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+        {% endif %}

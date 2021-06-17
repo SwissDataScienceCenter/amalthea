@@ -1,9 +1,9 @@
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: {name}
+  name: {{ name }}
 data:
-  proxy-rules.yaml:
+  proxy-rules.yaml: |
     http:
       routers:
         proxy:
@@ -11,8 +11,10 @@ data:
             - http
           rule: PathPrefix(`/`)
           middlewares:
+          {% if oidc["enabled"] %}
             - oidcPlugin
             - customAuthorization
+          {% endif %}
             - cookieCleaner
           service: notebook
 
@@ -46,18 +48,18 @@ data:
               - url: 'http://localhost:8888/'
                 weight: 1
 
-  # Note: We expose the oidc plucgin through traefik in order
+  # Note: We expose the oidc plugin through traefik in order
   # to keep the ingress object simple. In principle traffic
   # to /oauth2 could go from the ingress directly to the oidc
   # plugin.
 
-  oidc-plugin-rules.yaml:
+  oidc-plugin-rules.yaml: |
     http:
       routers:
         oidcPlugin:
           entryPoints:
             - http
-          rule: PathPrefix(`{path}/oauth2/`)
+          rule: PathPrefix(`{{ path }}/oauth2/`)
           middlewares:
             - stripPath
             - authHeaders
@@ -67,14 +69,14 @@ data:
         stripPath:
           stripPrefix:
             prefixes:
-              - "{path}"
+              - {{ path }}
 
         authHeaders:
           headers:
             browserXssFilter: true
             contentTypeNosniff: true
             forceSTSHeader: true
-            sslHost: '{host}'
+            sslHost: {{ routing["host"] }}
             stsIncludeSubdomains: true
             stsPreload: true
             frameDeny: true
@@ -87,7 +89,7 @@ data:
               - url: 'http://localhost:4180/'
                 weight: 1
 
-  traefik.yaml:
+  traefik.yaml: |
     log:
       level: debug
     api:

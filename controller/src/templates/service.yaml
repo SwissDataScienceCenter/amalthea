@@ -1,9 +1,9 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: {name}
+  name: {{ name }}
   labels:
-    app: {name}
+    app: {{ name }}
 spec:
   ports:
     - name: http
@@ -11,5 +11,5 @@ spec:
       port: 80
       targetPort: 8000
   selector:
-    app: {name}
+    app: {{ name }}
   ClusterIP: None
