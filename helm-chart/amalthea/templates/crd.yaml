@@ -16,6 +16,24 @@ spec:
     - name: v1alpha1
       served: true
       storage: true
+      additionalPrinterColumns:
+      - name: Image
+        type: string
+        description: The Jupyter server image that is running
+        jsonPath: .spec.jupyterServer.image
+      - name: Host
+        type: string
+        description: Host under which the server can be reached
+        jsonPath: .spec.routing.host
+      - name: Path
+        type: string
+        description: Path under which the server can be reached
+        jsonPath: .spec.routing.path
+      - name: Pod Status
+        type: string
+        description: Status of the main pod
+        jsonPath: .status.mainPod.status.phase
+
       schema:
         openAPIV3Schema:
           type: object
@@ -23,10 +41,9 @@ spec:
             status:
               type: object
               x-kubernetes-preserve-unknown-fields: true
-            children:
-              default: {}
-              type: object
-              x-kubernetes-preserve-unknown-fields: true
+              default:
+                children: {}
+                mainPod: {}
             spec:
               type: object
               properties:
@@ -61,9 +78,9 @@ spec:
                     path:
                       type: string
                       default: "/"
-                    tlsSecret: 
+                    tlsSecret:
                       type: string
-                    ingressAnnotations: 
+                    ingressAnnotations:
                       type: string
 
                 storage:
@@ -125,8 +142,8 @@ spec:
                       type:
                         type: string
                         enum:
-                          - jsonPatch
-                          - jsonMergePatch
+                          - application/json-patch+json
+                          - application/merge-patch+json
                       patch:
                         x-kubernetes-preserve-unknown-fields: true
 {{- end }}

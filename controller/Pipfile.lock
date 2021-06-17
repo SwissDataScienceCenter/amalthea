@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "0e4164d1664358cf4f38649baf625e1681c684f3428e04d43b8fae07d0c283a5"
+            "sha256": "be4f014c3d145349fee4132224f03cf90a54199b9408afecc7b873d4e0f52e5c"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -113,6 +113,13 @@
             ],
             "markers": "python_version >= '3.6'",
             "version": "==8.0.1"
+        },
+        "expiringdict": {
+            "hashes": [
+                "sha256:fe2ba427220425c3c8a3d29f6d2e2985bcee323f8bcd4021e68ebefbd90d8250"
+            ],
+            "index": "pypi",
+            "version": "==1.2.1"
         },
         "google-auth": {
             "hashes": [

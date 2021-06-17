@@ -1,89 +1,75 @@
 import base64
-import jsonpatch
-import json_merge_patch
-import logging
-import os
-import yaml
 import json
+import os
 from urllib.parse import urljoin
 
+import jsonpatch
+import json_merge_patch
+import yaml
 
+
+CONTENT_TYPES = {
+    "json-patch": "application/json-patch+json",
+    "merge-patch": "application/merge-patch+json",
+}
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
 
-def get_resource_list(pvc_enabled=False):
+def get_children_templates(pvc_enabled=False):
     """
     Define a list of all resources that should be created.
     """
-    resources = [
-        {
-            "name": "service",
-            "template": "service.yaml",
-        },
-        {
-            "name": "ingress",
-            "template": "ingress.yaml",
-        },
-        {
-            "name": "statefulset",
-            "template": "statefulset.yaml",
-        },
-        {
-            "name": "configmap",
-            "template": "configmap.yaml",
-        },
-    ]
-
+    children_templates = {
+        "service": "service.yaml",
+        "ingress": "ingress.yaml",
+        "statefulset": "statefulset.yaml",
+        "configmap": "configmap.yaml",
+    }
     if pvc_enabled:
-        resources.append(
-            {
-                "name": "pvc",
-                "template": "pvc.yaml",
-            }
-        )
-    return resources
+        children_templates["pvc"] = "pvc.yaml"
+
+    return children_templates
 
 
-def create_template_values(metadata, spec):
+def create_template_values(auth, jupyter_server, name, oidc, routing, pvc, storage):
     """
     Create a single non-nested dictionary which contains all the
     variables needed for the templating as keys.
     """
+
     template_values = {
         # Metadata
-        "name": metadata["name"],
+        "name": name,
         # Jupyter server
-        "jupyter_image": spec["jupyterServer"]["image"],
-        "jupyter_default_url": spec["jupyterServer"]["defaultUrl"],
-        "jupyter_root_dir": spec["jupyterServer"]["rootDir"],
-        "jupyter_token": spec["auth"]["token"],
+        "jupyter_image": jupyter_server["image"],
+        "jupyter_default_url": jupyter_server["defaultUrl"],
+        "jupyter_root_dir": jupyter_server["rootDir"],
+        "jupyter_token": auth["token"],
         # Routing
-        "host": spec["routing"]["host"],
-        "path": spec["routing"]["path"].rstrip("/"),
-        "full_url": urljoin(
-            f"https://{spec['routing']['host']}", spec["routing"]["path"].rstrip("/")
-        ),
+        "host": routing["host"],
+        "path": routing["path"].rstrip("/"),
+        "full_url": urljoin(f"https://{routing['host']}", routing["path"].rstrip("/")),
         # Session ingress
-        "ingress_tls_secret": spec["routing"]["tlsSecret"],
-        "ingress_annotations": spec["routing"]["ingressAnnotations"],
+        "ingress_tls_secret": routing["tlsSecret"],
+        "ingress_annotations": routing["ingressAnnotations"],
         # Cookie cleaner
-        "cookie_whitelist": json.dumps(spec["auth"]["cookieWhiteList"]),
-        "cookie_blacklist": json.dumps(spec["auth"].get("cookieBlackList", None)),
+        "cookie_whitelist": json.dumps(auth["cookieWhiteList"]),
+        "cookie_blacklist": json.dumps(auth.get("cookieBlackList", None)),
     }
-    if spec["auth"]["oidc"]["enabled"]:
+    if oidc["enabled"]:
         template_values.update(
             {
-                "oidc_issuer_url": spec["auth"]["oidc"]["issuerUrl"],
-                "oidc_client_id": spec["auth"]["oidc"]["clientId"],
-                "oidc_client_secret": spec["auth"]["oidc"]["clientSecret"],
-                "oidc_user_id": spec["auth"]["oidc"]["userId"],
+                "oidc_issuer_url": oidc["issuerUrl"],
+                "oidc_client_id": oidc["clientId"],
+                "oidc_client_secret": oidc["clientSecret"],
+                "oidc_user_id": oidc["userId"],
                 "authentication_cookie_secret": base64.urlsafe_b64encode(
                     os.urandom(32)
                 ).decode(),
             }
         )
-    if spec["storage"]["pvc"]["enabled"]:
-        template_values.update({"volume_size": spec["storage"]["size"]})
+    if pvc["enabled"]:
+        template_values.update({"volume_size": storage["size"]})
     return template_values
 
 
@@ -100,58 +86,77 @@ def render_template(template_file, template_values):
     return resource_spec
 
 
-def get_resources(metadata, spec):
+def get_children_specs(name, spec, logger):
     """
     Create the resource specifications (as nested python dictionaries) that
     make up the custom resource object. No input validation happens here, we
     rely on CRD schema validation.
     """
 
-    template_values = create_template_values(metadata, spec)
+    # Deeply nested python dictionaries are annoying...
+    auth = spec["auth"]
+    jupyter_server = spec["jupyterServer"]
+    oidc = auth["oidc"]
+    routing = spec["routing"]
+    storage = spec["storage"]
+    pvc = storage["pvc"]
 
-    resources = get_resource_list(
-        pvc_enabled=spec["storage"]["pvc"]["enabled"],
+    template_values = create_template_values(
+        auth=auth,
+        jupyter_server=jupyter_server,
+        name=name,
+        oidc=oidc,
+        routing=routing,
+        pvc=pvc,
+        storage=storage,
     )
 
-    # Create a list of the resources to be created (as dictionaries)
-    resources_specs = {}
-    for resource in resources:
-        resources_specs[resource["name"]] = render_template(
-            resource["template"], template_values
-        )
+    # Generate one big dictionary containing the specs of all child
+    # resources to be created.
+    children_templates = get_children_templates(
+        pvc_enabled=pvc["enabled"],
+    )
+    children_specs = {
+        key: render_template(tpl, template_values)
+        for key, tpl in children_templates.items()
+    }
+
+    pod_spec = children_specs["statefulset"]["spec"]["template"]["spec"]
 
     # Add pvc or emptyDir to statefulset volumes
-    if spec["storage"]["pvc"]["enabled"]:
-        resources_specs["statefulset"]["spec"]["template"]["spec"]["volumes"].append(
+    if pvc["enabled"]:
+        pod_spec["volumes"].append(
             {
                 "name": "workspace",
-                "persistentVolumeClaim": {"claimName": metadata["name"]},
+                "persistentVolumeClaim": {
+                    "claimName": children_specs["pvc"]["metadata"]["name"]
+                },
             }
         )
         # If the storage class is provided update the manifests, else without specifying
-        # anything the default storage class is used automatically
-        if spec["storage"]["pvc"].get("storageClassName") is not None:
-            resources_specs["pvc"]["spec"]["storageClassName"] = spec["storage"][
-                "pvc"
-            ].get("storageClassName")
+        # anything the default storage class is used automatically.
+        if "storageClassName" in pvc:
+            children_specs["pvc"]["spec"]["storageClassName"] = pvc["storageClassName"]
     else:
-        resources_specs["statefulset"]["spec"]["template"]["spec"]["volumes"].append(
-            {"name": "workspace", "emptyDir": {"sizeLimit": spec["storage"]["size"]}}
+        pod_spec["volumes"].append(
+            {"name": "workspace", "emptyDir": {"sizeLimit": storage["size"]}}
         )
 
-    # Adapt statefulset containers for OIDC being case
-    if spec["auth"]["oidc"]["enabled"]:
+    # Adapt statefulset containers for the OIDC case (ie add two containers that
+    # will serve a forward-auth middlewares)
+    if oidc["enabled"]:
         for template_file in [
             "authentication-plugin.yaml",
             "authorization-plugin.yaml",
         ]:
-            resources_specs["statefulset"]["spec"]["template"]["spec"][
-                "containers"
-            ].append(render_template(template_file, template_values))
+            pod_spec["containers"].append(
+                render_template(template_file, template_values)
+            )
 
-    # Adapt traefik rules for non-OIDC case.
-    cm_data = resources_specs["configmap"]["data"]
-    if not spec["auth"]["oidc"]["enabled"]:
+    # Adapt traefik rules for the non-OIDC case (ie remove the
+    # two forward-auth middlewares)
+    cm_data = children_specs["configmap"]["data"]
+    if not oidc["enabled"]:
         proxy_middlewares = cm_data["proxy-rules.yaml"]["http"]["routers"]["proxy"][
             "middlewares"
         ]
@@ -159,23 +164,23 @@ def get_resources(metadata, spec):
         proxy_middlewares.remove("customAuthorization")
         del cm_data["oidc-plugin-rules.yaml"]
 
-    # Flatten the traefik configuration dictionaries into a string
+    # Serialize the traefik configuration dictionary into a string
     for key, value in cm_data.items():
         cm_data[key] = yaml.safe_dump(value)
 
     # Finally, apply all the patches and return the result
     # TODO: Enable strategic merge patches if possible
     for patch in spec["patches"]:
-        if patch["type"] == "jsonPatch":
-            resources_specs = jsonpatch.apply_patch(
-                resources_specs, json.dumps(patch["patch"])
+        if patch["type"] == CONTENT_TYPES["json-patch"]:
+            children_specs = jsonpatch.apply_patch(
+                children_specs, json.dumps(patch["patch"])
             )
-        elif patch["type"] == "jsonMergePatch":
-            resources_specs = json_merge_patch.merge(resources_specs, patch["patch"])
+        elif patch["type"] == CONTENT_TYPES["merge-patch"]:
+            children_specs = json_merge_patch.merge(children_specs, patch["patch"])
         else:
             # This should actually already be caught at the CRD validation level.
-            logging.debug(
+            logger.debug(
                 f"Invalid patch type - ignoring this patch: {json.dumps(patch)}"
             )
 
-    return resources_specs
+    return children_specs
