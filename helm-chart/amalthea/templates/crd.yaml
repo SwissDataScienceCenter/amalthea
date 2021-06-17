@@ -111,13 +111,13 @@ spec:
                   type: object
                   default: {} # Stupid, but necessary for the inner defaults do work
                   properties:
-                    cookieWhiteList:
+                    cookieAllowlist:
                       type: array
                       default: ["username-localhost-8888", "_xsrf"]
                       items:
                         type: string
                     # As soon as a cookie black list is defined, the white list is ignored.
-                    cookieBlackList:
+                    cookieBlocklist:
                       type: array
                       items:
                         type: string

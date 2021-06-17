@@ -1,10 +1,13 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: {name}
+  name: {{ name }}
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: {volume_size}
+      storage: {{ storage["size"] }}
+  {% if "storageClassName" in pvc %}
+  storageClassName: {{ pvc["storageClassName"] }}
+  {% endif %}

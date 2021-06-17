@@ -10,6 +10,7 @@ kubernetes = "*"
 jsonpatch = "*"
 json-merge-patch = "*"
 expiringdict = "*"
+jinja2 = "*"
 
 [dev-packages]
 ipython = "*"

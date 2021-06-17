@@ -2,8 +2,8 @@
 const cookieParser = require('cookie-parser');
 const express = require('express');
 
-const blacklist = JSON.parse(process.env.BLACKLIST);
-const whitelist = JSON.parse(process.env.WHITELIST);
+const blocklist = JSON.parse(process.env.BLOCKLIST);
+const allowlist = JSON.parse(process.env.ALLOWLIST);
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -17,17 +17,17 @@ app.get('/', (req, res) => {
     let cookieString = ""
 
     // Do the actual filtering on the cookies object keys, in
-    // the presence of a blacklist, we ignore the whitelist
-    if (blacklist != null) {
+    // the presence of a blocklist, we ignore the allowlist
+    if (blocklist != null) {
       filteredCookies = Object.keys(req.cookies)
-        .filter(key => !blacklist.includes(key))
+        .filter(key => !blocklist.includes(key))
         .reduce((obj, key) => {
           obj[key] = req.cookies[key];
           return obj;
         }, {});
-    } else if (whitelist != null) {
+    } else if (allowlist != null) {
       filteredCookies = Object.keys(req.cookies)
-        .filter(key => whitelist.includes(key))
+        .filter(key => allowlist.includes(key))
         .reduce((obj, key) => {
           obj[key] = req.cookies[key];
           return obj;

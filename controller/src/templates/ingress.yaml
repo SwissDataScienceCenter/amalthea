@@ -1,18 +1,20 @@
 kind: Ingress
 apiVersion: extensions/v1beta1
 metadata:
-  name: {name}
-  annotations: {ingress_annotations}
+  name: {{ name }}
+  annotations: {{ routing["ingressAnnotations"] }}
 spec:
+{% if routing['tls']['enabled'] %}
   tls:
     - hosts:
-        - {host}
-      secretName: {ingress_tls_secret}
+        - {{ routing["host"] }}
+      secretName: {{ routing["tls"]["secret"] }}
+{% endif %}
   rules:
-    - host: {host}
+    - host: {{ routing["host"] }}
       http:
         paths:
-        - path: {path}
+        - path: {{ path }}
           backend:
-            serviceName: {name}
+            serviceName: {{ name }}
             servicePort: 80
