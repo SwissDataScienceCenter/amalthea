@@ -48,9 +48,13 @@ def create_template_values(auth, jupyter_server, name, oidc, routing, pvc, stora
         # Routing
         "host": routing["host"],
         "path": routing["path"].rstrip("/"),
-        "full_url": urljoin(f"https://{routing['host']}", routing["path"].rstrip("/")),
+        "full_url": urljoin(
+            f"http{'s' if routing['tls']['enabled'] else ''}://{routing['host']}",
+            routing["path"].rstrip("/"),
+        ),
         # Session ingress
-        "ingress_tls_secret": routing["tlsSecret"],
+        # TLS secret and annotations will be removed from ingress if ""
+        "ingress_tls_secret": routing["tls"].get("secret", ""),
         "ingress_annotations": routing["ingressAnnotations"],
         # Cookie cleaner
         "cookie_whitelist": json.dumps(auth["cookieWhiteList"]),
@@ -122,6 +126,12 @@ def get_children_specs(name, spec, logger):
     }
 
     pod_spec = children_specs["statefulset"]["spec"]["template"]["spec"]
+
+    # TODO: We have to do more and more modifications here which could be avoided
+    # TODO: by choosing a proper templating language like jinja.
+
+    if not routing["tls"]["enabled"]:
+        del children_specs["ingress"]["spec"]["tls"]
 
     # Add pvc or emptyDir to statefulset volumes
     if pvc["enabled"]:
