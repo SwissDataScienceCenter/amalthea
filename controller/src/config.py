@@ -1,5 +1,6 @@
-import yaml
+import json
 import os
+import yaml
 
 api_group = "renku.io"
 api_version = "v1alpha1"
@@ -18,3 +19,5 @@ try:
         kopf_operator_settings = yaml.safe_load(f.read())
 except FileNotFoundError:
     kopf_operator_settings = {}
+
+amalthea_selector_labels = yaml.safe_load(os.getenv("AMALTHEA_SELECTOR_LABELS", "{}"))

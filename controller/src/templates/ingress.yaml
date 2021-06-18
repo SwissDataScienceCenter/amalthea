@@ -2,7 +2,7 @@ kind: Ingress
 apiVersion: extensions/v1beta1
 metadata:
   name: {{ name }}
-  annotations: {{ routing["ingressAnnotations"] }}
+  annotations: {{ ingress_annotations }}
 spec:
 {% if routing['tls']['enabled'] %}
   tls:

@@ -1,0 +1,73 @@
+{{- if .Values.networkPolicies.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "amalthea.fullname" . }}-controller
+  labels:
+    {{- include "amalthea.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "amalthea.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controller
+  policyTypes:
+    - Ingress
+
+{{- if eq .Values.scope.clusterWide false -}}
+{{- /* We store the full scope because . is overwritten when in the loop. */}}
+{{- $fullTemplateScope := . }}
+
+{{- range .Values.scope.namespaces }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  namespace: {{ . }}
+  name: {{ include "amalthea.fullname" $fullTemplateScope }}-jupyterserver
+  labels:
+    {{- include "amalthea.labels" $fullTemplateScope | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "amalthea.selectorLabels" $fullTemplateScope | nindent 6 }}
+      app.kubernetes.io/component: jupyterserver
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8000
+      from:
+        - podSelector:
+            matchLabels:
+              {{- $fullTemplateScope.Values.networkPolicies.ingressSelectorLabels | nindent 14 }}
+          namespaceSelector:
+            matchLabels:
+              {{- $fullTemplateScope.Values.networkPolicies.ingressNamespaceSelectorLabels | nindent 14 }}
+  egress:
+  - to:
+    # Allow DNS resolution (internal and external)
+    ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+  - to:
+    # Allow access to web outside of cluster by excluding
+    # IP ranges which are reserved for private networking from
+    # the allowed range.
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - port: 80
+      protocol: TCP
+    - port: 443
+      protocol: TCP
+{{- end }}
+{{- end -}}
+{{- end -}}
