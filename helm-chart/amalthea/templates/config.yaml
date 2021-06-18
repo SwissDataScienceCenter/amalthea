@@ -5,4 +5,4 @@ metadata:
   labels:
     {{- include "amalthea.labels" . | nindent 4 }}
 data:
-  kopf-operator-settings.yaml: {{ .Values.kopfOperatorSettings | quote  }}
+  kopf-operator-settings.yaml: {{ .Values.kopfOperatorSettings | quote }}

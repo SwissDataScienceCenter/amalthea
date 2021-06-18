@@ -16,6 +16,16 @@ CONTENT_TYPES = {
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
 
+def get_urls(spec):
+    """Small convenience method to construct the URLs of the Jupyter server."""
+    host_url = f"http{'s' if spec['routing']['tls']['enabled'] else ''}://{spec['routing']['host']}"
+    full_url = urljoin(
+        host_url,
+        spec["routing"]["path"].rstrip("/"),
+    )
+    return host_url, full_url
+
+
 def get_children_templates(pvc_enabled=False):
     """
     Define a list of all resources that should be created.
@@ -39,11 +49,7 @@ def create_template_values(name, spec):
     or deeply nested python dictionaries in templates are not fun...
     """
 
-    host_url = f"http{'s' if spec['routing']['tls']['enabled'] else ''}://{spec['routing']['host']}"
-    full_url = urljoin(
-        host_url,
-        spec["routing"]["path"].rstrip("/"),
-    )
+    host_url, full_url = get_urls(spec)
     # All we need for template rendering, alphabetically listed
     template_values = {
         "auth": spec["auth"],
@@ -52,6 +58,7 @@ def create_template_values(name, spec):
         "cookie_secret": base64.urlsafe_b64encode(os.urandom(32)).decode(),
         "full_url": full_url,
         "host_url": host_url,
+        "ingress_annotations": json.dumps(spec["routing"]["ingressAnnotations"]),
         "jupyter_server": spec["jupyterServer"],
         "name": name,
         "oidc": spec["auth"]["oidc"],

@@ -10,7 +10,23 @@ scope:
   namespaces:
     - default
 
-deployCrd: true  # whether to deploy the jupyterserver CRD
+deployCrd: true # whether to deploy the jupyterserver CRD
+
+# Enable a network policy to limit ingress to the controller
+# and one network policy per namespace within the amalthea scope
+# to limit ingress and egress to the jupyter servers.
+#
+# Note that until cluster-wide network policies are available,
+# enabling network policies won't do anything if the scope of
+# the operator is clusterWide.
+networkPolicies:
+  enabled: false
+  # Selector label for pods and namespaces that run
+  # the ingress controller.
+  # ingressSelectorLabels: |
+  #   app.kubernetes.io: nginx-ingress
+  # ingressNamespaceSelectorLabels: |
+  #   field.cattle.io/projectId: p-7cjb4
 
 rescheduleOnNodeFailure: false
 
@@ -28,7 +44,7 @@ image:
   repository: renku/amalthea
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.0.1-n018.hcebe511"
+  tag: "0.0.1-rc1"
 
 imagePullSecrets: []
 nameOverride: ""

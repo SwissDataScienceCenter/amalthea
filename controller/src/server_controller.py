@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import json
 
 from expiringdict import ExpiringDict
 import kopf
@@ -8,14 +9,8 @@ from kubernetes.dynamic.exceptions import ApiException, NotFoundError
 
 
 import config
-from k8s_resources import CONTENT_TYPES, get_children_specs
+from k8s_resources import CONTENT_TYPES, get_children_specs, get_urls
 
-
-# Some common labels we're going to put on child resources
-PARENT_UID_LABEL = f"{config.api_group}/amalthea-parent-uid"
-PARENT_NAME_LABEL = f"{config.api_group}/amalthea-parent-name"
-CHILD_KEY_LABEL = f"{config.api_group}/amalthea-child-key"
-MAIN_POD_LABEL = f"{config.api_group}/amalthea-main-pod"
 
 # A dictionary matching a K8s event type to a jsonpatch operation type
 JSONPATCH_OPS = {"MODIFIED": "replace", "ADDED": "add", "DELETED": "remove"}
@@ -23,6 +18,34 @@ JSONPATCH_OPS = {"MODIFIED": "replace", "ADDED": "add", "DELETED": "remove"}
 # A very simple in-memory cache to store the result of the
 # "resources" query of the dynamic API client.
 api_cache = ExpiringDict(max_len=100, max_age_seconds=60)
+
+
+PARENT_UID_LABEL_KEY = "amalthea.renku.io/parent-uid"
+PARENT_NAME_LABEL_KEY = "amalthea.renku.io/parent-name"
+CHILD_KEY_LABEL_KEY = "amalthea.renku.io/child-key"
+MAIN_POD_LABEL_KEY = "amalthea.renku.io/main-pod"
+
+
+def get_labels(
+    parent_name, parent_uid, parent_labels, child_key=None, is_main_pod=False
+):
+    """Create the appropriate labels per resource"""
+    # Add labels from lowest to highest priority
+    labels = {}
+    labels.update(parent_labels)
+    labels.update(config.amalthea_selector_labels)
+    labels.update(
+        {
+            "app.kubernetes.io/component": config.custom_resource_name.lower(),
+            PARENT_UID_LABEL_KEY: parent_uid,
+            PARENT_NAME_LABEL_KEY: parent_name,
+        }
+    )
+    if child_key:
+        labels.update({CHILD_KEY_LABEL_KEY: child_key})
+    if is_main_pod:
+        labels.update({MAIN_POD_LABEL_KEY: "true"})
+    return labels
 
 
 def get_api(api_version, kind):
@@ -81,43 +104,42 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
     """
     children_specs = get_children_specs(name, spec, logger)
 
-    # We make sure the pod created from the statefulset gets labeled
-    # with the custom resource reference add a special label to distinguish
-    # it from direct children.
-    kopf.label(
-        children_specs["statefulset"]["spec"]["template"],
-        labels={
-            PARENT_NAME_LABEL: name,
-            PARENT_UID_LABEL: uid,
-            MAIN_POD_LABEL: "true",
-            **labels,
-        },
-    )
+    try:
 
-    # Add the labels to all child resources and create them in the cluster
-    children_uids = {}
-    for child_key, child_spec in children_specs.items():
+        # We make sure the pod created from the statefulset gets labeled
+        # with the custom resource references and add a special label to
+        # distinguish it from direct children.
         kopf.label(
-            child_spec,
-            labels={
-                PARENT_NAME_LABEL: name,
-                PARENT_UID_LABEL: uid,
-                CHILD_KEY_LABEL: child_key,
-                **labels,
-            },
+            children_specs["statefulset"]["spec"]["template"],
+            labels=get_labels(name, uid, labels, is_main_pod=True),
         )
-        kopf.adopt(child_spec)
 
-        children_uids[child_key] = create_namespaced_resource(
-            namespace=namespace, body=child_spec, logger=logger
-        ).metadata.uid
+        # Add the labels to all child resources and create them in the cluster
+        children_uids = {}
+        for child_key, child_spec in children_specs.items():
+            kopf.label(
+                child_spec,
+                labels=get_labels(name, uid, labels, child_key=child_key),
+            )
+            kopf.adopt(child_spec)
 
-    return {"created_resources": children_uids}
+            children_uids[child_key] = create_namespaced_resource(
+                namespace=namespace, body=child_spec, logger=logger
+            ).metadata.uid
+
+    except Exception as e:
+        logger.debug(
+            f"Full dump of all child resources:\n\
+                {json.dumps(children_specs, indent=4, sort_keys=True)}"
+        )
+        raise e
+
+    return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 
 
 @kopf.on.event(
     kopf.EVERYTHING,
-    labels={PARENT_NAME_LABEL: kopf.PRESENT},
+    labels={PARENT_NAME_LABEL_KEY: kopf.PRESENT},
 )
 def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
     """
@@ -129,12 +151,12 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 
     # Collect labels and other metainformation from the resource which
     # triggered the event.
-    parent_name = labels[PARENT_NAME_LABEL]
-    parent_uid = labels[PARENT_UID_LABEL]
-    child_key = labels.get(CHILD_KEY_LABEL, None)
+    parent_name = labels[PARENT_NAME_LABEL_KEY]
+    parent_uid = labels[PARENT_UID_LABEL_KEY]
+    child_key = labels.get(CHILD_KEY_LABEL_KEY, None)
     owner_references = meta.get("ownerReferences", [])
     owner_uids = [ref["uid"] for ref in owner_references]
-    is_main_pod = labels.get(MAIN_POD_LABEL, "") == "true"
+    is_main_pod = labels.get(MAIN_POD_LABEL_KEY, "") == "true"
 
     # Check if the jupyter server is the actual parent (ie owner) in order
     # to exclude the grand children of the jupyter server. The only grand child

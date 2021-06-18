@@ -21,14 +21,10 @@ spec:
         type: string
         description: The Jupyter server image that is running
         jsonPath: .spec.jupyterServer.image
-      - name: Host
+      - name: URL
         type: string
-        description: Host under which the server can be reached
-        jsonPath: .spec.routing.host
-      - name: Path
-        type: string
-        description: Path under which the server can be reached
-        jsonPath: .spec.routing.path
+        description: Full URL where the server can be reached
+        jsonPath: .status.create_fn.fullServerURL
       - name: Pod Status
         type: string
         description: Status of the main pod
@@ -87,7 +83,9 @@ spec:
                         secret:
                           type: string
                     ingressAnnotations:
-                      type: string
+                      type: object
+                      default: {}
+                      x-kubernetes-preserve-unknown-fields: true
 
                 storage:
                   type: object
