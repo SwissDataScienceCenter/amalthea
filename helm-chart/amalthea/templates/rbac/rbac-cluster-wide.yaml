@@ -22,7 +22,23 @@ metadata:
   name: {{ include "amalthea.fullname" . }}
   labels:
     {{- include "amalthea.labels" . | nindent 4 }}
-{{- template "amalthea.rules" }}
+
+rules:
+
+  # Kopf: runtime observation of namespaces & CRDs (addition/deletion).
+  - apiGroups: [apiextensions.k8s.io]
+    resources: [customresourcedefinitions]
+    verbs: [list, watch]
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [list, watch]
+
+  # Kopf: admission webhook configuration management.
+  - apiGroups: [admissionregistration.k8s.io/v1, admissionregistration.k8s.io/v1beta1]
+    resources: [validatingwebhookconfigurations, mutatingwebhookconfigurations]
+    verbs: [create, patch]
+
+{{- include "amalthea.rules" . }}
 
 {{- end }}
 {{- end }}

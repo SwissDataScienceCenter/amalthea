@@ -29,7 +29,8 @@ metadata:
   namespace: {{ . }}
   labels:
     {{- include "amalthea.labels" $fullTemplateScope | nindent 4 }}
-{{- template "amalthea.rules" }}
+rules:
+{{- include "amalthea.rules" $fullTemplateScope }}
 
 {{- end }}
 {{- end }}
