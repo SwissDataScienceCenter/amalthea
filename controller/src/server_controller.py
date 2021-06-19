@@ -104,19 +104,20 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
     """
     children_specs = get_children_specs(name, spec, logger)
 
-    try:
+    # We make sure the pod created from the statefulset gets labeled
+    # with the custom resource references and add a special label to
+    # distinguish it from direct children.
+    kopf.label(
+        children_specs["statefulset"]["spec"]["template"],
+        labels=get_labels(name, uid, labels, is_main_pod=True),
+    )
 
-        # We make sure the pod created from the statefulset gets labeled
-        # with the custom resource references and add a special label to
-        # distinguish it from direct children.
-        kopf.label(
-            children_specs["statefulset"]["spec"]["template"],
-            labels=get_labels(name, uid, labels, is_main_pod=True),
-        )
-
-        # Add the labels to all child resources and create them in the cluster
-        children_uids = {}
-        for child_key, child_spec in children_specs.items():
+    # Add the labels to all child resources and create them in the cluster
+    children_uids = {}
+    children_exceptions = {}
+    for child_key, child_spec in children_specs.items():
+        # TODO: look at the option of using subhandlers here.
+        try:
             kopf.label(
                 child_spec,
                 labels=get_labels(name, uid, labels, child_key=child_key),
@@ -126,13 +127,19 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
             children_uids[child_key] = create_namespaced_resource(
                 namespace=namespace, body=child_spec, logger=logger
             ).metadata.uid
+        except Exception as child_exception:
+            children_exceptions[child_key] = child_exception
 
-    except Exception as e:
+    if len(children_exceptions.keys()) > 0:
+        logger.debug(
+            f"Resources which triggered \
+            exceptions: {children_exceptions.keys()}"
+        )
         logger.debug(
             f"Full dump of all child resources:\n\
-                {json.dumps(children_specs, indent=4, sort_keys=True)}"
+            {json.dumps(children_specs, indent=4, sort_keys=True)}"
         )
-        raise e
+        raise children_exceptions[list(children_exceptions.keys())[0]]
 
     return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 
