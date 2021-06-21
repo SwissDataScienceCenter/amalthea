@@ -45,7 +45,7 @@ def get_children_templates(pvc_enabled=False):
 def create_template_values(name, spec):
     """
     Create a single non-nested dictionary which contains all the
-    variables needed for the templating as keys because too much logig
+    variables needed for the templating as keys because too much logic
     or deeply nested python dictionaries in templates are not fun...
     """
 

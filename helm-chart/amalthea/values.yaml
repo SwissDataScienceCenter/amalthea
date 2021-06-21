@@ -5,6 +5,14 @@
 # Indicate the scope which this operator watches for
 # JupyterServer resources.
 scope:
+  # It is recommended to limit the scope of Amalthea to some
+  # explicitly mentioned namespaces for two reasons:
+  # 1. Amalthea needs pretty extensive permissions on the namespace
+  #    in which it operates.
+  # 2. Cluster-wide network policies do not yet exist in Kubernetes.
+  #    Therefore, no network policies are automatically added for
+  #    cluster-wide deployments and admins will need to set up appropriate
+  #    network policies manually.
   clusterWide: false
   # Namespaces are ignored if clusterWide is set to true.
   namespaces:
@@ -14,15 +22,16 @@ deployCrd: true # whether to deploy the jupyterserver CRD
 
 # Enable a network policy to limit ingress to the controller
 # and one network policy per namespace within the amalthea scope
-# to limit ingress and egress to the jupyter servers.
+# to limit ingress and egress from/to the jupyter servers.
 #
-# Note that until cluster-wide network policies are available,
-# enabling network policies won't do anything if the scope of
-# the operator is clusterWide.
+# Note that until cluster-wide network policies are available in
+# Kubernetes (https://github.com/kubernetes/enhancements/issues/2091),
+# enabling network policies won't do anything if the scope of the
+# operator is set to clusterWide.
 networkPolicies:
   enabled: false
-  # Selector label for pods and namespaces that run
-  # the ingress controller.
+  # # Selector label for pods and namespaces that run
+  # # the ingress controller. For example:
   # ingressSelectorLabels: |
   #   app.kubernetes.io: nginx-ingress
   # ingressNamespaceSelectorLabels: |
@@ -41,12 +50,12 @@ kopfOperatorSettings: |
     client_timeout: 600
 
 rbac:
-  # If the operator should be able to create child resources other than
-  # [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps]
-  # which are necessary for Amalthea to work, add the corresponding API groups and
-  # resources here.
-  extraChildApiGroups: [renku.io]
-  extraChildResources: [jupyterservers]
+  # # If the operator should be able to create child resources other than
+  # # [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps]
+  # # which are necessary for Amalthea to work, add the corresponding API groups and
+  # # resources here.
+  extraChildApiGroups: []
+  extraChildResources: []
 
 image:
   repository: renku/amalthea
