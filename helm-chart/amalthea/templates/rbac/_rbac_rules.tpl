@@ -5,8 +5,8 @@
     verbs: [create]
 
   # Amalthea: watching & handling for the custom resource we declare.
-  - apiGroups: [renku.io]
-    resources: [jupyterservers]
+  - apiGroups: [{{ .Values.crdApiGroup }}]
+    resources: [{{ .Values.crdNames.plural }}]
     verbs: [list, watch, patch]
 
   - apiGroups: [""]

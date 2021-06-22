@@ -95,3 +95,16 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+# Specify API group, version and custom resource names. You will very
+# likely never want to change any of this! This is mostly useful for
+# dev purposes as it allows multiple otherwise incompatible versions of
+# the CRD to co-exist in one cluster.
+crdApiGroup: renku.io
+crdApiVersion: v1alhpha1
+crdNames:
+  kind: JupyterServer
+  plural: jupyterservers
+  singular: jupyterserver
+  shortNames:
+    - js

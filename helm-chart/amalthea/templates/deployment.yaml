@@ -55,6 +55,12 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           env:
+            - name: CRD_API_GROUP
+              value: {{ .Values.crdApiGroup }}
+            - name: CRD_API_VERSION
+              value: {{ .Values.crdApiVersion }}
+            - name: CRD_NAME
+              value: {{ .Values.crdNames.kind }}
             - name: RESCHEDULE_ON_NODE_FAILURE
               value: {{ .Values.rescheduleOnNodeFailure | quote }}
             - name: AMALTHEA_SELECTOR_LABELS

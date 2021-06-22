@@ -20,10 +20,10 @@ JSONPATCH_OPS = {"MODIFIED": "replace", "ADDED": "add", "DELETED": "remove"}
 api_cache = ExpiringDict(max_len=100, max_age_seconds=60)
 
 
-PARENT_UID_LABEL_KEY = "amalthea.renku.io/parent-uid"
-PARENT_NAME_LABEL_KEY = "amalthea.renku.io/parent-name"
-CHILD_KEY_LABEL_KEY = "amalthea.renku.io/child-key"
-MAIN_POD_LABEL_KEY = "amalthea.renku.io/main-pod"
+PARENT_UID_LABEL_KEY = f"{config.api_group}/parent-uid"
+PARENT_NAME_LABEL_KEY = f"{config.api_group}/parent-name"
+CHILD_KEY_LABEL_KEY = f"{config.api_group}/child-key"
+MAIN_POD_LABEL_KEY = f"{config.api_group}/main-pod"
 
 
 def get_labels(
