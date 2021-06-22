@@ -35,6 +35,7 @@ def get_children_templates(pvc_enabled=False):
         "ingress": "ingress.yaml",
         "statefulset": "statefulset.yaml",
         "configmap": "configmap.yaml",
+        "secret": "secret.yaml",
     }
     if pvc_enabled:
         children_templates["pvc"] = "pvc.yaml"
@@ -53,13 +54,17 @@ def create_template_values(name, spec):
     # All we need for template rendering, alphabetically listed
     template_values = {
         "auth": spec["auth"],
+        "authentication_plugin_cookie_secret": base64.urlsafe_b64encode(
+            os.urandom(32)
+        ).decode(),
         "cookie_allowlist": json.dumps(spec["auth"]["cookieAllowlist"]),
         "cookie_blocklist": json.dumps(spec["auth"].get("cookieBlocklist", None)),
-        "cookie_secret": base64.urlsafe_b64encode(os.urandom(32)).decode(),
         "full_url": full_url,
         "host_url": host_url,
         "ingress_annotations": json.dumps(spec["routing"]["ingressAnnotations"]),
         "jupyter_server": spec["jupyterServer"],
+        "jupyter_server_app_token": spec["auth"].get("token", os.urandom(32).hex()),
+        "jupyter_server_cookie_secret": os.urandom(32).hex(),
         "name": name,
         "oidc": spec["auth"]["oidc"],
         "path": spec["routing"]["path"].rstrip("/"),
@@ -76,10 +81,12 @@ def render_template(template_file, template_values):
     Render a template given the template strings and return
     a python dictionary specifying the resource.
     """
+    import base64
 
-    tmpl_path = os.path.join(TEMPLATE_DIR, template_file)
-    tmpl_string = open(tmpl_path, "rt").read()
-    yaml_string = jinja2.Template(tmpl_string).render(**template_values)
+    tmpl_loader = jinja2.FileSystemLoader(TEMPLATE_DIR)
+    tmpl_env = jinja2.Environment(loader=tmpl_loader)
+    tmpl_env.filters["b64encode"] = lambda x: base64.b64encode(x.encode()).decode()
+    yaml_string = tmpl_env.get_template(template_file).render(**template_values)
     resource_spec = yaml.safe_load(yaml_string)
     return resource_spec
 

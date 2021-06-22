@@ -42,16 +42,14 @@ spec:
           command:
             - start-notebook.sh
           args:
-          # TODOs:
-          # - Move these configurations to a configmap and mount it as jupyter_notebook_config.py and
-          #   jupyter_server_config.py respectively.
-          # - Drop support for jupyter notebook.
-            - "--ServerApp.ip=0.0.0.0"
-            - "--NotebookApp.ip=0.0.0.0"
+            - "--ServerApp.ip=localhost"
+            - "--NotebookApp.ip=localhost"
             - "--ServerApp.port=8888"
             - "--NotebookApp.port=8888"
-            - "--ServerApp.token={{ auth["token"] }}"
-            - "--NotebookApp.token={{ auth["token"] }}"
+            - "--ServerApp.token=$(SERVER_APP_TOKEN)"
+            - "--NotebookApp.token=$(SERVER_APP_TOKEN)"
+            - "--ServerApp.cookie_secret=$(SERVER_APP_COOKIE_SECRET)"
+            - "--NotebookApp.cookie_secret=$(SERVER_APP_COOKIE_SECRET)"
             - "--ServerApp.allow_origin={{ host_url }}"
             - "--NotebookApp.allow_origin={{ host_url }}"
             - "--ServerApp.base_url={{ path }}"
@@ -65,6 +63,17 @@ spec:
             - name: workspace
               mountPath: {{ jupyter_server["rootDir"] }}
               subPath: work
+          env:
+            - name: SERVER_APP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ name }}
+                  key: jupyterServerAppToken
+            - name: SERVER_APP_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ name }}
+                  key: jupyterServerCookieSecret
           ports:
             - name: notebook-port
               containerPort: 8888
@@ -153,11 +162,9 @@ spec:
           args:
             - "--provider=oidc"
             - "--client-id={{ oidc["clientId"] }}"
-            - "--client-secret={{ oidc["clientSecret"] }}"
             - "--oidc-issuer-url={{ oidc["issuerUrl"] }}"
             - "--session-cookie-minimal"
             - "--set-xauthrequest"
-            - "--cookie-secret={{ cookie_secret }}"
             - "--email-domain=*"
             - "--http-address=:4180"
             - "--skip-provider-button"
@@ -168,6 +175,24 @@ spec:
             - name: http
               containerPort: 4180
               protocol: TCP
+          env:
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ name }}
+                  key: authenticationPluginCookieSecret
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+              {% if "value" in auth["oidc"]["clientSecret"] %}
+                secretKeyRef:
+                  name: {{ name }}
+                  key: oidcClientSecret
+              {% endif %}
+              {% if "secretKeyRef" in auth["oidc"]["clientSecret"] %}
+                secretKeyRef:
+                  name: {{ auth["oidc"]["clientSecret"]["name"] }}
+                  key: {{ auth["oidc"]["clientSecret"]["key"] }}
+              {% endif %}
           resources:
             requests:
               cpu: 20m
