@@ -2,9 +2,9 @@ import json
 import os
 import yaml
 
-api_group = "renku.io"
-api_version = "v1alpha1"
-custom_resource_name = "JupyterServer"
+api_group = os.getenv("CRD_API_GROUP", "andi.io")
+api_version = os.getenv("CRD_API_VERSION", "v1alpha1")
+custom_resource_name = os.getenv("CRD_NAME", "JupyterServer")
 
 # Strings which will be evaluated as true on env variables.
 TRUE_STRINGS = ["True", "true", "1"]
