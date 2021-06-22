@@ -8,7 +8,7 @@ spec:
   tls:
     - hosts:
         - {{ routing["host"] }}
-      secretName: {{ routing["tls"]["secret"] }}
+      secretName: {{ routing["tls"]["secretName"] }}
 {% endif %}
   rules:
     - host: {{ routing["host"] }}
