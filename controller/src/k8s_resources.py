@@ -1,7 +1,6 @@
 import base64
 import json
 import os
-import secrets
 from urllib.parse import urljoin
 
 import jinja2
@@ -55,7 +54,9 @@ def create_template_values(name, spec):
     # All we need for template rendering, alphabetically listed
     template_values = {
         "auth": spec["auth"],
-        "authentication_plugin_cookie_secret": secrets.token_urlsafe(32)[:32],
+        "authentication_plugin_cookie_secret": base64.urlsafe_b64encode(
+            os.urandom(32)
+        ).decode(),
         "cookie_allowlist": json.dumps(spec["auth"]["cookieAllowlist"]),
         "cookie_blocklist": json.dumps(spec["auth"].get("cookieBlocklist", None)),
         "full_url": full_url,
@@ -84,7 +85,7 @@ def render_template(template_file, template_values):
 
     tmpl_loader = jinja2.FileSystemLoader(TEMPLATE_DIR)
     tmpl_env = jinja2.Environment(loader=tmpl_loader)
-    tmpl_env.filters["b64encode"] = lambda x: base64.b64encode(x.encode()).decode()
+    tmpl_env.filters["b64encode"] = lambda x: base64.b64encode(x.encode("utf-8")).decode("ascii")
     yaml_string = tmpl_env.get_template(template_file).render(**template_values)
     resource_spec = yaml.safe_load(yaml_string)
     return resource_spec
