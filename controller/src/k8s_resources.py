@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import secrets
 from urllib.parse import urljoin
 
 import jinja2
@@ -54,9 +55,7 @@ def create_template_values(name, spec):
     # All we need for template rendering, alphabetically listed
     template_values = {
         "auth": spec["auth"],
-        "authentication_plugin_cookie_secret": base64.urlsafe_b64encode(
-            os.urandom(32)
-        ).decode(),
+        "authentication_plugin_cookie_secret": secrets.token_urlsafe(32)[:32],
         "cookie_allowlist": json.dumps(spec["auth"]["cookieAllowlist"]),
         "cookie_blocklist": json.dumps(spec["auth"].get("cookieBlocklist", None)),
         "full_url": full_url,
