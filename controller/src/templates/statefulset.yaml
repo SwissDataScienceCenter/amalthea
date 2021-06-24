@@ -21,6 +21,12 @@ spec:
           configMap:
             name: {{ name }}
             defaultMode: 420
+        - name: jupyter-server-secrets
+          secret:
+            secretName: {{ name }}
+            items:
+              - key: jupyterServerCookieSecret
+                path: cookie_secret
         {% if pvc["enabled"] %}
         - name: workspace
           persistentVolumeClaim:
@@ -42,14 +48,14 @@ spec:
           command:
             - start-notebook.sh
           args:
-            - "--ServerApp.ip=localhost"
-            - "--NotebookApp.ip=localhost"
+            - "--ServerApp.ip=127.0.0.1"
+            - "--NotebookApp.ip=127.0.0.1"
             - "--ServerApp.port=8888"
             - "--NotebookApp.port=8888"
             - "--ServerApp.token=$(SERVER_APP_TOKEN)"
             - "--NotebookApp.token=$(SERVER_APP_TOKEN)"
-            - "--ServerApp.cookie_secret=$(SERVER_APP_COOKIE_SECRET)"
-            - "--NotebookApp.cookie_secret=$(SERVER_APP_COOKIE_SECRET)"
+            - "--ServerApp.cookie_secret_file=/etc/jupyter_server_secrets/cookie_secret"
+            - "--NotebookApp.cookie_secret_file=/etc/jupyter_server_secrets/cookie_secret"
             - "--ServerApp.allow_origin={{ host_url }}"
             - "--NotebookApp.allow_origin={{ host_url }}"
             - "--ServerApp.base_url={{ path }}"
@@ -63,17 +69,15 @@ spec:
             - name: workspace
               mountPath: {{ jupyter_server["rootDir"] }}
               subPath: work
+            - name: jupyter-server-secrets
+              mountPath: /etc/jupyter_server_secrets
+              readOnly: true
           env:
             - name: SERVER_APP_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ name }}
                   key: jupyterServerAppToken
-            - name: SERVER_APP_COOKIE_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ name }}
-                  key: jupyterServerCookieSecret
           ports:
             - name: notebook-port
               containerPort: 8888
