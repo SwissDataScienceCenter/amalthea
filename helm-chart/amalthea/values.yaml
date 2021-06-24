@@ -101,7 +101,7 @@ affinity: {}
 # dev purposes as it allows multiple otherwise incompatible versions of
 # the CRD to co-exist in one cluster.
 crdApiGroup: renku.io
-crdApiVersion: v1alhpha1
+crdApiVersion: v1alpha1
 crdNames:
   kind: JupyterServer
   plural: jupyterservers
