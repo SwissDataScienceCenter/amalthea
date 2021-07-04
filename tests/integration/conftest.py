@@ -67,9 +67,7 @@ def k8s_namespace():
 
 
 @pytest.fixture
-def launch_session(
-    operator, k8s_amalthea_api, k8s_namespace, is_session_ready
-):
+def launch_session(operator, k8s_amalthea_api, k8s_namespace, is_session_ready):
     launched_sessions = []
 
     def _launch_session(manifest):

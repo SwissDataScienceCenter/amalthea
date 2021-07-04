@@ -34,7 +34,4 @@ jobs:
       - name: Run tests
         run: |
           helm lint helm-chart/amalthea
-          # TODO: helm test amalthea
-          echo "helm test not yet set up"
-          # TODO: pytest
-          echo "no test suite available yet"
+          pipenv run pytest tests
