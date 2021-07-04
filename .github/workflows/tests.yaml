@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
-      - uses: engineerd/setup-kind@v0.5.0
+      - uses: helm/kind-action@v1.2.0
       - uses: actions/setup-python@v1
         with:
           python-version: 3.8
