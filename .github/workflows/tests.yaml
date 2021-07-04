@@ -34,7 +34,5 @@ jobs:
       - name: Run tests
         run: |
           helm lint helm-chart/amalthea
-          cd controller
-          pipenv shell
-          cd ../
-          pytest
+          PIPENV_PIPFILE=controller/ pipenv install --deploy --system --dev
+          PIPENV_PIPFILE=controller/ pipenv run pytest
