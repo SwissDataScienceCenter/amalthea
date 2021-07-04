@@ -34,4 +34,7 @@ jobs:
       - name: Run tests
         run: |
           helm lint helm-chart/amalthea
-          pipenv run pytest tests
+          cd controller
+          pipenv shell
+          cd ../
+          pytest
