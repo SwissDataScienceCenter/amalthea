@@ -78,6 +78,7 @@ spec:
                       default: "/"
                     tls:
                       type: object
+                      default: {}
                       properties:
                         enabled:
                           type: boolean
@@ -91,6 +92,7 @@ spec:
 
                 storage:
                   type: object
+                  default: {}
                   properties:
                     size:
                       description: "Size of the PVC or sizeLimit of the emptyDir volume which backs the session respectively."
@@ -98,6 +100,7 @@ spec:
                       default: 100Mi
                     pvc:
                       type: object
+                      default: {}
                       properties:
                         enabled:
                           description: "Wether a PVC should be used to back the session. Defaults to 'false' in which case an emptyDir volume will be used."
@@ -138,6 +141,7 @@ spec:
                       type: string
                     oidc:
                       type: object
+                      default: {}
                       properties:
                         enabled:
                           type: boolean

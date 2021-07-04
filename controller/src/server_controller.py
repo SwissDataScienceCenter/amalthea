@@ -8,8 +8,8 @@ from kubernetes.dynamic import DynamicClient
 from kubernetes.dynamic.exceptions import ApiException, NotFoundError
 
 
-from . import config
-from .k8s_resources import CONTENT_TYPES, get_children_specs, get_urls
+from controller.src import config
+from controller.src.k8s_resources import CONTENT_TYPES, get_children_specs, get_urls
 
 
 # A dictionary matching a K8s event type to a jsonpatch operation type

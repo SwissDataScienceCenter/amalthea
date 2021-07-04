@@ -1,7 +1,7 @@
 import os
 import yaml
 
-api_group = os.getenv("CRD_API_GROUP", "andi.io")
+api_group = os.getenv("CRD_API_GROUP", "renku.io")
 api_version = os.getenv("CRD_API_VERSION", "v1alpha1")
 custom_resource_name = os.getenv("CRD_NAME", "JupyterServer")
 

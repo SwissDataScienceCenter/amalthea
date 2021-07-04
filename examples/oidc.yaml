@@ -4,8 +4,8 @@ metadata:
   name: ## ADD NAME
   namespace: ## ADD NAMESPACE
 spec:
-  notebookImage: jupyter/minimal-notebook:latest
-  host: ## Add hostname
+  routing:
+    host: ## Add hostname
   auth:
     kind: oidc
     oidc:
@@ -13,4 +13,3 @@ spec:
       clientId: ## Client ID of registered application
       clientSecret: ## Client secret of registered application
       userId: ## ADD THE USER_ID OF THE USER WHO WILL HAVE ACCESS TO THE SERVER
-
