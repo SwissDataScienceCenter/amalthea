@@ -48,7 +48,7 @@ spec:
             {{- if .Values.scope.clusterWide }}
             - "--all-namespaces"
             {{- else }}
-            {{- range .Values.scope.namespaces }}
+            {{- range (.Values.scope.namespaces | default (list .Release.Namespace)) }}
             - "--namespace={{ . }}"
             {{- end }}
             {{- end }}
