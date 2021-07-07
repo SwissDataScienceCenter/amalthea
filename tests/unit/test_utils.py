@@ -1,6 +1,6 @@
 import pytest
 
-from controller.src.server_controller import (
+from controller.server_controller import (
     get_labels,
     PARENT_NAME_LABEL_KEY,
     PARENT_UID_LABEL_KEY,

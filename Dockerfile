@@ -10,5 +10,6 @@ COPY Pipfile Pipfile.lock /app/
 WORKDIR /app
 RUN pipenv install --system --deploy
 
-COPY controller/src /app/src
-ENTRYPOINT ["kopf", "run", "--liveness=http://0.0.0.0:8080/healthz", "/app/src/server_controller.py"]
+COPY controller /app/controller
+ENV PYTHONPATH ".:${PYTHONPATH}"
+ENTRYPOINT ["kopf", "run", "--liveness=http://0.0.0.0:8080/healthz", "/app/controller/server_controller.py"]

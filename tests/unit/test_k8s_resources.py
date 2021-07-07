@@ -1,7 +1,7 @@
 import pytest
 import re
 
-from controller.src.k8s_resources import (
+from controller.k8s_resources import (
     get_urls,
     get_children_templates,
     create_template_values,
