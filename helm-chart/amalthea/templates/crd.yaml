@@ -66,6 +66,7 @@ spec:
                       description: "Regular resource requests, will be set on the main notebook container."
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
+                      default: {}
 
                 routing:
                   type: object

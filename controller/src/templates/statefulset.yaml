@@ -78,9 +78,7 @@ spec:
                 secretKeyRef:
                   name: {{ name }}
                   key: jupyterServerAppToken
-          {% if "resources" in jupyter_server %}
-          resources: {{ jupyter_server["resources"] | tojson }}
-          {% endif %}
+          resources: {{ jupyter_server["resources"] | default({}) | tojson }}
           ports:
             - name: notebook-port
               containerPort: 8888

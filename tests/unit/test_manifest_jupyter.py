@@ -38,4 +38,4 @@ def test_jupyterserver(resources, valid_spec):
     if resources is not None:
         assert js_container["resources"] == resources
     else:
-        assert "resources" not in js_container.keys()
+        assert js_container["resources"] == {}
