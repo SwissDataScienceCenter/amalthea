@@ -19,20 +19,20 @@ jobs:
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
         run: |
           echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
-          cd helm-chart/
           python -m pip install --upgrade pip pipenv
           pipenv install --deploy --system --dev
+          cd helm-chart/
           helm dep update amalthea
-          chartpress --push
+          PIPENV_PIPFILE="../Pipfile" pipenv run chartpress --push
 
       - name: Install amalthea chart
         run: |
           cd helm-chart/
-          helm install amalthea ./amalthea/ -n amalthea --create-namespace --set scope.namespaces={amalthea}
+          helm install amalthea ./amalthea/ -n default --create-namespace
           helm list -n amalthea
 
       - name: Run tests
         run: |
           helm lint helm-chart/amalthea
-          PIPENV_PIPFILE="controller/Pipfile" pipenv install --deploy --system --dev
-          PIPENV_PIPFILE="controller/Pipfile" pipenv run pytest
+          pipenv install --deploy --system --dev
+          pipenv run pytest
