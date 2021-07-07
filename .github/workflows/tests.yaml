@@ -28,7 +28,7 @@ jobs:
       - name: Install amalthea chart
         run: |
           cd helm-chart/
-          helm install amalthea ./amalthea/ -n default --create-namespace
+          helm install amalthea ./amalthea/ -n default --create-namespace --wait --timeout 5m0s
           helm list -n amalthea
 
       - name: Run tests
