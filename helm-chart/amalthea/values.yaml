@@ -14,9 +14,12 @@ scope:
   #    cluster-wide deployments and admins will need to set up appropriate
   #    network policies manually.
   clusterWide: false
-  # Namespaces are ignored if clusterWide is set to true.
-  namespaces:
-    - default
+  # Namespaces should not be provided if clusterWide is true.
+  # If the deployment is not clusterwide, then there are two options: 
+  # 1. Specify the namespaces where amalthea should operate
+  # 2. Do not define namespaces at all, in which case amalthea
+  #    will only operate in the namespace where the helm chart is deployed.
+  # namespaces: ["default"]
 
 deployCrd: true # whether to deploy the jupyterserver CRD
 
