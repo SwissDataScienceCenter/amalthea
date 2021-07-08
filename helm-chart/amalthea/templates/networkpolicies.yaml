@@ -12,10 +12,10 @@ spec:
       app.kubernetes.io/component: controller
   policyTypes:
     - Ingress
-{{- end -}}
+{{ end }}
 
 {{- if and (or .Values.networkPolicies.sessions.ingress.restrict .Values.networkPolicies.sessions.egress.restrict) (not .Values.scope.clusterWide) -}}
-{{- range (.Values.scope.namespaces | default (list .Release.Namespace)) }}
+{{- range (.Values.scope.namespaces | default (list .Release.Namespace)) -}}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -30,47 +30,57 @@ spec:
       {{- include "amalthea.selectorLabels" $ | nindent 6 }}
       app.kubernetes.io/component: jupyterserver
   policyTypes:
+{{- if $.Values.networkPolicies.sessions.ingress.restrict }}
     - Ingress
+{{- end }}
+{{- if $.Values.networkPolicies.sessions.egress.restrict }}
     - Egress
-{{- if $.Values.networkPolicies.sessions.ingress.restrict -}}
+{{- end }}
+{{- if $.Values.networkPolicies.sessions.ingress.restrict }}
   ingress:
     - ports:
         - protocol: TCP
           port: 8000
       from:
+{{- if $.Values.networkPolicies.sessions.ingress.allowIngressOnlyFrom.podSelectorLabels }}
         - podSelector:
             matchLabels:
-              {{- $.Values.networkPolicies.sessions.ingress.podSelectorLabels | toYaml | nindent 14 }}
-          namespaceSelector:
-            matchLabels:
-              {{- $.Values.networkPolicies.sessions.ingress.namespaceSelectorLabels | toYaml | nindent 14 }}
-{{- end -}}
-{{- if $.Values.networkPolicies.sessions.egress.restrict -}}
-  egress:
-  - to:
-    # Allow DNS resolution (internal and external)
-    ports:
-    - port: 53
-      protocol: UDP
-    - port: 53
-      protocol: TCP
-  - to:
-    # Allow access to web outside of cluster by excluding
-    # IP ranges which are reserved for private networking from
-    # the allowed range.
-    - ipBlock:
-        cidr: 0.0.0.0/0
-        except:
-        - 10.0.0.0/8
-        - 172.16.0.0/12
-        - 192.168.0.0/16
-    ports:
-    - port: 80
-      protocol: TCP
-    - port: 443
-      protocol: TCP
-{{- end -}}
+              {{- $.Values.networkPolicies.sessions.ingress.allowIngressOnlyFrom.podSelectorLabels | toYaml | nindent 14 }}
 {{- end }}
-{{- else -}}
-{{- fail "Network policies for the sessions cannot be applied for a cluster wide amalthea deployment." }}
+{{- if $.Values.networkPolicies.sessions.ingress.allowIngressOnlyFrom.namespaceSelectorLabels }}
+        - namespaceSelector:
+            matchLabels:
+              {{- $.Values.networkPolicies.sessions.ingress.allowIngressOnlyFrom.namespaceSelectorLabels | toYaml | nindent 14 }}
+{{- end }}
+{{- end }}
+{{- if $.Values.networkPolicies.sessions.egress.restrict }}
+  egress:
+    - to:
+      # Allow DNS resolution (internal and external)
+      ports:
+      - port: 53
+        protocol: UDP
+      - port: 53
+        protocol: TCP
+    - to:
+      # Allow access to web outside of cluster by excluding
+      # IP ranges which are reserved for private networking from
+      # the allowed range.
+      - ipBlock:
+          cidr: 0.0.0.0/0
+          except:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+      ports:
+      - port: 80
+        protocol: TCP
+      - port: 443
+        protocol: TCP
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- if and (or .Values.networkPolicies.sessions.ingress.restrict .Values.networkPolicies.sessions.egress.restrict) .Values.scope.clusterWide -}}
+{{- fail "Network policies for the sessions cannot be applied for a cluster wide amalthea deployment." -}}
 {{- end -}}

@@ -25,7 +25,7 @@ deployCrd: true # whether to deploy the jupyterserver CRD
 
 networkPolicies:
   controller:
-    # # Deny all ingress to the amalthea operator - there is no need for anything
+    # # Deny all ingress to the amalthea controller - there is no need for anything
     # # to have acess to the controller.
     denyAllIngress: true
   sessions:
