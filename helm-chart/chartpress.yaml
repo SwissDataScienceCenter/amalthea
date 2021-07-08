@@ -10,7 +10,7 @@ charts:
 
     images:
       amalthea:
-        contextPath: ../controller
-        dockerfilePath: ../controller/Dockerfile
+        contextPath: ../
+        dockerfilePath: ../Dockerfile
         valuesPath:
           - image

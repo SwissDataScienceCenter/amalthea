@@ -78,6 +78,7 @@ spec:
                 secretKeyRef:
                   name: {{ name }}
                   key: jupyterServerAppToken
+          resources: {{ jupyter_server["resources"] | default({}) | tojson }}
           ports:
             - name: notebook-port
               containerPort: 8888
@@ -194,8 +195,8 @@ spec:
               {% endif %}
               {% if "secretKeyRef" in auth["oidc"]["clientSecret"] %}
                 secretKeyRef:
-                  name: {{ auth["oidc"]["clientSecret"]["name"] }}
-                  key: {{ auth["oidc"]["clientSecret"]["key"] }}
+                  name: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["name"] }}
+                  key: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["key"] }}
               {% endif %}
           resources:
             requests:

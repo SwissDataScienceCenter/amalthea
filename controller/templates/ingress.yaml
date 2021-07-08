@@ -14,7 +14,7 @@ spec:
     - host: {{ routing["host"] }}
       http:
         paths:
-        - path: {{ path }}
+        - path: {{ routing["path"] }}
           backend:
             serviceName: {{ name }}
             servicePort: 80

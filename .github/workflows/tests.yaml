@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
-      - uses: engineerd/setup-kind@v0.5.0
+      - uses: helm/kind-action@v1.2.0
       - uses: actions/setup-python@v1
         with:
           python-version: 3.8
@@ -19,22 +19,20 @@ jobs:
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
         run: |
           echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
-          cd helm-chart/
           python -m pip install --upgrade pip pipenv
           pipenv install --deploy --system --dev
+          cd helm-chart/
           helm dep update amalthea
-          chartpress --push
+          PIPENV_PIPFILE="../Pipfile" pipenv run chartpress --push
 
       - name: Install amalthea chart
         run: |
           cd helm-chart/
-          helm install amalthea ./amalthea/ -n amalthea --create-namespace --set scope.namespaces={amalthea}
+          helm install amalthea ./amalthea/ -n default --create-namespace --wait --timeout 5m0s
           helm list -n amalthea
 
       - name: Run tests
         run: |
           helm lint helm-chart/amalthea
-          # TODO: helm test amalthea
-          echo "helm test not yet set up"
-          # TODO: pytest
-          echo "no test suite available yet"
+          pipenv install --deploy --system --dev
+          pipenv run pytest

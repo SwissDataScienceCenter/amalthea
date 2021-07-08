@@ -85,7 +85,9 @@ def render_template(template_file, template_values):
 
     tmpl_loader = jinja2.FileSystemLoader(TEMPLATE_DIR)
     tmpl_env = jinja2.Environment(loader=tmpl_loader)
-    tmpl_env.filters["b64encode"] = lambda x: base64.b64encode(x.encode("utf-8")).decode("ascii")
+    tmpl_env.filters["b64encode"] = lambda x: base64.b64encode(
+        x.encode("utf-8")
+    ).decode("ascii")
     yaml_string = tmpl_env.get_template(template_file).render(**template_values)
     resource_spec = yaml.safe_load(yaml_string)
     return resource_spec

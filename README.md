@@ -27,3 +27,27 @@ According to [Wikipedia](https://en.wikipedia.org/wiki/Amalthea), the name Amalt
 - a container ship
 
 Also, it's another Greek name for something Kubernetes related.
+
+## Contributing
+
+The easiest way to set up the environment that will let you develop and test a feature is to use [kind](https://kind.sigs.k8s.io/).
+Kind runs a whole k8s cluster in docker and it can easily be used to run and test amalthea. We use kind for our integration
+tests too. The integration tests will run in your current active k8s context in the `default` namespace. So it is
+reccomended that you create a new kind cluster before you start the tests. The tests will install the amalthea CRD, so
+if you already have an amalthea CRD installed, please delete it before running the tests. By installing the CRD in the 
+tests we ensure that the correct, up-to-date CRD is being tested and not an older version left over from past work or tests.
+
+Once you install kind, creating a cluster is as easy as:
+
+```bash
+kind create cluster
+```
+
+This will create a cluster named kind and also set your k8s context to the new cluster.
+
+The only other requirement is pipenv. In order to install it check the [instructions here](https://pipenv.pypa.io/en/latest/#install-pipenv-today)
+
+To run the tests simply do:
+```bash
+pipenv run pytest
+```
