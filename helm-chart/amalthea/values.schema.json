@@ -74,81 +74,92 @@
             "description": "Enable a network policy to limit ingress to the controller and one network policy per namespace within the amalthea scope to limit ingress and egress from/to the jupyter servers.",
             "type": "object",
             "properties": {
-                "enabled": {
-                    "type": "boolean"
-                }
-            },
-            "if": {
-                "properties": {
-                    "enabled": {
-                        "const": true
-                    }
-                }
-            },
-            "then": {
-                "oneOf": [
-                    {
-                        "properties": {
-                            "enabled": {
-                                "const": true
-                            },
-                            "ingressSelectorLabels": {
-                                "type": "string"
-                            }
-                        },
-                        "required": [
-                            "enabled",
-                            "ingressSelectorLabels"
-                        ],
-                        "additionalProperties": false
+                "controller":{
+                    "type": "object",
+                    "properties": {
+                        "denyAllIngress": {
+                            "type": "boolean"
+                        }
                     },
-                    {
-                        "properties": {
-                            "enabled": {
-                                "const": true
-                            },
-                            "ingressNamespaceSelectorLabels": {
-                                "type": "string"
-                            }
-                        },
-                        "required": [
-                            "enabled",
-                            "ingressNamespaceSelectorLabels"
-                        ],
-                        "additionalProperties": false
-                    },
-                    {
-                        "properties": {
-                            "enabled": {
-                                "const": true
-                            },
-                            "ingressSelectorLabels": {
-                                "type": "string"
-                            },
-                            "ingressNamespaceSelectorLabels": {
-                                "type": "string"
-                            }
-                        },
-                        "required": [
-                            "enabled",
-                            "ingressSelectorLabels",
-                            "ingressNamespaceSelectorLabels"
-                        ],
-                        "additionalProperties": false
-                    }
-                ]
-            },
-            "else": {
-                "properties": {
-                    "enabled": {
-                        "const": false
-                    }
+                    "required": ["denyAllIngress"],
+                    "additionalProperties": false
                 },
-                "required": [
-                    "enabled"
-                ],
-                "additionalProperties": false
-            }
+                "sessions":{
+                    "type": "object",
+                    "properties": {
+                        "ingress": {
+                            "type": "object",
+                            "properties": {
+                                "restrict": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "if": {
+                                "properties": {
+                                    "restrict": {
+                                        "const": true
+                                    }
+                                }
+                            },
+                            "then": {
+                                "properties": {
+                                    "restrict": {
+                                        "const": true
+                                    },
+                                    "allowIngressOnlyFrom": {
+                                        "type": "object",
+                                        "properties": {
+                                            "namespaceSelectorLabels": {
+                                                "type": "object",
+                                                "additionalProperties": true,
+                                                "patternProperties": {
+                                                    ".*": { "type": "string" }
+                                                },
+                                                "minProperties": 1
+                                            },
+                                            "podSelectorLabels": {
+                                                "type": "object",
+                                                "additionalProperties": true,
+                                                "patternProperties": {
+                                                    ".*": { "type": "string" }
+                                                },
+                                                "minProperties": 1
+                                            }
+                                        }
+                                    }
+                                },
+                                "required": ["restrict", "allowIngressOnlyFrom"],
+                                "additionalProperties": false
+                            },
+                            "else": {
+                                "properties": {
+                                    "restrict": {
+                                        "const": false
+                                    }
+                                },
+                                "required": ["restrict"],
+                                "additionalProperties": false
+                            }
+                        },
+                        "egress": {
+                            "type": "object",
+                            "properties": {
+                                "restrict": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": ["restrict"],
+                            "additionalProperties": false
+                        }
+                    },
+                    "required": ["ingress", "egress"],
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false,
+            "required": [
+                "controller", "sessions"
+            ]
         },
         "rescheduleOnNodeFailure": {
             "description": "Experimental feature - reschedule sessions on different nodes if a node fails.",

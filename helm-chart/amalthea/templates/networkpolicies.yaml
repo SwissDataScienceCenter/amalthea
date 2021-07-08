@@ -1,4 +1,4 @@
-{{- if .Values.networkPolicies.enabled -}}
+{{- if .Values.networkPolicies.controller.denyAllIngress -}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -12,28 +12,27 @@ spec:
       app.kubernetes.io/component: controller
   policyTypes:
     - Ingress
+{{- end -}}
 
-{{- if eq .Values.scope.clusterWide false -}}
-{{- /* We store the full scope because . is overwritten when in the loop. */}}
-{{- $fullTemplateScope := . }}
-
+{{- if and (or .Values.networkPolicies.sessions.ingress.restrict .Values.networkPolicies.sessions.egress.restrict) (not .Values.scope.clusterWide) -}}
 {{- range (.Values.scope.namespaces | default (list .Release.Namespace)) }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   namespace: {{ . }}
-  name: {{ include "amalthea.fullname" $fullTemplateScope }}-jupyterserver
+  name: {{ include "amalthea.fullname" $ }}-jupyterserver
   labels:
-    {{- include "amalthea.labels" $fullTemplateScope | nindent 4 }}
+    {{- include "amalthea.labels" $ | nindent 4 }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "amalthea.selectorLabels" $fullTemplateScope | nindent 6 }}
+      {{- include "amalthea.selectorLabels" $ | nindent 6 }}
       app.kubernetes.io/component: jupyterserver
   policyTypes:
     - Ingress
     - Egress
+{{- if $.Values.networkPolicies.sessions.ingress.restrict -}}
   ingress:
     - ports:
         - protocol: TCP
@@ -41,10 +40,12 @@ spec:
       from:
         - podSelector:
             matchLabels:
-              {{- $fullTemplateScope.Values.networkPolicies.ingressSelectorLabels | nindent 14 }}
+              {{- $.Values.networkPolicies.sessions.ingress.podSelectorLabels | toYaml | nindent 14 }}
           namespaceSelector:
             matchLabels:
-              {{- $fullTemplateScope.Values.networkPolicies.ingressNamespaceSelectorLabels | nindent 14 }}
+              {{- $.Values.networkPolicies.sessions.ingress.namespaceSelectorLabels | toYaml | nindent 14 }}
+{{- end -}}
+{{- if $.Values.networkPolicies.sessions.egress.restrict -}}
   egress:
   - to:
     # Allow DNS resolution (internal and external)
@@ -68,6 +69,8 @@ spec:
       protocol: TCP
     - port: 443
       protocol: TCP
-{{- end }}
 {{- end -}}
+{{- end }}
+{{- else -}}
+{{- fail "Network policies for the sessions cannot be applied for a cluster wide amalthea deployment." }}
 {{- end -}}
