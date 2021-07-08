@@ -1,4 +1,4 @@
-{{- if .Values.networkPolicies.enabled -}}
+{{- if .Values.networkPolicies.controller.denyAllIngress -}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -12,62 +12,75 @@ spec:
       app.kubernetes.io/component: controller
   policyTypes:
     - Ingress
+{{ end }}
 
-{{- if eq .Values.scope.clusterWide false -}}
-{{- /* We store the full scope because . is overwritten when in the loop. */}}
-{{- $fullTemplateScope := . }}
-
-{{- range (.Values.scope.namespaces | default (list .Release.Namespace)) }}
+{{- if and (or .Values.networkPolicies.jupyterServers.ingress.enabled .Values.networkPolicies.jupyterServers.egress.enabled) (not .Values.scope.clusterWide) -}}
+{{- range (.Values.scope.namespaces | default (list .Release.Namespace)) -}}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   namespace: {{ . }}
-  name: {{ include "amalthea.fullname" $fullTemplateScope }}-jupyterserver
+  name: {{ include "amalthea.fullname" $ }}-jupyterserver
   labels:
-    {{- include "amalthea.labels" $fullTemplateScope | nindent 4 }}
+    {{- include "amalthea.labels" $ | nindent 4 }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "amalthea.selectorLabels" $fullTemplateScope | nindent 6 }}
+      {{- include "amalthea.selectorLabels" $ | nindent 6 }}
       app.kubernetes.io/component: jupyterserver
   policyTypes:
+{{- if $.Values.networkPolicies.jupyterServers.ingress.enabled }}
     - Ingress
+{{- end }}
+{{- if $.Values.networkPolicies.jupyterServers.egress.enabled }}
     - Egress
+{{- end }}
+{{- if $.Values.networkPolicies.jupyterServers.ingress.enabled }}
   ingress:
     - ports:
         - protocol: TCP
           port: 8000
       from:
+{{- if $.Values.networkPolicies.jupyterServers.ingress.allowIngressOnlyFrom.podSelectorLabels }}
         - podSelector:
             matchLabels:
-              {{- $fullTemplateScope.Values.networkPolicies.ingressSelectorLabels | nindent 14 }}
-          namespaceSelector:
-            matchLabels:
-              {{- $fullTemplateScope.Values.networkPolicies.ingressNamespaceSelectorLabels | nindent 14 }}
-  egress:
-  - to:
-    # Allow DNS resolution (internal and external)
-    ports:
-    - port: 53
-      protocol: UDP
-    - port: 53
-      protocol: TCP
-  - to:
-    # Allow access to web outside of cluster by excluding
-    # IP ranges which are reserved for private networking from
-    # the allowed range.
-    - ipBlock:
-        cidr: 0.0.0.0/0
-        except:
-        - 10.0.0.0/8
-        - 172.16.0.0/12
-        - 192.168.0.0/16
-    ports:
-    - port: 80
-      protocol: TCP
-    - port: 443
-      protocol: TCP
+              {{- $.Values.networkPolicies.jupyterServers.ingress.allowIngressOnlyFrom.podSelectorLabels | toYaml | nindent 14 }}
 {{- end }}
-{{- end -}}
+{{- if $.Values.networkPolicies.jupyterServers.ingress.allowIngressOnlyFrom.namespaceSelectorLabels }}
+        - namespaceSelector:
+            matchLabels:
+              {{- $.Values.networkPolicies.jupyterServers.ingress.allowIngressOnlyFrom.namespaceSelectorLabels | toYaml | nindent 14 }}
+{{- end }}
+{{- end }}
+{{- if $.Values.networkPolicies.jupyterServers.egress.enabled }}
+  egress:
+    - to:
+      # Allow DNS resolution (internal and external)
+      ports:
+      - port: 53
+        protocol: UDP
+      - port: 53
+        protocol: TCP
+    - to:
+      # Allow access to web outside of cluster by excluding
+      # IP ranges which are reserved for private networking from
+      # the allowed range.
+      - ipBlock:
+          cidr: 0.0.0.0/0
+          except:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+      ports:
+      - port: 80
+        protocol: TCP
+      - port: 443
+        protocol: TCP
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- if and (or .Values.networkPolicies.jupyterServers.ingress.enabled .Values.networkPolicies.jupyterServers.egress.enabled) .Values.scope.clusterWide -}}
+{{- fail "Network policies for the jupuyter servers cannot be applied for a cluster wide amalthea deployment." -}}
 {{- end -}}

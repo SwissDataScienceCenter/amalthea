@@ -23,22 +23,30 @@ scope:
 
 deployCrd: true # whether to deploy the jupyterserver CRD
 
-# Enable a network policy to limit ingress to the controller
-# and one network policy per namespace within the amalthea scope
-# to limit ingress and egress from/to the jupyter servers.
-#
-# Note that until cluster-wide network policies are available in
-# Kubernetes (https://github.com/kubernetes/enhancements/issues/2091),
-# enabling network policies won't do anything if the scope of the
-# operator is set to clusterWide.
 networkPolicies:
-  enabled: false
-  # # Selector label for pods and namespaces that run
-  # # the ingress controller. For example:
-  # ingressSelectorLabels: |
-  #   app.kubernetes.io: nginx-ingress
-  # ingressNamespaceSelectorLabels: |
-  #   field.cattle.io/projectId: p-7cjb4
+  controller:
+    # # Deny all ingress to the amalthea controller - there is no need for anything
+    # # to have acess to the controller.
+    denyAllIngress: true
+  jupyterServers:
+    # # Note that until cluster-wide network policies are available in
+    # # Kubernetes (https://github.com/kubernetes/enhancements/issues/2091),
+    # # enabling network policies for the sessions won't do anything if the scope of the
+    # # operator is set to clusterWide.
+    ingress:
+      # # The ingress network policy can be used to prevent ingress into the jupyter server
+      # # from everywhere except the pods and namespaces captured by the selectors below. For
+      # # example you can use this to allow ingress into the sessions only from a specific
+      # # kubernetes ingress resource - i.e. only nginx ignress controller pods can access the sessions.
+      enabled: false
+      # allowIngressOnlyFrom:
+      #   namespaceSelectorLabels: {}
+      #   podSelectorLabels: {}
+    egress:
+      # # If enabled allows jupyter servers to access ports 80 and 443 (http/https) 
+      # # outside of the cluster and port 53 for DNS outside and inside of the cluster
+      # # all other egress is prohibited.
+      enabled: true
 
 rescheduleOnNodeFailure: false
 
