@@ -345,6 +345,11 @@
                 "kind", "plural", "singular", "shortNames"
             ],
             "additionalProperties": false
+        },
+        "global": {
+            "type": "object",
+            "default": {},
+            "additionalProperties": true
         }
     },
     "required": [
