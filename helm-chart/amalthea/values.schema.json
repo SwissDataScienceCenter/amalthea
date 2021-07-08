@@ -3,7 +3,7 @@
     "definitions": {},
     "properties": {
         "scope": {
-            "description": "The scope and namespaces where amalthea will operate and create sessions.",
+            "description": "The scope and namespaces where amalthea will operate and create jupyter servers.",
             "properties": {
                 "clusterWide": {
                     "type": "boolean"
@@ -84,26 +84,26 @@
                     "required": ["denyAllIngress"],
                     "additionalProperties": false
                 },
-                "sessions":{
+                "jupyterServers":{
                     "type": "object",
                     "properties": {
                         "ingress": {
                             "type": "object",
                             "properties": {
-                                "restrict": {
+                                "enabled": {
                                     "type": "boolean"
                                 }
                             },
                             "if": {
                                 "properties": {
-                                    "restrict": {
+                                    "enabled": {
                                         "const": true
                                     }
                                 }
                             },
                             "then": {
                                 "properties": {
-                                    "restrict": {
+                                    "enabled": {
                                         "const": true
                                     },
                                     "allowIngressOnlyFrom": {
@@ -128,27 +128,27 @@
                                         }
                                     }
                                 },
-                                "required": ["restrict", "allowIngressOnlyFrom"],
+                                "required": ["enabled", "allowIngressOnlyFrom"],
                                 "additionalProperties": false
                             },
                             "else": {
                                 "properties": {
-                                    "restrict": {
+                                    "enabled": {
                                         "const": false
                                     }
                                 },
-                                "required": ["restrict"],
+                                "required": ["enabled"],
                                 "additionalProperties": false
                             }
                         },
                         "egress": {
                             "type": "object",
                             "properties": {
-                                "restrict": {
+                                "enabled": {
                                     "type": "boolean"
                                 }
                             },
-                            "required": ["restrict"],
+                            "required": ["enabled"],
                             "additionalProperties": false
                         }
                     },
@@ -158,11 +158,11 @@
             },
             "additionalProperties": false,
             "required": [
-                "controller", "sessions"
+                "controller", "jupyterServers"
             ]
         },
         "rescheduleOnNodeFailure": {
-            "description": "Experimental feature - reschedule sessions on different nodes if a node fails.",
+            "description": "Experimental feature - reschedule jupyterServers on different nodes if a node fails.",
             "type": "boolean"
         },
         "kopfOperatorSettings": {

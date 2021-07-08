@@ -14,7 +14,7 @@ spec:
     - Ingress
 {{ end }}
 
-{{- if and (or .Values.networkPolicies.sessions.ingress.restrict .Values.networkPolicies.sessions.egress.restrict) (not .Values.scope.clusterWide) -}}
+{{- if and (or .Values.networkPolicies.jupyterServers.ingress.enabled .Values.networkPolicies.jupyterServers.egress.enabled) (not .Values.scope.clusterWide) -}}
 {{- range (.Values.scope.namespaces | default (list .Release.Namespace)) -}}
 ---
 apiVersion: networking.k8s.io/v1
@@ -30,30 +30,30 @@ spec:
       {{- include "amalthea.selectorLabels" $ | nindent 6 }}
       app.kubernetes.io/component: jupyterserver
   policyTypes:
-{{- if $.Values.networkPolicies.sessions.ingress.restrict }}
+{{- if $.Values.networkPolicies.jupyterServers.ingress.enabled }}
     - Ingress
 {{- end }}
-{{- if $.Values.networkPolicies.sessions.egress.restrict }}
+{{- if $.Values.networkPolicies.jupyterServers.egress.enabled }}
     - Egress
 {{- end }}
-{{- if $.Values.networkPolicies.sessions.ingress.restrict }}
+{{- if $.Values.networkPolicies.jupyterServers.ingress.enabled }}
   ingress:
     - ports:
         - protocol: TCP
           port: 8000
       from:
-{{- if $.Values.networkPolicies.sessions.ingress.allowIngressOnlyFrom.podSelectorLabels }}
+{{- if $.Values.networkPolicies.jupyterServers.ingress.allowIngressOnlyFrom.podSelectorLabels }}
         - podSelector:
             matchLabels:
-              {{- $.Values.networkPolicies.sessions.ingress.allowIngressOnlyFrom.podSelectorLabels | toYaml | nindent 14 }}
+              {{- $.Values.networkPolicies.jupyterServers.ingress.allowIngressOnlyFrom.podSelectorLabels | toYaml | nindent 14 }}
 {{- end }}
-{{- if $.Values.networkPolicies.sessions.ingress.allowIngressOnlyFrom.namespaceSelectorLabels }}
+{{- if $.Values.networkPolicies.jupyterServers.ingress.allowIngressOnlyFrom.namespaceSelectorLabels }}
         - namespaceSelector:
             matchLabels:
-              {{- $.Values.networkPolicies.sessions.ingress.allowIngressOnlyFrom.namespaceSelectorLabels | toYaml | nindent 14 }}
+              {{- $.Values.networkPolicies.jupyterServers.ingress.allowIngressOnlyFrom.namespaceSelectorLabels | toYaml | nindent 14 }}
 {{- end }}
 {{- end }}
-{{- if $.Values.networkPolicies.sessions.egress.restrict }}
+{{- if $.Values.networkPolicies.jupyterServers.egress.enabled }}
   egress:
     - to:
       # Allow DNS resolution (internal and external)
@@ -81,6 +81,6 @@ spec:
 {{- end }}
 {{- end }}
 
-{{- if and (or .Values.networkPolicies.sessions.ingress.restrict .Values.networkPolicies.sessions.egress.restrict) .Values.scope.clusterWide -}}
-{{- fail "Network policies for the sessions cannot be applied for a cluster wide amalthea deployment." -}}
+{{- if and (or .Values.networkPolicies.jupyterServers.ingress.enabled .Values.networkPolicies.jupyterServers.egress.enabled) .Values.scope.clusterWide -}}
+{{- fail "Network policies for the jupuyter servers cannot be applied for a cluster wide amalthea deployment." -}}
 {{- end -}}
