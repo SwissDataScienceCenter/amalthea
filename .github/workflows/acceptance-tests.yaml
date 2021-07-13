@@ -1,0 +1,68 @@
+name: Acceptance Tests
+
+on:
+  pull_request:
+    types:
+    - opened
+    - edited
+    - synchronize
+    - reopened
+    - closed
+
+jobs:
+  acceptance-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull Code
+        uses: actions/checkout@v2
+      - name: Make Kind Config File
+        run: |
+          cat <<EOF > kind-config.yaml
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+          - role: control-plane
+            kubeadmConfigPatches:
+            - |
+              kind: InitConfiguration
+              nodeRegistration:
+                kubeletExtraArgs:
+                  node-labels: "ingress-ready=true"
+            extraPortMappings:
+            - containerPort: 80
+              hostPort: 80
+              protocol: TCP
+            - containerPort: 443
+              hostPort: 443
+              protocol: TCP
+          EOF
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.2.0
+        with:
+          cluster_name: kind
+          wait: 10m0s
+          config: kind-config.yaml
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - name: Build Chart and Images
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          python -m pip install --upgrade pip pipenv
+          pipenv install --deploy --system --dev
+          echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
+          pipenv run chartpress --push
+      - name: Install Amalthea and Ingress-Nginx
+        run: |
+          VERSION=$(curl https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/stable.txt)
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/$VERSION/deploy/static/provider/kind/deploy.yaml
+          kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s
+          helm dep update helm-chart/amalthea
+          helm install amalthea helm-chart/amalthea --wait
+      - name: Run Acceptance Tests
+        uses: cypress-io/github-action@v2
+        with:
+          working-directory: acceptance-tests
+          command: npx mocha test.js
