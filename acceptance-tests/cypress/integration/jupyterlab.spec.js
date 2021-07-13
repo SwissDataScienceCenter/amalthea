@@ -12,4 +12,3 @@ describe('Basic functionality', function() {
       cy.get('div.jp-LauncherCard[title="Start a new terminal session"]', { timeout: 10000 }).click()
     })
   })
-  
