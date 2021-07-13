@@ -46,14 +46,11 @@ jobs:
         with:
           python-version: 3.8
       - name: Build Chart and Images
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
           python -m pip install --upgrade pip pipenv
-          pipenv install --deploy --system --dev
-          echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
-          pipenv run chartpress --push
+          pipenv install --dev
+          pipenv run chartpress
+          kind load docker-image $(pipenv run chartpress --list-images) 
       - name: Install Amalthea and Ingress-Nginx
         run: |
           VERSION=$(curl https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/stable.txt)
