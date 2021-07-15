@@ -45,19 +45,22 @@ function sleep(ms) {
 
 const checkStatusCode = async function (url) {
   var count = 0;
-  const maxCount = 300;  // sleeps 1 sec per iteration
+  const maxCount = 120;
   while (true) {
+    console.log("Waiting for container to become ready...")
     try {
       res = await axios.get(url)
-      if (res.status < 300 || count > maxCount) {
+      if (res.status < 300) {
         return {"status": res.status};
       }
-      count = count + 1;
-      await sleep(1000);
     }
-    catch (error) {
-      icount = count + 1;
+    catch (err) {}
+    finally {
+      if (count > maxCount) {
+        return {"error": "Timed out waiting for container to become ready"}
+      }
       await sleep(1000);
+      count = count + 1;
     }
   }
 }
