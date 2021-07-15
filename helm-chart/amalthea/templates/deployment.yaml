@@ -66,6 +66,8 @@ spec:
             - name: AMALTHEA_SELECTOR_LABELS
               value: |
                 {{- include "amalthea.selectorLabels" . | nindent 16 }}
+            - name: EXTRA_CHILD_RESOURCES
+              value: {{ .Values.extraChildResources | toJson | quote }}
           volumeMounts:
             - name: config
               mountPath: /app/config

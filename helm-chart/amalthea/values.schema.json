@@ -17,8 +17,7 @@
                 }
             },
             "then": {
-                "oneOf": [
-                    {
+                "oneOf": [{
                         "properties": {
                             "clusterWide": {
                                 "const": false
@@ -26,11 +25,9 @@
                             "namespaces": {
                                 "type": "array",
                                 "minItems": 1,
-                                "items": [
-                                    {
-                                        "type": "string"
-                                    }
-                                ],
+                                "items": [{
+                                    "type": "string"
+                                }],
                                 "uniqueItems": true
                             }
                         },
@@ -74,7 +71,7 @@
             "description": "Enable a network policy to limit ingress to the controller and one network policy per namespace within the amalthea scope to limit ingress and egress from/to the jupyter servers.",
             "type": "object",
             "properties": {
-                "controller":{
+                "controller": {
                     "type": "object",
                     "properties": {
                         "denyAllIngress": {
@@ -84,7 +81,7 @@
                     "required": ["denyAllIngress"],
                     "additionalProperties": false
                 },
-                "jupyterServers":{
+                "jupyterServers": {
                     "type": "object",
                     "properties": {
                         "ingress": {
@@ -113,7 +110,9 @@
                                                 "type": "object",
                                                 "additionalProperties": true,
                                                 "patternProperties": {
-                                                    ".*": { "type": "string" }
+                                                    ".*": {
+                                                        "type": "string"
+                                                    }
                                                 },
                                                 "minProperties": 1
                                             },
@@ -121,7 +120,9 @@
                                                 "type": "object",
                                                 "additionalProperties": true,
                                                 "patternProperties": {
-                                                    ".*": { "type": "string" }
+                                                    ".*": {
+                                                        "type": "string"
+                                                    }
                                                 },
                                                 "minProperties": 1
                                             }
@@ -173,26 +174,23 @@
             "description": "If the operator should be able to create child resources other than [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps] which are necessary for Amalthea to work, add the corresponding API groups and resources here.",
             "type": "object",
             "properties": {
-                "extraChildApiGroups": {
-                    "type": "array",
-                    "items": [
-                        {
-                            "type": "string"
-                        }
-                    ]
-                },
                 "extraChildResources": {
                     "type": "array",
-                    "items": [
-                        {
-                            "type": "string"
+                    "items": [{
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "group": {
+                                "type": "string"
+                            }
                         }
-                    ]
+                    }]
                 }
             },
             "additionalProperties": false,
             "required": [
-                "extraChildApiGroups",
                 "extraChildResources"
             ]
         },
@@ -219,11 +217,9 @@
         },
         "imagePullSecrets": {
             "type": "array",
-            "items": [
-                {
-                    "type": "string"
-                }
-            ]
+            "items": [{
+                "type": "string"
+            }]
         },
         "nameOverride": {
             "type": "string"
@@ -318,11 +314,9 @@
         },
         "tolerations": {
             "type": "array",
-            "items": [
-                {
-                    "type": "string"
-                }
-            ]
+            "items": [{
+                "type": "string"
+            }]
         },
         "affinity": {
             "type": "object"
@@ -343,11 +337,9 @@
                 },
                 "shortNames": {
                     "type": "array",
-                    "items": [
-                        {
-                            "type": "string"
-                        }
-                    ],
+                    "items": [{
+                        "type": "string"
+                    }],
                     "minItems": 1,
                     "uniqueItems": true
                 }

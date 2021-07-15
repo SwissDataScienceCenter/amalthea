@@ -60,13 +60,13 @@ kopfOperatorSettings: |
     # silent, see https://github.com/nolar/kopf/issues/762#issuecomment-838423267
     client_timeout: 600
 
-rbac:
-  # # If the operator should be able to create child resources other than
-  # # [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps]
-  # # which are necessary for Amalthea to work, add the corresponding API groups and
-  # # resources here.
-  extraChildApiGroups: []
-  extraChildResources: []
+# If the operator should be able to create and watch child resources other than
+# [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps]
+# which are necessary for Amalthea to work, add the corresponding API groups and
+# resources here as an array of name/group objects, eg:
+extraChildResources: []
+  # - name: jupyterservers
+  #   group: amalthea.dev
 
 image:
   repository: renku/amalthea

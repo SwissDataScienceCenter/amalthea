@@ -19,9 +19,6 @@
       - ""
       - apps
       - extensions
-    {{- range .Values.rbac.extraChildApiGroups }}
-      - {{ . }}
-    {{- end }}
     resources:
       - statefulsets
       - persistentvolumeclaims
@@ -29,9 +26,14 @@
       - ingresses
       - secrets
       - configmaps
-    {{- range .Values.rbac.extraChildResources }}
-      - {{ . }}
-    {{- end }}
     verbs: [create, get, list, watch]
+
+    {{- range .Values.extraChildResources }}
+  - apiGroups:
+      - {{ .group }}
+    resources:
+      - {{ .name }}
+    verbs: [create, get, list, watch]
+    {{- end }}
 
 {{- end }}
