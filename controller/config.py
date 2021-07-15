@@ -2,7 +2,7 @@ import json
 import os
 import yaml
 
-api_group = os.getenv("CRD_API_GROUP", "renku.io")
+api_group = os.getenv("CRD_API_GROUP", "amalthea.dev")
 api_version = os.getenv("CRD_API_VERSION", "v1alpha1")
 custom_resource_name = os.getenv("CRD_NAME", "JupyterServer")
 

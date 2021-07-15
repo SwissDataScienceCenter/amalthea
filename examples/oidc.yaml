@@ -1,4 +1,4 @@
-apiVersion: renku.io/v1alpha1
+apiVersion: amalthea.dev/v1alpha1
 kind: JupyterServer
 metadata:
   name: ## ADD NAME
