@@ -49,6 +49,13 @@ npm install
 npx mocha test.js
 ```
 
+Alternatively to specify an image, environment (i.e. lab/rstudio) and a cypress test spec.
+Set the following environment variables:
+
+```
+TEST_IMAGE_NAME=renku/renkulab-py:3.8-0.8.0 TEST_SPEC=jupyterlab.spec.js ENVIRONMENT=lab npx mocha test.js
+```
+
 5. Cleanup
 
 ```

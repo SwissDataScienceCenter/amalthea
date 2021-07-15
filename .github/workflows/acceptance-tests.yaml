@@ -3,14 +3,25 @@ name: Acceptance Tests
 on:
   pull_request:
     types:
-    - opened
-    - edited
     - synchronize
-    - reopened
-    - closed
 
 jobs:
   acceptance-tests:
+    strategy:
+      matrix:
+        include:
+          - image: renku/renkulab-r:4.0.5-0.8.0
+            env: lab
+            spec: jupyterlab.spec.js
+          - image: renku/renkulab-cuda-tf:0.8.0
+            env: lab
+            spec: jupyterlab.spec.js
+          - image: renku/renkulab-julia:1.6.1-0.8.0
+            env: lab
+            spec: jupyterlab.spec.js
+          - image: renku/renkulab-py:3.8-0.8.0
+            env: lab
+            spec: jupyterlab.spec.js
     runs-on: ubuntu-latest
     steps:
       - name: Pull Code
@@ -61,6 +72,10 @@ jobs:
           helm install amalthea helm-chart/amalthea --wait
       - name: Run Acceptance Tests
         uses: cypress-io/github-action@v2
+        env:
+          TEST_IMAGE_NAME: ${{ matrix.image }}
+          TEST_SPEC: ${{ matrix.spec }}
+          ENVIRONMENT: ${{ matrix.env }}
         with:
           working-directory: acceptance-tests
           command: npx mocha test.js
