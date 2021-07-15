@@ -67,7 +67,7 @@ const checkStatusCode = async function (url) {
 
 testSpecs.forEach(function(spec, _) {
   var url = `http://${host}/${spec.sessionName}/${spec.env}?token=${token}`
-  var manifest = `apiVersion: renku.io/v1alpha1
+  var manifest = `apiVersion: amalthea.dev/v1alpha1
 kind: JupyterServer
 metadata:
   name: ${spec.sessionName}
