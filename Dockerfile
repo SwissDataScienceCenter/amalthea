@@ -6,10 +6,11 @@ RUN pip install --no-cache-dir --disable-pip-version-check -U pip && \
     pip install --no-cache-dir --disable-pip-version-check pipenv
 
 # Install all packages
-COPY Pipfile Pipfile.lock /app/
 WORKDIR /app
+COPY Pipfile Pipfile.lock ./
 RUN pipenv install --system --deploy
 
 COPY controller /app/controller
-ENV PYTHONPATH ".:${PYTHONPATH}"
-ENTRYPOINT ["kopf", "run", "--liveness=http://0.0.0.0:8080/healthz", "/app/controller/server_controller.py"]
+COPY kopf_entrypoint.py ./
+
+ENTRYPOINT ["kopf", "run", "--liveness=http://0.0.0.0:8080/healthz", "./kopf_entrypoint.py"]
