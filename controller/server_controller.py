@@ -144,10 +144,17 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
     return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 
 
-@kopf.on.event(
-    kopf.EVERYTHING,
-    labels={PARENT_NAME_LABEL_KEY: kopf.PRESENT},
-)
+# create @kopf.on.event(...) type of decorators
+# Go to the bottom of the update_status function definition to see how
+# those decorators are applied.
+def get_update_decorator(child_resource_kind):
+    return kopf.on.event(
+        child_resource_kind["name"],
+        group=child_resource_kind["group"],
+        labels={PARENT_NAME_LABEL_KEY: kopf.PRESENT},
+    )
+
+
 def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
     """
     Update the custom object status with the status of all children
@@ -213,6 +220,11 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
             pass
         else:
             raise e
+
+
+# Add the actual decorators
+for child_resource_kind in config.CHILD_RESOURCES:
+    update_status = get_update_decorator(child_resource_kind)(update_status)
 
 
 # Note: This is a very experimental feature and it's implementation is likely

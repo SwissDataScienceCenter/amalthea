@@ -1,5 +1,5 @@
 import pytest
-from controller.server_controller import get_children_specs
+from controller.k8s_resources import get_children_specs
 import logging
 
 

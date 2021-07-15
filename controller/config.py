@@ -1,7 +1,8 @@
+import json
 import os
 import yaml
 
-api_group = os.getenv("CRD_API_GROUP", "renku.io")
+api_group = os.getenv("CRD_API_GROUP", "amalthea.dev")
 api_version = os.getenv("CRD_API_VERSION", "v1alpha1")
 custom_resource_name = os.getenv("CRD_NAME", "JupyterServer")
 
@@ -20,3 +21,17 @@ except FileNotFoundError:
     kopf_operator_settings = {}
 
 amalthea_selector_labels = yaml.safe_load(os.getenv("AMALTHEA_SELECTOR_LABELS", "{}"))
+
+
+# Allowed child resources / groups that we need per default
+CHILD_RESOURCES = [
+    {"name": "statefulsets", "group": "apps"},
+    {"name": "pods", "group": ""},
+    {"name": "ingresses", "group": "extensions"},
+    {"name": "secrets", "group": ""},
+    {"name": "configmaps", "group": ""},
+    {"name": "services", "group": ""},
+    {"name": "persistentvolumeclaims", "group": ""},
+]
+
+CHILD_RESOURCES += json.loads(os.getenv("EXTRA_CHILD_RESOURCES", "[]"))

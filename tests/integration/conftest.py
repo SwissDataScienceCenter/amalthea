@@ -8,15 +8,22 @@ import subprocess
 from kubernetes import config
 from time import sleep
 from pathlib import Path
-import os
 
 from tests.integration.utils import find_resource, is_pod_ready
+from utils.chart_rbac import configure_local_dev, cleanup_local_dev
 
 
 @pytest.fixture
-def operator(install_crd):
-    os.environ["PYTHONPATH"] = ".:" + os.environ.get("PYTHONPATH", "")
-    yield KopfRunner(["run", "-A", "--verbose", "controller/server_controller.py"])
+def operator(configure_rbac, k8s_namespace):
+    yield KopfRunner(
+        [
+            "run",
+            "-n",
+            f"{k8s_namespace}",
+            "--verbose",
+            "kopf_entrypoint.py",
+        ]
+    )
 
 
 @pytest.fixture
@@ -130,3 +137,18 @@ def install_crd(load_k8s_config):
 
     subprocess.check_call(["kubectl", "delete", "-f", crd_file])
     Path(crd_file).unlink(missing_ok=True)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def configure_rbac(install_crd):
+    """This fixture configures the tests to use a serviceaccount
+    with the same roles that the operator has when installed through
+    the helm chart."""
+
+    admin_context = subprocess.check_output(
+        "kubectl config current-context", shell=True
+    ).decode()
+    yield configure_local_dev("default", ["default"], include_crd=False)
+
+    # Cleanup after testing
+    cleanup_local_dev(admin_context, "default", ["default"], include_crd=False)
