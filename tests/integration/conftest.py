@@ -8,15 +8,21 @@ import subprocess
 from kubernetes import config
 from time import sleep
 from pathlib import Path
-import os
 
 from tests.integration.utils import find_resource, is_pod_ready
 
 
 @pytest.fixture
-def operator(install_crd):
-    os.environ["PYTHONPATH"] = ".:" + os.environ.get("PYTHONPATH", "")
-    yield KopfRunner(["run", "-A", "--verbose", "controller/server_controller.py"])
+def operator(configure_rbac, k8s_namespace):
+    yield KopfRunner(
+        [
+            "run",
+            "-n",
+            f"{k8s_namespace}",
+            "--verbose",
+            "kopf_entrypoint.py",
+        ]
+    )
 
 
 @pytest.fixture
