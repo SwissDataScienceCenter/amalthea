@@ -15,16 +15,17 @@ const url = `http://${host}/${sessionName}/${env}?token=${token}`
 const manifest = `apiVersion: amalthea.dev/v1alpha1
 kind: JupyterServer
 metadata:
-name: ${sessionName}
-namespace: ${k8sNamespace}
+  name: ${sessionName}
+  namespace: ${k8sNamespace}
 spec:
-jupyterServer:
-  image: ${image}
-routing:
-  host: ${host}
-  path: /${sessionName}
-auth:
-  token: ${token}`
+  jupyterServer:
+    image: ${image}
+  routing:
+    host: ${host}
+    path: /${sessionName}
+  auth:
+    token: ${token}
+`
 
 
 function sleep(ms) {
