@@ -170,29 +170,20 @@
             "description": "Settings to be passed to kopf.",
             "type": "string"
         },
-        "rbac": {
+        "extraChildResources": {
             "description": "If the operator should be able to create child resources other than [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps] which are necessary for Amalthea to work, add the corresponding API groups and resources here.",
-            "type": "object",
-            "properties": {
-                "extraChildResources": {
-                    "type": "array",
-                    "items": [{
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "string"
-                            },
-                            "group": {
-                                "type": "string"
-                            }
-                        }
-                    }]
+            "type": "array",
+            "items": [{
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "group": {
+                        "type": "string"
+                    }
                 }
-            },
-            "additionalProperties": false,
-            "required": [
-                "extraChildResources"
-            ]
+            }]
         },
         "image": {
             "description": "The image used for the operator.",
@@ -361,7 +352,7 @@
         "networkPolicies",
         "rescheduleOnNodeFailure",
         "kopfOperatorSettings",
-        "rbac",
+        "extraChildResources",
         "image",
         "nameOverride",
         "fullnameOverride",
