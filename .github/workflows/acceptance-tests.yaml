@@ -10,16 +10,16 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: renku/renkulab-r:4.0.5-0.8.0
+          - image: jupyter/minimal-notebook
             env: lab
             spec: jupyterlab.spec.js
-          - image: renku/renkulab-cuda-tf:0.8.0
+          - image: jupyter/r-notebook
             env: lab
             spec: jupyterlab.spec.js
-          - image: renku/renkulab-julia:1.6.1-0.8.0
+          - image: jupyter/tensorflow-notebook
             env: lab
             spec: jupyterlab.spec.js
-          - image: renku/renkulab-py:3.8-0.8.0
+          - image: jupyter/all-spark-notebook
             env: lab
             spec: jupyterlab.spec.js
     runs-on: ubuntu-latest
