@@ -27,6 +27,14 @@ spec:
             items:
               - key: jupyterServerCookieSecret
                 path: cookie_secret
+        - name: jupyter-config
+          configMap:
+            name: {{ name }}
+            items:
+              - key: jupyter_server_config.py
+                path: jupyter_server_config.py
+              - key: jupyter_notebook_config.py
+                path: jupyter_notebook_config.py
         {% if pvc["enabled"] %}
         - name: workspace
           persistentVolumeClaim:
@@ -44,26 +52,6 @@ spec:
       containers:
         - name: jupyter-server
           image: {{ jupyter_server["image"] }}
-          entrypoint: ["tini", "-g", "--"]
-          command:
-            - start-notebook.sh
-          args:
-            - "--ServerApp.ip=127.0.0.1"
-            - "--NotebookApp.ip=127.0.0.1"
-            - "--ServerApp.port=8888"
-            - "--NotebookApp.port=8888"
-            - "--ServerApp.token=$(SERVER_APP_TOKEN)"
-            - "--NotebookApp.token=$(SERVER_APP_TOKEN)"
-            - "--ServerApp.cookie_secret_file=/etc/jupyter_server_secrets/cookie_secret"
-            - "--NotebookApp.cookie_secret_file=/etc/jupyter_server_secrets/cookie_secret"
-            - "--ServerApp.allow_origin={{ host_url }}"
-            - "--NotebookApp.allow_origin={{ host_url }}"
-            - "--ServerApp.base_url={{ path }}"
-            - "--NotebookApp.base_url={{ path }}"
-            - "--ServerApp.root_dir={{ jupyter_server["rootDir"] }}"
-            - "--NotebookApp.notebook_dir={{ jupyter_server["rootDir"] }}"
-            - "--ServerApp.default_url={{ jupyter_server["defaultUrl"] }}"
-            - "--NotebookApp.default_url={{ jupyter_server["defaultUrl"] }}"
           workingDir: {{ jupyter_server["rootDir"] }}
           volumeMounts:
             - name: workspace
@@ -71,6 +59,9 @@ spec:
               subPath: work
             - name: jupyter-server-secrets
               mountPath: /etc/jupyter_server_secrets
+              readOnly: true
+            - name: jupyter-config
+              mountPath: /etc/jupyter
               readOnly: true
           env:
             - name: SERVER_APP_TOKEN
