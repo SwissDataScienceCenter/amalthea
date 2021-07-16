@@ -5,7 +5,10 @@
 - node
 
 ## Running
-1. Start a kind cluster, see [here](https://kind.sigs.k8s.io/docs/user/ingress/#ingress-nginx) for more details
+1. Start a `kind` cluster with the config below which will enable
+`ingress-nginx` to be installed and used as an ingress controller.
+See [here](https://kind.sigs.k8s.io/docs/user/ingress/#ingress-nginx) for more details
+on installing `ingress-nginx` in kind.
 
 ```
 cat <<EOF | kind create cluster --name kind --config=-
