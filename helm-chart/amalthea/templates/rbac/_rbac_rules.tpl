@@ -19,6 +19,7 @@
       - ""
       - apps
       - extensions
+      - networking.k8s.io
     resources:
       - statefulsets
       - persistentvolumeclaims
