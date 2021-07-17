@@ -42,7 +42,9 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/$VER
 3. Install amathea
 
 ```
-helm install amalthea helm-chart/amalthea
+cd helm-chart
+pipenv run chartpress
+helm install amalthea amalthea
 ```
 
 4. Run the tests
