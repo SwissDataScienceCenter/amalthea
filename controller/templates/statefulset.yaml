@@ -61,7 +61,7 @@ spec:
               mountPath: /etc/jupyter_server_secrets
               readOnly: true
             - name: jupyter-config
-              mountPath: /etc/jupyter
+              mountPath: /etc/amalthea_jupyter_config
               readOnly: true
           env:
             - name: SERVER_APP_TOKEN
@@ -69,6 +69,8 @@ spec:
                 secretKeyRef:
                   name: {{ name }}
                   key: jupyterServerAppToken
+            - name: JUPYTER_CONFIG_DIR
+              value: /etc/amalthea_jupyter_config
           resources: {{ jupyter_server["resources"] | default({}) | tojson }}
           ports:
             - name: notebook-port
