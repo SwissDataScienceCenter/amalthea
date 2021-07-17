@@ -44,6 +44,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/$VER
 ```
 cd helm-chart
 pipenv run chartpress
+kind load docker-image $(pipenv run chartpress --list-images) 
 helm install amalthea amalthea
 ```
 
