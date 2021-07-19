@@ -209,3 +209,7 @@ tags
 
 # End of https://www.toptal.com/developers/gitignore/api/vscode,vim,emacs,node
 examples-private/
+
+# Cypress
+acceptance-tests/cypress/screenshots
+acceptance-tests/cypress/videos
