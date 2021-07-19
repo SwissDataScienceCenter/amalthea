@@ -27,14 +27,21 @@ spec:
             items:
               - key: jupyterServerCookieSecret
                 path: cookie_secret
-        - name: jupyter-config
+        - name: jupyter-config-notebook
+          configMap:
+            name: {{ name }}
+            items:
+              - key: jupyter_notebook_config.py
+                path: jupyter_notebook_config.py
+        - name: jupyter-config-server
           configMap:
             name: {{ name }}
             items:
               - key: jupyter_server_config.py
                 path: jupyter_server_config.py
-              - key: jupyter_notebook_config.py
-                path: jupyter_notebook_config.py
+        - name: jupyter-config
+          emptyDir:
+            sizeLimit: "2Mi"
         {% if pvc["enabled"] %}
         - name: workspace
           persistentVolumeClaim:
@@ -62,6 +69,12 @@ spec:
               readOnly: true
             - name: jupyter-config
               mountPath: /etc/amalthea_jupyter_config
+            - name: jupyter-config-server
+              mountPath: /etc/amalthea_jupyter_config/jupyter_server_config.py
+              subPath: jupyter_server_config.py
+            - name: jupyter-config-notebook
+              mountPath: /etc/amalthea_jupyter_config/jupyter_notebook_config.py
+              subPath: jupyter_notebook_config.py
           env:
             - name: SERVER_APP_TOKEN
               valueFrom:
