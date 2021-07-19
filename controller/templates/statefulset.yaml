@@ -62,7 +62,6 @@ spec:
               readOnly: true
             - name: jupyter-config
               mountPath: /etc/amalthea_jupyter_config
-              readOnly: true
           env:
             - name: SERVER_APP_TOKEN
               valueFrom:

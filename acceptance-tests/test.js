@@ -10,6 +10,7 @@ const image = process.env.TEST_IMAGE_NAME || "renku/renkulab-py:3.8-0.8.0";
 const testSpec = process.env.TEST_SPEC || "jupyterlab.spec.js";
 const env = process.env.ENVIRONMENT || "lab"
 const sessionName = "test";
+const timeoutSeconds = process.env.TIMEOUT_SECS || 600;
 
 const url = `http://${host}/${sessionName}/${env}?token=${token}`
 const manifest = `apiVersion: amalthea.dev/v1alpha1
@@ -35,7 +36,6 @@ function sleep(ms) {
 
 const checkStatusCode = async function (url) {
   var count = 0;
-  const maxCount = 300;
   while (true) {
     console.log("Waiting for container to become ready...")
     try {
@@ -46,7 +46,7 @@ const checkStatusCode = async function (url) {
     }
     catch (err) {}
     finally {
-      if (count > maxCount) {
+      if (count > timeoutSeconds) {
         return {"error": "Timed out waiting for container to become ready"}
       }
       await sleep(1000);
