@@ -1,11 +1,10 @@
 from datetime import datetime, timedelta
-import json
 
 from expiringdict import ExpiringDict
 import kopf
 import kubernetes.client as k8s_client
 from kubernetes.dynamic import DynamicClient
-from kubernetes.dynamic.exceptions import ApiException, NotFoundError
+from kubernetes.dynamic.exceptions import NotFoundError
 
 
 from controller import config
@@ -64,17 +63,12 @@ def get_api(api_version, kind):
         return api_cache[(api_version, kind)]
 
 
-def create_namespaced_resource(namespace, body, logger):
+def create_namespaced_resource(namespace, body):
     """
     Create a k8s resource given the namespace and the full resource object.
     """
     api = get_api(body["apiVersion"], body["kind"])
-    try:
-        return api.create(namespace=namespace, body=body)
-    except ApiException as e:
-        logger.error(
-            f"Exception when creating a {body['kind']} by calling {api}: {e}\n"
-        )
+    return api.create(namespace=namespace, body=body)
 
 
 @kopf.on.startup()
@@ -114,7 +108,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
 
     # Add the labels to all child resources and create them in the cluster
     children_uids = {}
-    children_exceptions = {}
+
     for child_key, child_spec in children_specs.items():
         # TODO: look at the option of using subhandlers here.
         try:
@@ -125,21 +119,13 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
             kopf.adopt(child_spec)
 
             children_uids[child_key] = create_namespaced_resource(
-                namespace=namespace, body=child_spec, logger=logger
+                namespace=namespace, body=child_spec
             ).metadata.uid
         except Exception as child_exception:
-            children_exceptions[child_key] = child_exception
-
-    if len(children_exceptions.keys()) > 0:
-        logger.debug(
-            f"Resources which triggered \
-            exceptions: {children_exceptions.keys()}"
-        )
-        logger.debug(
-            f"Full dump of all child resources:\n\
-            {json.dumps(children_specs, indent=4, sort_keys=True)}"
-        )
-        raise children_exceptions[list(children_exceptions.keys())[0]]
+            logger.exception(child_exception)
+            raise kopf.PermanentError(
+                f"The creation of child resource {child_key} failed."
+            )
 
     return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 
