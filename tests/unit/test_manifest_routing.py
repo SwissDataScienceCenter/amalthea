@@ -42,9 +42,15 @@ def test_routing(tls, valid_spec):
                 "paths": [
                     {
                         "path": routing["path"],
-                        "backend": {"serviceName": name, "servicePort": 80},
-                    }
-                ]
+                        "pathType": "Prefix",
+                        "backend": {
+                            "service": {
+                                "name": name,
+                                "port": {"number": 80},
+                            },
+                        },
+                    },
+                ],
             },
         }
     ]
