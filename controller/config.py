@@ -27,7 +27,7 @@ amalthea_selector_labels = yaml.safe_load(os.getenv("AMALTHEA_SELECTOR_LABELS", 
 CHILD_RESOURCES = [
     {"name": "statefulsets", "group": "apps"},
     {"name": "pods", "group": ""},
-    {"name": "ingresses", "group": "extensions"},
+    {"name": "ingresses", "group": "networking.k8s.io"},
     {"name": "secrets", "group": ""},
     {"name": "configmaps", "group": ""},
     {"name": "services", "group": ""},
