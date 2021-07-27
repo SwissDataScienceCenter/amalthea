@@ -27,6 +27,21 @@ spec:
             items:
               - key: jupyterServerCookieSecret
                 path: cookie_secret
+        - name: jupyter-config-notebook
+          configMap:
+            name: {{ name }}
+            items:
+              - key: jupyter_notebook_config.py
+                path: jupyter_notebook_config.py
+        - name: jupyter-config-server
+          configMap:
+            name: {{ name }}
+            items:
+              - key: jupyter_server_config.py
+                path: jupyter_server_config.py
+        - name: jupyter-config
+          emptyDir:
+            sizeLimit: "2Mi"
         {% if pvc["enabled"] %}
         - name: workspace
           persistentVolumeClaim:
@@ -44,26 +59,6 @@ spec:
       containers:
         - name: jupyter-server
           image: {{ jupyter_server["image"] }}
-          entrypoint: ["tini", "-g", "--"]
-          command:
-            - start-notebook.sh
-          args:
-            - "--ServerApp.ip=127.0.0.1"
-            - "--NotebookApp.ip=127.0.0.1"
-            - "--ServerApp.port=8888"
-            - "--NotebookApp.port=8888"
-            - "--ServerApp.token=$(SERVER_APP_TOKEN)"
-            - "--NotebookApp.token=$(SERVER_APP_TOKEN)"
-            - "--ServerApp.cookie_secret_file=/etc/jupyter_server_secrets/cookie_secret"
-            - "--NotebookApp.cookie_secret_file=/etc/jupyter_server_secrets/cookie_secret"
-            - "--ServerApp.allow_origin={{ host_url }}"
-            - "--NotebookApp.allow_origin={{ host_url }}"
-            - "--ServerApp.base_url={{ path }}"
-            - "--NotebookApp.base_url={{ path }}"
-            - "--ServerApp.root_dir={{ jupyter_server["rootDir"] }}"
-            - "--NotebookApp.notebook_dir={{ jupyter_server["rootDir"] }}"
-            - "--ServerApp.default_url={{ jupyter_server["defaultUrl"] }}"
-            - "--NotebookApp.default_url={{ jupyter_server["defaultUrl"] }}"
           workingDir: {{ jupyter_server["rootDir"] }}
           volumeMounts:
             - name: workspace
@@ -72,12 +67,22 @@ spec:
             - name: jupyter-server-secrets
               mountPath: /etc/jupyter_server_secrets
               readOnly: true
+            - name: jupyter-config
+              mountPath: /etc/amalthea_jupyter_config
+            - name: jupyter-config-server
+              mountPath: /etc/amalthea_jupyter_config/jupyter_server_config.py
+              subPath: jupyter_server_config.py
+            - name: jupyter-config-notebook
+              mountPath: /etc/amalthea_jupyter_config/jupyter_notebook_config.py
+              subPath: jupyter_notebook_config.py
           env:
             - name: SERVER_APP_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ name }}
                   key: jupyterServerAppToken
+            - name: JUPYTER_CONFIG_DIR
+              value: /etc/amalthea_jupyter_config
           resources: {{ jupyter_server["resources"] | default({}) | tojson }}
           ports:
             - name: notebook-port
