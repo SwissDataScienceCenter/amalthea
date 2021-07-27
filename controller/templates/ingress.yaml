@@ -15,6 +15,9 @@ spec:
       http:
         paths:
         - path: {{ routing["path"] }}
+          pathType: Prefix
           backend:
-            serviceName: {{ name }}
-            servicePort: 80
+            service:
+              name: {{ name }}
+              port:
+                number: 80
