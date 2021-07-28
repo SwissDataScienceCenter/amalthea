@@ -105,11 +105,11 @@ spec:
               protocol: TCP
           resources:
             requests:
-              cpu: 20m
-              memory: 16Mi
-            limits:
-              cpu: 100m
+              cpu: 50m
               memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
           volumeMounts:
             - name: traefik-configmap
               mountPath: /config
@@ -144,10 +144,10 @@ spec:
           resources:
             requests:
               cpu: 20m
-              memory: 16Mi
+              memory: 32Mi
             limits:
               cpu: 100m
-              memory: 32Mi
+              memory: 64Mi
 
         {% if oidc["enabled"] %}
         - name: authorization-plugin
@@ -162,10 +162,10 @@ spec:
           resources:
             requests:
               cpu: 20m
-              memory: 16Mi
+              memory: 32Mi
             limits:
               cpu: 100m
-              memory: 32Mi
+              memory: 64Mi
 
         - name: authentication-plugin
           image: "bitnami/oauth2-proxy:7.1.2"
