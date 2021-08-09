@@ -36,6 +36,18 @@ CHILD_RESOURCES = [
 
 CHILD_RESOURCES += json.loads(os.getenv("EXTRA_CHILD_RESOURCES", "[]"))
 
-KOPF_CREATE_TIMEOUT = None if os.getenv("KOPF_CREATE_TIMEOUT") is None else float(os.getenv("KOPF_CREATE_TIMEOUT"))
-KOPF_CREATE_BACKOFF = None if os.getenv("KOPF_CREATE_BACKOFF") is None else float(os.getenv("KOPF_CREATE_BACKOFF"))
-KOPF_CREATE_RETRIES = None if os.getenv("KOPF_CREATE_RETRIES") is None else int(os.getenv("KOPF_CREATE_RETRIES"))
+KOPF_CREATE_TIMEOUT = (
+    None
+    if os.getenv("KOPF_CREATE_TIMEOUT") is None
+    else float(os.getenv("KOPF_CREATE_TIMEOUT"))
+)
+KOPF_CREATE_BACKOFF = (
+    None
+    if os.getenv("KOPF_CREATE_BACKOFF") is None
+    else float(os.getenv("KOPF_CREATE_BACKOFF"))
+)
+KOPF_CREATE_RETRIES = (
+    None
+    if os.getenv("KOPF_CREATE_RETRIES") is None
+    else int(os.getenv("KOPF_CREATE_RETRIES"))
+)
