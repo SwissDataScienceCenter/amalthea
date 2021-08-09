@@ -68,6 +68,18 @@ spec:
                 {{- include "amalthea.selectorLabels" . | nindent 16 }}
             - name: EXTRA_CHILD_RESOURCES
               value: {{ .Values.extraChildResources | toJson | quote }}
+            {{- with .Values.kopf.onCreate }}
+            - name: KOPF_CREATE_TIMEOUT
+              value: {{ .timeout }}
+            {{- end }}
+            {{- with .Values.kopf.onCreate }}
+            - name: KOPF_CREATE_BACKOFF
+              value: {{ .backoff }}
+            {{- end }}
+            {{- with .Values.kopf.onCreate }}
+            - name: KOPF_CREATE_RETRIES
+              value: {{ .retries }}
+            {{- end }}
           volumeMounts:
             - name: config
               mountPath: /app/config
