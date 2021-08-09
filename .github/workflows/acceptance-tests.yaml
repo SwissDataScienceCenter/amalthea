@@ -3,7 +3,11 @@ name: Acceptance Tests
 on:
   pull_request:
     types:
+    - opened
+    - edited
     - synchronize
+    - reopened
+    - closed
 
 jobs:
   acceptance-tests-images:
