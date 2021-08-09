@@ -58,7 +58,8 @@ spec:
                       default: /lab
                     rootDir:
                       type: string
-                      default: /home/jovyan/work/
+                      description: "The absolute path to the root/notebook directory for jupyterlab. Should lead to a subdirectory of or match the path at storage.pvc.mountPath"
+                      default: /home/jovyan/work
 
                     # TODO: Automatically fetch and inline schema
                     # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
@@ -110,6 +111,10 @@ spec:
                         storageClassName:
                           type: string
                           description: "Storage class to be used for the PVC. If left empty, the default storage class defined for the cluster will be used."
+                        mountPath:
+                          type: string
+                          description: "The absolute path to the location where the PVC should be mounted in the user session pod."
+                          default: /home/jovyan/work
 
                 auth:
                   type: object
