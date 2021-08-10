@@ -1,4 +1,5 @@
 import pytest
+import re
 from controller.k8s_resources import get_children_specs
 import logging
 
@@ -32,8 +33,28 @@ def test_jupyterserver(resources, valid_spec):
     manifest = get_children_specs(name, spec, logging)
     js_container = manifest["statefulset"]["spec"]["template"]["spec"]["containers"][0]
     assert js_container["image"] == server["image"]
-    assert f"--ServerApp.default_url={server['defaultUrl']}" in js_container["args"]
-    assert f"--NotebookApp.default_url={server['defaultUrl']}" in js_container["args"]
+    assert (
+        len(
+            re.findall(
+                re.escape("c.ServerApp.default_url=")
+                + r"[\'\"]{1}"
+                + re.escape(server["defaultUrl"]),
+                manifest["configmap"]["data"]["jupyter_server_config.py"],
+            )
+        )
+        == 1
+    )
+    assert (
+        len(
+            re.findall(
+                re.escape("c.NotebookApp.default_url=")
+                + r"[\'\"]{1}"
+                + re.escape(server["defaultUrl"]),
+                manifest["configmap"]["data"]["jupyter_notebook_config.py"],
+            )
+        )
+        == 1
+    )
     assert js_container["workingDir"] == server["rootDir"]
     if resources is not None:
         assert js_container["resources"] == resources

@@ -19,21 +19,21 @@ jobs:
           - kind-image-version: "v1.21.2"
             helm-version: "v3.6.3"
             test-image:
-              - image: jupyter/r-notebook
-                env: lab
-                spec: jupyterlab.spec.js
+              image: jupyter/r-notebook
+              env: lab
+              spec: jupyterlab.spec.js
           - kind-image-version: "v1.21.2"
             helm-version: "v3.6.3"
             test-image:
-              - image: jupyter/tensorflow-notebook
-                env: lab
-                spec: jupyterlab.spec.js
+              image: jupyter/tensorflow-notebook
+              env: lab
+              spec: jupyterlab.spec.js
           - kind-image-version: "v1.21.2"
             helm-version: "v3.6.3"
             test-image:
-              - image: jupyter/all-spark-notebook
-                env: lab
-                spec: jupyterlab.spec.js
+              image: jupyter/all-spark-notebook
+              env: lab
+              spec: jupyterlab.spec.js
     runs-on: ubuntu-latest
     steps:
       - name: Pull Code

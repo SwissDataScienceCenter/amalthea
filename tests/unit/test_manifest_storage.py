@@ -12,6 +12,7 @@ def test_storage(storage_class, size, pvc_enabled, valid_spec):
         "pvc": {
             "enabled": pvc_enabled,
             "storageClassName": storage_class,
+            "mountPath": "/home/jovyan/work/",
         },
     }
     spec = valid_spec(storage=storage)
@@ -44,5 +45,4 @@ def test_storage(storage_class, size, pvc_enabled, valid_spec):
     assert {
         "name": "workspace",
         "mountPath": "/home/jovyan/work/",
-        "subPath": "work",
     } in volume_mounts

@@ -3,6 +3,28 @@ apiVersion: v1
 metadata:
   name: {{ name }}
 data:
+  jupyter_notebook_config.py: |
+    import os
+    c.NotebookApp.ip="127.0.0.1"
+    c.NotebookApp.port=8888
+    c.NotebookApp.token=os.environ["SERVER_APP_TOKEN"]
+    c.NotebookApp.cookie_secret_file="/etc/jupyter_server_secrets/cookie_secret"
+    c.NotebookApp.allow_origin="{{ host_url }}"
+    c.NotebookApp.base_url="{{ path }}"
+    c.NotebookApp.notebook_dir="{{ jupyter_server["rootDir"] }}"
+    c.NotebookApp.default_url="{{ jupyter_server["defaultUrl"] }}"
+
+  jupyter_server_config.py: |
+    import os
+    c.ServerApp.ip="127.0.0.1"
+    c.ServerApp.port=8888
+    c.ServerApp.token=os.environ["SERVER_APP_TOKEN"]
+    c.ServerApp.cookie_secret_file="/etc/jupyter_server_secrets/cookie_secret"
+    c.ServerApp.allow_origin="{{ host_url }}"
+    c.ServerApp.base_url="{{ path }}"
+    c.ServerApp.root_dir="{{ jupyter_server["rootDir"] }}"
+    c.ServerApp.default_url="{{ jupyter_server["defaultUrl"] }}"
+
   proxy-rules.yaml: |
     http:
       routers:
