@@ -170,10 +170,10 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-                "operatorSettings"
+                "startupConfiguration"
             ],
             "properties": {
-                "operatorSettings": {
+                "startupConfiguration": {
                     "description": "Settings to be passed to kopf.",
                     "type": "string"
                 },

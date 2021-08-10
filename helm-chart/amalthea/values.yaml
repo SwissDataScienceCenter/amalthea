@@ -55,7 +55,7 @@ kopf:
   # # a yaml object as multiline string. See
   # # https://kopf.readthedocs.io/en/stable/configuration/
   # # for configuraiton options.
-  operatorSettings: |
+  startupConfiguration: |
     watching:
       # This can fix a problem of a watch stream suddenly falling
       # silent, see https://github.com/nolar/kopf/issues/762#issuecomment-838423267
