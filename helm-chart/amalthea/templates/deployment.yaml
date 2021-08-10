@@ -70,15 +70,11 @@ spec:
               value: {{ .Values.extraChildResources | toJson | quote }}
             {{- with .Values.kopf.onCreate }}
             - name: KOPF_CREATE_TIMEOUT
-              value: {{ .timeout }}
-            {{- end }}
-            {{- with .Values.kopf.onCreate }}
+              value: {{ .timeout | quote }}
             - name: KOPF_CREATE_BACKOFF
-              value: {{ .backoff }}
-            {{- end }}
-            {{- with .Values.kopf.onCreate }}
+              value: {{ .backoff | quote }}
             - name: KOPF_CREATE_RETRIES
-              value: {{ .retries }}
+              value: {{ .retries | quote }}
             {{- end }}
           volumeMounts:
             - name: config

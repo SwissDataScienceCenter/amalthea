@@ -38,16 +38,16 @@ CHILD_RESOURCES += json.loads(os.getenv("EXTRA_CHILD_RESOURCES", "[]"))
 
 KOPF_CREATE_TIMEOUT = (
     None
-    if os.getenv("KOPF_CREATE_TIMEOUT") is None
+    if os.getenv("KOPF_CREATE_TIMEOUT", "") == ""
     else float(os.getenv("KOPF_CREATE_TIMEOUT"))
 )
 KOPF_CREATE_BACKOFF = (
     None
-    if os.getenv("KOPF_CREATE_BACKOFF") is None
+    if os.getenv("KOPF_CREATE_BACKOFF", "") == ""
     else float(os.getenv("KOPF_CREATE_BACKOFF"))
 )
 KOPF_CREATE_RETRIES = (
     None
-    if os.getenv("KOPF_CREATE_RETRIES") is None
+    if os.getenv("KOPF_CREATE_RETRIES", "") == ""
     else int(os.getenv("KOPF_CREATE_RETRIES"))
 )
