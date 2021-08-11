@@ -90,6 +90,9 @@ def configure(logger, settings, **_):
     config.api_group,
     config.api_version,
     config.custom_resource_name,
+    timeout=config.KOPF_CREATE_TIMEOUT,
+    retries=config.KOPF_CREATE_RETRIES,
+    backoff=config.KOPF_CREATE_BACKOFF,
 )
 def create_fn(labels, logger, name, namespace, spec, uid, **_):
     """
@@ -111,21 +114,15 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
 
     for child_key, child_spec in children_specs.items():
         # TODO: look at the option of using subhandlers here.
-        try:
-            kopf.label(
-                child_spec,
-                labels=get_labels(name, uid, labels, child_key=child_key),
-            )
-            kopf.adopt(child_spec)
+        kopf.label(
+            child_spec,
+            labels=get_labels(name, uid, labels, child_key=child_key),
+        )
+        kopf.adopt(child_spec)
 
-            children_uids[child_key] = create_namespaced_resource(
-                namespace=namespace, body=child_spec
-            ).metadata.uid
-        except Exception as child_exception:
-            logger.exception(child_exception)
-            raise kopf.PermanentError(
-                f"The creation of child resource {child_key} failed."
-            )
+        children_uids[child_key] = create_namespaced_resource(
+            namespace=namespace, body=child_spec
+        ).metadata.uid
 
     return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 

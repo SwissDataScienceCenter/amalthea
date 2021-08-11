@@ -50,15 +50,24 @@ networkPolicies:
 
 rescheduleOnNodeFailure: false
 
-# Configure the kopf operator settings by providing
-# a yaml object as multiline string. See
-# https://kopf.readthedocs.io/en/stable/configuration/
-# for configuraiton options.
-kopfOperatorSettings: |
-  watching:
-    # This can fix a problem of a watch stream suddenly falling
-    # silent, see https://github.com/nolar/kopf/issues/762#issuecomment-838423267
-    client_timeout: 600
+kopf:
+  # # Configure the kopf operator settings by providing
+  # # a yaml object as multiline string. See
+  # # https://kopf.readthedocs.io/en/stable/configuration/
+  # # for configuraiton options.
+  startupConfiguration: |
+    watching:
+      # This can fix a problem of a watch stream suddenly falling
+      # silent, see https://github.com/nolar/kopf/issues/762#issuecomment-838423267
+      client_timeout: 600
+  # # Configure the use of timeout, delay and backoff for the successful creation
+  # # of k8s resources by the operator. Leaving out timeout or retries results
+  # # in the operator permanently retrying and never giving up when it encounters
+  # # erors during the k8s resource creation phase.
+  # onCreate:
+  #   timeout: 600
+  #   retries: 60
+  #   backoff: 10
 
 # If the operator should be able to create and watch child resources other than
 # [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps]

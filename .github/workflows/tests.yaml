@@ -1,6 +1,13 @@
 name: tests
 
-on: [push]
+on:
+  pull_request:
+    types:
+    - opened
+    - edited
+    - synchronize
+    - reopened
+    - closed
 
 jobs:
   run-tests:

@@ -166,9 +166,44 @@
             "description": "Experimental feature - reschedule jupyterServers on different nodes if a node fails.",
             "type": "boolean"
         },
-        "kopfOperatorSettings": {
-            "description": "Settings to be passed to kopf.",
-            "type": "string"
+        "kopf": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "startupConfiguration"
+            ],
+            "properties": {
+                "startupConfiguration": {
+                    "description": "Settings to be passed to kopf.",
+                    "type": "string"
+                },
+                "onCreate": {
+                    "type": "object",
+                    "default": {},
+                    "additionalProperties": false,
+                    "required": [],
+                    "properties": {
+                        "timeout": {
+                            "type":"number",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "description": "How long in seconds until the create handler gives up if the resources cannot be successfully created."
+                        },
+                        "retries": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": false,
+                            "description": "How many retries should the handler attempt when the creation of a resource fails."
+                        },
+                        "backoff": {
+                            "type": "number",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "description": "How long to wait in seconds before the handler retries the failed creation of a resource."
+                        }
+                    }
+                }
+            }
         },
         "extraChildResources": {
             "description": "If the operator should be able to create child resources other than [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps] which are necessary for Amalthea to work, add the corresponding API groups and resources here.",
@@ -351,7 +386,7 @@
         "deployCrd",
         "networkPolicies",
         "rescheduleOnNodeFailure",
-        "kopfOperatorSettings",
+        "kopf",
         "extraChildResources",
         "image",
         "nameOverride",

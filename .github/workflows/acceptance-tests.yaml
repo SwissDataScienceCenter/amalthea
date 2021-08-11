@@ -3,7 +3,11 @@ name: Acceptance Tests
 on:
   pull_request:
     types:
+    - opened
+    - edited
     - synchronize
+    - reopened
+    - closed
 
 jobs:
   acceptance-tests-images:
@@ -38,6 +42,8 @@ jobs:
     steps:
       - name: Pull Code
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - name: Make Kind Config File
         run: |
           cat <<EOF > kind-config.yaml
