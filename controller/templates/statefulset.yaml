@@ -80,7 +80,7 @@ spec:
                 secretKeyRef:
                   name: {{ name }}
                   key: jupyterServerAppToken
-            - name: JUPYTER_CONFIG_DIR
+            - name: JUPYTER_CONFIG_PATH
               value: {{ storage["pvc"]["mountPath"] }}/.jupyter_config
           resources: {{ jupyter_server["resources"] | default({}) | tojson }}
           ports:
