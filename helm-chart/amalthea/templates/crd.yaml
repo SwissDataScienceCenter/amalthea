@@ -120,16 +120,6 @@ spec:
                   type: object
                   default: {} # Stupid, but necessary for the inner defaults do work
                   properties:
-                    cookieAllowlist:
-                      type: array
-                      default: ["username-localhost-8888", "_xsrf"]
-                      items:
-                        type: string
-                    # As soon as a cookie block list is defined, the white list is ignored.
-                    cookieBlocklist:
-                      type: array
-                      items:
-                        type: string
                     token:
                       description: |
                         A token that will be passed to the `--ServerApp.token` option when running

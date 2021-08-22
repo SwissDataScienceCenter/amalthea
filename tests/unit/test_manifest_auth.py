@@ -9,8 +9,6 @@ from base64 import b64encode
 @pytest.mark.parametrize("token", ["", None, "secret_token"])
 def test_auth_no_oidc(token, cookie_block_list, cookie_allow_list, valid_spec):
     auth = {
-        "cookieAllowlist": cookie_allow_list,
-        "cookieBlocklist": cookie_block_list,
         "oidc": {
             "enabled": False,
         },
@@ -22,9 +20,6 @@ def test_auth_no_oidc(token, cookie_block_list, cookie_allow_list, valid_spec):
     manifest = get_children_specs(name, spec, logging)
     secret = manifest["secret"]
     js_container = manifest["statefulset"]["spec"]["template"]["spec"]["containers"][0]
-    cookie_cleaner_container = manifest["statefulset"]["spec"]["template"]["spec"][
-        "containers"
-    ][2]
     assert "jupyterServerAppToken" in secret["data"].keys()
     assert {
         "name": "SERVER_APP_TOKEN",
@@ -44,14 +39,6 @@ def test_auth_no_oidc(token, cookie_block_list, cookie_allow_list, valid_spec):
             secret["data"]["jupyterServerAppToken"]
             == b64encode(token.encode()).decode()
         )
-    assert {
-        "name": "ALLOWLIST",
-        "value": str(cookie_allow_list).replace("'", '"'),
-    } in cookie_cleaner_container["env"]
-    assert {
-        "name": "BLOCKLIST",
-        "value": str(cookie_block_list).replace("'", '"'),
-    } in cookie_cleaner_container["env"]
     assert not any(
         [
             container["name"] in ["authentication-plugin", "authorization-plugin"]
@@ -71,7 +58,6 @@ def test_auth_no_oidc(token, cookie_block_list, cookie_allow_list, valid_spec):
 )
 def test_auth_oidc(oidc_secret, valid_spec):
     auth = {
-        "cookieAllowlist": [],
         "oidc": {
             "enabled": True,
             "issuerUrl": "https://issuer.url",
@@ -101,7 +87,7 @@ def test_auth_oidc(oidc_secret, valid_spec):
     )
     assert "authenticationPluginCookieSecret" in secret["data"].keys()
     auth_container = manifest["statefulset"]["spec"]["template"]["spec"]["containers"][
-        4
+        3
     ]
     auth_container_oidc_secret = [
         env

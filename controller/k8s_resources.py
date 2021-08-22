@@ -57,8 +57,6 @@ def create_template_values(name, spec):
         "authentication_plugin_cookie_secret": base64.urlsafe_b64encode(
             os.urandom(32)
         ).decode(),
-        "cookie_allowlist": json.dumps(spec["auth"]["cookieAllowlist"]),
-        "cookie_blocklist": json.dumps(spec["auth"].get("cookieBlocklist", None)),
         "full_url": full_url,
         "host_url": host_url,
         "ingress_annotations": json.dumps(spec["routing"]["ingressAnnotations"]),
