@@ -43,12 +43,10 @@ networkPolicies:
       #   namespaceSelectorLabels: {}
       #   podSelectorLabels: {}
     egress:
-      # # If enabled allows jupyter servers to access ports 80 and 443 (http/https) 
+      # # If enabled allows jupyter servers to access ports 80 and 443 (http/https)
       # # outside of the cluster and port 53 for DNS outside and inside of the cluster
       # # all other egress is prohibited.
       enabled: true
-
-rescheduleOnNodeFailure: false
 
 kopf:
   # # Configure the kopf operator settings by providing

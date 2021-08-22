@@ -1,5 +1,3 @@
-from datetime import datetime, timedelta
-
 from expiringdict import ExpiringDict
 import kopf
 import kubernetes.client as k8s_client
@@ -208,48 +206,3 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 # Add the actual decorators
 for child_resource_kind in config.CHILD_RESOURCES:
     update_status = get_update_decorator(child_resource_kind)(update_status)
-
-
-# Note: This is a very experimental feature and it's implementation is likely
-#       to evolve over time. Use with care.
-if config.reschedule_on_node_failure:
-
-    @kopf.timer(
-        config.api_group,
-        config.api_version,
-        config.custom_resource_name,
-        initial_delay=60,
-        interval=15,
-        idle=15,
-    )
-    def clean_pods_on_dead_nodes(namespace, name, logger, **_):
-        """
-        Periodically check all jupyter server objects for the health of their host
-        node. Kill pods on unreachable/dead nodes with the sledgehammer. This brings
-        a risk multiple containers writing to the same volume should the pod still
-        be running on the unreachable node.
-        """
-        pod_status = k8s_client.CoreV1Api().read_namespaced_pod_status(
-            namespace=namespace,
-            name=f"{name}-0",
-        )
-        ready_cond = [
-            cond for cond in pod_status.status.conditions if cond.type == "Ready"
-        ][0]
-
-        # Would be nice if this came as a boolean already...
-        if not (ready_cond.status == "False" and pod_status.status.phase == "Running"):
-            return
-
-        status_age = (
-            datetime.now(ready_cond.last_transition_time.tzinfo)
-            - ready_cond.last_transition_time
-        )
-
-        if status_age > timedelta(minutes=1):
-            k8s_client.CoreV1Api().delete_namespaced_pod(
-                namespace=namespace,
-                name=f"{name}-0",
-                grace_period_seconds=0,
-                propagation_policy="Background",
-            )
