@@ -6,13 +6,6 @@ api_group = os.getenv("CRD_API_GROUP", "amalthea.dev")
 api_version = os.getenv("CRD_API_VERSION", "v1alpha1")
 custom_resource_name = os.getenv("CRD_NAME", "JupyterServer")
 
-# Strings which will be evaluated as true on env variables.
-TRUE_STRINGS = ["True", "true", "1"]
-
-# Note: This is an experimental feature, us it with care.
-reschedule_on_node_failure = (
-    os.getenv("RESCHEDULE_ON_NODE_FAILURE", False) in TRUE_STRINGS
-)
 
 try:
     with open("/app/config/kopf-operator-settings.yaml", "r") as f:

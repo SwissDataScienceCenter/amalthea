@@ -162,10 +162,6 @@
                 "controller", "jupyterServers"
             ]
         },
-        "rescheduleOnNodeFailure": {
-            "description": "Experimental feature - reschedule jupyterServers on different nodes if a node fails.",
-            "type": "boolean"
-        },
         "kopf": {
             "type": "object",
             "additionalProperties": false,
@@ -385,7 +381,6 @@
         "scope",
         "deployCrd",
         "networkPolicies",
-        "rescheduleOnNodeFailure",
         "kopf",
         "extraChildResources",
         "image",
