@@ -129,25 +129,6 @@ spec:
             successThreshold: 1
             failureThreshold: 1
 
-        - name: cookie-cleaner
-          image: ableuler/cookie-cleaner:0.0.0-9
-          env:
-            - name: ALLOWLIST
-              value: '{{ cookie_allowlist }}'
-            - name: BLOCKLIST
-              value: '{{ cookie_blocklist }}'
-          ports:
-            - name: http
-              containerPort: 3001
-              protocol: TCP
-          resources:
-            requests:
-              cpu: 20m
-              memory: 32Mi
-            limits:
-              cpu: 100m
-              memory: 64Mi
-
         {% if oidc["enabled"] %}
         - name: authorization-plugin
           image: ableuler/auth-test:0.0.0-1

@@ -11,7 +11,6 @@ def default_spec(crd_schema):
         "auth": {
             "token": "token",
             "oidc": {"enabled": False},
-            "cookieAllowlist": [],
         },
         "jupyterServer": {
             "defaultUrl": "default_url",
