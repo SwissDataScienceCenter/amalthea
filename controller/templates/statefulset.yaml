@@ -17,10 +17,14 @@ spec:
       imagePullSecrets: []
       initContainers: []
       volumes:
-        - name: traefik-configmap
+        {% if oidc["enabled"] %}
+        - name: oauth2-proxy-config
           configMap:
             name: {{ name }}
-            defaultMode: 420
+            items:
+              - key: authorized-users.txt
+                path: authorized-users.txt
+        {% endif %}
         - name: jupyter-server-secrets
           secret:
             secretName: {{ name }}
@@ -93,74 +97,25 @@ spec:
             fsGroup: 100
             allowPrivilegeEscalation: false
 
-
-        - name: auth-proxy
-          image: "traefik:2.1.4"
-          args:
-            - "--configfile=/config/traefik.yaml"
-          ports:
-            - name: http
-              containerPort: 8000
-              protocol: TCP
-          resources:
-            requests:
-              cpu: 50m
-              memory: 32Mi
-            limits:
-              cpu: 200m
-              memory: 64Mi
-          volumeMounts:
-            - name: traefik-configmap
-              mountPath: /config
-          livenessProbe:
-            tcpSocket:
-              port: 8000
-            initialDelaySeconds: 10
-            timeoutSeconds: 2
-            periodSeconds: 10
-            successThreshold: 1
-            failureThreshold: 3
-          readinessProbe:
-            tcpSocket:
-              port: 8000
-            initialDelaySeconds: 10
-            timeoutSeconds: 2
-            periodSeconds: 10
-            successThreshold: 1
-            failureThreshold: 1
-
         {% if oidc["enabled"] %}
-        - name: authorization-plugin
-          image: ableuler/auth-test:0.0.0-1
-          env:
-            - name: USER_ID
-              value: {{ oidc["userId"] }}
-          ports:
-            - name: http
-              containerPort: 3000
-              protocol: TCP
-          resources:
-            requests:
-              cpu: 20m
-              memory: 32Mi
-            limits:
-              cpu: 100m
-              memory: 64Mi
 
-        - name: authentication-plugin
-          image: "bitnami/oauth2-proxy:7.1.2"
+        - name: oauth2-proxy
+          image: "bitnami/oauth2-proxy:7.1.3"
           args:
             - "--provider=oidc"
             - "--client-id={{ oidc["clientId"] }}"
             - "--oidc-issuer-url={{ oidc["issuerUrl"] }}"
             - "--session-cookie-minimal"
-            - "--set-xauthrequest"
-            - "--email-domain=*"
             - "--http-address=:4180"
             - "--skip-provider-button"
-            - "--reverse-proxy"
-            - "--upstream=static://202"
+            - "--upstream=http://127.0.0.1:8888"
             - "--redirect-url={{ full_url }}/oauth2/callback"
+            - "--cookie-path={{ path }}"
+            - "--proxy-prefix={{ path }}/oauth2"
+            - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
+            {% for group in oidc["authorizedGroups"] %}
+            - "--allowed-group={{ group }}"
+            {% endfor %}
           ports:
             - name: http
               containerPort: 4180
@@ -170,7 +125,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ name }}
-                  key: authenticationPluginCookieSecret
+                  key: oauth2ProxyCookieSecret
             - name: OAUTH2_PROXY_CLIENT_SECRET
               valueFrom:
               {% if "value" in auth["oidc"]["clientSecret"] %}
@@ -183,6 +138,10 @@ spec:
                   name: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["name"] }}
                   key: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["key"] }}
               {% endif %}
+          volumeMounts:
+            - name: oauth2-proxy-config
+              mountPath: /etc/oauth2-proxy/authorized-users.txt
+              subPath: authorized-users.txt
           resources:
             requests:
               cpu: 20m

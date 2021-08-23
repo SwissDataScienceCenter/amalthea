@@ -71,23 +71,15 @@ def test_auth_oidc(oidc_secret, valid_spec):
     secret = manifest["secret"]
     assert any(
         [
-            container["name"] == "authentication-plugin"
+            container["name"] == "oauth2-proxy"
             for container in manifest["statefulset"]["spec"]["template"]["spec"][
                 "containers"
             ]
         ]
     )
-    assert any(
-        [
-            container["name"] == "authorization-plugin"
-            for container in manifest["statefulset"]["spec"]["template"]["spec"][
-                "containers"
-            ]
-        ]
-    )
-    assert "authenticationPluginCookieSecret" in secret["data"].keys()
+    assert "oauth2ProxyCookieSecret" in secret["data"].keys()
     auth_container = manifest["statefulset"]["spec"]["template"]["spec"]["containers"][
-        3
+        1
     ]
     auth_container_oidc_secret = [
         env

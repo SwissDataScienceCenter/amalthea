@@ -14,7 +14,7 @@ spec:
     - host: {{ routing["host"] }}
       http:
         paths:
-        - path: {{ routing["path"] }}
+        - path: {{ path }}
           pathType: Prefix
           backend:
             service:

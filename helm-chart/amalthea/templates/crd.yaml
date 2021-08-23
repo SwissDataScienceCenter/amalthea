@@ -173,8 +173,25 @@ spec:
                                 - value
                             - required:
                                 - secretKeyRef
-                        userId:
-                          type: string
+                        authorizedEmails:
+                          description: |
+                            List of users (identified by Email address read from the "email" OIDC claim)
+                            which are allowed to access this Jupyter session. This list is stored as a file
+                            and passed to the `--authenticated-emails-file` option (see
+                            https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview#command-line-options).
+                          type: array
+                          default: []
+                          items:
+                            type: string
+                        authorizedGroups:
+                          description: |
+                            List of groups of users (read from the "groups" OIDC claim) which are allowed
+                            to access this Jupyter session. This list passed to the `--allowed-group` option (see
+                            https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview#command-line-options).
+                          type: array
+                          default: []
+                          items:
+                            type: string
 
                 patches:
                   description: "Patches to be applied. Currently only json patches and json merge patches are supported."

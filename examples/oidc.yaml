@@ -12,4 +12,8 @@ spec:
       issuerUrl: ## Issuer URL of OIDC provider
       clientId: ## Client ID of registered application
       clientSecret: ## Client secret of registered application
-      userId: ## ADD THE USER_ID OF THE USER WHO WILL HAVE ACCESS TO THE SERVER
+      authorizedEmails:
+        []
+        ## Email address of the user who is allowed access this server
+        # - me@example.com
+        # - myfriend@example.com

@@ -5,8 +5,11 @@ metadata:
 data:
   jupyter_notebook_config.py: |
     import os
-    from urllib.parse import urlparse
+    {%- if oidc["enabled"] %}
     c.NotebookApp.ip="127.0.0.1"
+    {%- else %}
+    c.NotebookApp.ip="0.0.0.0"
+    {%- endif %}
     c.NotebookApp.port=8888
     c.NotebookApp.token=os.environ["SERVER_APP_TOKEN"]
     c.NotebookApp.cookie_secret_file="/etc/jupyter_server_secrets/cookie_secret"
@@ -15,12 +18,15 @@ data:
     c.NotebookApp.notebook_dir="{{ jupyter_server["rootDir"] }}"
     c.NotebookApp.default_url="{{ jupyter_server["defaultUrl"] }}"
     # Note that we could also just allow non-local hosts in general
-    c.NotebookApp.local_hostnames=["localhost", urlparse("{{ host_url }}").netloc]
+    c.NotebookApp.local_hostnames=["localhost", "{{ routing["host"] }}"]
 
   jupyter_server_config.py: |
     import os
-    from urllib.parse import urlparse
+    {%- if oidc["enabled"] %}
     c.ServerApp.ip="127.0.0.1"
+    {%- else %}
+    c.ServerApp.ip="0.0.0.0"
+    {%- endif %}
     c.ServerApp.port=8888
     c.ServerApp.token=os.environ["SERVER_APP_TOKEN"]
     c.ServerApp.cookie_secret_file="/etc/jupyter_server_secrets/cookie_secret"
@@ -29,98 +35,9 @@ data:
     c.ServerApp.root_dir="{{ jupyter_server["rootDir"] }}"
     c.ServerApp.default_url="{{ jupyter_server["defaultUrl"] }}"
     # Note that we could also just allow non-local hosts in general
-    c.ServerApp.local_hostnames=["localhost", urlparse("{{ host_url }}").netloc]
+    c.ServerApp.local_hostnames=["localhost", "{{ routing["host"] }}"]
 
-
-  proxy-rules.yaml: |
-    http:
-      routers:
-        proxy:
-          entryPoints:
-            - http
-          rule: PathPrefix(`/`)
-          middlewares:
-          {% if oidc["enabled"] %}
-            - oidcPlugin
-            - customAuthorization
-          {% endif %}
-          service: notebook
-
-      middlewares:
-        oidcPlugin:
-          forwardAuth:
-            address: 'http://localhost:4180/'
-            trustForwardHeader: true
-            authResponseHeaders:
-              - X-Auth-Request-Access-Token
-              - Authorization
-              - X-Auth-Request-User
-              - X-Auth-Request-Groups
-              - X-Auth-Request-Email
-              - X-Auth-Request-Preferred-Username
-        customAuthorization:
-          forwardAuth:
-            address: 'http://localhost:3000'
-
-      services:
-        notebook:
-          loadBalancer:
-            method: drr
-            servers:
-              - url: 'http://localhost:8888/'
-                weight: 1
-
-  # Note: We expose the oidc plugin through traefik in order
-  # to keep the ingress object simple. In principle traffic
-  # to /oauth2 could go from the ingress directly to the oidc
-  # plugin.
-
-  oidc-plugin-rules.yaml: |
-    http:
-      routers:
-        oidcPlugin:
-          entryPoints:
-            - http
-          rule: PathPrefix(`{{ path }}/oauth2/`)
-          middlewares:
-            - stripPath
-            - authHeaders
-          service: oidcPlugin
-
-      middlewares:
-        stripPath:
-          stripPrefix:
-            prefixes:
-              - {{ path }}
-
-        authHeaders:
-          headers:
-            browserXssFilter: true
-            contentTypeNosniff: true
-            forceSTSHeader: true
-            sslHost: {{ routing["host"] }}
-            stsIncludeSubdomains: true
-            stsPreload: true
-            frameDeny: true
-
-      services:
-        oidcPlugin:
-          loadBalancer:
-            method: drr
-            servers:
-              - url: 'http://localhost:4180/'
-                weight: 1
-
-  traefik.yaml: |
-    log:
-      level: debug
-    api:
-      dashboard: false
-    providers:
-      file:
-        directory: /config
-    entryPoints:
-      http:
-        address: ':8000'
-    accessLog:
-      bufferingSize: 10
+  authorized-users.txt: |
+    {%- for email in oidc["authorizedEmails"] %}
+    {{ email }}
+    {%- endfor %}
