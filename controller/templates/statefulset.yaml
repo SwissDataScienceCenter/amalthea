@@ -59,6 +59,7 @@ spec:
       automountServiceAccountToken: false
       securityContext:
         fsGroup: 100
+      enableServiceLinks: false
 
       containers:
         - name: jupyter-server
