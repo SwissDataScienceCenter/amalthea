@@ -6,7 +6,7 @@ const axios = require('axios').default;
 const token = "testtoken123456";
 const host = "localhost";
 const k8sNamespace = process.env.K8S_NAMESPACE || "default";
-const image = process.env.TEST_IMAGE_NAME || "renku/renkulab-py:3.8-0.8.0";
+const image = process.env.TEST_IMAGE_NAME || "jupyter/base-notebook:latest";
 const testSpec = process.env.TEST_SPEC || "jupyterlab.spec.js";
 const env = process.env.ENVIRONMENT || "lab"
 const sessionName = "test";
@@ -24,6 +24,8 @@ spec:
   routing:
     host: ${host}
     path: /${sessionName}
+    ingressAnnotations:
+      kubernetes.io/ingress.class: "nginx"
   auth:
     token: ${token}
 `
