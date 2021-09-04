@@ -1,4 +1,4 @@
-FROM node:16.6.2-bullseye-slim
+FROM node:16-bullseye-slim
 
 LABEL maintainer="info@datascience.ch"
 
