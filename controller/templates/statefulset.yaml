@@ -98,6 +98,39 @@ spec:
             fsGroup: 100
             allowPrivilegeEscalation: false
 
+          # We allow quite some time (5 + 1 minutes) for the jupyter container to come up in
+          # case the entrypoint contains a lot of code which has to be executed before the
+          # Jupyter server can even accept connections. However, really long running tasks
+          # should be put into an init container.
+          livenessProbe:
+            httpGet:
+              httpHeaders:
+                - name: host
+                  value: 127.0.0.1:8888
+              path: {{ path }}
+              port: 8888
+            periodSeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              httpHeaders:
+                - name: host
+                  value: 127.0.0.1:8888
+              path: {{ path }}
+              port: 8888
+            periodSeconds: 2
+            failureThreshold: 2
+          startupProbe:
+            httpGet:
+              httpHeaders:
+                - name: host
+                  value: 127.0.0.1:8888
+              path: {{ path }}
+              port: 8888
+            periodSeconds: 1
+            failureThreshold: 300
+
+
         {% if oidc["enabled"] %}
 
         - name: oauth2-proxy
