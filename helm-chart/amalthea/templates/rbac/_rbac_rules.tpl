@@ -7,11 +7,16 @@
   # Amalthea: watching & handling for the custom resource we declare.
   - apiGroups: [{{ .Values.crdApiGroup }}]
     resources: [{{ .Values.crdNames.plural }}]
-    verbs: [list, watch, patch]
+    verbs: [list, watch, patch, delete]
 
   - apiGroups: [""]
     resources: [pods]
     verbs: [get, list, watch, delete]
+
+  # Amalthea get pod metrics used to cull idle sessions
+  - apiGroups: ["metrics.k8s.io"]
+    resources: [pods]
+    verbs: [get, list, watch]
 
   # Amalthea: child resources we produce
   # Note that we do not patch/update/delete them ever.

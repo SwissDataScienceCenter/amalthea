@@ -371,6 +371,29 @@
             ],
             "additionalProperties": false
         },
+        "culling": {
+            "type": "object",
+            "properties": {
+                "session_idle_check_interval_seconds": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "session_cull_idle_threshold_seconds": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "cpu_usage_milicores_idle_threshold": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "required": [
+                "session_idle_check_interval_seconds",
+                "session_cull_idle_threshold_seconds",
+                "cpu_usage_milicores_idle_threshold"
+            ],
+            "additionalProperties": false
+        },
         "global": {
             "type": "object",
             "default": {},
@@ -396,7 +419,8 @@
         "affinity",
         "crdApiGroup",
         "crdApiVersion",
-        "crdNames"
+        "crdNames",
+        "culling"
     ],
     "title": "Values",
     "type": "object",

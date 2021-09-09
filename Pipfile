@@ -11,6 +11,7 @@ jsonpatch = "*"
 json-merge-patch = "*"
 expiringdict = "*"
 jinja2 = "*"
+pytz = "*"
 
 [dev-packages]
 ipython = "*"

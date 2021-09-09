@@ -126,3 +126,14 @@ crdNames:
   singular: jupyterserver
   shortNames:
     - js
+
+
+# Determine how often amalthea checks each session to determine
+# whether it is idle and how long should one session be idle for
+# before it is culled. The total cpu usage of all containers in a 
+# user session's pod is used to determine if the session is idle
+# in addition to the open connections to the oauth2-proxy.
+culling:
+  session_idle_check_interval_seconds: 300
+  session_cull_idle_threshold_seconds: 86400
+  cpu_usage_milicores_idle_threshold: 200

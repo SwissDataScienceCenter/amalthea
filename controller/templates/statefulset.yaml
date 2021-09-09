@@ -102,33 +102,33 @@ spec:
           # case the entrypoint contains a lot of code which has to be executed before the
           # Jupyter server can even accept connections. However, really long running tasks
           # should be put into an init container.
-          livenessProbe:
-            httpGet:
-              httpHeaders:
-                - name: host
-                  value: 127.0.0.1:8888
-              path: {{ path }}
-              port: 8888
-            periodSeconds: 10
-            failureThreshold: 6
-          readinessProbe:
-            httpGet:
-              httpHeaders:
-                - name: host
-                  value: 127.0.0.1:8888
-              path: {{ path }}
-              port: 8888
-            periodSeconds: 2
-            failureThreshold: 2
-          startupProbe:
-            httpGet:
-              httpHeaders:
-                - name: host
-                  value: 127.0.0.1:8888
-              path: {{ path }}
-              port: 8888
-            periodSeconds: 1
-            failureThreshold: 300
+          # livenessProbe:
+          #   httpGet:
+          #     httpHeaders:
+          #       - name: host
+          #         value: 127.0.0.1:8888
+          #     path: {{ path }}
+          #     port: 8888
+          #   periodSeconds: 10
+          #   failureThreshold: 6
+          # readinessProbe:
+          #   httpGet:
+          #     httpHeaders:
+          #       - name: host
+          #         value: 127.0.0.1:8888
+          #     path: {{ path }}
+          #     port: 8888
+          #   periodSeconds: 2
+          #   failureThreshold: 2
+          # startupProbe:
+          #   httpGet:
+          #     httpHeaders:
+          #       - name: host
+          #         value: 127.0.0.1:8888
+          #     path: {{ path }}
+          #     port: 8888
+          #   periodSeconds: 1
+          #   failureThreshold: 300
 
 
         {% if oidc["enabled"] %}
@@ -147,6 +147,7 @@ spec:
             - "--cookie-path={{ path }}"
             - "--proxy-prefix={{ path }}/oauth2"
             - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
+            - "--skip-auth-route=^{{ path }}/api/status$"
             {% for group in oidc["authorizedGroups"] %}
             - "--allowed-group={{ group }}"
             {% endfor %}
