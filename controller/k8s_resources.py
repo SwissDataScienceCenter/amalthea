@@ -68,6 +68,15 @@ def create_template_values(name, spec):
         "path": os.path.join("/", spec["routing"]["path"].rstrip("/")),
         "pvc": spec["storage"]["pvc"],
         "routing": spec["routing"],
+        "server_probe_path": (
+            spec["routing"]["path"].rstrip("/")
+            + "/api/status"
+            + (
+                f"?token={spec['auth'].get('token')}"
+                if spec["auth"].get("token", "") != ""
+                else ""
+            )
+        ),
         "storage": spec["storage"],
     }
 
