@@ -140,9 +140,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     cpu_usage = get_cpu_usage(pod=pod_name, namespace=namespace)
     js_server_status = get_js_server_status(body)
     custom_resource_api = get_api(config.api_version, config.custom_resource_name)
-    idle_seconds = int(
-        body["status"].get("idleSeconds", 0)
-    )
+    idle_seconds = int(body["status"].get("idleSeconds", 0))
     logger.info(
         f"Checking idle status of session {name}, "
         f"idle seconds: {idle_seconds}, "

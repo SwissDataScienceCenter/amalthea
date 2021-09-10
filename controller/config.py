@@ -45,9 +45,7 @@ KOPF_CREATE_RETRIES = (
     else int(os.getenv("KOPF_CREATE_RETRIES"))
 )
 
-CULLING_ENABLED = (
-    os.getenv("CULLING_ENABLED", "false").lower() == "true"
-)
+CULLING_ENABLED = os.getenv("CULLING_ENABLED", "false").lower() == "true"
 JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS = int(
     os.getenv("JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS", 300)
 )
