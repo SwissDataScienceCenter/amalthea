@@ -66,12 +66,14 @@ spec:
                 {{- include "amalthea.selectorLabels" . | nindent 16 }}
             - name: EXTRA_CHILD_RESOURCES
               value: {{ .Values.extraChildResources | toJson | quote }}
-            - name: SESSION_IDLE_CHECK_INTERVAL_SECONDS
-              value: {{ .Values.culling.session_idle_check_interval_seconds | quote }}
-            - name: SESSION_CULL_IDLE_THRESHOLD_SECONDS
-              value: {{ .Values.culling.session_cull_idle_threshold_seconds | quote }}
-            - name: CPU_USAGE_MILICORES_IDLE_THRESHOLD
-              value: {{ .Values.culling.cpu_usage_milicores_idle_threshold | quote }}
+            - name: JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
+              value: {{ .Values.culling.jupyter_server_idle_check_interval_seconds | quote }}
+            - name: JUPYTER_SERVER_CULL_IDLE_THRESHOLD_SECONDS
+              value: {{ .Values.culling.jupyter_server_cull_idle_threshold_seconds | quote }}
+            - name: CPU_USAGE_MILLICORES_IDLE_THRESHOLD
+              value: {{ .Values.culling.cpu_usage_millicores_idle_threshold | quote }}
+            - name: CULLING_ENABLED
+              value: {{ .Values.culling.enabled | quote }}
             {{- with .Values.kopf.onCreate }}
             - name: KOPF_CREATE_TIMEOUT
               value: {{ .timeout | quote }}

@@ -127,13 +127,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
     return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 
 
-@kopf.timer(
-    config.api_group,
-    config.api_version,
-    config.custom_resource_name,
-    interval=config.SESSION_IDLE_CHECK_INTERVAL_SECONDS,
-)
-def cull_idle_sessions(body, name, namespace, logger, **kwargs):
+def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     """
     Check if a session is idle (has zero open connections in proxy and CPU is below
     threshold). If the session is idle then annotate the jupyterserver resource with
@@ -142,12 +136,12 @@ def cull_idle_sessions(body, name, namespace, logger, **kwargs):
     try:
         pod_name = body["status"]["mainPod"]["name"]
     except KeyError:
-        pod_name = None
+        return
     cpu_usage = get_cpu_usage(pod=pod_name, namespace=namespace)
     js_server_status = get_js_server_status(body)
     custom_resource_api = get_api(config.api_version, config.custom_resource_name)
     idle_seconds = int(
-        body["metadata"]["annotations"].get(config.api_group + "/idle-seconds", 0)
+        body["status"].get("idleSeconds", 0)
     )
     logger.info(
         f"Checking idle status of session {name}, "
@@ -157,21 +151,21 @@ def cull_idle_sessions(body, name, namespace, logger, **kwargs):
     )
 
     now = pytz.UTC.localize(datetime.utcnow())
-    session_is_idle = (
-        cpu_usage <= config.CPU_USAGE_MILICORES_IDLE_THRESHOLD
+    jupyter_server_is_idle = (
+        cpu_usage <= config.CPU_USAGE_MILLICORES_IDLE_THRESHOLD
         and type(js_server_status) is dict
         and js_server_status.get("connections", 0) == 0
         and js_server_status.get("kernels", 0) == 0
         and (
             now - js_server_status.get("last_activity", now).astimezone(pytz.UTC)
         ).total_seconds()
-        > config.SESSION_IDLE_CHECK_INTERVAL_SECONDS
+        > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
     )
 
     if (
-        session_is_idle
-        and idle_seconds + config.SESSION_IDLE_CHECK_INTERVAL_SECONDS
-        >= config.SESSION_CULL_IDLE_THRESHOLD_SECONDS
+        jupyter_server_is_idle
+        and idle_seconds + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
+        >= config.JUPYTER_SERVER_CULL_IDLE_THRESHOLD_SECONDS
     ):
         logger.info(f"Deleting session {name} due to inactivity")
         try:
@@ -180,24 +174,21 @@ def cull_idle_sessions(body, name, namespace, logger, **kwargs):
             pass
         return
 
-    if session_is_idle:
+    if jupyter_server_is_idle:
         logger.info(
             f"Session {name} found to be idle for "
-            f"{idle_seconds + config.SESSION_IDLE_CHECK_INTERVAL_SECONDS}"
+            f"{idle_seconds + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS}"
         )
         try:
             custom_resource_api.patch(
                 namespace=namespace,
                 name=name,
                 body={
-                    "metadata": {
-                        "annotations": {
-                            config.api_group
-                            + "/idle-seconds": str(
-                                idle_seconds
-                                + config.SESSION_IDLE_CHECK_INTERVAL_SECONDS
-                            )
-                        },
+                    "status": {
+                        "idleSeconds": str(
+                            idle_seconds
+                            + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
+                        ),
                     },
                 },
                 content_type=CONTENT_TYPES["merge-patch"],
@@ -212,9 +203,7 @@ def cull_idle_sessions(body, name, namespace, logger, **kwargs):
                     namespace=namespace,
                     name=name,
                     body={
-                        "metadata": {
-                            "annotations": {config.api_group + "/idle-seconds": "0"},
-                        },
+                        "status": {"idleSeconds": "0"},
                     },
                     content_type=CONTENT_TYPES["merge-patch"],
                 )
@@ -303,3 +292,12 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 # Add the actual decorators
 for child_resource_kind in config.CHILD_RESOURCES:
     update_status = get_update_decorator(child_resource_kind)(update_status)
+
+# Add culling if enabled
+if config.CULLING_ENABLED:
+    kopf.timer(
+        config.api_group,
+        config.api_version,
+        config.custom_resource_name,
+        interval=config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS,
+    )(cull_idle_jupyter_servers)

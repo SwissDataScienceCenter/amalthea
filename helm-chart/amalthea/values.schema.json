@@ -374,23 +374,27 @@
         "culling": {
             "type": "object",
             "properties": {
-                "session_idle_check_interval_seconds": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "jupyter_server_idle_check_interval_seconds": {
                     "type": "integer",
                     "minimum": 0
                 },
-                "session_cull_idle_threshold_seconds": {
+                "jupyter_server_cull_idle_threshold_seconds": {
                     "type": "integer",
                     "minimum": 0
                 },
-                "cpu_usage_milicores_idle_threshold": {
+                "cpu_usage_millicores_idle_threshold": {
                     "type": "integer",
                     "minimum": 0
                 }
             },
             "required": [
-                "session_idle_check_interval_seconds",
-                "session_cull_idle_threshold_seconds",
-                "cpu_usage_milicores_idle_threshold"
+                "enabled",
+                "jupyter_server_idle_check_interval_seconds",
+                "jupyter_server_cull_idle_threshold_seconds",
+                "cpu_usage_millicores_idle_threshold"
             ],
             "additionalProperties": false
         },

@@ -15,9 +15,9 @@ def get_cpu_usage(pod, namespace):
     the culling should not be prevented if the metrics server is not present or cannot be
     found at the expected url.
     """
-    total_usage_milicores = 0
+    total_usage_millicores = 0
     if pod is None:
-        return total_usage_milicores
+        return total_usage_millicores
     client = dynamic.DynamicClient(
         api_client.ApiClient(configuration=k8s_config.load_incluster_config())
     )
@@ -29,21 +29,25 @@ def get_cpu_usage(pod, namespace):
         logging.warning(
             f"Could not get CPU usage for culling idle sessions for pod {pod}, because: {err}"
         )
-        return total_usage_milicores
+        return total_usage_millicores
 
     try:
         for container in res.containers:
             if container["usage"]["cpu"].endswith("n"):
-                total_usage_milicores += int(container["usage"]["cpu"][:-1]) / 1e6
+                total_usage_millicores += int(container["usage"]["cpu"][:-1]) / 1e6
     except (KeyError, ValueError, AttributeError) as err:
         logging.warning(
             f"Could not parse CPU usage for culling idle sessions for pod {pod}, because: {err}"
         )
 
-    return total_usage_milicores
+    return total_usage_millicores
 
 
 def get_js_server_status(js_body):
+    """
+    Get the status for the jupyter server from the /api/status endpoint
+    by using the body of the jupyter server resource.
+    """
     try:
         server_url = js_body["status"]["create_fn"]["fullServerURL"]
         token = js_body["spec"]["auth"].get("token")
