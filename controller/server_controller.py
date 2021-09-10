@@ -213,9 +213,7 @@ def cull_idle_sessions(body, name, namespace, logger, **kwargs):
                     name=name,
                     body={
                         "metadata": {
-                            "annotations": {
-                                config.api_group + "/idle-seconds": "0"
-                            },
+                            "annotations": {config.api_group + "/idle-seconds": "0"},
                         },
                     },
                     content_type=CONTENT_TYPES["merge-patch"],
