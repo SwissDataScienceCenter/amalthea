@@ -102,39 +102,33 @@ spec:
           # case the entrypoint contains a lot of code which has to be executed before the
           # Jupyter server can even accept connections. However, really long running tasks
           # should be put into an init container.
-          livenessProbe:
-            exec:
-              command:
-                - "curl"
-                - "-L"
-                - "--silent"
-                - "--fail"
-                - "localhost:8888{{ server_probe_path }}"
-            periodSeconds: 10
-            failureThreshold: 6
-            timeoutSeconds: 5
-          readinessProbe:
-            exec:
-              command:
-                - "curl"
-                - "-L"
-                - "--silent"
-                - "--fail"
-                - "localhost:8888{{ server_probe_path }}"
-            periodSeconds: 2
-            failureThreshold: 2
-            timeoutSeconds: 5
-          startupProbe:
-            exec:
-              command:
-                - "curl"
-                - "-L"
-                - "--silent"
-                - "--fail"
-                - "localhost:8888{{ server_probe_path }}"
-            periodSeconds: 1
-            failureThreshold: 300
-            timeoutSeconds: 5
+          # livenessProbe:
+          #   httpGet:
+          #     httpHeaders:
+          #       - name: host
+          #         value: 127.0.0.1:8888
+          #     path: {{ path }}
+          #     port: 8888
+          #   periodSeconds: 10
+          #   failureThreshold: 6
+          # readinessProbe:
+          #   httpGet:
+          #     httpHeaders:
+          #       - name: host
+          #         value: 127.0.0.1:8888
+          #     path: {{ path }}
+          #     port: 8888
+          #   periodSeconds: 2
+          #   failureThreshold: 2
+          # startupProbe:
+          #   httpGet:
+          #     httpHeaders:
+          #       - name: host
+          #         value: 127.0.0.1:8888
+          #     path: {{ path }}
+          #     port: 8888
+          #   periodSeconds: 1
+          #   failureThreshold: 300
 
 
         {% if oidc["enabled"] %}
