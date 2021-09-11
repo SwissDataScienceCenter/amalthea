@@ -89,9 +89,11 @@ spec:
               value: {{ storage["pvc"]["mountPath"] }}/.jupyter_config
           resources: {{ jupyter_server["resources"] | default({}) | tojson }}
           ports:
+          {% if not oidc["enabled"] %}
             - name: notebook-port
               containerPort: 8888
               protocol: TCP
+          {% endif %}
           securityContext:
             runAsUser: 1000
             runAsGroup: 100
@@ -103,30 +105,18 @@ spec:
           # Jupyter server can even accept connections. However, really long running tasks
           # should be put into an init container.
           livenessProbe:
-            httpGet:
-              httpHeaders:
-                - name: host
-                  value: 127.0.0.1:8888
-              path: {{ path }}
-              port: 8888
+            exec:
+              command:  ["sh", "-c", "jupyter notebook list | grep :8888/"]
             periodSeconds: 10
             failureThreshold: 6
           readinessProbe:
-            httpGet:
-              httpHeaders:
-                - name: host
-                  value: 127.0.0.1:8888
-              path: {{ path }}
-              port: 8888
+            exec:
+              command: ["sh", "-c", "jupyter notebook list | grep :8888/"]
             periodSeconds: 2
             failureThreshold: 2
           startupProbe:
-            httpGet:
-              httpHeaders:
-                - name: host
-                  value: 127.0.0.1:8888
-              path: {{ path }}
-              port: 8888
+            exec:
+              command: ["sh", "-c", "jupyter notebook list | grep :8888/"]
             periodSeconds: 1
             failureThreshold: 300
 
