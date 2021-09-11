@@ -17,8 +17,7 @@ data:
     c.NotebookApp.base_url="{{ path }}"
     c.NotebookApp.notebook_dir="{{ jupyter_server["rootDir"] }}"
     c.NotebookApp.default_url="{{ jupyter_server["defaultUrl"] }}"
-    # Note that we could also just allow non-local hosts in general
-    c.NotebookApp.local_hostnames=["localhost", "{{ routing["host"] }}"]
+    c.NotebookApp.allow_remote_access=True
 
   jupyter_server_config.py: |
     import os
@@ -34,8 +33,7 @@ data:
     c.ServerApp.base_url="{{ path }}"
     c.ServerApp.root_dir="{{ jupyter_server["rootDir"] }}"
     c.ServerApp.default_url="{{ jupyter_server["defaultUrl"] }}"
-    # Note that we could also just allow non-local hosts in general
-    c.ServerApp.local_hostnames=["localhost", "{{ routing["host"] }}"]
+    c.ServerApp.allow_remote_access=True
 
   authorized-users.txt: |
     {%- for email in oidc["authorizedEmails"] %}
