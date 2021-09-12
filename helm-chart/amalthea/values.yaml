@@ -132,7 +132,8 @@ crdNames:
 # whether it is idle and how long should one session be idle for
 # before it is culled. The total cpu usage of all containers in a 
 # user session's pod is used to determine if the session is idle
-# in addition to the open connections to the oauth2-proxy.
+# in addition to activity statistics from the jupyterserver
+# api/status endpoint.
 culling:
   enabled: false
   jupyter_server_idle_check_interval_seconds: 300

@@ -169,6 +169,10 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
         try:
             custom_resource_api.delete(name=name, namespace=namespace)
         except NotFoundError:
+            logger.warning(
+                f"Trying to delete Jupyter server {name} in namespace {namespace}, "
+                "but we cannot find it. Has it been deleted in the meantime?"
+            )
             pass
         return
 
@@ -192,6 +196,10 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
                 content_type=CONTENT_TYPES["merge-patch"],
             )
         except NotFoundError:
+            logger.warning(
+                f"Trying to update idle time for Jupyter server {name} in namespace {namespace}, "
+                "but we cannot find it. Has it been deleted in the meantime?"
+            )
             pass
     else:
         if idle_seconds > 0:
@@ -206,6 +214,10 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
                     content_type=CONTENT_TYPES["merge-patch"],
                 )
             except NotFoundError:
+                logger.warning(
+                    f"Trying to reset idle timer for Jupyter server {name} in namespace {namespace}, "
+                    "but we cannot find it. Has it been deleted in the meantime?"
+                )
                 pass
 
 
