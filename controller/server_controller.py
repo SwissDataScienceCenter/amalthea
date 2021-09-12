@@ -165,7 +165,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
         and idle_seconds + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
         >= config.JUPYTER_SERVER_CULL_IDLE_THRESHOLD_SECONDS
     ):
-        logger.info(f"Deleting session {name} due to inactivity")
+        logger.info(f"Deleting Jupyter server {name} due to inactivity")
         try:
             custom_resource_api.delete(name=name, namespace=namespace)
         except NotFoundError:
@@ -174,7 +174,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
 
     if jupyter_server_is_idle:
         logger.info(
-            f"Session {name} found to be idle for "
+            f"Jupyter Server {name} in namespace {namespace} found to be idle for "
             f"{idle_seconds + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS}"
         )
         try:
@@ -196,7 +196,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     else:
         if idle_seconds > 0:
             try:
-                logger.info(f"Resetting idle timer for session {name}.")
+                logger.info(f"Resetting idle timer for Jupyter server {name} in namespace {namespace}.")
                 custom_resource_api.patch(
                     namespace=namespace,
                     name=name,

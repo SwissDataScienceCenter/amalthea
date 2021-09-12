@@ -13,7 +13,7 @@
     resources: [pods]
     verbs: [get, list, watch, delete]
 
-  # Amalthea get pod metrics used to cull idle sessions
+  # Amalthea get pod metrics used to cull idle Jupyter servers
   - apiGroups: ["metrics.k8s.io"]
     resources: [pods]
     verbs: [get, list, watch]
