@@ -216,6 +216,7 @@ spec:
                     idleSecondsThreshold:
                       description: "How long should a server be idle for before it is culled."
                       type: integer
-                      exclusiveMinimum: 0
+                      exclusiveMinimum: true
+                      minimum: 0
                       default: 86400
 {{- end }}
