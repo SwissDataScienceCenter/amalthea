@@ -1,6 +1,7 @@
 from expiringdict import ExpiringDict
 import kopf
 import kubernetes.client as k8s_client
+from kubernetes.client.models import V1DeleteOptions
 from kubernetes.dynamic import DynamicClient
 from kubernetes.dynamic.exceptions import NotFoundError
 from datetime import datetime
@@ -167,7 +168,11 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     ):
         logger.info(f"Deleting Jupyter server {name} due to inactivity")
         try:
-            custom_resource_api.delete(name=name, namespace=namespace)
+            custom_resource_api.delete(
+                name=name,
+                namespace=namespace,
+                body=V1DeleteOptions(propagation_policy="Foreground"),
+            )
         except NotFoundError:
             logger.warning(
                 f"Trying to delete Jupyter server {name} in namespace {namespace}, "
@@ -204,7 +209,9 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     else:
         if idle_seconds > 0:
             try:
-                logger.info(f"Resetting idle timer for Jupyter server {name} in namespace {namespace}.")
+                logger.info(
+                    f"Resetting idle timer for Jupyter server {name} in namespace {namespace}."
+                )
                 custom_resource_api.patch(
                     namespace=namespace,
                     name=name,
@@ -215,8 +222,8 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
                 )
             except NotFoundError:
                 logger.warning(
-                    f"Trying to reset idle timer for Jupyter server {name} in namespace {namespace}, "
-                    "but we cannot find it. Has it been deleted in the meantime?"
+                    f"Trying to reset idle timer for Jupyter server {name} in namespace {namespace}"
+                    ", but we cannot find it. Has it been deleted in the meantime?"
                 )
                 pass
 
