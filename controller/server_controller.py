@@ -131,7 +131,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
 def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     """
     Check if a session is idle (has zero open connections in proxy and CPU is below
-    threshold). If the session is idle then annotate the jupyterserver resource with
+    threshold). If the session is idle then update the jupyter server status with
     the idle duration. If any sessions have been idle for long enough, then cull them.
     """
     try:
@@ -142,6 +142,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     js_server_status = get_js_server_status(body)
     custom_resource_api = get_api(config.api_version, config.custom_resource_name)
     idle_seconds = int(body["status"].get("idleSeconds", 0))
+    idle_seconds_threshold = body["spec"]["culling"]["idleSecondsThreshold"]
     logger.info(
         f"Checking idle status of session {name}, "
         f"idle seconds: {idle_seconds}, "
@@ -164,7 +165,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     if (
         jupyter_server_is_idle
         and idle_seconds + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
-        >= config.JUPYTER_SERVER_CULL_IDLE_THRESHOLD_SECONDS
+        >= idle_seconds_threshold
     ):
         logger.info(f"Deleting Jupyter server {name} due to inactivity")
         try:

@@ -207,4 +207,15 @@ spec:
                           - application/merge-patch+json
                       patch:
                         x-kubernetes-preserve-unknown-fields: true
+                
+                culling:
+                  description: "Options about culling idle servers."
+                  type: object
+                  default: {}
+                  properties:
+                    idleSecondsThreshold:
+                      description: "How long should a server be idle for before it is culled."
+                      type: integer
+                      exclusiveMinimum: 0
+                      default: 86400
 {{- end }}

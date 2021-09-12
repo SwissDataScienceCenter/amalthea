@@ -381,10 +381,6 @@
                     "type": "integer",
                     "minimum": 0
                 },
-                "jupyter_server_cull_idle_threshold_seconds": {
-                    "type": "integer",
-                    "minimum": 0
-                },
                 "cpu_usage_millicores_idle_threshold": {
                     "type": "integer",
                     "minimum": 0
@@ -393,7 +389,6 @@
             "required": [
                 "enabled",
                 "jupyter_server_idle_check_interval_seconds",
-                "jupyter_server_cull_idle_threshold_seconds",
                 "cpu_usage_millicores_idle_threshold"
             ],
             "additionalProperties": false

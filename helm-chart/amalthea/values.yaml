@@ -128,14 +128,13 @@ crdNames:
     - js
 
 
-# Determine how often amalthea checks each session to determine
-# whether it is idle and how long should one session be idle for
-# before it is culled. The total cpu usage of all containers in a 
-# user session's pod is used to determine if the session is idle
-# in addition to activity statistics from the jupyterserver
-# api/status endpoint.
+# Determine how often amalthea checks each server to determine whether it is idle.
+# The criteria for deeming that a server is idle are based on the cpu usage
+# and the stats provided by the jupyter server /api/status endpoint. The culling 
+# section of the custom resource definition of JupyterServer can be used to control
+# on a per-server basis how long each server is idle for before it is culled or 
+# what is the CPU usage at or below which the server is considered idle.
 culling:
   enabled: false
   jupyter_server_idle_check_interval_seconds: 300
-  jupyter_server_cull_idle_threshold_seconds: 86400
   cpu_usage_millicores_idle_threshold: 200
