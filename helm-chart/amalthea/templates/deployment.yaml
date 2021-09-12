@@ -68,8 +68,6 @@ spec:
               value: {{ .Values.extraChildResources | toJson | quote }}
             - name: JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
               value: {{ .Values.culling.jupyter_server_idle_check_interval_seconds | quote }}
-            - name: JUPYTER_SERVER_CULL_IDLE_THRESHOLD_SECONDS
-              value: {{ .Values.culling.jupyter_server_cull_idle_threshold_seconds | quote }}
             - name: CPU_USAGE_MILLICORES_IDLE_THRESHOLD
               value: {{ .Values.culling.cpu_usage_millicores_idle_threshold | quote }}
             - name: CULLING_ENABLED
