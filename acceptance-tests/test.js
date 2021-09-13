@@ -80,17 +80,16 @@ EOF`);
     assert(status < 300)
   });
   it('Should pass all acceptance tests', async function () {
-    try {
-      const {stdout, stderr, error} = await exec(`npx cypress run --spec cypress/integration/${testSpec} --env URL=${url}`);
-      console.log(`\n\n--------------------------------------------Cypress stdout--------------------------------------------\n${stdout}`)
-      console.log(`\n\n--------------------------------------------Cypress stderr--------------------------------------------\n${stderr}`)
-      console.log(`\n\n--------------------------------------------Cypress error--------------------------------------------\n${error}`)
-      console.log(`\n\n-----------------------------------------------------------------------------------------------------\n`)
-    }
-    catch (err) {
-      console.log(`Something went wrong trying to launch tests: ${err}`)  
+    const {stdout, stderr, error} = await exec(`npx cypress run --spec cypress/integration/${testSpec} --env URL=${url}`);
+    console.log(`\n\n--------------------------------------------Cypress stdout--------------------------------------------\n${stdout}`)
+    console.log(`\n\n--------------------------------------------Cypress stderr--------------------------------------------\n${stderr}`)
+    console.log(`\n\n--------------------------------------------Cypress error--------------------------------------------\n${error}`)
+    console.log(`\n\n-----------------------------------------------------------------------------------------------------\n`)
+    if (error || stderr) {
+      console.log(`Something went wrong trying to launch tests. Error: ${error}, Stderr: ${stderr}`)  
     }
     assert(!error)
+    assert(!stderr)
   });
   after(async function () {
     console.log(`Stopping session with image ${image}.`)
