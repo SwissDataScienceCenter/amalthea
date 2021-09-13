@@ -94,8 +94,8 @@ EOF`);
       assert(!stderr)
     }
     catch (err) {
-      assert(!err)
       console.log(`Something went wrong trying to launch tests.\nError: ${err}`)  
+      assert(!err)
     }
   });
   after(async function () {
