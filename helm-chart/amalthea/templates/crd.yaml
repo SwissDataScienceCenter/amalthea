@@ -214,9 +214,8 @@ spec:
                   default: {}
                   properties:
                     idleSecondsThreshold:
-                      description: "How long should a server be idle for before it is culled."
+                      description: "How long should a server be idle for before it is culled. A value of zero indicates that the server should never be culled."
                       type: integer
-                      exclusiveMinimum: true
                       minimum: 0
-                      default: 86400
+                      default: 0
 {{- end }}

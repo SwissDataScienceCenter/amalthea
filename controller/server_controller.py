@@ -128,12 +128,22 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
     return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 
 
+@kopf.timer(
+    config.api_group,
+    config.api_version,
+    config.custom_resource_name,
+    interval=config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS,
+)
 def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     """
     Check if a session is idle (has zero open connections in proxy and CPU is below
     threshold). If the session is idle then update the jupyter server status with
     the idle duration. If any sessions have been idle for long enough, then cull them.
     """
+    idle_seconds_threshold = body["spec"]["culling"]["idleSecondsThreshold"]
+    if idle_seconds_threshold == 0:
+        # culling for this server is disabled
+        return
     try:
         pod_name = body["status"]["mainPod"]["name"]
     except KeyError:
@@ -142,7 +152,6 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     js_server_status = get_js_server_status(body)
     custom_resource_api = get_api(config.api_version, config.custom_resource_name)
     idle_seconds = int(body["status"].get("idleSeconds", 0))
-    idle_seconds_threshold = body["spec"]["culling"]["idleSecondsThreshold"]
     logger.info(
         f"Checking idle status of session {name}, "
         f"idle seconds: {idle_seconds}, "
@@ -310,12 +319,3 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 # Add the actual decorators
 for child_resource_kind in config.CHILD_RESOURCES:
     update_status = get_update_decorator(child_resource_kind)(update_status)
-
-# Add culling if enabled
-if config.CULLING_ENABLED:
-    kopf.timer(
-        config.api_group,
-        config.api_version,
-        config.custom_resource_name,
-        interval=config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS,
-    )(cull_idle_jupyter_servers)

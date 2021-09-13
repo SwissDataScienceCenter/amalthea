@@ -132,9 +132,8 @@ crdNames:
 # The criteria for deeming that a server is idle are based on the cpu usage
 # and the stats provided by the jupyter server /api/status endpoint. The culling 
 # section of the custom resource definition of JupyterServer can be used to control
-# on a per-server basis how long each server is idle for before it is culled or 
-# what is the CPU usage at or below which the server is considered idle.
+# on a per-server basis whether a server is ever culled and also if it is culled then
+# how long each server is idle for before it is culled.
 culling:
-  enabled: false
-  jupyter_server_idle_check_interval_seconds: 300
-  cpu_usage_millicores_idle_threshold: 200
+  jupyterServerIdleCheckIntervalSeconds: 300
+  cpuUsageMillicoresIdleThreshold: 500

@@ -67,11 +67,9 @@ spec:
             - name: EXTRA_CHILD_RESOURCES
               value: {{ .Values.extraChildResources | toJson | quote }}
             - name: JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
-              value: {{ .Values.culling.jupyter_server_idle_check_interval_seconds | quote }}
+              value: {{ .Values.culling.jupyterServerIdleCheckIntervalSeconds | quote }}
             - name: CPU_USAGE_MILLICORES_IDLE_THRESHOLD
-              value: {{ .Values.culling.cpu_usage_millicores_idle_threshold | quote }}
-            - name: CULLING_ENABLED
-              value: {{ .Values.culling.enabled | quote }}
+              value: {{ .Values.culling.cpuUsageMillicoresIdleThreshold | quote }}
             {{- with .Values.kopf.onCreate }}
             - name: KOPF_CREATE_TIMEOUT
               value: {{ .timeout | quote }}
