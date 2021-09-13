@@ -43,7 +43,7 @@ const checkStatusCode = async function (url) {
     try {
       res = await axios.get(url)
       if (res.status < 300) {
-        console.log(`Response from starting container succeeded with response: ${res.data}`)
+        console.log(`Response from starting container succeeded with status code: ${res.status}`)
         return {"status": res.status};
       }
     }
@@ -51,11 +51,11 @@ const checkStatusCode = async function (url) {
       console.log(`Waiting to start for a container failed with error: ${err}.`)
     }
     finally {
-      if (count > timeoutSeconds) {
+      if (count > timeoutSeconds / 10) {
         console.log("Waiting for container to become available timed out.")
         return {"error": "Timed out waiting for container to become ready"}
       }
-      await sleep(1000);
+      await sleep(10000);
       count = count + 1;
     }
   }
@@ -80,16 +80,23 @@ EOF`);
     assert(status < 300)
   });
   it('Should pass all acceptance tests', async function () {
-    const {stdout, stderr, error} = await exec(`npx cypress run --spec cypress/integration/${testSpec} --env URL=${url}`);
-    console.log(`\n\n--------------------------------------------Cypress stdout--------------------------------------------\n${stdout}`)
-    console.log(`\n\n--------------------------------------------Cypress stderr--------------------------------------------\n${stderr}`)
-    console.log(`\n\n--------------------------------------------Cypress error--------------------------------------------\n${error}`)
-    console.log(`\n\n-----------------------------------------------------------------------------------------------------\n`)
-    if (error || stderr) {
-      console.log(`Something went wrong trying to launch tests. Error: ${error}, Stderr: ${stderr}`)  
+    console.log("Starting cypress tests")
+    try {
+      const {stdout, stderr, error} = await exec(`npx cypress run --spec cypress/integration/${testSpec} --env URL=${url}`);
+      console.log(`\n\n--------------------------------------------Cypress stdout--------------------------------------------\n${stdout}`)
+      console.log(`\n\n--------------------------------------------Cypress stderr--------------------------------------------\n${stderr}`)
+      console.log(`\n\n--------------------------------------------Cypress error--------------------------------------------\n${error}`)
+      console.log(`\n\n-----------------------------------------------------------------------------------------------------\n`)
+      if (error || stderr) {
+        console.log(`Something went wrong trying to launch tests.\nError: ${error}\nStderr: ${stderr}\nStdout:${stdout}`)  
+      }
+      assert(!error)
+      assert(!stderr)
     }
-    assert(!error)
-    assert(!stderr)
+    catch (err) {
+      assert(!err)
+      console.log(`Something went wrong trying to launch tests.\nError: ${err}`)  
+    }
   });
   after(async function () {
     console.log(`Stopping session with image ${image}.`)
