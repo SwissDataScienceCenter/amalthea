@@ -11,6 +11,7 @@ jsonpatch = "*"
 json-merge-patch = "*"
 expiringdict = "*"
 jinja2 = "*"
+pytz = "*"
 
 [dev-packages]
 ipython = "*"
@@ -21,7 +22,6 @@ pylint = "*"
 pytest-black = "*"
 pytest-flake8 = "*"
 pytest-mock = "*"
-jsonschema = "*"
 chartpress = "*"
 
 [requires]

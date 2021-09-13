@@ -371,6 +371,24 @@
             ],
             "additionalProperties": false
         },
+        "culling": {
+            "type": "object",
+            "properties": {
+                "jupyterServerIdleCheckIntervalSeconds": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "cpuUsageMillicoresIdleThreshold": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "required": [
+                "jupyterServerIdleCheckIntervalSeconds",
+                "cpuUsageMillicoresIdleThreshold"
+            ],
+            "additionalProperties": false
+        },
         "global": {
             "type": "object",
             "default": {},
@@ -396,7 +414,8 @@
         "affinity",
         "crdApiGroup",
         "crdApiVersion",
-        "crdNames"
+        "crdNames",
+        "culling"
     ],
     "title": "Values",
     "type": "object",

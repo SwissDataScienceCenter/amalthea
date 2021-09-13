@@ -109,16 +109,19 @@ spec:
               command:  ["sh", "-c", "jupyter notebook list | grep :8888/"]
             periodSeconds: 10
             failureThreshold: 6
+            timeoutSeconds: 9
           readinessProbe:
             exec:
               command: ["sh", "-c", "jupyter notebook list | grep :8888/"]
-            periodSeconds: 2
+            periodSeconds: 10
             failureThreshold: 2
+            timeoutSeconds: 9
           startupProbe:
             exec:
               command: ["sh", "-c", "jupyter notebook list | grep :8888/"]
-            periodSeconds: 1
-            failureThreshold: 300
+            periodSeconds: 10
+            failureThreshold: 30
+            timeoutSeconds: 9
 
 
         {% if oidc["enabled"] %}
@@ -137,6 +140,7 @@ spec:
             - "--cookie-path={{ path }}"
             - "--proxy-prefix={{ path }}/oauth2"
             - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
+            - "--skip-auth-route=^{{ path }}/api/status$"
             {% for group in oidc["authorizedGroups"] %}
             - "--allowed-group={{ group }}"
             {% endfor %}
