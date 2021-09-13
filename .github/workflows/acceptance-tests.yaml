@@ -93,6 +93,10 @@ jobs:
           kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s
           helm dep update helm-chart/amalthea
           helm install amalthea helm-chart/amalthea --wait
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
       - name: Run Acceptance Tests
         uses: cypress-io/github-action@v2
         env:
