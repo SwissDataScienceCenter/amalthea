@@ -12,6 +12,7 @@ on:
 jobs:
   acceptance-tests-images:
     strategy:
+      max-parallel: 2
       matrix:
         kind-image-version: ["v1.21.2", "v1.20.7", "v1.19.11"]
         helm-version: ["v3.6.3", "v3.0.0"]
@@ -93,10 +94,6 @@ jobs:
           kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s
           helm dep update helm-chart/amalthea
           helm install amalthea helm-chart/amalthea --wait
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        with:
-          limit-access-to-actor: true
       - name: Run Acceptance Tests
         uses: cypress-io/github-action@v2
         env:
