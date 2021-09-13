@@ -43,12 +43,16 @@ const checkStatusCode = async function (url) {
     try {
       res = await axios.get(url)
       if (res.status < 300) {
+        console.log(`Response from starting container succeeded with response: ${res}`)
         return {"status": res.status};
       }
     }
-    catch (err) {}
+    catch (err) {
+      console.log(`Waiting to start for a container failed with error: ${err}.`)
+    }
     finally {
       if (count > timeoutSeconds) {
+        console.log("Waiting for container to become available timed out.")
         return {"error": "Timed out waiting for container to become ready"}
       }
       await sleep(1000);
