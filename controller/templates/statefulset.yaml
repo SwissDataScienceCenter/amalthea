@@ -104,24 +104,24 @@ spec:
           # case the entrypoint contains a lot of code which has to be executed before the
           # Jupyter server can even accept connections. However, really long running tasks
           # should be put into an init container.
-          livenessProbe:
-            exec:
-              command:  ["sh", "-c", "jupyter notebook list | grep :8888/"]
-            periodSeconds: 10
-            failureThreshold: 6
-            timeoutSeconds: 9
-          readinessProbe:
-            exec:
-              command: ["sh", "-c", "jupyter notebook list | grep :8888/"]
-            periodSeconds: 10
-            failureThreshold: 2
-            timeoutSeconds: 9
-          startupProbe:
-            exec:
-              command: ["sh", "-c", "jupyter notebook list | grep :8888/"]
-            periodSeconds: 10
-            failureThreshold: 30
-            timeoutSeconds: 9
+          # livenessProbe:
+          #   exec:
+          #     command:  ["sh", "-c", "jupyter notebook list | grep :8888/"]
+          #   periodSeconds: 10
+          #   failureThreshold: 6
+          #   timeoutSeconds: 9
+          # readinessProbe:
+          #   exec:
+          #     command: ["sh", "-c", "jupyter notebook list | grep :8888/"]
+          #   periodSeconds: 10
+          #   failureThreshold: 2
+          #   timeoutSeconds: 9
+          # startupProbe:
+          #   exec:
+          #     command: ["sh", "-c", "jupyter notebook list | grep :8888/"]
+          #   periodSeconds: 10
+          #   failureThreshold: 30
+          #   timeoutSeconds: 9
 
 
         {% if oidc["enabled"] %}
