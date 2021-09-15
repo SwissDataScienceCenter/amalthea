@@ -65,6 +65,7 @@ const checkStatusCode = async function (url) {
 describe(`Starting session ${sessionName} with image ${image}`, function () {
   this.timeout(0);
   before(async function () {
+    console.log(`Launching session with manifest:\n${manifest}`)
     try {
       const {error} = await exec(`cat <<EOF | kubectl apply -f - 
 ${manifest}
