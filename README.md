@@ -8,7 +8,7 @@ of custom `JupyterServer` objects.
 ## Example
 
 Once Amalthea is installed in a cluster through the helm chart, deploying a
-jupyter server for a user `Jane Doe` with email `jane.doe@example.com` is easy
+jupyter server for a user `Jane Doe` with email `jane.doe@example.com` is as easy
 as applying the following YAML file to the cluster:
 
 ```yaml
@@ -52,7 +52,7 @@ Kubernetes cluster:
 - Access control through integration with existing OpenID Connect (OIDC)
   providers
 - Some failure recovery thanks to running the Jupyter server using a
-  `StatefulSet` controller and by backing it with a persistent volume
+  statefulSet controller and by backing it with a persistent volume
   (optional).
 
 When launching a Jupyter server, the custom resource spec is used to
@@ -68,7 +68,7 @@ creation of the following K8s resources:
 - A configmap to hold some non-secret configuration
 - A secret to hold some secret configuration
 - A service to expose the pod defined in the statefulSet
-- An ingress to make the jupyter server outside reachable from outside of the
+- An ingress to make the Jupyter server outside reachable from outside of the
   cluster
 
 ## Patching a JupyterServer
@@ -86,7 +86,7 @@ change K8s resources which are created as part of the custom resource object.
 
 The main use case of Amalthea is to provide a layer on top of which developers
 can build kubernetes-native applications that allow their users to spin-up and
-manage Jupyter servers. We do not see Amalthea as a standalone tool which is
+manage Jupyter servers. We do not see Amalthea as a standalone tool 
 used by end users, as creating Jupyter servers with Amalthea requires access to
 the Kubernetes API.
 
@@ -105,8 +105,9 @@ The intended scope of Amalthea is much smaller than that. Specifically:
   application stack.
 - Amalthea itself is stateless. All state is stored as Kubernetes objects in
   etcd.
-- Amalthea uses the Kubernetes ingress- and service concepts for dynamically
-  adding and removing routes as Jupyter servers come and go.
+- Amalthea uses the Kubernetes-native ingress- and service concepts for dynamically
+  adding and removing routes as Jupyter servers come and go, instead of relying on 
+  an additoinal proxy for routing.
 
 ## What's in the repo
 
