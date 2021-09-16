@@ -1,0 +1,232 @@
+# This CRD is automatically generated from the helm charts, do not modify! 
+# Source: amalthea/templates/crd.yaml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: jupyterservers.amalthea.dev
+spec:
+  scope: Namespaced
+  group: amalthea.dev
+  names:
+    kind: JupyterServer
+    plural: jupyterservers
+    singular: jupyterserver
+    shortNames:
+    - js
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    additionalPrinterColumns:
+    - name: Image
+      type: string
+      description: The Jupyter server image that is running
+      jsonPath: .spec.jupyterServer.image
+    - name: URL
+      type: string
+      description: Full URL where the server can be reached
+      jsonPath: .status.create_fn.fullServerURL
+    - name: Pod Status
+      type: string
+      description: Status of the main pod
+      jsonPath: .status.mainPod.status.phase
+
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+            default:
+              children: {}
+              mainPod: {}
+          spec:
+            type: object
+            properties:
+
+              jupyterServer:
+                type: object
+                default: {}   # Stupid, but necessary for the inner defaults do work
+                properties:
+                  image:
+                    type: string
+                    default: jupyter/minimal-notebook:latest
+                  defaultUrl:
+                    type: string
+                    default: /lab
+                  rootDir:
+                    type: string
+                    description: |
+                      The absolute path to the root/notebook directory for jupyterlab. Should
+                      lead to a subdirectory of or match the path at storage.pvc.mountPath
+                    default: /home/jovyan/work
+                  resources:
+                    description: |
+                      Regular resource requests, will be set on the main notebook
+                      container.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                    default: {}
+
+              routing:
+                type: object
+                default: {}   # Stupid, but necessary for the inner defaults do work
+                properties:
+                  host:
+                    type: string
+                  path:
+                    type: string
+                    default: /
+                  tls:
+                    type: object
+                    default: {}
+                    properties:
+                      enabled:
+                        type: boolean
+                        default: false
+                      secretName:
+                        type: string
+                  ingressAnnotations:
+                    type: object
+                    default: {}
+                    x-kubernetes-preserve-unknown-fields: true
+
+              storage:
+                type: object
+                default: {}
+                properties:
+                  size:
+                    description: |
+                      Size of the PVC or sizeLimit of the emptyDir volume which
+                      backs the session respectively.
+                    type: string
+                    default: 100Mi
+                  pvc:
+                    type: object
+                    default: {}
+                    properties:
+                      enabled:
+                        description: |
+                          Wether a PVC should be used to back the session. Defaults
+                          to 'false' in which case an emptyDir volume will be used.
+                        type: boolean
+                        default: false
+                      storageClassName:
+                        type: string
+                        description: |
+                          Storage class to be used for the PVC. If left empty, the
+                          default storage class defined for the cluster will be used.
+                      mountPath:
+                        type: string
+                        description: |
+                          The absolute path to the location where the PVC should be
+                          mounted in the user session pod.
+                        default: /home/jovyan/work
+
+              auth:
+                type: object
+                default: {}   # Stupid, but necessary for the inner defaults do work
+                properties:
+                  token:
+                    description: |
+                      A token that will be passed to the `--ServerApp.token` option when running
+                      the Jupyter server and needed when first accessing the Jupyter server. The
+                      options are:
+                      - By leaving this field empty, a token will be autogenerated and added under the
+                        key `ServerApp.token` to the secret which is created as a child of the custom
+                        resource object.
+                      - Setting the token to an empty string "" runs the Jupyter server container
+                        itself without any authentication. This is recommended when enabling OIDC
+                        as authentication and authorization are then handled by the dedicated plugins.
+                      - Set an actual value here. Note that this string will be stored in clear text
+                        as part of the custom resource object. This option is mostly useful for dev
+                        purposes.
+                    type: string
+                  oidc:
+                    type: object
+                    default: {}
+                    properties:
+                      enabled:
+                        type: boolean
+                        default: false
+                      issuerUrl:
+                        type: string
+                      clientId:
+                        type: string
+                      clientSecret:
+                        description: |
+                          The client secret of the application registered with the OIDC provider. This
+                          secret can be given here explicitly as string or through a reference to an
+                          existing secret. Using the secret reference is the preferred option because it
+                          avoids storing the secret in cleartext on the custom resource specification.
+                        type: object
+                        properties:
+                          value:
+                            type: string
+                          secretKeyRef:
+                            description: |
+                              A regular reference to the key/secret which holds the client secret of the
+                              application registered with the OIDC provider. Note that the secret has to
+                              be in the same namespace in which the custom resource object is going to be
+                              created.
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+                        oneOf:
+                        - required:
+                          - value
+                        - required:
+                          - secretKeyRef
+                      authorizedEmails:
+                        description: |
+                          List of users (identified by Email address read from the "email" OIDC claim)
+                          which are allowed to access this Jupyter session. This list is stored as a file
+                          and passed to the `--authenticated-emails-file` option (see
+                          https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview#command-line-options).
+                        type: array
+                        default: []
+                        items:
+                          type: string
+                      authorizedGroups:
+                        description: |
+                          List of groups of users (read from the "groups" OIDC claim) which are allowed
+                          to access this Jupyter session. This list passed to the `--allowed-group` option (see
+                          https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview#command-line-options).
+                        type: array
+                        default: []
+                        items:
+                          type: string
+
+              patches:
+                description: |
+                  Patches to be applied. Currently only json patches and json merge
+                  patches are supported.
+                type: array
+                default: []
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                      - application/json-patch+json
+                      - application/merge-patch+json
+                    patch:
+                      x-kubernetes-preserve-unknown-fields: true
+
+              culling:
+                description: Options about culling idle servers
+                type: object
+                default: {}
+                properties:
+                  idleSecondsThreshold:
+                    description: |
+                      How long should a server be idle for before it is culled. A value of zero
+                      indicates that the server should never be culled.
+                    type: integer
+                    minimum: 0
+                    default: 0
