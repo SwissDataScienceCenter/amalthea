@@ -1,0 +1,46 @@
+{{- if .Values.scheduler.enable }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    component: scheduler
+    tier: control-plane
+  name: {{ include "amalthea.fullname" . }}-scheduler
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      component: scheduler
+      tier: control-plane
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        component: scheduler
+        tier: control-plane
+    spec:
+      serviceAccountName: {{ include "amalthea.fullname" . }}-scheduler
+      containers:
+        - command:
+            - /usr/local/bin/kube-scheduler
+            - --address=0.0.0.0
+            - --leader-elect=false
+            - --policy-configmap={{ include "amalthea.fullname" . }}-scheduler
+            - --scheduler-name={{ include "amalthea.fullname" . }}-scheduler
+            - --policy-configmap-namespace={{ .Release.Namespace }}
+          image: "{{ .Values.scheduler.image.repository }}:{{ .Values.scheduler.image.tag }}"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 10251
+            initialDelaySeconds: 15
+          name: {{ include "amalthea.fullname" . }}-scheduler
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 10251
+          resources:
+            requests:
+              cpu: "0.1"
+{{- end }}

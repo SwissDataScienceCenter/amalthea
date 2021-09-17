@@ -1,0 +1,16 @@
+{{- if .Values.scheduler.enable }}
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ include "amalthea.fullname" . }}-scheduler
+  namespace: {{ .Release.Namespace }}
+data:
+  policy.cfg: |
+    apiVersion: v1
+    kind: Policy
+    {{- with .Values.scheduler.priorities }}
+    priorities:
+      {{- toYaml . | nindent 6}}
+    {{- end}}
+{{- end }}
