@@ -1,0 +1,35 @@
+name: Autogenerate the manifests and documentation for the CRD
+
+on:
+  push:
+    branches:
+      - "**"
+      - "!main"
+jobs:
+  generate-crd-docs:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Build chart, push images
+        run: |
+          pipenv install --dev
+          cd helm-chart/
+          pipenv run chartpress --push
+          git add amalthea/Chart.yaml amalthea/values.yaml
+          cd ../
+      - name: Render chart into manifests
+        run: python3 utils/render-chart-manifests.py
+      - name: Generate CRD documentation
+        uses: SwissDataScienceCenter/renku-actions/generate-crd-docs@3d6f5abf79b61d969b0d958e42dabb4e9f15392c
+        env:
+          RESOURCES: ./manifests/crd.yaml
+          OUTPUT: ./docs/crd.md
+      - name: Push changes to branch
+        run: |
+          git config --global user.name 'Amalthea Bot'
+          git config --global user.email 'bot@amalthea.dev'
+          git add docs/crd.md || true
+          git commit -m "chore(docs): update manifests and CRD docs" || true
+          git push || true

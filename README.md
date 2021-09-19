@@ -5,6 +5,19 @@ This project defines a custom `JupyterServer`
 for Kubernetes and implements a Kubernetes operator which controls the lifecycle
 of custom `JupyterServer` objects.
 
+## Installation
+
+The recommended way of installing Amalthea is through its **helm chart**:
+
+```bash
+helm repo add renku https://swissdatasciencecenter.github.io/helm-charts
+helm install amalthea renku/amalthea
+```
+
+For people who prefer to use plain manifests in combination with tools like
+`kustomize`, we provide the rendered templates in the
+[manifests directory](https://github.com/SwissDataScienceCenter/amalthea/tree/main/manifests).
+
 ## Example
 
 Once Amalthea is installed in a cluster through the helm chart, deploying a
@@ -86,7 +99,7 @@ change K8s resources which are created as part of the custom resource object.
 
 The main use case of Amalthea is to provide a layer on top of which developers
 can build kubernetes-native applications that allow their users to spin-up and
-manage Jupyter servers. We do not see Amalthea as a standalone tool 
+manage Jupyter servers. We do not see Amalthea as a standalone tool
 used by end users, as creating Jupyter servers with Amalthea requires access to
 the Kubernetes API.
 
@@ -106,7 +119,7 @@ The intended scope of Amalthea is much smaller than that. Specifically:
 - Amalthea itself is stateless. All state is stored as Kubernetes objects in
   etcd.
 - Amalthea uses the Kubernetes-native ingress- and service concepts for dynamically
-  adding and removing routes as Jupyter servers come and go, instead of relying on 
+  adding and removing routes as Jupyter servers come and go, instead of relying on
   an additoinal proxy for routing.
 
 ## What's in the repo
@@ -159,6 +172,14 @@ For Amalthea development you will need python 3,
 [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation),
 [kubectl](https://Kubernetes.io/docs/tasks/tools/#kubectl) and
 [helm](https://helm.sh/docs/intro/install/).
+
+After cloning the repo, you can install the necessary python dependencies and
+activate a custom project git hook by running
+
+```bash
+pipenv install --dev
+git config core.hooksPath .githooks
+```
 
 ### Kind
 

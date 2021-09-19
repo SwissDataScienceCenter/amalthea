@@ -79,7 +79,7 @@ image:
   repository: renku/amalthea
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.0.1-rc1"
+  tag: ""
 
 imagePullSecrets: []
 nameOverride: ""
