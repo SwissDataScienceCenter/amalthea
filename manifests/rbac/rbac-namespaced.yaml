@@ -1,0 +1,20 @@
+# This manifest is auto-generated from the helm chart, do not modify! 
+# Source: amalthea/templates/rbac/rbac-namespaced.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: amalthea
+  namespace: default
+  labels:
+    helm.sh/chart: amalthea-0.0.1-set.by.chartpress
+    app.kubernetes.io/name: amalthea
+    app.kubernetes.io/instance: amalthea
+    app.kubernetes.io/version: "latest"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: amalthea
+subjects:
+  - kind: ServiceAccount
+    name: amalthea
+    namespace: default

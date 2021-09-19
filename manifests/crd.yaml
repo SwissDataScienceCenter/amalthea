@@ -1,21 +1,20 @@
-{{- if .Values.deployCrd -}}
+# This manifest is auto-generated from the helm chart, do not modify! 
+# Source: amalthea/templates/crd.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: {{ .Values.crdNames.plural }}.{{ .Values.crdApiGroup }}
+  name: jupyterservers.amalthea.dev
 spec:
   scope: Namespaced
-  group: {{ .Values.crdApiGroup }}
+  group: amalthea.dev
   names:
-    kind: {{ .Values.crdNames.kind }}
-    plural: {{ .Values.crdNames.plural }}
-    singular: {{ .Values.crdNames.singular }}
+    kind: JupyterServer
+    plural: jupyterservers
+    singular: jupyterserver
     shortNames:
-    {{- range .Values.crdNames.shortNames }}
-      - {{ . }}
-    {{- end }}
+      - js
   versions:
-    - name: {{ .Values.crdApiVersion }}
+    - name: v1alpha1
       served: true
       storage: true
       additionalPrinterColumns:
@@ -231,4 +230,3 @@ spec:
                       type: integer
                       minimum: 0
                       default: 0
-{{- end }}

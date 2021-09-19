@@ -1,0 +1,40 @@
+name: Prepare a new release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version of the release to prep
+        required: true
+
+jobs:
+  prep-release:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Tag version
+        run: git tag ${{ github.event.inputs.version }}
+      - name: Create changelog
+        run: |
+          npm install -g conventional-changelog-cli@2.1.1
+          conventional-changelog -r 1 -i CHANGES.md -s
+      - name: Build chart, DO NOT push tagged images yet
+        run: |
+          python -m pip install --upgrade pip pipenv
+          pipenv install --dev
+          cd helm-chart/
+          pipenv run chartpress --skip-build --tag ${{ github.event.inputs.version }}
+          cd ../
+      - name: Render chart into manifests
+        run: python3 utils/render-chart-manifests.py
+      - name: Generate CRD documentation
+        uses: SwissDataScienceCenter/renku-actions/generate-crd-docs@3d6f5abf79b61d969b0d958e42dabb4e9f15392c
+        env:
+          RESOURCES: ./manifests/crd.yaml
+          OUTPUT: ./docs/crd.md
+      - name: Push changes to new branch
+        run: |
+          git config --global user.name 'Amalthea Bot'
+          git config --global user.email 'bot@amalthea.dev'
+          git checkout -b 000-prep-${{ github.event.inputs.version }}-release
+          git commit -am "chore: prep ${{ github.event.inputs.version }} release"
+          git push --set-upstream origin 000-prep-${{ github.event.inputs.version }}-release
