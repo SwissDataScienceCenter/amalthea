@@ -17,14 +17,12 @@ spec:
       imagePullSecrets: []
       initContainers: []
       volumes:
-        {% if oidc["enabled"] %}
         - name: oauth2-proxy-config
           configMap:
             name: {{ name }}
             items:
               - key: authorized-users.txt
                 path: authorized-users.txt
-        {% endif %}
         - name: jupyter-server-secrets
           secret:
             secretName: {{ name }}
@@ -88,12 +86,6 @@ spec:
             - name: JUPYTER_CONFIG_PATH
               value: {{ storage["pvc"]["mountPath"] }}/.jupyter_config
           resources: {{ jupyter_server["resources"] | default({}) | tojson }}
-          ports:
-          {% if not oidc["enabled"] %}
-            - name: notebook-port
-              containerPort: 8888
-              protocol: TCP
-          {% endif %}
           securityContext:
             runAsUser: 1000
             runAsGroup: 100
@@ -104,30 +96,31 @@ spec:
           # case the entrypoint contains a lot of code which has to be executed before the
           # Jupyter server can even accept connections. However, really long running tasks
           # should be put into an init container.
-          # livenessProbe:
-          #   exec:
-          #     command:  ["sh", "-c", "jupyter notebook list | grep :8888/"]
-          #   periodSeconds: 10
-          #   failureThreshold: 6
-          #   timeoutSeconds: 9
-          # readinessProbe:
-          #   exec:
-          #     command: ["sh", "-c", "jupyter notebook list | grep :8888/"]
-          #   periodSeconds: 10
-          #   failureThreshold: 2
-          #   timeoutSeconds: 9
-          # startupProbe:
-          #   exec:
-          #     command: ["sh", "-c", "jupyter notebook list | grep :8888/"]
-          #   periodSeconds: 10
-          #   failureThreshold: 30
-          #   timeoutSeconds: 9
-
-
-        {% if oidc["enabled"] %}
-
+          livenessProbe:
+            httpGet:
+              path: {{ path }}
+              port: 8888
+            periodSeconds: 10
+            failureThreshold: 6
+            timeoutSeconds: 9
+          readinessProbe:
+            httpGet:
+              path: {{ path }}
+              port: 8888
+            periodSeconds: 10
+            failureThreshold: 2
+            timeoutSeconds: 9
+          startupProbe:
+            httpGet:
+              path: {{ path }}
+              port: 8888
+            periodSeconds: 10
+            failureThreshold: 30
+            timeoutSeconds: 9
+        
         - name: oauth2-proxy
           image: "bitnami/oauth2-proxy:7.1.3"
+          {% if oidc["enabled"] %}
           args:
             - "--provider=oidc"
             - "--client-id={{ oidc["clientId"] }}"
@@ -144,6 +137,18 @@ spec:
             {% for group in oidc["authorizedGroups"] %}
             - "--allowed-group={{ group }}"
             {% endfor %}
+          {% else %}
+          args:
+            - "--skip-auth-route=.*"
+            - "--client-id={{ name }}"
+            - "--session-cookie-minimal"
+            - "--http-address=:4180"
+            - "--skip-provider-button"
+            - "--upstream=http://127.0.0.1:8888"
+            - "--cookie-path={{ path }}"
+            - "--proxy-prefix={{ path }}/oauth2"
+            - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
+          {% endif %}
           ports:
             - name: http
               containerPort: 4180
@@ -156,12 +161,11 @@ spec:
                   key: oauth2ProxyCookieSecret
             - name: OAUTH2_PROXY_CLIENT_SECRET
               valueFrom:
-              {% if "value" in auth["oidc"]["clientSecret"] %}
+              {% if not oidc["enabled"] or "value" in auth["oidc"]["clientSecret"] %}
                 secretKeyRef:
                   name: {{ name }}
                   key: oidcClientSecret
-              {% endif %}
-              {% if "secretKeyRef" in auth["oidc"]["clientSecret"] %}
+              {% elif "secretKeyRef" in auth["oidc"]["clientSecret"] %}
                 secretKeyRef:
                   name: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["name"] }}
                   key: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["key"] }}
@@ -177,4 +181,3 @@ spec:
             limits:
               cpu: 100m
               memory: 32Mi
-        {% endif %}
