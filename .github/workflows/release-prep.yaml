@@ -13,10 +13,10 @@ jobs:
       - uses: actions/checkout@v2
       - name: Tag version
         run: git tag ${{ github.event.inputs.version }}
-      - name: Create changelog
+      - name: Create changelog for new tag
         run: |
           npm install -g conventional-changelog-cli@2.1.1
-          conventional-changelog -r 1 -i CHANGES.md -s
+          echo -e "$(conventional-changelog -p angular -r2)\n$(tail -n +2 CHANGES.md)" > CHANGES.md
       - name: Build chart, DO NOT push tagged images yet
         run: |
           python -m pip install --upgrade pip pipenv
@@ -31,10 +31,9 @@ jobs:
         env:
           RESOURCES: ./manifests/crd.yaml
           OUTPUT: ./docs/crd.md
-      - name: Push changes to new branch
-        run: |
-          git config --global user.name 'Amalthea Bot'
-          git config --global user.email 'bot@amalthea.dev'
-          git checkout -b 000-prep-${{ github.event.inputs.version }}-release
-          git commit -am "chore: prep ${{ github.event.inputs.version }} release"
-          git push --set-upstream origin 000-prep-${{ github.event.inputs.version }}-release
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v3
+        with:
+          commit-message: "chore: prep ${{ github.event.inputs.version }} release"
+          delete-branch: true
+          title: Prep ${{ github.event.inputs.version }} release
