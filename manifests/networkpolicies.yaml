@@ -6,7 +6,6 @@ metadata:
   namespace: default
   name: amalthea-jupyterserver
   labels:
-    helm.sh/chart: amalthea-0.0.1-set.by.chartpress
     app.kubernetes.io/name: amalthea
     app.kubernetes.io/instance: amalthea
     app.kubernetes.io/version: "latest"
