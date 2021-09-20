@@ -1,4 +1,4 @@
-{{- if .Values.networkPolicies.controller.denyAllIngress -}}
+{{- if .Values.networkPolicies.enabled -}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -12,9 +12,7 @@ spec:
       app.kubernetes.io/component: controller
   policyTypes:
     - Ingress
-{{ end }}
-
-{{- if and (or .Values.networkPolicies.jupyterServers.ingress.enabled .Values.networkPolicies.jupyterServers.egress.enabled) (not .Values.scope.clusterWide) -}}
+{{- if and .Values.networkPolicies.enabled ( not .Values.scope.clusterWide ) -}}
 {{- range (.Values.scope.namespaces | default (list .Release.Namespace)) -}}
 ---
 apiVersion: networking.k8s.io/v1
@@ -30,30 +28,16 @@ spec:
       {{- include "amalthea.selectorLabels" $ | nindent 6 }}
       app.kubernetes.io/component: jupyterserver
   policyTypes:
-{{- if $.Values.networkPolicies.jupyterServers.ingress.enabled }}
     - Ingress
-{{- end }}
-{{- if $.Values.networkPolicies.jupyterServers.egress.enabled }}
     - Egress
-{{- end }}
-{{- if $.Values.networkPolicies.jupyterServers.ingress.enabled }}
   ingress:
-    - ports:
+    - from:
+      # Allow ingress only to the oauth2proxy
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
         - protocol: TCP
-          port: 8000
-      from:
-{{- if $.Values.networkPolicies.jupyterServers.ingress.allowIngressOnlyFrom.podSelectorLabels }}
-        - podSelector:
-            matchLabels:
-              {{- $.Values.networkPolicies.jupyterServers.ingress.allowIngressOnlyFrom.podSelectorLabels | toYaml | nindent 14 }}
-{{- end }}
-{{- if $.Values.networkPolicies.jupyterServers.ingress.allowIngressOnlyFrom.namespaceSelectorLabels }}
-        - namespaceSelector:
-            matchLabels:
-              {{- $.Values.networkPolicies.jupyterServers.ingress.allowIngressOnlyFrom.namespaceSelectorLabels | toYaml | nindent 14 }}
-{{- end }}
-{{- end }}
-{{- if $.Values.networkPolicies.jupyterServers.egress.enabled }}
+          port: 4180
   egress:
     - to:
       # Allow DNS resolution (internal and external)
@@ -81,6 +65,6 @@ spec:
 {{- end }}
 {{- end }}
 
-{{- if and (or .Values.networkPolicies.jupyterServers.ingress.enabled .Values.networkPolicies.jupyterServers.egress.enabled) .Values.scope.clusterWide -}}
+{{- if and .Values.networkPolicies.enabled .Values.scope.clusterWide -}}
 {{- fail "Network policies for the jupuyter servers cannot be applied for a cluster wide amalthea deployment." -}}
 {{- end -}}

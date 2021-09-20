@@ -5,11 +5,7 @@ metadata:
 data:
   jupyter_notebook_config.py: |
     import os
-    {%- if oidc["enabled"] %}
-    c.NotebookApp.ip="127.0.0.1"
-    {%- else %}
     c.NotebookApp.ip="0.0.0.0"
-    {%- endif %}
     c.NotebookApp.port=8888
     c.NotebookApp.token=os.environ["SERVER_APP_TOKEN"]
     c.NotebookApp.cookie_secret_file="/etc/jupyter_server_secrets/cookie_secret"
@@ -21,11 +17,7 @@ data:
 
   jupyter_server_config.py: |
     import os
-    {%- if oidc["enabled"] %}
-    c.ServerApp.ip="127.0.0.1"
-    {%- else %}
     c.ServerApp.ip="0.0.0.0"
-    {%- endif %}
     c.ServerApp.port=8888
     c.ServerApp.token=os.environ["SERVER_APP_TOKEN"]
     c.ServerApp.cookie_secret_file="/etc/jupyter_server_secrets/cookie_secret"
@@ -39,3 +31,16 @@ data:
     {%- for email in oidc["authorizedEmails"] %}
     {{ email }}
     {%- endfor %}
+
+  traefik-dynamic-config.yaml: |
+    http:
+      routers:
+        to-passthrough:
+          rule: "PathPrefix(`/`)"
+          service: passthrough
+
+      services:
+        passthrough:
+          loadBalancer:
+            servers:
+            - url: http://localhost:8888
