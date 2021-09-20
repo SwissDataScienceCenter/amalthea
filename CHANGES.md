@@ -1,6 +1,15 @@
 #  (2021-09-20)
 
 
+
+# [0.0.0-testtag](https://github.com/SwissDataScienceCenter/amalthea/compare/485cfec681a8ff22952c2715cc67640a76498ea7...0.0.0-testtag) (2021-09-20)
+
+
+### Features
+
+* add foo ([485cfec](https://github.com/SwissDataScienceCenter/amalthea/commit/485cfec681a8ff22952c2715cc67640a76498ea7))
+
+
 ### Features
 
 * publish plain manifests, auto-generate docs from CRD ([af5201b](https://github.com/SwissDataScienceCenter/amalthea/commit/af5201bc33c38ac5ca35cbc456453f274e8e44e6))
@@ -114,6 +123,3 @@
 * initial commit of sanitized poc ([da735ce](https://github.com/SwissDataScienceCenter/amalthea/commit/da735ced323eacb38fd010e4ae0a0479fb2bf310))
 * more generic patching and customization ([0210df7](https://github.com/SwissDataScienceCenter/amalthea/commit/0210df7ad408df3ec32295d34b0b1a38adc4e3c2))
 * several improvements and refactoring ([8687261](https://github.com/SwissDataScienceCenter/amalthea/commit/8687261039f345129aa62b9e68ae84a4a35e3483))
-
-
-

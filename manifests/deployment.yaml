@@ -6,7 +6,6 @@ metadata:
   name: amalthea
   labels:
     app.kubernetes.io/component: controller
-    helm.sh/chart: amalthea-0.0.1-set.by.chartpress
     app.kubernetes.io/name: amalthea
     app.kubernetes.io/instance: amalthea
     app.kubernetes.io/version: "latest"
@@ -34,7 +33,7 @@ spec:
         - name: amalthea
           securityContext:
             {}
-          image: "renku/amalthea:latest"
+          image: "renku/amalthea:0.0.0-testtag"
           imagePullPolicy: IfNotPresent
           livenessProbe:
             httpGet:
