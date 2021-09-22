@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - uses: helm/kind-action@v1.2.0
+        with:
+          cluster_name: kind
+          wait: 10m0s
       - uses: actions/setup-python@v1
         with:
           python-version: 3.8
