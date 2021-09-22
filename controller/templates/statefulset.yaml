@@ -17,12 +17,21 @@ spec:
       imagePullSecrets: []
       initContainers: []
       volumes:
+        {% if oidc["enabled"] %}
         - name: oauth2-proxy-config
           configMap:
             name: {{ name }}
             items:
               - key: authorized-users.txt
                 path: authorized-users.txt
+        {% else %}
+        - name: tinyproxy-config
+          configMap:
+            name: {{ name }}
+            items:
+              - key: tinyproxy.conf
+                path: tinyproxy.conf
+        {% endif %}
         - name: jupyter-server-secrets
           secret:
             secretName: {{ name }}
@@ -118,9 +127,9 @@ spec:
             failureThreshold: 30
             timeoutSeconds: 9
         
+        {% if oidc["enabled"] %}
         - name: oauth2-proxy
           image: "bitnami/oauth2-proxy:7.1.3"
-          {% if oidc["enabled"] %}
           args:
             - "--provider=oidc"
             - "--client-id={{ oidc["clientId"] }}"
@@ -137,18 +146,6 @@ spec:
             {% for group in oidc["authorizedGroups"] %}
             - "--allowed-group={{ group }}"
             {% endfor %}
-          {% else %}
-          args:
-            - "--skip-auth-route=.*"
-            - "--client-id={{ name }}"
-            - "--session-cookie-minimal"
-            - "--http-address=:4180"
-            - "--skip-provider-button"
-            - "--upstream=http://127.0.0.1:8888"
-            - "--cookie-path={{ path }}"
-            - "--proxy-prefix={{ path }}/oauth2"
-            - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
-          {% endif %}
           ports:
             - name: http
               containerPort: 4180
@@ -161,11 +158,12 @@ spec:
                   key: oauth2ProxyCookieSecret
             - name: OAUTH2_PROXY_CLIENT_SECRET
               valueFrom:
-              {% if not oidc["enabled"] or "value" in auth["oidc"]["clientSecret"] %}
+              {% if "value" in auth["oidc"]["clientSecret"] %}
                 secretKeyRef:
                   name: {{ name }}
                   key: oidcClientSecret
-              {% elif "secretKeyRef" in auth["oidc"]["clientSecret"] %}
+              {% endif %}
+              {% if "secretKeyRef" in auth["oidc"]["clientSecret"] %}
                 secretKeyRef:
                   name: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["name"] }}
                   key: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["key"] }}
@@ -181,3 +179,26 @@ spec:
             limits:
               cpu: 100m
               memory: 32Mi
+        {% else %}
+        - name: passthrough-proxy
+          image: "renku/tinyproxy:0.0.1-rc1"
+          command: ["tinyproxy"]
+          args:
+            - "-c"
+            - "/tinyproxy.conf"
+          ports:
+            - name: http
+              containerPort: 4180
+              protocol: TCP
+          volumeMounts:
+            - name: tinyproxy-config
+              mountPath: /tinyproxy.conf
+              subPath: tinyproxy.conf
+          resources:
+            requests:
+              cpu: 20m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+        {% endif %}

@@ -27,7 +27,14 @@ data:
     c.ServerApp.default_url="{{ jupyter_server["defaultUrl"] }}"
     c.ServerApp.allow_remote_access=True
 
+  {{% if oidc["enabled"] %}}
   authorized-users.txt: |
     {%- for email in oidc["authorizedEmails"] %}
     {{ email }}
     {%- endfor %}
+  {{% else %}}
+  tinyproxy.conf: |
+    Port 4180
+    Listen 0.0.0.0
+    Upstream {{ name }}:80
+  {{% endif %}}
