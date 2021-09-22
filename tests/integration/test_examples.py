@@ -15,6 +15,10 @@ def test_oidc_example(
     manifest["metadata"]["name"] = name
     manifest["metadata"]["namespace"] = k8s_namespace
     manifest["spec"]["routing"] = {"host": host}
+    manifest["spec"]["auth"] = {
+        "clientId": "amalthea-test-session",
+        "clientSecret": {"value": "amalthea-test-session-secret"},
+    }
     operator = launch_session(manifest)
     assert operator.exit_code == 0
     assert operator.exception is None
