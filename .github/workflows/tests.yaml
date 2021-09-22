@@ -19,6 +19,14 @@ jobs:
         with:
           python-version: 3.8
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        env:
+          DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
+        with:
+          limit-access-to-actor: true
+
       # TODO: Adapt the chart building action in Renku to work for this repo too.
       - name: Build chart, push images
         env:
