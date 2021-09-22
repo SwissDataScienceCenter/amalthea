@@ -125,7 +125,7 @@ directory contains the logic of that operator which is based on the very nice
 
 The easiest way to try amalthea out is to install it in a K8s cluster. If you
 dont have a K8s cluster handy you can also just use
-[kind](https://kind.sigs.k8s.io/). Further sesctions in the documentation give
+[kind](https://kind.sigs.k8s.io/). Further sections in the documentation give
 more details and information on how to do this.
 
 After installing the helm chart you can start creating `jupyterserver`
@@ -134,7 +134,7 @@ few edits in the `examples` folder in this repository.
 
 Amalthea can work with any image from the
 [Jupyter Docker Stacks](https://jupyter-docker-stacks.readthedocs.io/en/latest/using/selecting.html).
-But you can also build your own using the Juyter Docker Stacks Images as a base.
+But you can also build your own using the Jupyter Docker Stacks Images as a base.
 However, there are a few requirements for an image to work with Amalthea:
 
 - The container should use port 8888.

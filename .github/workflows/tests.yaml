@@ -15,22 +15,25 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - uses: helm/kind-action@v1.2.0
+        with:
+          cluster_name: kind
+          wait: 10m0s
       - uses: actions/setup-python@v1
         with:
           python-version: 3.8
 
       # TODO: Adapt the chart building action in Renku to work for this repo too.
-      - name: Build chart, push images
+      - name: Build images, load in kind
         env:
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
         run: |
-          echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
           python -m pip install --upgrade pip pipenv
           pipenv install --deploy --system --dev
           cd helm-chart/
           helm dep update amalthea
-          PIPENV_PIPFILE="../Pipfile" pipenv run chartpress --push
+          pipenv run chartpress
+          kind load docker-image $(pipenv run chartpress --list-images) 
 
       - name: Install amalthea chart
         run: |
