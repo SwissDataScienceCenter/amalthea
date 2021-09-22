@@ -1,13 +1,15 @@
+from datetime import datetime, timedelta
+from pathlib import Path
+import subprocess
+import tempfile
+from time import sleep
+
 import pytest
 from kopf.testing import KopfRunner
+from kubernetes import config
 from kubernetes.dynamic import DynamicClient
 import kubernetes.client as k8s_client
 import yaml
-from datetime import datetime, timedelta
-import subprocess
-from kubernetes import config
-from time import sleep
-from pathlib import Path
 
 from tests.integration.utils import find_resource, is_pod_ready
 from utils.chart_rbac import configure_local_dev, cleanup_local_dev
@@ -24,6 +26,18 @@ def operator(configure_rbac, k8s_namespace):
             "kopf_entrypoint.py",
         ]
     )
+
+    # We run the KopfRunner again for a short moment to remove all finalizers
+    # and allow cleanup.
+    with KopfRunner(
+        [
+            "run",
+            "-n",
+            f"{k8s_namespace}",
+            "kopf_entrypoint.py",
+        ]
+    ):
+        sleep(2)
 
 
 @pytest.fixture
@@ -94,6 +108,7 @@ def launch_session(operator, k8s_amalthea_api, k8s_namespace, is_session_ready):
             session["metadata"]["name"],
             namespace=k8s_namespace,
             propagation_policy="Foreground",
+            async_req=False,
         )
 
 
@@ -117,7 +132,7 @@ def is_session_ready(k8s_amalthea_api, k8s_namespace, k8s_pod_api):
                 pod_fully_ready = is_pod_ready(pod)
                 if pod_fully_ready:
                     return pod
-            sleep(20)
+            sleep(5)
         return pod
 
     yield _is_session_ready
@@ -125,7 +140,7 @@ def is_session_ready(k8s_amalthea_api, k8s_namespace, k8s_pod_api):
 
 @pytest.fixture(scope="session", autouse=True)
 def install_crd(load_k8s_config):
-    crd_file = "crd.yaml"
+    crd_file = f"{tempfile.mkdtemp()}/crd.yaml"
     manifest_str = subprocess.check_output(
         ["helm", "template", "amalthea", "helm-chart/amalthea"]
     )
