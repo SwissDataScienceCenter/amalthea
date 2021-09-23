@@ -71,112 +71,16 @@
             "type": "boolean"
         },
         "networkPolicies": {
-            "description": "Enable a network policy to limit ingress to the controller and one network policy per namespace within the amalthea scope to limit ingress and egress from/to the jupyter servers.",
+            "description": "Enable default network policies for the controller and jupyter servers.",
             "type": "object",
             "properties": {
-                "controller": {
-                    "type": "object",
-                    "properties": {
-                        "denyAllIngress": {
-                            "type": "boolean"
-                        }
-                    },
-                    "required": [
-                        "denyAllIngress"
-                    ],
-                    "additionalProperties": false
-                },
-                "jupyterServers": {
-                    "type": "object",
-                    "properties": {
-                        "ingress": {
-                            "type": "object",
-                            "properties": {
-                                "enabled": {
-                                    "type": "boolean"
-                                }
-                            },
-                            "if": {
-                                "properties": {
-                                    "enabled": {
-                                        "const": true
-                                    }
-                                }
-                            },
-                            "then": {
-                                "properties": {
-                                    "enabled": {
-                                        "const": true
-                                    },
-                                    "allowIngressOnlyFrom": {
-                                        "type": "object",
-                                        "properties": {
-                                            "namespaceSelectorLabels": {
-                                                "type": "object",
-                                                "additionalProperties": true,
-                                                "patternProperties": {
-                                                    ".*": {
-                                                        "type": "string"
-                                                    }
-                                                },
-                                                "minProperties": 1
-                                            },
-                                            "podSelectorLabels": {
-                                                "type": "object",
-                                                "additionalProperties": true,
-                                                "patternProperties": {
-                                                    ".*": {
-                                                        "type": "string"
-                                                    }
-                                                },
-                                                "minProperties": 1
-                                            }
-                                        }
-                                    }
-                                },
-                                "required": [
-                                    "enabled",
-                                    "allowIngressOnlyFrom"
-                                ],
-                                "additionalProperties": false
-                            },
-                            "else": {
-                                "properties": {
-                                    "enabled": {
-                                        "const": false
-                                    }
-                                },
-                                "required": [
-                                    "enabled"
-                                ],
-                                "additionalProperties": false
-                            }
-                        },
-                        "egress": {
-                            "type": "object",
-                            "properties": {
-                                "enabled": {
-                                    "type": "boolean"
-                                }
-                            },
-                            "required": [
-                                "enabled"
-                            ],
-                            "additionalProperties": false
-                        }
-                    },
-                    "required": [
-                        "ingress",
-                        "egress"
-                    ],
-                    "additionalProperties": false
+                "enabled": {
+                    "type": "boolean",
+                    "default": true
                 }
             },
             "additionalProperties": false,
-            "required": [
-                "controller",
-                "jupyterServers"
-            ]
+            "required": ["enabled"]
         },
         "kopf": {
             "type": "object",

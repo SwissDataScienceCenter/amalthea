@@ -24,29 +24,18 @@ scope:
 deployCrd: true # whether to deploy the jupyterserver CRD
 
 networkPolicies:
-  controller:
-    # # Deny all ingress to the amalthea controller - there is no need for anything
-    # # to have acess to the controller.
-    denyAllIngress: true
-  jupyterServers:
-    # # Note that until cluster-wide network policies are available in
-    # # Kubernetes (https://github.com/kubernetes/enhancements/issues/2091),
-    # # enabling network policies for the sessions won't do anything if the scope of the
-    # # operator is set to clusterWide.
-    ingress:
-      # # The ingress network policy can be used to prevent ingress into the jupyter server
-      # # from everywhere except the pods and namespaces captured by the selectors below. For
-      # # example you can use this to allow ingress into the sessions only from a specific
-      # # kubernetes ingress resource - i.e. only nginx ignress controller pods can access the sessions.
-      enabled: false
-      # allowIngressOnlyFrom:
-      #   namespaceSelectorLabels: {}
-      #   podSelectorLabels: {}
-    egress:
-      # # If enabled allows jupyter servers to access ports 80 and 443 (http/https)
-      # # outside of the cluster and port 53 for DNS outside and inside of the cluster
-      # # all other egress is prohibited.
-      enabled: true
+  # # Enable sensible, default network policies. Note that until cluster-wide 
+  # # network policies are available in Kubernetes (https://github.com/kubernetes/enhancements/issues/2091),
+  # # enabling network policies for the servers won't do anything if the scope of the
+  # # operator is set to clusterWide. These default policies disable all ingress
+  # # to the controller pod and also apply the following policies to all
+  # # jupyter server pods:
+  # #   - egress: allowed only for DNS resolution inside and outside the cluster
+  # #             and for going to any address/port/etc as long as it is outside of the cluster,
+  # #             i.e. egresses from jupyter servers aimed at other things within the k8s cluster
+  # #             are blocked
+  # #   - ingress: allowed only on port 4180 for TCP so that the oauth2proxy can be reached
+  enabled: true
 
 kopf:
   # # Configure the kopf operator settings by providing

@@ -9,11 +9,7 @@ spec:
     - name: http
       protocol: TCP
       port: 80
-      {% if oidc["enabled"] %}
       targetPort: 4180
-      {% else %}
-      targetPort: 8888
-      {% endif %}
 
   selector:
     app: {{ name }}
