@@ -3,11 +3,12 @@ name: Acceptance Tests
 on:
   pull_request:
     types:
-    - opened
-    - edited
-    - synchronize
-    - reopened
-    - closed
+      - opened
+      - edited
+      - synchronize
+      - reopened
+      - closed
+  workflow_dispatch:
 
 jobs:
   acceptance-tests-images:
@@ -85,7 +86,7 @@ jobs:
           pipenv install --dev
           cd helm-chart
           pipenv run chartpress
-          kind load docker-image $(pipenv run chartpress --list-images) 
+          kind load docker-image $(pipenv run chartpress --list-images)
       - name: Install Amalthea and Ingress-Nginx
         run: |
           VERSION=$(curl https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/stable.txt)

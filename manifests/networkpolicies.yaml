@@ -1,0 +1,62 @@
+---
+# This manifest is auto-generated from the helm chart, do not modify! 
+# Source: amalthea/templates/networkpolicies.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: amalthea-controller
+  labels:
+    app.kubernetes.io/name: amalthea
+    app.kubernetes.io/instance: amalthea
+    app.kubernetes.io/version: "latest"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: amalthea
+      app.kubernetes.io/instance: amalthea
+      app.kubernetes.io/component: controller
+  policyTypes:
+    - Ingress
+---
+# This manifest is auto-generated from the helm chart, do not modify! 
+# Source: amalthea/templates/networkpolicies.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  namespace: default
+  name: amalthea-jupyterserver
+  labels:
+    app.kubernetes.io/name: amalthea
+    app.kubernetes.io/instance: amalthea
+    app.kubernetes.io/version: "latest"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: amalthea
+      app.kubernetes.io/instance: amalthea
+      app.kubernetes.io/component: jupyterserver
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+      # Allow DNS resolution (internal and external)
+      ports:
+      - port: 53
+        protocol: UDP
+      - port: 53
+        protocol: TCP
+    - to:
+      # Allow access to web outside of cluster by excluding
+      # IP ranges which are reserved for private networking from
+      # the allowed range.
+      - ipBlock:
+          cidr: 0.0.0.0/0
+          except:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+      ports:
+      - port: 80
+        protocol: TCP
+      - port: 443
+        protocol: TCP

@@ -1,6 +1,8 @@
 name: publish-chart
 
-on: [push]
+on:
+  push:
+  workflow_dispatch:
 
 jobs:
   publish-chart:
