@@ -25,12 +25,12 @@ spec:
               - key: authorized-users.txt
                 path: authorized-users.txt
         {% else %}
-        - name: tinyproxy-config
+        - name: traefik-dynamic-config
           configMap:
             name: {{ name }}
             items:
-              - key: tinyproxy.conf
-                path: tinyproxy.conf
+              - key: traefik-dynamic-config.yaml
+                path: traefik-dynamic-config.yaml
         {% endif %}
         - name: jupyter-server-secrets
           secret:
@@ -181,24 +181,24 @@ spec:
               memory: 32Mi
         {% else %}
         - name: passthrough-proxy
-          image: "renku/tinyproxy:0.0.1-rc1"
-          command: ["tinyproxy"]
+          image: traefik:v2.5
           args:
-            - "-c"
-            - "/tinyproxy.conf"
+           - --entryPoints.web.address=:4180
+           - --providers.file.directory=/traefik
+           - --log.level=DEBUG
           ports:
             - name: http
               containerPort: 4180
               protocol: TCP
           volumeMounts:
-            - name: tinyproxy-config
-              mountPath: /tinyproxy.conf
-              subPath: tinyproxy.conf
+            - name: traefik-dynamic-config
+              mountPath: /traefik/traefik-dynamic-config.yaml
+              subPath: traefik-dynamic-config.yaml
           resources:
             requests:
               cpu: 20m
               memory: 16Mi
             limits:
               cpu: 100m
-              memory: 32Mi
+              memory: 64Mi
         {% endif %}
