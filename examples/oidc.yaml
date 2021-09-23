@@ -9,6 +9,7 @@ spec:
   auth:
     kind: oidc
     oidc:
+      enabled: true
       issuerUrl: ## Issuer URL of OIDC provider
       clientId: ## Client ID of registered application
       clientSecret:
