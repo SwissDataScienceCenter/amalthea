@@ -36,7 +36,16 @@ spec:
       app.kubernetes.io/instance: amalthea
       app.kubernetes.io/component: jupyterserver
   policyTypes:
+    - Ingress
     - Egress
+  ingress:
+    - from:
+      # Allow ingress only to the oauth2proxy
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 4180
   egress:
     - to:
       # Allow DNS resolution (internal and external)
