@@ -1,3 +1,10 @@
 {
-    "python.formatting.provider": "black"
+    "python.formatting.provider": "black",
+    "[python]": {
+        "editor.wordWrap": "wordWrapColumn",
+        "editor.wordWrapColumn": 100,
+    },
+    "python.formatting.blackArgs": [
+        "--line-length 100"
+    ],
 }

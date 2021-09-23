@@ -1,0 +1,61 @@
+{{- if .Values.scheduler.enable }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "amalthea.fullname" . }}-scheduler
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "amalthea.fullname" . }}-scheduler-as-kube-scheduler
+roleRef:
+  kind: ClusterRole
+  name: system:kube-scheduler
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "amalthea.fullname" . }}-scheduler
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "amalthea.fullname" . }}-scheduler-as-volume-scheduler
+roleRef:
+  kind: ClusterRole
+  name: system:volume-scheduler
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "amalthea.fullname" . }}-scheduler
+    namespace: {{ .Release.Namespace }}
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ include "amalthea.fullname" . }}-scheduler
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "amalthea.fullname" . }}-namespace-reader
+roleRef:
+  kind: ClusterRole
+  name: {{ include "amalthea.fullname" . }}-scheduler
+  apiGroup: ""
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "amalthea.fullname" . }}-scheduler
+    namespace: {{ .Release.Namespace }}
+    apiGroup: ""
+  - kind: ServiceAccount
+    name: {{ include "amalthea.fullname" . }}-scheduler
+    namespace: kube-system
+    apiGroup: ""
+{{end}}

@@ -17,7 +17,8 @@
                 }
             },
             "then": {
-                "oneOf": [{
+                "oneOf": [
+                    {
                         "properties": {
                             "clusterWide": {
                                 "const": false
@@ -25,9 +26,11 @@
                             "namespaces": {
                                 "type": "array",
                                 "minItems": 1,
-                                "items": [{
-                                    "type": "string"
-                                }],
+                                "items": [
+                                    {
+                                        "type": "string"
+                                    }
+                                ],
                                 "uniqueItems": true
                             }
                         },
@@ -97,7 +100,7 @@
                     "required": [],
                     "properties": {
                         "timeout": {
-                            "type":"number",
+                            "type": "number",
                             "minimum": 0,
                             "exclusiveMinimum": true,
                             "description": "How long in seconds until the create handler gives up if the resources cannot be successfully created."
@@ -121,17 +124,19 @@
         "extraChildResources": {
             "description": "If the operator should be able to create child resources other than [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps] which are necessary for Amalthea to work, add the corresponding API groups and resources here.",
             "type": "array",
-            "items": [{
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string"
-                    },
-                    "group": {
-                        "type": "string"
+            "items": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string"
+                        },
+                        "group": {
+                            "type": "string"
+                        }
                     }
                 }
-            }]
+            ]
         },
         "image": {
             "description": "The image used for the operator.",
@@ -156,9 +161,11 @@
         },
         "imagePullSecrets": {
             "type": "array",
-            "items": [{
-                "type": "string"
-            }]
+            "items": [
+                {
+                    "type": "string"
+                }
+            ]
         },
         "nameOverride": {
             "type": "string"
@@ -253,9 +260,11 @@
         },
         "tolerations": {
             "type": "array",
-            "items": [{
-                "type": "string"
-            }]
+            "items": [
+                {
+                    "type": "string"
+                }
+            ]
         },
         "affinity": {
             "type": "object"
@@ -276,15 +285,20 @@
                 },
                 "shortNames": {
                     "type": "array",
-                    "items": [{
-                        "type": "string"
-                    }],
+                    "items": [
+                        {
+                            "type": "string"
+                        }
+                    ],
                     "minItems": 1,
                     "uniqueItems": true
                 }
             },
             "required": [
-                "kind", "plural", "singular", "shortNames"
+                "kind",
+                "plural",
+                "singular",
+                "shortNames"
             ],
             "additionalProperties": false
         },
@@ -304,6 +318,64 @@
                 "jupyterServerIdleCheckIntervalSeconds",
                 "cpuUsageMillicoresIdleThreshold"
             ],
+            "additionalProperties": false
+        },
+        "scheduler": {
+            "type": "object",
+            "required": [
+                "enable",
+                "image",
+                "priorities"
+            ],
+            "properties": {
+                "enable": {
+                    "type": "boolean"
+                },
+                "image": {
+                    "type": "object",
+                    "required": [
+                        "repository",
+                        "pullPolicy",
+                        "tag"
+                    ],
+                    "properties": {
+                        "repository": {
+                            "type": "string"
+                        },
+                        "pullPolicy": {
+                            "type": "string"
+                        },
+                        "tag": {
+                            "type": "string"
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "priorities": {
+                    "type": "array",
+                    "additionalItems": true,
+                    "items": {
+                        "anyOf": [
+                            {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "weight"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "weight": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        ]
+                    }
+                }
+            },
             "additionalProperties": false
         },
         "global": {
