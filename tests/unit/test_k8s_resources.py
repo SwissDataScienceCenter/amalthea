@@ -75,6 +75,7 @@ def test_create_template_values(valid_spec):
         "path",
         "pvc",
         "routing",
+        "schedulerName",
         "storage",
     ]
     spec = valid_spec()
