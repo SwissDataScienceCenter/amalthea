@@ -15,7 +15,7 @@ scope:
   #    network policies manually.
   clusterWide: false
   # Namespaces should not be provided if clusterWide is true.
-  # If the deployment is not clusterwide, then there are two options: 
+  # If the deployment is not clusterwide, then there are two options:
   # 1. Specify the namespaces where amalthea should operate
   # 2. Do not define namespaces at all, in which case amalthea
   #    will only operate in the namespace where the helm chart is deployed.
@@ -71,7 +71,8 @@ kopf:
 # [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps]
 # which are necessary for Amalthea to work, add the corresponding API groups and
 # resources here as an array of name/group objects, eg:
-extraChildResources: []
+extraChildResources:
+  []
   # - name: jupyterservers
   #   group: amalthea.dev
 
@@ -127,13 +128,47 @@ crdNames:
   shortNames:
     - js
 
-
 # Determine how often amalthea checks each server to determine whether it is idle.
 # The criteria for deeming that a server is idle are based on the cpu usage
-# and the stats provided by the jupyter server /api/status endpoint. The culling 
+# and the stats provided by the jupyter server /api/status endpoint. The culling
 # section of the custom resource definition of JupyterServer can be used to control
 # on a per-server basis whether a server is ever culled and also if it is culled then
 # how long each server is idle for before it is culled.
 culling:
   jupyterServerIdleCheckIntervalSeconds: 300
   cpuUsageMillicoresIdleThreshold: 500
+
+# Deploy an optional additional scheduler in the same namespace where the operator is deployed.
+# The additional scheduler allows for fine grained scheduling policies for the pods managed by this operator.
+# As an example the pods can be scheduled to prioritize the most requested nodes, thus "packing" the workload in
+# as few nodes as possible, instead of spreading them over all the available nodes.
+# NOTE: ensure that the tag of the scheduler image matches the version of the Kubernetes cluster where it is deployed.
+scheduler:
+  enable: false
+  image:
+    repository: k8s.gcr.io/kube-scheduler
+    pullPolicy: IfNotPresent
+    tag: you-MUST-set-a-tag-matching-the-k8s-version-in-your-cluster
+  priorities:
+    - name: MostRequestedPriority
+      weight: 100
+    - name: ServiceSpreadingPriority
+      weight: 1
+    - name: EqualPriority
+      weight: 1
+    - name: ImageLocalityPriority
+      weight: 1
+    - name: SelectorSpreadPriority
+      weight: 1
+    - name: InterPodAffinityPriority
+      weight: 1
+    - name: LeastRequestedPriority
+      weight: 1
+    - name: BalancedResourceAllocation
+      weight: 1
+    - name: NodePreferAvoidPodsPriority
+      weight: 1
+    - name: NodeAffinityPriority
+      weight: 1
+    - name: TaintTolerationPriority
+      weight: 1

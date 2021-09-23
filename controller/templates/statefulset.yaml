@@ -60,7 +60,9 @@ spec:
       securityContext:
         fsGroup: 100
       enableServiceLinks: false
-
+      {% if scheduler_name %}
+      schedulerName: {{ scheduler_name }}
+      {% endif %}
       containers:
         - name: jupyter-server
           image: {{ jupyter_server["image"] }}
