@@ -8,6 +8,8 @@ import jsonpatch
 import json_merge_patch
 import yaml
 
+from controller import config
+
 
 CONTENT_TYPES = {
     "json-patch": "application/json-patch+json",
@@ -68,6 +70,7 @@ def create_template_values(name, spec):
         "path": os.path.join("/", spec["routing"]["path"].rstrip("/")),
         "pvc": spec["storage"]["pvc"],
         "routing": spec["routing"],
+        "schedulerName": config.SERVER_SCHEDULER_NAME,
         "storage": spec["storage"],
     }
 

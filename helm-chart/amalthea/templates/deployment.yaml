@@ -78,6 +78,10 @@ spec:
             - name: KOPF_CREATE_RETRIES
               value: {{ .retries | quote }}
             {{- end }}
+            {{- if .Values.scheduler.enable}}
+            - name: SERVER_SCHEDULER_NAME
+              value: {{ include "amalthea.fullname" . }}-scheduler
+            {{- end }}
           volumeMounts:
             - name: config
               mountPath: /app/config

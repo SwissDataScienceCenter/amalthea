@@ -27,7 +27,6 @@ spec:
             - --address=0.0.0.0
             - --leader-elect=false
             - --policy-configmap={{ include "amalthea.fullname" . }}-scheduler
-            - --scheduler-name={{ include "amalthea.fullname" . }}-scheduler
             - --policy-configmap-namespace={{ .Release.Namespace }}
           image: "{{ .Values.scheduler.image.repository }}:{{ .Values.scheduler.image.tag }}"
           livenessProbe:
