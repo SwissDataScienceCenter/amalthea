@@ -48,6 +48,8 @@ spec:
 
                 jupyterServer:
                   type: object
+                  description: |
+                    Configuration options (such as image to run) for the jupyter server.
                   default: {} # Stupid, but necessary for the inner defaults do work
                   properties:
                     image:
