@@ -185,7 +185,6 @@ spec:
           args:
            - --entryPoints.web.address=:4180
            - --providers.file.directory=/traefik
-           - --log.level=DEBUG
           ports:
             - name: http
               containerPort: 4180
@@ -197,7 +196,7 @@ spec:
           resources:
             requests:
               cpu: 20m
-              memory: 16Mi
+              memory: 32Mi
             limits:
               cpu: 100m
               memory: 64Mi
