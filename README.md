@@ -31,7 +31,8 @@ spec:
       enabled: true
       issuerUrl: https://auth.example.com
       clientId: jupyter-servers
-      clientSecret: 5912adbd5f946edd4bd783aa168f21810a1ae6181311e3c35346bebe679b4482
+      clientSecret:
+        value: 5912adbd5f946edd4bd783aa168f21810a1ae6181311e3c35346bebe679b4482
       authorizedEmails:
         - jane.doe@example.com
     token: ""
