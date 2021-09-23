@@ -107,7 +107,8 @@ Resource Types:
         <td><b><a href="#jupyterserverspecjupyterserver">jupyterServer</a></b></td>
         <td>object</td>
         <td>
-          <br/>
+          Configuration options (such as image to run) for the jupyter server.
+<br/>
           <br/>
             <i>Default</i>: map[]<br/>
         </td>
@@ -389,6 +390,7 @@ indicates that the server should never be culled.
 
 
 
+Configuration options (such as image to run) for the jupyter server.
 
 
 <table>
