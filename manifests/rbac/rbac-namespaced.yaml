@@ -1,0 +1,66 @@
+---
+# This manifest is auto-generated from the helm chart, do not modify! 
+# Source: amalthea/templates/rbac/rbac-namespaced.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: amalthea
+  namespace: default
+  labels:
+    app.kubernetes.io/name: amalthea
+    app.kubernetes.io/instance: amalthea
+    app.kubernetes.io/version: "latest"
+rules:
+  # Kopf: posting the events about the handlers progress/errors.
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [create]
+
+  # Amalthea: watching & handling for the custom resource we declare.
+  - apiGroups: [amalthea.dev]
+    resources: [jupyterservers]
+    verbs: [list, watch, patch, delete]
+
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch, delete]
+
+  # Amalthea get pod metrics used to cull idle Jupyter servers
+  - apiGroups: ["metrics.k8s.io"]
+    resources: [pods]
+    verbs: [get, list, watch]
+
+  # Amalthea: child resources we produce
+  # Note that we do not patch/update/delete them ever.
+  - apiGroups:
+      - ""
+      - apps
+      - networking.k8s.io
+    resources:
+      - statefulsets
+      - persistentvolumeclaims
+      - services
+      - ingresses
+      - secrets
+      - configmaps
+    verbs: [create, get, list, watch]
+---
+# This manifest is auto-generated from the helm chart, do not modify! 
+# Source: amalthea/templates/rbac/rbac-namespaced.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: amalthea
+  namespace: default
+  labels:
+    app.kubernetes.io/name: amalthea
+    app.kubernetes.io/instance: amalthea
+    app.kubernetes.io/version: "latest"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: amalthea
+subjects:
+  - kind: ServiceAccount
+    name: amalthea
+    namespace: default
