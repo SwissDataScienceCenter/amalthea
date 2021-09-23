@@ -70,7 +70,7 @@ def create_template_values(name, spec):
         "path": os.path.join("/", spec["routing"]["path"].rstrip("/")),
         "pvc": spec["storage"]["pvc"],
         "routing": spec["routing"],
-        "schedulerName": config.SERVER_SCHEDULER_NAME,
+        "scheduler_name": config.SERVER_SCHEDULER_NAME,
         "storage": spec["storage"],
     }
 
