@@ -148,7 +148,7 @@ scheduler:
   image:
     repository: k8s.gcr.io/kube-scheduler
     pullPolicy: IfNotPresent
-    tag: v1.22.1
+    tag: you-MUST-set-a-tag-matching-the-k8s-version-in-your-cluster
   priorities:
     - name: MostRequestedPriority
       weight: 100
