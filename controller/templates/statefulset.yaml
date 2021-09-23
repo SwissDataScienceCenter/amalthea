@@ -61,7 +61,7 @@ spec:
         fsGroup: 100
       enableServiceLinks: false
       {% if scheduler_name %}
-      schedulerName: {{schedulerName}}
+      schedulerName: {{ scheduler_name }}
       {% endif %}
       containers:
         - name: jupyter-server
