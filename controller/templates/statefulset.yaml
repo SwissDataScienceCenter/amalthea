@@ -60,7 +60,7 @@ spec:
       securityContext:
         fsGroup: 100
       enableServiceLinks: false
-      {% if schedulerName|length %}
+      {% if scheduler_name %}
       schedulerName: {{schedulerName}}
       {% endif %}
       containers:
