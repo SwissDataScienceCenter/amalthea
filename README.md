@@ -1,9 +1,8 @@
 # Amalthea - A Kubernetes operator for Jupyter servers
 
-This project defines a custom `JupyterServer`
-[resource](https://github.com/SwissDataScienceCenter/amalthea/tree/main/helm-chart/amalthea/templates/crd.yaml)
-for Kubernetes and implements a Kubernetes operator which controls the lifecycle
-of custom `JupyterServer` objects.
+This project defines a `JupyterServer` [custom resource](manifests/crd.yaml) for
+Kubernetes and implements a Kubernetes operator which controls the lifecycle of
+custom `JupyterServer` objects.
 
 ## Installation
 
@@ -16,10 +15,9 @@ helm install amalthea renku/amalthea
 
 For people who prefer to use plain manifests in combination with tools like
 `kustomize`, we provide the rendered templates in the
-[manifests directory](https://github.com/SwissDataScienceCenter/amalthea/tree/main/manifests),
-together with a basic `kustomization.yaml` file which can serve as a base for
-overlays. A basic install equivalent to a helm install using the default values
-can be achieved through
+[manifests directory](manifests), together with a basic `kustomization.yaml`
+file which can serve as a base for overlays. A basic install equivalent to a
+helm install using the default values can be achieved through
 
 ```bash
 kubectl apply -k github.com/SwissDataScienceCenter/amalthea/manifests/
@@ -28,8 +26,8 @@ kubectl apply -k github.com/SwissDataScienceCenter/amalthea/manifests/
 ## Example
 
 Once Amalthea is installed in a cluster through the helm chart, deploying a
-jupyter server for a user `Jane Doe` with email `jane.doe@example.com` is as easy
-as applying the following YAML file to the cluster:
+jupyter server for a user `Jane Doe` with email `jane.doe@example.com` is as
+easy as applying the following YAML file to the cluster:
 
 ```yaml
 apiVersion: amalthea.dev/v1alpha1
@@ -59,8 +57,8 @@ spec:
 ```
 
 For the full configuration options check out the
-[CRD](https://github.com/SwissDataScienceCenter/amalthea/tree/main/helm-chart/amalthea/templates/crd.yaml)
-as well as the [section on patching](#patching-a-jupyterserver).
+[CRD documentation](docs/crd.md) as well as the
+[section on patching](#patching-a-jupyterserver).
 
 ## What's "inside" a JupyterServer resource
 
@@ -76,11 +74,10 @@ Kubernetes cluster:
   statefulSet controller and by backing it with a persistent volume
   (optional).
 
-When launching a Jupyter server, the custom resource spec is used to
-render the jinja templates defined
-[here](https://github.com/SwissDataScienceCenter/amalthea/tree/main/controller/templates).
-The rendered templates are then applied to the cluster, resulting in the
-creation of the following K8s resources:
+When launching a Jupyter server, the custom resource spec is used to render the
+jinja templates defined [here](controller/templates). The rendered templates are
+then applied to the cluster, resulting in the creation of the following K8s
+resources:
 
 - A statefulSet whose pod spec has two containers, tha actual Jupyter server and
   an [oauth2 proxy](https://github.com/oauth2-proxy/oauth2-proxy) which is
@@ -126,20 +123,18 @@ The intended scope of Amalthea is much smaller than that. Specifically:
   application stack.
 - Amalthea itself is stateless. All state is stored as Kubernetes objects in
   etcd.
-- Amalthea uses the Kubernetes-native ingress- and service concepts for dynamically
-  adding and removing routes as Jupyter servers come and go, instead of relying on
-  an additoinal proxy for routing.
+- Amalthea uses the Kubernetes-native ingress- and service concepts for
+  dynamically adding and removing routes as Jupyter servers come and go, instead
+  of relying on an additoinal proxy for routing.
 
 ## What's in the repo
 
-The
-[helm-chart/amalthea](https://github.com/SwissDataScienceCenter/amalthea/tree/main/helm-chart/amalthea)
-directory contains a chart which installs the custom resource definiton
-(optional) and the controller. The helm chart templates therefore contain the
-[Custom Resource Definition](https://github.com/SwissDataScienceCenter/amalthea/tree/main/helm-chart/amalthea/templates/crd.yaml)
-of the `JupyterServer` resource. The
-[controller](https://github.com/SwissDataScienceCenter/amalthea/tree/main/controller)
-directory contains the logic of that operator which is based on the very nice
+The [helm-chart/amalthea](helm-chart/amalthea) directory contains a chart which
+installs the custom resource definiton (optional) and the controller. The helm
+chart templates therefore contain the
+[Custom Resource Definition](helm-chart/amalthea/templates/crd.yaml) of the
+`JupyterServer` resource. The [controller](controller) directory contains the
+logic of that operator which is based on the very nice
 [kopf framework](https://github.com/nolar/kopf).
 
 ## Testing Amalthea
