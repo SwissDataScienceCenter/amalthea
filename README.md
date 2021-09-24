@@ -181,12 +181,11 @@ For Amalthea development you will need python 3,
 [kubectl](https://Kubernetes.io/docs/tasks/tools/#kubectl) and
 [helm](https://helm.sh/docs/intro/install/).
 
-After cloning the repo, you can install the necessary python dependencies and
-activate a custom project git hook by running
+After cloning the repo, you can install the necessary python dependencies by
+running
 
 ```bash
 pipenv install --dev
-git config core.hooksPath .githooks
 ```
 
 ### Kind
