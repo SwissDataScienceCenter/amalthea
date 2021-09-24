@@ -145,8 +145,7 @@ dont have a K8s cluster handy you can also just use
 more details and information on how to do this.
 
 After installing the helm chart you can start creating `jupyterserver`
-resources. We have example manifests that are ready to be deployed with just a
-few edits in the `examples` folder in this repository.
+resources.
 
 Amalthea can work with any image from the
 [Jupyter Docker Stacks](https://jupyter-docker-stacks.readthedocs.io/en/latest/using/selecting.html).

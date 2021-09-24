@@ -1,0 +1,23 @@
+apiVersion: amalthea.dev/v1alpha1
+kind: JupyterServer
+metadata:
+  name: scipy-session
+  namespace: default
+spec:
+  jupyterServer:
+    image: jupyter/scipy-notebook:33add21fab64
+  routing:
+    host: sessions.kind-cluster
+    path: /my-scipy-session
+    ingressAnnotations:
+      kubernetes.io/ingress.class: "nginx"
+  auth:
+    token: ""
+    oidc:
+      enabled: true
+      issuerUrl: http://kind-cluster/dex
+      clientId: amalthea
+      clientSecret:
+        value: secret
+      authorizedEmails:
+        - me@example.com
