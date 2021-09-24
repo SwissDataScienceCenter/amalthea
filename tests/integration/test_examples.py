@@ -9,7 +9,7 @@ def test_oidc_example(
     is_session_ready,
     k8s_amalthea_api,
 ):
-    manifest = read_manifest("examples/oidc.yaml")
+    manifest = read_manifest("tests/examples/oidc.yaml")
     name = "test-oidc"
     host = "test.host.com"
     manifest["metadata"]["name"] = name
@@ -38,7 +38,7 @@ def test_token_example(
     is_session_ready,
     k8s_amalthea_api,
 ):
-    manifest = read_manifest("examples/token.yaml")
+    manifest = read_manifest("tests/examples/token.yaml")
     name = "test-token"
     host = "test.host.com"
     token = "secret_token_123456"
