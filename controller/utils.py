@@ -179,7 +179,7 @@ def convert_to_bytes(value):
         "Ki": 2**10,
         "Mi": 2**20,
         "Gi": 2**30,
-        "Ti": 1024 * (2**30),
+        "Ti": 2**40,
     }
     res = re.match(r"^([^\sKMGTi]+)\s*([KMGT][i]*)?$", value.strip())
     if res is None:
