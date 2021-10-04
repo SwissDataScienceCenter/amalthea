@@ -378,6 +378,23 @@
             },
             "additionalProperties": false
         },
+        "resourceUsageCheck": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "intervalSeconds": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            },
+            "required": [
+                "enabled",
+                "intervalSeconds"
+            ],
+            "additionalProperties": false
+        },
         "global": {
             "type": "object",
             "default": {},

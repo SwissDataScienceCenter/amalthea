@@ -68,6 +68,10 @@ spec:
               value: {{ .Values.extraChildResources | toJson | quote }}
             - name: JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
               value: {{ .Values.culling.jupyterServerIdleCheckIntervalSeconds | quote }}
+            - name: JUPYTER_SERVER_RESOURCE_CHECK_ENABLED
+              value: {{ .Values.resourceUsageCheck.enabled | quote }}
+            - name: JUPYTER_SERVER_RESOURCE_CHECK_INTERVAL_SECONDS
+              value: {{ .Values.resourceUsageCheck.intervalSeconds | quote }}
             - name: CPU_USAGE_MILLICORES_IDLE_THRESHOLD
               value: {{ .Values.culling.cpuUsageMillicoresIdleThreshold | quote }}
             {{- with .Values.kopf.onCreate }}

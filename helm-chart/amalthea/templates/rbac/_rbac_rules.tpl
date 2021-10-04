@@ -12,6 +12,10 @@
   - apiGroups: [""]
     resources: [pods]
     verbs: [get, list, watch, delete]
+  
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [create, get]
 
   # Amalthea get pod metrics used to cull idle Jupyter servers
   - apiGroups: ["metrics.k8s.io"]
