@@ -7,7 +7,11 @@ import pytz
 from controller import config
 from controller.k8s_resources import CONTENT_TYPES, get_children_specs, get_urls
 from controller.culling import get_cpu_usage_for_culling, get_js_server_status
-from controller.utils import get_pod_metrics, get_volume_disk_capacity, get_api, parse_pod_metrics
+from controller.utils import (
+    get_pod_metrics,
+    get_volume_disk_capacity,
+    get_api, parse_pod_metrics
+)
 
 
 def get_labels(
@@ -303,7 +307,9 @@ def update_resource_usage(body, name, namespace, **kwargs):
     disk_capacity = get_volume_disk_capacity(pod_name, namespace, "workspace")
     pod_metrics = get_pod_metrics(pod_name, namespace)
     parsed_pod_metrics = parse_pod_metrics(pod_metrics)
-    cpu_memory = list(filter(lambda x: x.get("name") == "jupyter-server", parsed_pod_metrics))
+    cpu_memory = list(
+        filter(lambda x: x.get("name") == "jupyter-server", parsed_pod_metrics)
+    )
     cpu_memory = cpu_memory[0] if len(cpu_memory) == 1 else {}
     patch = {
         "status": {

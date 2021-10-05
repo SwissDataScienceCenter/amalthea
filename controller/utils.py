@@ -20,7 +20,8 @@ def get_pod_metrics(pod_name, namespace):
     client = dynamic.DynamicClient(api_client.ApiClient())
     try:
         res = client.request(
-            "GET", f"/apis/metrics.k8s.io/v1beta1/namespaces/{namespace}/pods/{pod_name}"
+            "GET",
+            f"/apis/metrics.k8s.io/v1beta1/namespaces/{namespace}/pods/{pod_name}"
         )
     except ApiException as err:
         logging.warning(
@@ -43,16 +44,14 @@ def parse_pod_metrics(metrics):
         containers = []
     for container in containers:
         try:
-            parsed_data = {
-                "name": container.name
-            }
-            parsed_data["cpu_millicores"] = convert_to_millicores(container["usage"]["cpu"])
+            parsed_data = {"name": container.name}
+            parsed_data["cpu_millicores"] = convert_to_millicores(
+                container["usage"]["cpu"]
+            )
             parsed_data["memory_bytes"] = convert_to_bytes(container["usage"]["memory"])
             parsed_metrics.append(parsed_data)
         except (KeyError, ValueError, AttributeError) as err:
-            logging.warning(
-                f"Could not parse metrics {metrics} because: {err}"
-            )
+            logging.warning(f"Could not parse metrics {metrics} because: {err}")
     return parsed_metrics
 
 
@@ -84,7 +83,7 @@ def get_volume_disk_capacity(pod_name, namespace, volume_name):
                     pod_name,
                     namespace,
                     container.name,
-                    ["sh", "-c", f"df -Pk {mount_path}"]
+                    ["sh", "-c", f"df -Pk {mount_path}"],
                 )
                 disk_cap = parse_disk_capacity(disk_cap_raw)
                 # make sure `df -h` returned the results from only one mount point
@@ -96,8 +95,10 @@ def get_volume_disk_capacity(pod_name, namespace, volume_name):
                         and volume["emptyDir"].get("sizeLimit") is not None
                     ):
                         total_bytes = convert_to_bytes(volume["emptyDir"]["sizeLimit"])
-                        disk_cap[0]['total_bytes'] = total_bytes
-                        disk_cap[0]['available_bytes'] = total_bytes - disk_cap[0]['used_bytes']
+                        disk_cap[0]["total_bytes"] = total_bytes
+                        disk_cap[0]["available_bytes"] = (
+                            total_bytes - disk_cap[0]["used_bytes"]
+                        )
                     return disk_cap[0]
     return {}
 
@@ -115,8 +116,10 @@ def pod_exec(pod_name, namespace, container_name, command):
         namespace,
         command=command,
         container=container_name,
-        stderr=True, stdin=False,
-        stdout=True, tty=False
+        stderr=True,
+        stdin=False,
+        stdout=True,
+        tty=False
     )
     return resp
 
@@ -138,10 +141,7 @@ def parse_disk_capacity(capacity, bytes_multiplier=1024):
         header = re.split(r"\s+", lines[0])
 
     for line in lines[1:]:
-        data = dict(zip(
-            header,
-            re.split(r"\s+", line)
-        ))
+        data = dict(zip(header, re.split(r"\s+", line)))
         data["used_bytes"] = float(data["Used"]) * bytes_multiplier
         data["available_bytes"] = float(data["Available"]) * bytes_multiplier
         data["total_bytes"] = data["used_bytes"] + data["available_bytes"]
@@ -176,10 +176,10 @@ def convert_to_bytes(value):
         "M": 1e6,
         "G": 1e9,
         "T": 1e12,
-        "Ki": 2**10,
-        "Mi": 2**20,
-        "Gi": 2**30,
-        "Ti": 2**40,
+        "Ki": 2 ** 10,
+        "Mi": 2 ** 20,
+        "Gi": 2 ** 30,
+        "Ti": 2 ** 40,
     }
     res = re.match(r"^([^\sKMGTi]+)\s*([KMGT][i]*)?$", value.strip())
     if res is None:
