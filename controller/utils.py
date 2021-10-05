@@ -21,7 +21,7 @@ def get_pod_metrics(pod_name, namespace):
     try:
         res = client.request(
             "GET",
-            f"/apis/metrics.k8s.io/v1beta1/namespaces/{namespace}/pods/{pod_name}"
+            f"/apis/metrics.k8s.io/v1beta1/namespaces/{namespace}/pods/{pod_name}",
         )
     except ApiException as err:
         logging.warning(
@@ -119,7 +119,7 @@ def pod_exec(pod_name, namespace, container_name, command):
         stderr=True,
         stdin=False,
         stdout=True,
-        tty=False
+        tty=False,
     )
     return resp
 
