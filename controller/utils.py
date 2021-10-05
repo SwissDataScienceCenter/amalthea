@@ -74,17 +74,30 @@ def get_volume_disk_capacity(pod_name, namespace, volume_name):
 
     containers = pod.spec.get("initContainers", []) + pod.spec.get("containers", [])
     for container in containers:
-        for volume_mount in container.volumeMounts:
+        for volume_mount in container.get("volumeMounts", []):
             if volume_mount.get("name") == volume_name:
                 mount_path = volume_mount.get("mountPath")
                 volume = list(filter(lambda x: x.name == volume_name, pod.spec.volumes))
                 volume = volume[0] if len(volume) == 1 else {}
-                disk_cap_raw = pod_exec(
-                    pod_name,
-                    namespace,
-                    container.name,
-                    ["sh", "-c", f"df -Pk {mount_path}"],
-                )
+                command = ["sh", "-c", f"df -Pk {mount_path}"]
+                try:
+                    disk_cap_raw = pod_exec(
+                        pod_name,
+                        namespace,
+                        container.name,
+                        command,
+                    )
+                except ApiException:
+                    disk_cap_raw = ""
+                    logging.warning(
+                        f"Checking disk capacity failed with {pod_name}, "
+                        f"{namespace}, {container.name}, {command}."
+                    )
+                else:
+                    logging.info(
+                        f"Checking disk capacity succeeded with {pod_name}, "
+                        f"{namespace}, {container.name}, {command}."
+                    )
                 disk_cap = parse_disk_capacity(disk_cap_raw)
                 # make sure `df -h` returned the results from only one mount point
                 if len(disk_cap) == 1:
@@ -120,6 +133,7 @@ def pod_exec(pod_name, namespace, container_name, command):
         stdin=False,
         stdout=True,
         tty=False,
+        _preload_content=True,
     )
     return resp
 
