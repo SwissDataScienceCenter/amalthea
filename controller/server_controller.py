@@ -11,7 +11,7 @@ from controller.utils import (
     get_pod_metrics,
     get_volume_disk_capacity,
     get_api,
-    parse_pod_metrics
+    parse_pod_metrics,
 )
 
 
