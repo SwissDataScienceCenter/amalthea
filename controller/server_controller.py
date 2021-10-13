@@ -280,10 +280,10 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
     try:
         op = JSONPATCH_OPS[event["type"]]
     except KeyError:
-        logger.info(
-            f"Ignoring event of kind {event['type']} on resource of {body['kind']}"
-        )
-        return
+        # Note: Many events (for example on an initial listing) come without
+        # a type. In this case we use "replace" to recover which will also
+        # work for not yet existing objects.
+        op = "replace"
 
     path = "/status/mainPod" if is_main_pod else f"/status/children/{child_key}"
     value = {
@@ -307,10 +307,10 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
             body=[patch_op],
             content_type=CONTENT_TYPES["json-patch"],
         )
-    # Handle the case when the custom resource is already gone, must
-    # happen for removals of children exclusively, not for "add" or "replace".
+    # Handle the case when the custom resource is already gone, can
+    # happen for removals of children, not for "add" events.
     except NotFoundError as e:
-        if op == "remove":
+        if op != "add":
             pass
         else:
             raise e
