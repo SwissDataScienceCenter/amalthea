@@ -89,7 +89,9 @@ jobs:
           kind load docker-image $(pipenv run chartpress --list-images)
       - name: Install Amalthea and Ingress-Nginx
         run: |
-          VERSION=$(curl https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/stable.txt)
+          # VERSION=$(curl https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/stable.txt)
+          # TODO: fix workflow for latest controller version, see https://github.com/SwissDataScienceCenter/amalthea/issues/107
+          VERSION=controller-v1.0.3
           kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/$VERSION/deploy/static/provider/kind/deploy.yaml
           kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s
           helm dep update helm-chart/amalthea
