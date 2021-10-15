@@ -1,0 +1,41 @@
+name: Prepare a new release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version of the release to prep
+        required: true
+
+jobs:
+  prep-release:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Tag version
+        run: git tag ${{ github.event.inputs.version }}
+      - name: Create changelog for new tag
+        run: |
+          npm install -g conventional-changelog-cli@2.1.1
+          echo -e "$(conventional-changelog -p angular -r2)\n$(tail -n +2 CHANGES.md)" > CHANGES.md
+      - name: Build chart, DO NOT push tagged images yet
+        run: |
+          python -m pip install --upgrade pip pipenv
+          pipenv install --dev
+          cd helm-chart/
+          pipenv run chartpress --skip-build --tag ${{ github.event.inputs.version }}
+          cd ../
+      - name: Render chart into manifests
+        run: python3 utils/render-chart-manifests.py
+      - name: Generate CRD documentation
+        uses: SwissDataScienceCenter/renku-actions/generate-crd-docs@3d6f5abf79b61d969b0d958e42dabb4e9f15392c
+        env:
+          RESOURCES: ./manifests/crd.yaml
+          OUTPUT: ./docs/crd.md
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v3
+        with:
+          commit-message: "chore: prep ${{ github.event.inputs.version }} release"
+          delete-branch: true
+          title: Prep ${{ github.event.inputs.version }} release
