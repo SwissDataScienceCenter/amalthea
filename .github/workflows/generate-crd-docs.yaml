@@ -14,10 +14,16 @@ jobs:
         with:
           fetch-depth: 0
       - name: Install python packages
+        if:
+          "!(startsWith(github.event.head_commit.message, 'chore: prep') &&
+          endsWith(github.event.head_commit.message, 'release'))"
         run: |
           python -m pip install --upgrade pip pipenv
           pipenv install --dev
       - name: Set appVersion and push images
+        if:
+          "!(startsWith(github.event.head_commit.message, 'chore: prep') &&
+          endsWith(github.event.head_commit.message, 'release'))"
         env:
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
@@ -34,6 +40,9 @@ jobs:
           pipenv run chartpress --reset
           cd ../
       - name: Render chart into manifests
+        if:
+          "!(startsWith(github.event.head_commit.message, 'chore: prep') &&
+          endsWith(github.event.head_commit.message, 'release'))"
         run: |
           pipenv run python utils/render-chart-manifests.py
       - name: Generate CRD documentation
@@ -42,6 +51,9 @@ jobs:
           RESOURCES: ./manifests/crd.yaml
           OUTPUT: ./docs/crd.md
       - name: Create pull request
+        if:
+          "!(startsWith(github.event.head_commit.message, 'chore: prep') &&
+          endsWith(github.event.head_commit.message, 'release'))"
         uses: peter-evans/create-pull-request@v3
         env:
           GITHUB_TOKEN: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
