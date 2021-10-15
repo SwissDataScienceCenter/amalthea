@@ -23,4 +23,4 @@ version: 0.1.0
 # that the appVersion is used as image tag if that is not specified in the values file. For
 # the time being appVersion should match the chart version for each released version of this
 # chart.
-appVersion: latest
+appVersion: 6fb4065

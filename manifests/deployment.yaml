@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/component: controller
     app.kubernetes.io/name: amalthea
     app.kubernetes.io/instance: amalthea
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/version: "6fb4065"
 spec:
   # There must be only one instance of the kopf operator handling the
   # same custom resource object at a time.
@@ -34,7 +34,7 @@ spec:
         - name: amalthea
           securityContext:
             {}
-          image: "renku/amalthea:latest"
+          image: "renku/amalthea:6fb4065"
           imagePullPolicy: IfNotPresent
           livenessProbe:
             httpGet:

@@ -8,6 +8,6 @@ metadata:
   labels:
     app.kubernetes.io/name: amalthea
     app.kubernetes.io/instance: amalthea
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/version: "6fb4065"
 data:
   kopf-operator-settings.yaml: "watching:\n  # This can fix a problem of a watch stream suddenly falling\n  # silent, see https://github.com/nolar/kopf/issues/762#issuecomment-838423267\n  client_timeout: 600\n"

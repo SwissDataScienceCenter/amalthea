@@ -9,7 +9,7 @@ metadata:
   labels:
     app.kubernetes.io/name: amalthea
     app.kubernetes.io/instance: amalthea
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/version: "6fb4065"
 rules:
   # Kopf: posting the events about the handlers progress/errors.
   - apiGroups: [""]
@@ -55,7 +55,7 @@ metadata:
   labels:
     app.kubernetes.io/name: amalthea
     app.kubernetes.io/instance: amalthea
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/version: "6fb4065"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
