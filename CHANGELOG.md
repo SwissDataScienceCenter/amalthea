@@ -1,4 +1,13 @@
-# [0.1.0](https://github.com/SwissDataScienceCenter/amalthea/compare/da735ced323eacb38fd010e4ae0a0479fb2bf310...0.1.0) (2021-09-15)
+#  (2021-10-18)
+
+
+
+## [0.1.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.1.0...0.1.1) (2021-10-14)
+
+
+### Bug Fixes
+
+* react to child resource events without an event type ([6fb4065](https://github.com/SwissDataScienceCenter/amalthea/commit/6fb4065f4a693aa9cceac86425228335b2cfd2f8))
 
 
 ### Features
