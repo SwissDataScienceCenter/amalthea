@@ -1,4 +1,4 @@
-name: Prepare a new release
+pname: Prepare a new release
 on:
   workflow_dispatch:
     inputs:
@@ -23,6 +23,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip pipenv
           pipenv install --dev
+          sed -i'' -e 's/^appVersion: .*/appVersion: '"${{ github.event.inputs.version }}"'/g'  helm-chart/amalthea/Chart.yaml
           cd helm-chart/
           pipenv run chartpress --skip-build --tag ${{ github.event.inputs.version }}
           cd ../
@@ -36,6 +37,7 @@ jobs:
       - name: Create pull request
         uses: peter-evans/create-pull-request@v3
         with:
-          commit-message: "chore: prep ${{ github.event.inputs.version }} release"
+          commit-message:
+            "chore: prep ${{ github.event.inputs.version }} release"
           delete-branch: true
           title: Prep ${{ github.event.inputs.version }} release
