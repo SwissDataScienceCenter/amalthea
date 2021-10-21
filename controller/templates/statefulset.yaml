@@ -60,7 +60,7 @@ spec:
         {% else %}
         - name: workspace
           emptyDir:
-            {% if storage["emptyDir"]["enforceSizeLimit"] %}
+            {% if storage["size"] is not none and storage["size"] != "" %}
             sizeLimit: {{ storage["size"] }}
             {% endif %}
         {% endif %}

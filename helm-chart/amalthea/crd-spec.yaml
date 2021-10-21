@@ -216,19 +216,10 @@ spec:
               type: string
           type: object
         size:
-          default: 100Mi
+          default: null
           description:
             Size of the PVC or sizeLimit of the emptyDir volume which backs the
             session respectively.
           type: string
-        emptyDir:
-          type: object
-          description: "Options related to using emptyDir for storage. If PVC storage is disabled then emptyDir storage is used, otherwise all options here are ignored."
-          default: {}
-          properties:
-            enforceSizeLimit: 
-              description: "Do not set a size limit when emptyDir is used as  session storage. Going over the set limits results in immediate eviction."
-              default: false
-              type: boolean
       type: object
   type: object
