@@ -60,7 +60,9 @@ spec:
         {% else %}
         - name: workspace
           emptyDir:
+            {% if storage["emptyDir"]["enforceSizeLimit"] %}
             sizeLimit: {{ storage["size"] }}
+            {% endif %}
         {% endif %}
       terminationGracePeriodSeconds: 30
       automountServiceAccountToken: false
