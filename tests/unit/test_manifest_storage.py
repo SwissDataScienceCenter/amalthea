@@ -14,10 +14,6 @@ def test_storage(storage_class, size, pvc_enabled, valid_spec):
             "storageClassName": storage_class,
             "mountPath": "/home/jovyan/work/",
         },
-        "emptyDir": {
-            "enabled": not pvc_enabled,
-            "enforceSizeLimit": True,
-        },
     }
     spec = valid_spec(storage=storage)
     name = "test"

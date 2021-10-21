@@ -20,14 +20,7 @@ def default_spec():
             "tls": {"enabled": False},
             "ingressAnnotations": {},
         },
-        "storage": {
-            "size": "1G",
-            "pvc": {"enabled": False},
-            "emptyDir": {
-                "enabled": False,
-                "enforceSizeLimit": True,
-            },
-        },
+        "storage": {"size": "1G", "pvc": {"enabled": False}},
         "patches": [],
     }
     return spec
