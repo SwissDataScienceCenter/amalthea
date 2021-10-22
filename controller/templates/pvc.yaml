@@ -7,7 +7,11 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
+      {% if storage["size"] is not none and storage["size"] != "" %}
       storage: {{ storage["size"] }}
+      {% else %}
+      storage: 100Mi
+      {% endif %}
   {% if "storageClassName" in pvc %}
   storageClassName: {{ pvc["storageClassName"] }}
   {% endif %}
