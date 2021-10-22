@@ -216,7 +216,7 @@ spec:
               type: string
           type: object
         size:
-          default: null
+          default: 100Mi
           description:
             Size of the PVC or sizeLimit of the emptyDir volume which backs the
             session respectively.
