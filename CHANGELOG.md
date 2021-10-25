@@ -1,4 +1,22 @@
-# [0.1.0](https://github.com/SwissDataScienceCenter/amalthea/compare/da735ced323eacb38fd010e4ae0a0479fb2bf310...0.1.0) (2021-09-15)
+#  (2021-10-22)
+
+
+
+## [0.1.2](https://github.com/SwissDataScienceCenter/amalthea/compare/0.1.1...0.1.2) (2021-10-22)
+
+
+### Features
+
+* **app:** option to not limit size of user session emptyDir ([#110](https://github.com/SwissDataScienceCenter/amalthea/issues/110)) ([47a9631](https://github.com/SwissDataScienceCenter/amalthea/commit/47a96312e2e86b8e44e6f6e77964c19f82e956b9))
+
+
+
+## [0.1.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.1.0...0.1.1) (2021-10-14)
+
+
+### Bug Fixes
+
+* react to child resource events without an event type ([6fb4065](https://github.com/SwissDataScienceCenter/amalthea/commit/6fb4065f4a693aa9cceac86425228335b2cfd2f8))
 
 
 ### Features
