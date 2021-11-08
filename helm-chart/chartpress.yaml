@@ -4,7 +4,7 @@ charts:
     imagePrefix: renku/
     # An empty tag means that the appVersion specified in Chart.yaml is used.
     resetTag: ""
-    resetVersion: 0.1.2
+    resetVersion: 0.1.3
     repo:
       git: SwissDataScienceCenter/helm-charts
       published: https://swissdatasciencecenter.github.io/helm-charts/

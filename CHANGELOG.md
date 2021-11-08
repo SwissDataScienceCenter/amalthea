@@ -1,4 +1,13 @@
-#  (2021-10-22)
+#  (2021-11-08)
+
+
+
+## [0.1.3](https://github.com/SwissDataScienceCenter/amalthea/compare/0.1.2...0.1.3) (2021-11-08)
+
+
+### Bug Fixes
+
+* **app:** faililng k8s probes for rstudio ([#112](https://github.com/SwissDataScienceCenter/amalthea/issues/112)) ([7aa13a5](https://github.com/SwissDataScienceCenter/amalthea/commit/7aa13a517721473d6a85c30c744c60fa3dc74b75))
 
 
 
