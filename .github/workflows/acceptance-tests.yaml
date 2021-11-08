@@ -104,4 +104,4 @@ jobs:
           ENVIRONMENT: ${{ matrix.test-image.env }}
         with:
           working-directory: acceptance-tests
-          command: npx mocha test.js
+          command: npx browserslist@latest --update-db && npx mocha test.js
