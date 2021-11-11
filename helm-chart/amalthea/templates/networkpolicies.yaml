@@ -47,7 +47,8 @@ spec:
       - port: 53
         protocol: TCP
     - to:
-      # Allow access to web outside of cluster by excluding
+      # Allow access to any port/protocol as long as it is directed
+      # outside of the cluster. This is done by excluding
       # IP ranges which are reserved for private networking from
       # the allowed range.
       - ipBlock:
@@ -56,11 +57,6 @@ spec:
           - 10.0.0.0/8
           - 172.16.0.0/12
           - 192.168.0.0/16
-      ports:
-      - port: 80
-        protocol: TCP
-      - port: 443
-        protocol: TCP
 {{- end }}
 {{- end }}
 {{- end }}
