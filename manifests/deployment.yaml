@@ -67,6 +67,10 @@ spec:
               value: "[]"
             - name: JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
               value: "300"
+            - name: JUPYTER_SERVER_RESOURCE_CHECK_ENABLED
+              value: "true"
+            - name: JUPYTER_SERVER_RESOURCE_CHECK_INTERVAL_SECONDS
+              value: "30"
             - name: CPU_USAGE_MILLICORES_IDLE_THRESHOLD
               value: "500"
           volumeMounts:
