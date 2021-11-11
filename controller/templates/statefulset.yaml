@@ -115,7 +115,7 @@ spec:
               httpHeaders:
                 - name: User-Agent
                   value: "Mozilla/5.0 Firefox"
-              path: {{ path }}
+              path: {{ probe_path }}
               port: 8888
             periodSeconds: 10
             failureThreshold: 6
@@ -126,7 +126,7 @@ spec:
               # Required because rstudio sends a 404 even if everything is ok and the user-agent is left out.
                 - name: User-Agent
                   value: "Mozilla/5.0 Firefox"
-              path: {{ path }}
+              path: {{ probe_path }}
               port: 8888
             periodSeconds: 10
             failureThreshold: 2
@@ -137,7 +137,7 @@ spec:
               # Required because rstudio sends a 404 even if everything is ok and the user-agent is left out.
                 - name: User-Agent
                   value: "Mozilla/5.0 Firefox"
-              path: {{ path }}
+              path: {{ probe_path }}
               port: 8888
             periodSeconds: 10
             failureThreshold: 30
