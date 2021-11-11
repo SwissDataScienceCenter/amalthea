@@ -73,6 +73,7 @@ def test_create_template_values(valid_spec):
         "name",
         "oidc",
         "path",
+        "probe_path",
         "pvc",
         "routing",
         "scheduler_name",

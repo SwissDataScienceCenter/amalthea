@@ -68,6 +68,9 @@ def create_template_values(name, spec):
         "name": name,
         "oidc": spec["auth"]["oidc"],
         "path": os.path.join("/", spec["routing"]["path"].rstrip("/")),
+        "probe_path": os.path.join(
+            "/", spec["routing"]["path"].rstrip("/"), "api/status"
+        ),
         "pvc": spec["storage"]["pvc"],
         "routing": spec["routing"],
         "scheduler_name": config.SERVER_SCHEDULER_NAME,
