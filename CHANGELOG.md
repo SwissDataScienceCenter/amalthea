@@ -1,4 +1,18 @@
-#  (2021-11-08)
+#  (2021-11-12)
+
+
+## [0.2.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.1.3...0.2.0) (2021-11-12)
+
+
+
+### Bug Fixes
+
+* **app:** failing probes for rstudio ([#117](https://github.com/SwissDataScienceCenter/amalthea/issues/117)) ([4fc45f6](https://github.com/SwissDataScienceCenter/amalthea/commit/4fc45f6855e485174b01d68efc0f07f6ebcd88b3))
+
+
+### Features
+
+* **app:** add resource usage to JupyterServer resources ([#104](https://github.com/SwissDataScienceCenter/amalthea/issues/104)) ([e4fc65e](https://github.com/SwissDataScienceCenter/amalthea/commit/e4fc65ea7a9c2816bec6c6c4224316b0d6de052b))
 
 
 
