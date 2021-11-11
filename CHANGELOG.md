@@ -8,6 +8,7 @@
 ### Bug Fixes
 
 * **app:** failing probes for rstudio ([#117](https://github.com/SwissDataScienceCenter/amalthea/issues/117)) ([4fc45f6](https://github.com/SwissDataScienceCenter/amalthea/commit/4fc45f6855e485174b01d68efc0f07f6ebcd88b3))
+* **chart:** allow egress from sessions to any port out of cluster ([#119](https://github.com/SwissDataScienceCenter/amalthea/issues/119)) ([49c7a62](https://github.com/SwissDataScienceCenter/amalthea/commit/49c7a6219dc7de3b511d526b0d0ab7d8d196bc2a))
 
 
 ### Features
