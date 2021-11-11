@@ -1,29 +1,18 @@
-from expiringdict import ExpiringDict
 import kopf
-import kubernetes.client as k8s_client
 from kubernetes.client.models import V1DeleteOptions
-from kubernetes.dynamic import DynamicClient
 from kubernetes.dynamic.exceptions import NotFoundError
 from datetime import datetime
 import pytz
 
 from controller import config
 from controller.k8s_resources import CONTENT_TYPES, get_children_specs, get_urls
-from controller.culling import get_cpu_usage, get_js_server_status
-
-
-# A dictionary matching a K8s event type to a jsonpatch operation type
-JSONPATCH_OPS = {"MODIFIED": "replace", "ADDED": "add", "DELETED": "remove"}
-
-# A very simple in-memory cache to store the result of the
-# "resources" query of the dynamic API client.
-api_cache = ExpiringDict(max_len=100, max_age_seconds=60)
-
-
-PARENT_UID_LABEL_KEY = f"{config.api_group}/parent-uid"
-PARENT_NAME_LABEL_KEY = f"{config.api_group}/parent-name"
-CHILD_KEY_LABEL_KEY = f"{config.api_group}/child-key"
-MAIN_POD_LABEL_KEY = f"{config.api_group}/main-pod"
+from controller.culling import get_cpu_usage_for_culling, get_js_server_status
+from controller.utils import (
+    get_pod_metrics,
+    get_volume_disk_capacity,
+    get_api,
+    parse_pod_metrics,
+)
 
 
 def get_labels(
@@ -37,31 +26,15 @@ def get_labels(
     labels.update(
         {
             "app.kubernetes.io/component": config.custom_resource_name.lower(),
-            PARENT_UID_LABEL_KEY: parent_uid,
-            PARENT_NAME_LABEL_KEY: parent_name,
+            config.PARENT_UID_LABEL_KEY: parent_uid,
+            config.PARENT_NAME_LABEL_KEY: parent_name,
         }
     )
     if child_key:
-        labels.update({CHILD_KEY_LABEL_KEY: child_key})
+        labels.update({config.CHILD_KEY_LABEL_KEY: child_key})
     if is_main_pod:
-        labels.update({MAIN_POD_LABEL_KEY: "true"})
+        labels.update({config.MAIN_POD_LABEL_KEY: "true"})
     return labels
-
-
-def get_api(api_version, kind):
-    """
-    Get the proper API for a certain resource. We cache the resources
-    availabe in the cluster for 60 seconds in order to reduce the amount
-    of unnecessary requests in busy clusters.
-    """
-    try:
-        return api_cache[(api_version, kind)]
-    except KeyError:
-        client = DynamicClient(k8s_client.ApiClient())
-        api_cache[(api_version, kind)] = client.resources.get(
-            api_version=api_version, kind=kind
-        )
-        return api_cache[(api_version, kind)]
 
 
 def create_namespaced_resource(namespace, body):
@@ -148,7 +121,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
         pod_name = body["status"]["mainPod"]["name"]
     except KeyError:
         return
-    cpu_usage = get_cpu_usage(pod=pod_name, namespace=namespace)
+    cpu_usage = get_cpu_usage_for_culling(pod=pod_name, namespace=namespace)
     js_server_status = get_js_server_status(body)
     custom_resource_api = get_api(config.api_version, config.custom_resource_name)
     idle_seconds = int(body["status"].get("idleSeconds", 0))
@@ -245,7 +218,7 @@ def get_update_decorator(child_resource_kind):
     return kopf.on.event(
         child_resource_kind["name"],
         group=child_resource_kind["group"],
-        labels={PARENT_NAME_LABEL_KEY: kopf.PRESENT},
+        labels={config.PARENT_NAME_LABEL_KEY: kopf.PRESENT},
     )
 
 
@@ -259,12 +232,12 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 
     # Collect labels and other metainformation from the resource which
     # triggered the event.
-    parent_name = labels[PARENT_NAME_LABEL_KEY]
-    parent_uid = labels[PARENT_UID_LABEL_KEY]
-    child_key = labels.get(CHILD_KEY_LABEL_KEY, None)
+    parent_name = labels[config.PARENT_NAME_LABEL_KEY]
+    parent_uid = labels[config.PARENT_UID_LABEL_KEY]
+    child_key = labels.get(config.CHILD_KEY_LABEL_KEY, None)
     owner_references = meta.get("ownerReferences", [])
     owner_uids = [ref["uid"] for ref in owner_references]
-    is_main_pod = labels.get(MAIN_POD_LABEL_KEY, "") == "true"
+    is_main_pod = labels.get(config.MAIN_POD_LABEL_KEY, "") == "true"
 
     # Check if the jupyter server is the actual parent (ie owner) in order
     # to exclude the grand children of the jupyter server. The only grand child
@@ -278,7 +251,7 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 
     # Assemble the jsonpatch to update the custom objects status
     try:
-        op = JSONPATCH_OPS[event["type"]]
+        op = config.JSONPATCH_OPS[event["type"]]
     except KeyError:
         # Note: Many events (for example on an initial listing) come without
         # a type. In this case we use "replace" to recover which will also
@@ -319,3 +292,58 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 # Add the actual decorators
 for child_resource_kind in config.CHILD_RESOURCES:
     update_status = get_update_decorator(child_resource_kind)(update_status)
+
+
+def update_resource_usage(body, name, namespace, **kwargs):
+    """
+    Periodically check the resource usage of the server pod and update the status of the
+    JupyterServer resource. Assumes that the relevant container is called juyter-server
+    and that the volume mount in the pod manifest is called workspace.
+    """
+    try:
+        pod_name = body["status"]["mainPod"]["name"]
+    except KeyError:
+        return
+
+    disk_capacity = get_volume_disk_capacity(pod_name, namespace, "workspace")
+    pod_metrics = get_pod_metrics(pod_name, namespace)
+    parsed_pod_metrics = parse_pod_metrics(pod_metrics)
+    cpu_memory = list(
+        filter(lambda x: x.get("name") == "jupyter-server", parsed_pod_metrics)
+    )
+    cpu_memory = cpu_memory[0] if len(cpu_memory) == 1 else {}
+    patch = {
+        "status": {
+            "mainPod": {
+                "resourceUsage": {
+                    "disk": {
+                        "usedBytes": disk_capacity.get("used_bytes"),
+                        "availableBytes": disk_capacity.get("available_bytes"),
+                        "totalBytes": disk_capacity.get("total_bytes"),
+                    },
+                    "cpuMillicores": cpu_memory.get("cpu_millicores"),
+                    "memoryBytes": cpu_memory.get("memory_bytes"),
+                }
+            }
+        }
+    }
+    custom_resource_api = get_api(config.api_version, config.custom_resource_name)
+    try:
+        custom_resource_api.patch(
+            namespace=namespace,
+            name=name,
+            body=patch,
+            content_type=CONTENT_TYPES["merge-patch"],
+        )
+    # Handle the case when the custom resource is already gone
+    except NotFoundError:
+        pass
+
+
+if config.JUPYTER_SERVER_RESOURCE_CHECK_ENABLED:
+    kopf.timer(
+        config.api_group,
+        config.api_version,
+        config.custom_resource_name,
+        interval=config.JUPYTER_SERVER_RESOURCE_CHECK_INTERVAL_SECONDS,
+    )(update_resource_usage)

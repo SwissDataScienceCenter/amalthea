@@ -126,6 +126,12 @@ culling:
   jupyterServerIdleCheckIntervalSeconds: 300
   cpuUsageMillicoresIdleThreshold: 500
 
+# Periodically check for the current usage of cpu, memory and disk for a Jupyter server pod
+# and update the JupyterServer status with the information.
+resourceUsageCheck:
+  enabled: true
+  intervalSeconds: 30
+
 # Deploy an optional additional scheduler in the same namespace where the operator is deployed.
 # The additional scheduler allows for fine grained scheduling policies for the pods managed by this operator.
 # As an example the pods can be scheduled to prioritize the most requested nodes, thus "packing" the workload in

@@ -52,3 +52,17 @@ CPU_USAGE_MILLICORES_IDLE_THRESHOLD = int(
     os.getenv("CPU_USAGE_MILLICORES_IDLE_THRESHOLD", 200)
 )
 SERVER_SCHEDULER_NAME = os.getenv("SERVER_SCHEDULER_NAME", None)
+JUPYTER_SERVER_RESOURCE_CHECK_ENABLED = (
+    os.getenv("JUPYTER_SERVER_RESOURCE_CHECK_ENABLED", "true").lower() == "true"
+)
+JUPYTER_SERVER_RESOURCE_CHECK_INTERVAL_SECONDS = int(
+    os.getenv("JUPYTER_SERVER_RESOURCE_CHECK_INTERVAL_SECONDS", 30)
+)
+
+# A dictionary matching a K8s event type to a jsonpatch operation type
+JSONPATCH_OPS = {"MODIFIED": "replace", "ADDED": "add", "DELETED": "remove"}
+
+PARENT_UID_LABEL_KEY = f"{api_group}/parent-uid"
+PARENT_NAME_LABEL_KEY = f"{api_group}/parent-name"
+CHILD_KEY_LABEL_KEY = f"{api_group}/child-key"
+MAIN_POD_LABEL_KEY = f"{api_group}/main-pod"
