@@ -69,7 +69,7 @@ def create_template_values(name, spec):
         "oidc": spec["auth"]["oidc"],
         "path": os.path.join("/", spec["routing"]["path"].rstrip("/")),
         "probe_path": os.path.join(
-            "/", spec["routing"]["path"].rstrip("/"), "api/status"
+            "/", spec["routing"]["path"].rstrip("/"), "api"
         ),
         "pvc": spec["storage"]["pvc"],
         "routing": spec["routing"],

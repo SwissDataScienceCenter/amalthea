@@ -111,10 +111,6 @@ spec:
           # should be put into an init container.
           livenessProbe:
             httpGet:
-              # Required because rstudio sends a 404 even if everything is ok and the user-agent is left out.
-              httpHeaders:
-                - name: User-Agent
-                  value: "Mozilla/5.0 Firefox"
               path: {{ probe_path }}
               port: 8888
             periodSeconds: 10
@@ -122,10 +118,6 @@ spec:
             timeoutSeconds: 9
           readinessProbe:
             httpGet:
-              httpHeaders:
-              # Required because rstudio sends a 404 even if everything is ok and the user-agent is left out.
-                - name: User-Agent
-                  value: "Mozilla/5.0 Firefox"
               path: {{ probe_path }}
               port: 8888
             periodSeconds: 10
@@ -133,10 +125,6 @@ spec:
             timeoutSeconds: 9
           startupProbe:
             httpGet:
-              httpHeaders:
-              # Required because rstudio sends a 404 even if everything is ok and the user-agent is left out.
-                - name: User-Agent
-                  value: "Mozilla/5.0 Firefox"
               path: {{ probe_path }}
               port: 8888
             periodSeconds: 10
