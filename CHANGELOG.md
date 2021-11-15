@@ -1,4 +1,14 @@
-#  (2021-11-12)
+#  (2021-11-16)
+
+
+## [0.2.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.2.0...0.2.1) (2021-11-16)
+
+
+
+### Bug Fixes
+
+* **app:** failing probes for anonymous sessions ([#122](https://github.com/SwissDataScienceCenter/amalthea/issues/122)) ([df96164](https://github.com/SwissDataScienceCenter/amalthea/commit/df96164bd44dd68d7fbf904db9bcdac72aab7cae))
+
 
 
 ## [0.2.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.1.3...0.2.0) (2021-11-12)
