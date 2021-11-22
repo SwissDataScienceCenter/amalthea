@@ -113,6 +113,11 @@ spec:
             httpGet:
               path: {{ probe_path }}
               port: 8888
+              {% if not oidc["enabled"] %}
+              httpHeaders:
+                - name: Authorization
+                  value: {{ "token " ~ jupyter_server_app_token }}
+              {% endif %}
             periodSeconds: 10
             failureThreshold: 6
             timeoutSeconds: 9
@@ -120,6 +125,11 @@ spec:
             httpGet:
               path: {{ probe_path }}
               port: 8888
+              {% if not oidc["enabled"] %}
+              httpHeaders:
+                - name: Authorization
+                  value: {{ "token " ~ jupyter_server_app_token }}
+              {% endif %}
             periodSeconds: 10
             failureThreshold: 2
             timeoutSeconds: 9
@@ -127,6 +137,11 @@ spec:
             httpGet:
               path: {{ probe_path }}
               port: 8888
+              {% if not oidc["enabled"] %}
+              httpHeaders:
+                - name: Authorization
+                  value: {{ "token " ~ jupyter_server_app_token }}
+              {% endif %}
             periodSeconds: 10
             failureThreshold: 30
             timeoutSeconds: 9

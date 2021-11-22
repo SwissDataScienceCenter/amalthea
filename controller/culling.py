@@ -11,7 +11,7 @@ from controller.utils import get_pod_metrics, parse_pod_metrics
 def get_cpu_usage_for_culling(pod, namespace):
     """
     Check the total cpu usage of a pod across all its containers. If the API request to
-    get the cpu usage fails (for any reason) report the utilization as being avove the threshold.
+    get the cpu usage fails (for any reason) report the utilization as being above the threshold.
     This is because the culling should not be done if the metrics server is not present
     or cannot be found at the expected url.
     """

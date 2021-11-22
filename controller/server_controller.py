@@ -114,9 +114,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     the idle duration. If any sessions have been idle for long enough, then cull them.
     """
     idle_seconds_threshold = body["spec"]["culling"]["idleSecondsThreshold"]
-    if idle_seconds_threshold == 0:
-        # culling for this server is disabled
-        return
+    max_age_seconds_threshold = body["spec"]["culling"].get("maxAgeSecondsThreshold", 0)
     try:
         pod_name = body["status"]["mainPod"]["name"]
     except KeyError:
@@ -125,31 +123,46 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     js_server_status = get_js_server_status(body)
     custom_resource_api = get_api(config.api_version, config.custom_resource_name)
     idle_seconds = int(body["status"].get("idleSeconds", 0))
+    now = pytz.UTC.localize(datetime.utcnow())
+    try:
+        jupyter_server_started =  datetime.fromisoformat(
+            body["metadata"]["creationTimestamp"].replace("Z", "+00:00")
+        )
+    except KeyError:
+        jupyter_server_started = now
+    jupyter_server_age_seconds = (now - jupyter_server_started).total_seconds()
+    last_activity_age_seconds = (
+        now - js_server_status.get("last_activity", now)
+    ).total_seconds()
     logger.info(
         f"Checking idle status of session {name}, "
         f"idle seconds: {idle_seconds}, "
         f"cpu usage: {cpu_usage}m, "
-        f"server status: {js_server_status}"
+        f"server status: {js_server_status}, "
+        f"age: {jupyter_server_age_seconds} seconds"
     )
-
-    now = pytz.UTC.localize(datetime.utcnow())
-    jupyter_server_is_idle = (
+    jupyter_server_is_idle_now = (
         cpu_usage <= config.CPU_USAGE_MILLICORES_IDLE_THRESHOLD
         and type(js_server_status) is dict
         and js_server_status.get("connections", 0) == 0
-        and js_server_status.get("kernels", 0) == 0
-        and (
-            now - js_server_status.get("last_activity", now).astimezone(pytz.UTC)
-        ).total_seconds()
-        > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
+        and last_activity_age_seconds > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
+    )
+    delete_idle_server = (
+        jupyter_server_is_idle_now
+        and idle_seconds_threshold > 0
+        and idle_seconds + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
+        >= idle_seconds_threshold
+    )
+    delete_old_server = (
+        max_age_seconds_threshold > 0
+        and jupyter_server_age_seconds >= max_age_seconds_threshold
     )
 
     if (
-        jupyter_server_is_idle
-        and idle_seconds + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
-        >= idle_seconds_threshold
+        delete_idle_server or delete_old_server
     ):
-        logger.info(f"Deleting Jupyter server {name} due to inactivity")
+        culling_reason = "inactivity" if delete_idle_server else "age"
+        logger.info(f"Deleting Jupyter server {name} due to {culling_reason}")
         try:
             custom_resource_api.delete(
                 name=name,
@@ -164,7 +177,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
             pass
         return
 
-    if jupyter_server_is_idle:
+    if jupyter_server_is_idle_now:
         logger.info(
             f"Jupyter Server {name} in namespace {namespace} found to be idle for "
             f"{idle_seconds + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS}"
