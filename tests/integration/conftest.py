@@ -98,7 +98,6 @@ def launch_session(operator, k8s_amalthea_api, k8s_namespace, is_session_ready):
     def _launch_session(manifest):
         with operator as runner:
             k8s_amalthea_api.create(manifest, namespace=k8s_namespace)
-            is_session_ready(manifest["metadata"]["name"])
             launched_sessions.append(manifest)
         return runner
 
@@ -118,27 +117,30 @@ def launch_session(operator, k8s_amalthea_api, k8s_namespace, is_session_ready):
 
 
 @pytest.fixture
-def is_session_ready(k8s_amalthea_api, k8s_namespace, k8s_pod_api):
-    def _is_session_ready(name, timeout_mins=10):
+def is_session_ready(k8s_namespace, k8s_pod_api):
+    def _is_session_ready(name, timeout_mins=5):
+        """The pod is considered ready only when it passes
+        the conditions for readiness 5 times in a row. This is
+        used to catch restarts/intermittent problems that occur sometimes
+        when the k8s probes are failing."""
+        minimum_pod_ready_checks = 5
+        pod_ready_checks_passing = 0
         tstart = datetime.now()
         timeout = timedelta(minutes=timeout_mins)
-        session = None
         pod_fully_ready = False
-        pod = None
-        while (
-            datetime.now() - tstart < timeout
-            and session is None
-            and not pod_fully_ready
-        ):
-            session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+        while (datetime.now() - tstart < timeout):
             pod_name = name + "-0"
             pod = find_resource(pod_name, k8s_namespace, k8s_pod_api)
             if pod is not None:
                 pod_fully_ready = is_pod_ready(pod)
                 if pod_fully_ready:
-                    return pod
+                    if pod_ready_checks_passing >= minimum_pod_ready_checks:
+                        return pod
+                    else:
+                        pod_ready_checks_passing += 1
+                else:
+                    pod_ready_checks_passing = 0
             sleep(10)
-        return pod
 
     yield _is_session_ready
 
