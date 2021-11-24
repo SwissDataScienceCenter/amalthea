@@ -18,7 +18,7 @@ def test_(
     # confirm session successfully launched
     assert operator.exit_code == 0
     assert operator.exception is None
-    pod = is_session_ready(name)
+    pod = is_session_ready(name, timeout_mins=2)
     assert pod is not None
     session = find_resource(name, k8s_namespace, k8s_amalthea_api)
     assert session is not None
