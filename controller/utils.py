@@ -58,7 +58,7 @@ def parse_pod_metrics(metrics):
 def get_volume_disk_capacity(pod_name, namespace, volume_name):
     """
     Find the container in the specified pod that has a volume named
-    `volume_name` and run df -h in that container to determine
+    `volume_name` and run df -h or du -sb in that container to determine
     the available space in the volume.
     """
     api = get_api("v1", "Pod")
@@ -79,40 +79,54 @@ def get_volume_disk_capacity(pod_name, namespace, volume_name):
                 mount_path = volume_mount.get("mountPath")
                 volume = list(filter(lambda x: x.name == volume_name, pod.spec.volumes))
                 volume = volume[0] if len(volume) == 1 else {}
-                command = ["sh", "-c", f"df -Pk {mount_path}"]
-                try:
-                    disk_cap_raw = pod_exec(
-                        pod_name,
-                        namespace,
-                        container.name,
-                        command,
-                    )
-                except ApiException:
-                    disk_cap_raw = ""
-                    logging.warning(
-                        f"Checking disk capacity failed with {pod_name}, "
-                        f"{namespace}, {container.name}, {command}."
-                    )
-                else:
-                    logging.info(
-                        f"Checking disk capacity succeeded with {pod_name}, "
-                        f"{namespace}, {container.name}, {command}."
-                    )
-                disk_cap = parse_disk_capacity(disk_cap_raw)
-                # make sure `df -h` returned the results from only one mount point
-                if len(disk_cap) == 1:
-                    # adjust total disk size if empty dir is used,
-                    # because df will show total node storage capacity
-                    if (
-                        "emptyDir" in volume.keys()
-                        and volume["emptyDir"].get("sizeLimit") is not None
-                    ):
-                        total_bytes = convert_to_bytes(volume["emptyDir"]["sizeLimit"])
-                        disk_cap[0]["total_bytes"] = total_bytes
-                        disk_cap[0]["available_bytes"] = (
-                            total_bytes - disk_cap[0]["used_bytes"]
+                if (
+                    "emptyDir" in volume.keys()
+                    and volume["emptyDir"].get("sizeLimit") is not None
+                ):
+                    # empty dir is used for the session
+                    command = ["sh", "-c", f"du -sb {mount_path}"]
+                    used_bytes = parse_du_command(
+                        pod_exec(
+                            pod_name,
+                            namespace,
+                            container.name,
+                            command,
                         )
-                    return disk_cap[0]
+                    )
+                    total_bytes = convert_to_bytes(volume["emptyDir"]["sizeLimit"])
+                    available_bytes = (
+                        0 if total_bytes - used_bytes < 0 else total_bytes - used_bytes
+                    )
+                    return {
+                        "total_bytes": total_bytes,
+                        "used_bytes": used_bytes,
+                        "available_bytes": available_bytes,
+                    }
+                else:
+                    # PVC is used for the session
+                    command = ["sh", "-c", f"df -Pk {mount_path}"]
+                    try:
+                        disk_cap_raw = pod_exec(
+                            pod_name,
+                            namespace,
+                            container.name,
+                            command,
+                        )
+                    except ApiException:
+                        disk_cap_raw = ""
+                        logging.warning(
+                            f"Checking disk capacity failed with {pod_name}, "
+                            f"{namespace}, {container.name}, {command}."
+                        )
+                    else:
+                        logging.info(
+                            f"Checking disk capacity succeeded with {pod_name}, "
+                            f"{namespace}, {container.name}, {command}."
+                        )
+                    disk_cap = parse_df_command(disk_cap_raw)
+                    # make sure `df -h` returned the results from only one mount point
+                    if len(disk_cap) == 1:
+                        return disk_cap[0]
     return {}
 
 
@@ -138,7 +152,7 @@ def pod_exec(pod_name, namespace, container_name, command):
     return resp
 
 
-def parse_disk_capacity(capacity, bytes_multiplier=1024):
+def parse_df_command(capacity, bytes_multiplier=1024):
     """
     Parse the metrics from running `df -h` in a container.
     """
@@ -162,6 +176,17 @@ def parse_disk_capacity(capacity, bytes_multiplier=1024):
         output.append(data)
 
     return output
+
+
+def parse_du_command(capacity, bytes_multiplier=1024):
+    """
+    Parse the result from running `du -sb` in a container.
+    """
+    try:
+        return float(capacity.split()[0]) * bytes_multiplier
+    except (KeyError, ValueError) as e:
+        logging.warning(f"Could not parse du command because: {e}")
+    return None
 
 
 def get_api(api_version, kind):

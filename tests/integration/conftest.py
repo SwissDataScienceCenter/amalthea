@@ -133,7 +133,7 @@ def is_session_ready(k8s_amalthea_api, k8s_namespace, k8s_pod_api):
                 pod_fully_ready = is_pod_ready(pod)
                 if pod_fully_ready:
                     return pod
-            sleep(5)
+            sleep(10)
         return pod
 
     yield _is_session_ready
@@ -176,7 +176,7 @@ def custom_session_manifest(read_manifest, k8s_namespace):
         manifest_file="tests/examples/token.yaml",
         name=f"test-session-{uuid4()}",
         jupyter_server={"image": "jupyter/minimal-notebook:latest"},
-        routing={"host": "test.host.com"},
+        routing={},
         culling={"idleSecondsThreshold": 300},
         auth={
             "token": "test-auth-token",
@@ -196,7 +196,10 @@ def custom_session_manifest(read_manifest, k8s_namespace):
                 "auth": auth,
                 "culling": culling,
                 "jupyterServer": jupyter_server,
-                "routing": routing,
+                "routing": {
+                    "host": f"{name}.{k8s_namespace}",
+                    **routing
+                },
             },
         }
 
