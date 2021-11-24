@@ -67,7 +67,11 @@ def create_template_values(name, spec):
         "jupyter_server_cookie_secret": os.urandom(32).hex(),
         "name": name,
         "oidc": spec["auth"]["oidc"],
-        "path": os.path.join("/", spec["routing"]["path"].rstrip("/")),
+        "path": (
+            spec["routing"]["path"]
+            if spec["routing"]["path"].endswith("/")
+            else spec["routing"]["path"] + "/"
+        ),
         "probe_path": os.path.join("/", spec["routing"]["path"].rstrip("/"), "api/status"),
         "pvc": spec["storage"]["pvc"],
         "routing": spec["routing"],

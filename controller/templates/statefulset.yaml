@@ -159,9 +159,9 @@ spec:
             - "--upstream=http://127.0.0.1:8888"
             - "--redirect-url={{ full_url }}/oauth2/callback"
             - "--cookie-path={{ path }}"
-            - "--proxy-prefix={{ path }}/oauth2"
+            - "--proxy-prefix={{ path }}oauth2"
             - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
-            - "--skip-auth-route=^{{ path }}/api/status$"
+            - "--skip-auth-route=^{{ path }}api/status$"
             {% for group in oidc["authorizedGroups"] %}
             - "--allowed-group={{ group }}"
             {% endfor %}
