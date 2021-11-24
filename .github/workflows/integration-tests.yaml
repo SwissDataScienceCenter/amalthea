@@ -12,6 +12,7 @@ on:
 jobs:
   run-integration-tests:
     strategy:
+      fail-fast: false
       matrix:
         pytest-mark: ["examples", "culling"]
     runs-on: ubuntu-latest

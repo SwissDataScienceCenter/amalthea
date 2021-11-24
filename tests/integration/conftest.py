@@ -119,6 +119,10 @@ def launch_session(operator, k8s_amalthea_api, k8s_namespace):
 @pytest.fixture
 def is_session_ready(k8s_namespace, k8s_pod_api):
     def _is_session_ready(name, timeout_mins=5):
+        """The pod is considered ready only when it passes
+        the conditions for readiness 5 times in a row. This is
+        used to catch restarts/intermittent problems that occur sometimes
+        when the k8s probes are failing."""
         minimum_pod_ready_checks = 5
         pod_ready_checks_passing = 0
         tstart = datetime.now()
