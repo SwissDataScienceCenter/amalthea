@@ -41,7 +41,7 @@ jobs:
       - name: Install amalthea chart
         run: |
           cd helm-chart/
-          helm install amalthea ./amalthea/ -n default --create-namespace --wait --timeout 5m0s
+          helm install amalthea ./amalthea/ -n default --create-namespace --wait --timeout 5m0s --set culling.jupyterServerIdleCheckIntervalSeconds=10
           helm list -n amalthea
 
       - name: Run tests
