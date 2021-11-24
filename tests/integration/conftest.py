@@ -17,7 +17,7 @@ from utils.chart_rbac import configure_local_dev, cleanup_local_dev
 
 
 @pytest.fixture
-def operator(configure_rbac, k8s_namespace):
+def operator(k8s_namespace):
     yield KopfRunner(
         [
             "run",
