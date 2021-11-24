@@ -72,7 +72,7 @@ def create_template_values(name, spec):
             if spec["routing"]["path"].endswith("/")
             else spec["routing"]["path"] + "/"
         ),
-        "probe_path": os.path.join("/", spec["routing"]["path"].rstrip("/"), "api/statusfdsf"),
+        "probe_path": os.path.join("/", spec["routing"]["path"].rstrip("/"), "api/status"),
         "pvc": spec["storage"]["pvc"],
         "routing": spec["routing"],
         "scheduler_name": config.SERVER_SCHEDULER_NAME,
