@@ -118,21 +118,14 @@ def launch_session(operator, k8s_amalthea_api, k8s_namespace, is_session_ready):
 
 
 @pytest.fixture
-def is_session_ready(k8s_amalthea_api, k8s_namespace, k8s_pod_api):
+def is_session_ready(k8s_namespace, k8s_pod_api):
     def _is_session_ready(name, timeout_mins=10):
         minimum_pod_ready_checks = 5
         pod_ready_checks_passing = 0
         tstart = datetime.now()
         timeout = timedelta(minutes=timeout_mins)
-        session = None
         pod_fully_ready = False
-        pod = None
-        while (
-            datetime.now() - tstart < timeout
-            and session is None
-            and not pod_fully_ready
-        ):
-            session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+        while (datetime.now() - tstart < timeout):
             pod_name = name + "-0"
             pod = find_resource(pod_name, k8s_namespace, k8s_pod_api)
             if pod is not None:
@@ -145,7 +138,6 @@ def is_session_ready(k8s_amalthea_api, k8s_namespace, k8s_pod_api):
                 else:
                     pod_ready_checks_passing = 0
             sleep(10)
-        return pod
 
     yield _is_session_ready
 
