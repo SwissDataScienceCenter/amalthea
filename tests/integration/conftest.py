@@ -92,13 +92,12 @@ def k8s_namespace():
 
 
 @pytest.fixture
-def launch_session(operator, k8s_amalthea_api, k8s_namespace, is_session_ready):
+def launch_session(operator, k8s_amalthea_api, k8s_namespace):
     launched_sessions = []
 
     def _launch_session(manifest):
         with operator as runner:
             k8s_amalthea_api.create(manifest, namespace=k8s_namespace)
-            is_session_ready(manifest["metadata"]["name"])
             launched_sessions.append(manifest)
         return runner
 
