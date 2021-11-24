@@ -44,7 +44,7 @@ jobs:
           helm repo update
           helm upgrade --install metrics-server metrics-server/metrics-server --set 'args[0]=--kubelet-insecure-tls'
           cd helm-chart/
-          helm install amalthea ./amalthea/ -n default --create-namespace --wait --timeout 5m0s --set culling.jupyterServerIdleCheckIntervalSeconds=10 --set culling.cpuUsageMillicoresIdleThreshold=9999999
+          helm install amalthea ./amalthea/ -n default --create-namespace --wait --timeout 5m0s --set culling.jupyterServerIdleCheckIntervalSeconds=10
           helm list -n amalthea
 
       - name: Setup tmate session

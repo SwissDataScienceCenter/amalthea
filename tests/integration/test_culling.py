@@ -24,6 +24,6 @@ def test_(
     assert session is not None
     assert session["metadata"]["name"] == name
     # wait for session to be culled
-    sleep(test_manifest["spec"]["culling"]["idleSecondsThreshold"] + 60)
+    sleep(test_manifest["spec"]["culling"]["idleSecondsThreshold"] + 120)
     # confirm session got culled
     assert find_resource(name, k8s_namespace, k8s_amalthea_api) is None
