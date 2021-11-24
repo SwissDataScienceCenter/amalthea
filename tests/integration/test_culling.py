@@ -26,4 +26,4 @@ def test_(
     # wait for session to be culled
     sleep(test_manifest["spec"]["culling"]["idleSecondsThreshold"] + 120)
     # confirm session got culled
-    assert find_resource(name, k8s_namespace, k8s_amalthea_api) is None
+    assert is_session_ready(name, timeout_mins=1) is None

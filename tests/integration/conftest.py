@@ -9,6 +9,7 @@ import pytest
 from kopf.testing import KopfRunner
 from kubernetes import config
 from kubernetes.dynamic import DynamicClient
+from kubernetes.dynamic.exceptions import NotFoundError
 import kubernetes.client as k8s_client
 import yaml
 
@@ -105,12 +106,15 @@ def launch_session(operator, k8s_amalthea_api, k8s_namespace, is_session_ready):
 
     # cleanup
     for session in launched_sessions:
-        k8s_amalthea_api.delete(
-            session["metadata"]["name"],
-            namespace=k8s_namespace,
-            propagation_policy="Foreground",
-            async_req=False,
-        )
+        try:
+            k8s_amalthea_api.delete(
+                session["metadata"]["name"],
+                namespace=k8s_namespace,
+                propagation_policy="Foreground",
+                async_req=False,
+            )
+        except NotFoundError:
+            pass
 
 
 @pytest.fixture
