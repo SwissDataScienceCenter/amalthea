@@ -113,6 +113,9 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     threshold). If the session is idle then update the jupyter server status with
     the idle duration. If any sessions have been idle for long enough, then cull them.
     """
+    js_server_status = get_js_server_status(body)
+    if js_server_status is None:
+        return  # this means server is not fully up and running yet
     idle_seconds_threshold = body["spec"]["culling"]["idleSecondsThreshold"]
     max_age_seconds_threshold = body["spec"]["culling"].get("maxAgeSecondsThreshold", 0)
     try:
@@ -124,12 +127,8 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     custom_resource_api = get_api(config.api_version, config.custom_resource_name)
     idle_seconds = int(body["status"].get("idleSeconds", 0))
     now = pytz.UTC.localize(datetime.utcnow())
-    last_activity = now if js_server_status is None else js_server_status.get("last_activity", now)
-    jupyter_server_started = datetime.fromisoformat(
-        body["metadata"]["creationTimestamp"][:-1] + "+00:00"
-        if body["metadata"]["creationTimestamp"].endswith("Z")
-        else body["metadata"]["creationTimestamp"]
-    )
+    last_activity = js_server_status.get("last_activity", now)
+    jupyter_server_started = js_server_status.get("started", now)
     jupyter_server_age_seconds = (now - jupyter_server_started).total_seconds()
     last_activity_age_seconds = (now - last_activity).total_seconds()
     logger.info(

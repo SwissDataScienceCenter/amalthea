@@ -1,6 +1,7 @@
 from datetime import datetime
 from json.decoder import JSONDecodeError
 import logging
+import pytz
 import requests
 from requests.exceptions import RequestException
 
@@ -41,15 +42,12 @@ def get_js_server_status(js_body):
     Get the status for the jupyter server from the /api/status endpoint
     by using the body of the jupyter server resource.
     """
-    try:
-        server_url = js_body["status"]["create_fn"]["fullServerURL"]
-        token = js_body["spec"]["auth"].get("token")
-    except KeyError:
-        return None
-    if token is None:
-        payload = {}
-    else:
-        payload = {"token": token}
+    server_url = js_body["status"]["create_fn"]["fullServerURL"]
+    payload = (
+        {}
+        if js_body["spec"]["auth"].get("token") is None
+        else {"token": js_body["spec"]["auth"].get("token")}
+    )
     try:
         res = requests.get(f"{server_url.rstrip('/')}/api/status", params=payload)
     except RequestException as err:
@@ -78,11 +76,11 @@ def get_js_server_status(js_body):
             res["last_activity"][:-1] + "+00:00"
             if res["last_activity"].endswith("Z")
             else res["last_activity"]
-        )
+        ).astimezone(pytz.utc)  # ensure timestamp is UTC
     if type(res) is dict and "started" in res.keys():
         res["started"] = datetime.fromisoformat(
             res["started"][:-1] + "+00:00"
             if res["started"].endswith("Z")
             else res["started"]
-        )
+        ).astimezone(pytz.utc)  # ensure timestamp is UTC
     return res

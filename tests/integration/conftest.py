@@ -13,7 +13,8 @@ from kubernetes.dynamic.exceptions import NotFoundError
 import kubernetes.client as k8s_client
 import yaml
 
-from tests.integration.utils import find_resource, is_pod_ready
+from controller.culling import get_js_server_status
+from tests.integration.utils import find_resource
 from utils.chart_rbac import configure_local_dev, cleanup_local_dev
 
 
@@ -120,30 +121,20 @@ def launch_session(operator, k8s_amalthea_api, k8s_namespace, is_session_ready):
 
 
 @pytest.fixture
-def is_session_ready(k8s_namespace, k8s_pod_api):
+def is_session_ready(k8s_namespace, k8s_amalthea_api, k8s_pod_api):
     def _is_session_ready(name, timeout_mins=5):
-        """The pod is considered ready only when it passes
-        the conditions for readiness 5 times in a row. This is
-        used to catch restarts/intermittent problems that occur sometimes
-        when the k8s probes are failing."""
-        minimum_pod_ready_checks = 5
-        pod_ready_checks_passing = 0
+        """The session is considered ready only when it successfully responds
+        to a status request."""
         tstart = datetime.now()
         timeout = timedelta(minutes=timeout_mins)
-        pod_fully_ready = False
         while (datetime.now() - tstart < timeout):
-            pod_name = name + "-0"
-            pod = find_resource(pod_name, k8s_namespace, k8s_pod_api)
-            if pod is not None:
-                pod_fully_ready = is_pod_ready(pod)
-                if pod_fully_ready:
-                    if pod_ready_checks_passing >= minimum_pod_ready_checks:
-                        return pod
-                    else:
-                        pod_ready_checks_passing += 1
-                else:
-                    pod_ready_checks_passing = 0
+            session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+            if session is not None:
+                status = get_js_server_status(session)
+                if status is not None:
+                    return True
             sleep(10)
+        return False
 
     yield _is_session_ready
 
