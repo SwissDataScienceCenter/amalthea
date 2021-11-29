@@ -125,12 +125,11 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     idle_seconds = int(body["status"].get("idleSeconds", 0))
     now = pytz.UTC.localize(datetime.utcnow())
     last_activity = now if js_server_status is None else js_server_status.get("last_activity", now)
-    try:
-        jupyter_server_started = datetime.fromisoformat(
-            body["metadata"]["creationTimestamp"].replace("Z", "+00:00")
-        )
-    except KeyError:
-        jupyter_server_started = now
+    jupyter_server_started = datetime.fromisoformat(
+        body["metadata"]["creationTimestamp"][:-1] + "+00:00"
+        if body["metadata"]["creationTimestamp"].endswith("Z")
+        else body["metadata"]["creationTimestamp"]
+    )
     jupyter_server_age_seconds = (now - jupyter_server_started).total_seconds()
     last_activity_age_seconds = (now - last_activity).total_seconds()
     logger.info(
@@ -149,8 +148,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     delete_idle_server = (
         jupyter_server_is_idle_now
         and idle_seconds_threshold > 0
-        and idle_seconds + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
-        >= idle_seconds_threshold
+        and idle_seconds >= idle_seconds_threshold
     )
     delete_old_server = (
         max_age_seconds_threshold > 0
