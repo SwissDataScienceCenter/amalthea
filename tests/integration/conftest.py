@@ -18,9 +18,10 @@ from tests.integration.utils import find_resource
 from utils.chart_rbac import configure_local_dev, cleanup_local_dev
 
 
-@pytest.fixture
-def operator(k8s_namespace):
-    yield KopfRunner(
+@pytest.fixture(scope="session", autouse=True)
+def operator(k8s_namespace, configure_rbac, install_crd):
+    # start the operator
+    kopf_runner = KopfRunner(
         [
             "run",
             "-n",
@@ -28,19 +29,16 @@ def operator(k8s_namespace):
             "--verbose",
             "kopf_entrypoint.py",
         ]
-    )
+    ).__enter__()
 
-    # We run the KopfRunner again for a short moment to remove all finalizers
-    # and allow cleanup.
-    with KopfRunner(
-        [
-            "run",
-            "-n",
-            f"{k8s_namespace}",
-            "kopf_entrypoint.py",
-        ]
-    ):
-        sleep(2)
+    def _operator():
+        return kopf_runner
+
+    yield _operator
+
+    # shut down the operator, sleep a bit to allow for proper cleanup
+    sleep(10)
+    kopf_runner.__exit__()
 
 
 @pytest.fixture
@@ -97,13 +95,8 @@ def launch_session(operator, k8s_amalthea_api, k8s_namespace, is_session_ready):
     launched_sessions = []
 
     def _launch_session(manifest):
-        with operator as runner:
-            k8s_amalthea_api.create(manifest, namespace=k8s_namespace)
-            # This is necessary because the operator needs to stay active until
-            # all child resources are completely created and everything is running.
-            is_session_ready(manifest["metadata"]["name"], timeout_mins=5)
-            launched_sessions.append(manifest)
-        return runner
+        k8s_amalthea_api.create(manifest, namespace=k8s_namespace)
+        launched_sessions.append(manifest)
 
     yield _launch_session
 
