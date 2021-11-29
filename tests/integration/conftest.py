@@ -130,7 +130,10 @@ def is_session_ready(k8s_namespace, k8s_amalthea_api, k8s_pod_api):
         while (datetime.now() - tstart < timeout):
             session = find_resource(name, k8s_namespace, k8s_amalthea_api)
             if session is not None:
-                status = get_js_server_status(session)
+                try:
+                    status = get_js_server_status(session)
+                except KeyError:
+                    return False
                 if status is not None:
                     return True
             sleep(10)
