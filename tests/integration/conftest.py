@@ -85,7 +85,7 @@ def k8s_pod_api(get_k8s_api):
     yield get_k8s_api("v1", "Pod")
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def k8s_namespace():
     yield "default"
 
