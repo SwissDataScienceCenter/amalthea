@@ -341,7 +341,17 @@ Options about culling idle servers
         <td><b>idleSecondsThreshold</b></td>
         <td>integer</td>
         <td>
-          How long should a server be idle for before it is culled. A value of zero indicates that the server should never be culled.<br/>
+          How long should a server be idle for before it is culled. A value of zero indicates that the server should never be culled for inactivity.<br/>
+          <br/>
+            <i>Default</i>: 0<br/>
+            <i>Minimum</i>: 0<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>maxAgeSecondsThreshold</b></td>
+        <td>integer</td>
+        <td>
+          The maximum allowed age for a session, regardless of whether it is active or not. A value of zero indicates that the server cannot be culled due to its age.<br/>
           <br/>
             <i>Default</i>: 0<br/>
             <i>Minimum</i>: 0<br/>
