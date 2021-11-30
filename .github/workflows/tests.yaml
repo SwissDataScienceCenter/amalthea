@@ -1,4 +1,4 @@
-name: Integration Tests
+name: tests
 
 on:
   pull_request:
@@ -10,11 +10,7 @@ on:
     - closed
 
 jobs:
-  run-integration-tests:
-    strategy:
-      fail-fast: false
-      matrix:
-        pytest-mark: ["examples", "culling"]
+  run-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
@@ -52,4 +48,4 @@ jobs:
         run: |
           helm lint helm-chart/amalthea
           pipenv install --deploy --system --dev
-          pipenv run pytest -m ${{ matrix.pytest-mark }} tests/integration
+          pipenv run pytest

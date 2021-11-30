@@ -3,7 +3,6 @@ from pathlib import Path
 import subprocess
 import tempfile
 from time import sleep
-from uuid import uuid4
 
 import pytest
 from kopf.testing import KopfRunner
@@ -168,74 +167,3 @@ def configure_rbac(install_crd):
 
     # Cleanup after testing
     cleanup_local_dev(admin_context, "default", ["default"], include_crd=False)
-
-
-@pytest.fixture
-def custom_session_manifest(read_manifest, k8s_namespace):
-    def _custom_session_manifest(
-        manifest_file="tests/examples/token.yaml",
-        name=f"test-session-{uuid4()}",
-        jupyter_server={"image": "jupyter/minimal-notebook:latest"},
-        routing={},
-        culling={"idleSecondsThreshold": 180},
-        auth={
-            "token": "test-auth-token",
-            "oidc": {
-                "enabled": False,
-            },
-        },
-    ):
-        manifest = read_manifest(manifest_file)
-        return {
-            **manifest,
-            "metadata": {
-                "name": name,
-                "namespace": k8s_namespace,
-            },
-            "spec": {
-                "auth": auth,
-                "culling": culling,
-                "jupyterServer": jupyter_server,
-                "routing": {
-                    "host": f"{name}.{k8s_namespace}",
-                    **routing
-                },
-            },
-        }
-
-    yield _custom_session_manifest
-
-
-@pytest.fixture(
-    params=[
-        {
-            "auth": {
-                "token": "",
-                "oidc": {
-                    "enabled": True,
-                    "issuerUrl": "https://accounts.google.com",
-                    "clientId": "amalthea-test-session",
-                    "clientSecret": {
-                        "value": "amalthea-test-session-secret",
-                    }
-                },
-            },
-            "manifest_file": "tests/examples/oidc.yaml",
-        },
-        {
-            "auth": {
-                "token": "test-token-123",
-                "oidc": {
-                    "enabled": False,
-                },
-            },
-            "manifest_file": "tests/examples/token.yaml",
-        },
-    ],
-    ids=["oidc_auth", "token_auth"],
-)
-def test_manifest(request, custom_session_manifest):
-    yield custom_session_manifest(
-        manifest_file=request.param["manifest_file"],
-        auth=request.param["auth"],
-    )
