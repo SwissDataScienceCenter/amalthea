@@ -101,11 +101,19 @@ spec:
       default: {}
       description: Options about culling idle servers
       properties:
+        maxAgeSecondsThreshold:
+          default: 0
+          description:
+            The maximum allowed age for a session, regardless of whether it
+            is active or not. A value of zero indicates that the server cannot be
+            culled due to its age.
+          minimum: 0
+          type: integer
         idleSecondsThreshold:
           default: 0
           description:
             How long should a server be idle for before it is culled. A value of
-            zero indicates that the server should never be culled.
+            zero indicates that the server should never be culled for inactivity.
           minimum: 0
           type: integer
       type: object

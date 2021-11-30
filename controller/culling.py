@@ -1,6 +1,7 @@
 from datetime import datetime
 from json.decoder import JSONDecodeError
 import logging
+import pytz
 import requests
 from requests.exceptions import RequestException
 
@@ -11,7 +12,7 @@ from controller.utils import get_pod_metrics, parse_pod_metrics
 def get_cpu_usage_for_culling(pod, namespace):
     """
     Check the total cpu usage of a pod across all its containers. If the API request to
-    get the cpu usage fails (for any reason) report the utilization as being avove the threshold.
+    get the cpu usage fails (for any reason) report the utilization as being above the threshold.
     This is because the culling should not be done if the metrics server is not present
     or cannot be found at the expected url.
     """
@@ -43,13 +44,14 @@ def get_js_server_status(js_body):
     """
     try:
         server_url = js_body["status"]["create_fn"]["fullServerURL"]
-        token = js_body["spec"]["auth"].get("token")
     except KeyError:
         return None
-    if token is None:
-        payload = {}
-    else:
-        payload = {"token": token}
+    payload = (
+        {}
+        if js_body["spec"]["auth"].get("token") is None
+        or js_body["spec"]["auth"].get("token") == ""
+        else {"token": js_body["spec"]["auth"].get("token")}
+    )
     try:
         res = requests.get(f"{server_url.rstrip('/')}/api/status", params=payload)
     except RequestException as err:
@@ -75,8 +77,18 @@ def get_js_server_status(js_body):
 
     if type(res) is dict and "last_activity" in res.keys():
         res["last_activity"] = datetime.fromisoformat(
-            res["last_activity"].replace("Z", "+00:00")
-        )
+            res["last_activity"][:-1] + "+00:00"
+            if res["last_activity"].endswith("Z")
+            else res["last_activity"]
+        ).astimezone(
+            pytz.utc
+        )  # ensure timestamp is UTC
     if type(res) is dict and "started" in res.keys():
-        res["started"] = datetime.fromisoformat(res["started"].replace("Z", "+00:00"))
+        res["started"] = datetime.fromisoformat(
+            res["started"][:-1] + "+00:00"
+            if res["started"].endswith("Z")
+            else res["started"]
+        ).astimezone(
+            pytz.utc
+        )  # ensure timestamp is UTC
     return res

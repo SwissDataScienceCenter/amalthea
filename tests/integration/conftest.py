@@ -8,15 +8,17 @@ import pytest
 from kopf.testing import KopfRunner
 from kubernetes import config
 from kubernetes.dynamic import DynamicClient
+from kubernetes.dynamic.exceptions import NotFoundError
 import kubernetes.client as k8s_client
 import yaml
 
-from tests.integration.utils import find_resource, is_pod_ready
+from controller.culling import get_js_server_status
+from tests.integration.utils import find_resource
 from utils.chart_rbac import configure_local_dev, cleanup_local_dev
 
 
 @pytest.fixture
-def operator(configure_rbac, k8s_namespace):
+def operator(k8s_namespace):
     yield KopfRunner(
         [
             "run",
@@ -96,7 +98,9 @@ def launch_session(operator, k8s_amalthea_api, k8s_namespace, is_session_ready):
     def _launch_session(manifest):
         with operator as runner:
             k8s_amalthea_api.create(manifest, namespace=k8s_namespace)
-            is_session_ready(manifest["metadata"]["name"])
+            # This is necessary because the operator needs to stay active until
+            # all child resources are completely created and everything is running.
+            is_session_ready(manifest["metadata"]["name"], timeout_mins=5)
             launched_sessions.append(manifest)
         return runner
 
@@ -104,36 +108,32 @@ def launch_session(operator, k8s_amalthea_api, k8s_namespace, is_session_ready):
 
     # cleanup
     for session in launched_sessions:
-        k8s_amalthea_api.delete(
-            session["metadata"]["name"],
-            namespace=k8s_namespace,
-            propagation_policy="Foreground",
-            async_req=False,
-        )
+        try:
+            k8s_amalthea_api.delete(
+                session["metadata"]["name"],
+                namespace=k8s_namespace,
+                propagation_policy="Foreground",
+                async_req=False,
+            )
+        except NotFoundError:
+            pass
 
 
 @pytest.fixture
-def is_session_ready(k8s_amalthea_api, k8s_namespace, k8s_pod_api):
-    def _is_session_ready(name, timeout_mins=10):
+def is_session_ready(k8s_namespace, k8s_amalthea_api, k8s_pod_api):
+    def _is_session_ready(name, timeout_mins=5):
+        """The session is considered ready only when it successfully responds
+        to a status request."""
         tstart = datetime.now()
         timeout = timedelta(minutes=timeout_mins)
-        session = None
-        pod_fully_ready = False
-        pod = None
-        while (
-            datetime.now() - tstart < timeout
-            and session is None
-            and not pod_fully_ready
-        ):
+        while datetime.now() - tstart < timeout:
             session = find_resource(name, k8s_namespace, k8s_amalthea_api)
-            pod_name = name + "-0"
-            pod = find_resource(pod_name, k8s_namespace, k8s_pod_api)
-            if pod is not None:
-                pod_fully_ready = is_pod_ready(pod)
-                if pod_fully_ready:
-                    return pod
-            sleep(5)
-        return pod
+            if session is not None:
+                status = get_js_server_status(session)
+                if status is not None:
+                    return True
+            sleep(10)
+        return False
 
     yield _is_session_ready
 
