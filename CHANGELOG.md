@@ -1,4 +1,15 @@
-#  (2021-11-16)
+#  (2021-11-30)
+
+
+
+## [0.2.2](https://github.com/SwissDataScienceCenter/amalthea/compare/0.2.1...0.2.2) (2021-11-30)
+
+
+
+### Bug Fixes
+
+* **app:** probes and culling ([#127](https://github.com/SwissDataScienceCenter/amalthea/issues/127)) ([3c02584](https://github.com/SwissDataScienceCenter/amalthea/commit/3c02584eb3913f6329a4f736a41070005f9d3ad9))
+
 
 
 ## [0.2.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.2.0...0.2.1) (2021-11-16)
