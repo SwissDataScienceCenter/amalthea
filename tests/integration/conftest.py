@@ -126,7 +126,7 @@ def is_session_ready(k8s_namespace, k8s_amalthea_api, k8s_pod_api):
         to a status request."""
         tstart = datetime.now()
         timeout = timedelta(minutes=timeout_mins)
-        while (datetime.now() - tstart < timeout):
+        while datetime.now() - tstart < timeout:
             session = find_resource(name, k8s_namespace, k8s_amalthea_api)
             if session is not None:
                 status = get_js_server_status(session)

@@ -42,10 +42,14 @@ def get_js_server_status(js_body):
     Get the status for the jupyter server from the /api/status endpoint
     by using the body of the jupyter server resource.
     """
-    server_url = js_body["status"]["create_fn"]["fullServerURL"]
+    try:
+        server_url = js_body["status"]["create_fn"]["fullServerURL"]
+    except KeyError:
+        return None
     payload = (
         {}
         if js_body["spec"]["auth"].get("token") is None
+        or js_body["spec"]["auth"].get("token") == ""
         else {"token": js_body["spec"]["auth"].get("token")}
     )
     try:
@@ -76,11 +80,15 @@ def get_js_server_status(js_body):
             res["last_activity"][:-1] + "+00:00"
             if res["last_activity"].endswith("Z")
             else res["last_activity"]
-        ).astimezone(pytz.utc)  # ensure timestamp is UTC
+        ).astimezone(
+            pytz.utc
+        )  # ensure timestamp is UTC
     if type(res) is dict and "started" in res.keys():
         res["started"] = datetime.fromisoformat(
             res["started"][:-1] + "+00:00"
             if res["started"].endswith("Z")
             else res["started"]
-        ).astimezone(pytz.utc)  # ensure timestamp is UTC
+        ).astimezone(
+            pytz.utc
+        )  # ensure timestamp is UTC
     return res
