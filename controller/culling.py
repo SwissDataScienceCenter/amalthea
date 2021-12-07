@@ -5,18 +5,17 @@ import pytz
 import requests
 from requests.exceptions import RequestException
 
-from controller import config
 from controller.utils import get_pod_metrics, parse_pod_metrics
 
 
 def get_cpu_usage_for_culling(pod, namespace):
     """
     Check the total cpu usage of a pod across all its containers. If the API request to
-    get the cpu usage fails (for any reason) report the utilization as being above the threshold.
-    This is because the culling should not be done if the metrics server is not present
+    get the cpu usage fails (for any reason) report the utilization as being 0.
+    This is because the culling should be done even if the metrics server is not present
     or cannot be found at the expected url.
     """
-    total_default_usage_millicores = config.CPU_USAGE_MILLICORES_IDLE_THRESHOLD + 100
+    total_default_usage_millicores = 0
     total_usage_millicores = 0
     found_metrics = False
     if pod is None:
@@ -42,10 +41,14 @@ def get_js_server_status(js_body):
     Get the status for the jupyter server from the /api/status endpoint
     by using the body of the jupyter server resource.
     """
-    server_url = js_body["status"]["create_fn"]["fullServerURL"]
+    try:
+        server_url = js_body["status"]["create_fn"]["fullServerURL"]
+    except KeyError:
+        return None
     payload = (
         {}
         if js_body["spec"]["auth"].get("token") is None
+        or js_body["spec"]["auth"].get("token") == ""
         else {"token": js_body["spec"]["auth"].get("token")}
     )
     try:

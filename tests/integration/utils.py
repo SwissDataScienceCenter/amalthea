@@ -19,10 +19,11 @@ def is_pod_ready(pod):
         and len(container_statuses) > 0
         and all([cs["ready"] for cs in container_statuses])
         and all([cs["started"] for cs in container_statuses])
-        and all([
-            type(cs["state"]) is dict
-            and "running" in cs["state"].keys()
-            for cs in container_statuses
-        ])
+        and all(
+            [
+                type(cs["state"]) is dict and "running" in cs["state"].keys()
+                for cs in container_statuses
+            ]
+        )
         and pod["metadata"].get("deletionTimestamp") is None
     )

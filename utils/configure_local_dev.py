@@ -2,13 +2,13 @@
 
 import argparse
 
-from chart_rbac import configure_local_dev
+from chart_rbac import create_k8s_resources, configure_local_shell
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="""Configure your kubectl context to use a
-        service account with the RBAC roles that amalthea will
+        description="""Create the k8s resources liek RBAC roles,
+        role binddings, etc that amalthea will
         have when deployed through the helm chart."""
     )
     parser.add_argument(
@@ -20,4 +20,5 @@ if __name__ == "__main__":
         Should match the corresponding flag used with `kopf run -n ...` """,
     )
     args = parser.parse_args()
-    configure_local_dev(args.namespace, [args.namespace])
+    create_k8s_resources(args.namespace, [args.namespace])
+    configure_local_shell(args.namespace)

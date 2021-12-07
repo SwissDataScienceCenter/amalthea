@@ -1,5 +1,4 @@
 import pytest
-from time import sleep
 
 from tests.integration.utils import find_resource
 
@@ -12,6 +11,7 @@ def test_(
     k8s_amalthea_api,
     k8s_pod_api,
     test_manifest,
+    is_session_deleted,
 ):
     name = test_manifest["metadata"]["name"]
     launch_session(test_manifest)
@@ -20,8 +20,14 @@ def test_(
     assert session is not None
     assert session["metadata"]["name"] == name
     # wait for session to be culled
-    sleep(test_manifest["spec"]["culling"]["idleSecondsThreshold"] + 120)
+    is_session_deleted(
+        name, test_manifest["spec"]["culling"]["idleSecondsThreshold"] + 60
+    )
     # confirm session got culled
     session = find_resource(name, k8s_namespace, k8s_amalthea_api)
     pod = find_resource(name + "-0", k8s_namespace, k8s_pod_api)
-    assert session is None or pod is None or pod["metadata"].get("deletionTimestamp") is not None
+    assert (
+        session is None
+        or pod is None
+        or pod["metadata"].get("deletionTimestamp") is not None
+    )

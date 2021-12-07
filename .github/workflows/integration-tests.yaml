@@ -18,10 +18,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
-      - uses: helm/kind-action@v1.2.0
+      - name: Make Kind Config File
+        run: |
+          cat <<EOF > kind-config.yaml
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+          - role: control-plane
+            image: kindest/node:${{ matrix.kind-image-version }}
+            kubeadmConfigPatches:
+            - |
+              kind: InitConfiguration
+              nodeRegistration:
+                kubeletExtraArgs:
+                  node-labels: "ingress-ready=true"
+            extraPortMappings:
+            - containerPort: 80
+              hostPort: 80
+              protocol: TCP
+            - containerPort: 443
+              hostPort: 443
+              protocol: TCP
+          EOF
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.2.0
         with:
           cluster_name: kind
           wait: 10m0s
+          config: kind-config.yaml
       - uses: actions/setup-python@v1
         with:
           python-version: 3.8
@@ -39,17 +63,17 @@ jobs:
           pipenv run chartpress
           kind load docker-image $(pipenv run chartpress --list-images) 
 
-      - name: Install amalthea chart
+      - name: Install metrics and nginx ingress chart
         run: |
           helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
           helm repo update
-          helm upgrade --install metrics-server metrics-server/metrics-server --set 'args[0]=--kubelet-insecure-tls'
-          cd helm-chart/
-          helm install amalthea ./amalthea/ -n default --create-namespace --wait --timeout 5m0s --set culling.jupyterServerIdleCheckIntervalSeconds=10
-          helm list -n amalthea
+          helm upgrade --install metrics-server metrics-server/metrics-server --set 'args[0]=--kubelet-insecure-tls' --wait --timeout 5m0s
+          VERSION=controller-v1.0.3
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/$VERSION/deploy/static/provider/kind/deploy.yaml
+          kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=5m0s
 
       - name: Run tests
         run: |
           helm lint helm-chart/amalthea
           pipenv install --deploy --system --dev
-          pipenv run pytest -m ${{ matrix.pytest-mark }} tests/integration
+          pipenv run pytest -s -v -m ${{ matrix.pytest-mark }} tests/integration
