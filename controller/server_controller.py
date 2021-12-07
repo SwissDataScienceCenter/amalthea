@@ -141,7 +141,8 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
         cpu_usage <= config.CPU_USAGE_MILLICORES_IDLE_THRESHOLD
         and type(js_server_status) is dict
         and js_server_status.get("connections", 0) == 0
-        and last_activity_age_seconds > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
+        and last_activity_age_seconds
+        > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
     )
     delete_idle_server = (
         jupyter_server_is_idle_now
@@ -153,9 +154,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
         and jupyter_server_age_seconds >= max_age_seconds_threshold
     )
 
-    if (
-        delete_idle_server or delete_old_server
-    ):
+    if delete_idle_server or delete_old_server:
         culling_reason = "inactivity" if delete_idle_server else "age"
         logger.info(f"Deleting Jupyter server {name} due to {culling_reason}")
         try:
