@@ -25,7 +25,6 @@ jobs:
           apiVersion: kind.x-k8s.io/v1alpha4
           nodes:
           - role: control-plane
-            image: kindest/node:${{ matrix.kind-image-version }}
             kubeadmConfigPatches:
             - |
               kind: InitConfiguration
