@@ -25,9 +25,10 @@ spec:
         - command:
             - /usr/local/bin/kube-scheduler
             - --address=0.0.0.0
-            - --leader-elect=false
-            - --policy-configmap={{ include "amalthea.fullname" . }}-scheduler
+            - --config=/etc/user-scheduler/config.yaml
+            - --policy-configmap={{ include "amalthea.fullname" . }}-scheduler-policy
             - --policy-configmap-namespace={{ .Release.Namespace }}
+            - --scheduler-name={{ include "amalthea.fullname" . }}-scheduler
           image: "{{ .Values.scheduler.image.repository }}:{{ .Values.scheduler.image.tag }}"
           livenessProbe:
             httpGet:
@@ -42,4 +43,11 @@ spec:
           resources:
             requests:
               cpu: "0.1"
+          volumeMounts:
+            - mountPath: /etc/user-scheduler
+              name: config
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "amalthea.fullname" . }}-scheduler-config
 {{- end }}
