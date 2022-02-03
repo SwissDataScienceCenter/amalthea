@@ -38,8 +38,8 @@ jobs:
       - name: Install amalthea chart
         run: |
           cd helm-chart/
-          helm install amalthea ./amalthea/ -n default --create-namespace --wait --timeout 5m0s
-          helm list -n amalthea
+          helm install amalthea-dev-local ./amalthea/ -n default --create-namespace --wait --timeout 5m0s
+          helm list -n default
 
       - name: Run tests
         run: |

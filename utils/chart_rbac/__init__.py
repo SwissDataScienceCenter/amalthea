@@ -75,7 +75,7 @@ def configure_local_dev(amalthea_namespace, server_namespaces, include_crd=True)
     # Get the token for the newly created service account
     sa = json.loads(
         sp.check_output(
-            [f"kubectl get sa -n {amalthea_namespace} {RELEASE_NAME}-amalthea -o json"],
+            [f"kubectl get sa -n {amalthea_namespace} {RELEASE_NAME} -o json"],
             shell=True,
         )
     )
