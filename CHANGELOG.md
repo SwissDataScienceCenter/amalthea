@@ -1,3 +1,15 @@
+#  (2022-02-04)
+
+
+## [0.2.3](https://github.com/SwissDataScienceCenter/amalthea/compare/0.2.2...0.2.3) (2022-01-04)
+
+
+
+### Bug Fixes
+
+* **app:** Optional user-scheduler ([43ad69c](https://github.com/SwissDataScienceCenter/amalthea/commit/43ad69ca639acb90470abafce46005f8ee20fc3c))
+
+
 #  (2021-11-30)
 
 
