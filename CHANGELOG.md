@@ -1,4 +1,4 @@
-#  (2022-01-04)
+#  (2022-02-04)
 
 
 ## [0.2.3](https://github.com/SwissDataScienceCenter/amalthea/compare/0.2.2...0.2.3) (2022-01-04)
