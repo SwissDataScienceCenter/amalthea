@@ -3,7 +3,7 @@
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: {{ include "amalthea.fullname" . }}-scheduler
+  name: {{ include "amalthea.fullname" . }}-scheduler-policy
   namespace: {{ .Release.Namespace }}
 data:
   policy.cfg: |
@@ -13,4 +13,19 @@ data:
     priorities:
       {{- toYaml . | nindent 6}}
     {{- end}}
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ include "amalthea.fullname" . }}-scheduler-config
+  namespace: {{ .Release.Namespace }}
+data:
+  # ref: https://kubernetes.io/docs/reference/scheduling/config/
+  config.yaml: |
+    apiVersion: kubescheduler.config.k8s.io/v1beta1
+    kind: KubeSchedulerConfiguration
+    leaderElection:
+      leaderElect: false
+    profiles:
+      - schedulerName: {{ include "amalthea.fullname" . }}-scheduler
 {{- end }}
