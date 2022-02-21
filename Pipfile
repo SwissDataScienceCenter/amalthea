@@ -14,7 +14,6 @@ jinja2 = "*"
 pytz = "*"
 
 [dev-packages]
-ipython = "*"
 black = "*"
 flake8 = "*"
 pytest = "*"
