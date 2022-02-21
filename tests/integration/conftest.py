@@ -16,7 +16,7 @@ import yaml
 
 from controller.culling import get_js_server_status
 from tests.integration.utils import find_resource
-from utils.chart_rbac import cleanup_local_dev, create_k8s_resources, RELEASE_NAME
+from utils.chart_rbac import cleanup_local_dev, create_k8s_resources
 
 
 @pytest.fixture(scope="session")
@@ -69,12 +69,13 @@ def make_operator_kubeconfig(
     create_amalthea_k8s_resources,
     k8s_namespace,
     operator_kubeconfig_fp,
+    release_name,
 ):
     k8s_client = client.ApiClient()
     # Get the token for the amalthea service account
     dc = DynamicClient(k8s_client)
     sa_api = dc.resources.get(api_version="v1", kind="ServiceAccount")
-    sa = sa_api.get(f"{RELEASE_NAME}-amalthea", k8s_namespace)
+    sa = sa_api.get(f"{release_name}", k8s_namespace)
     secret_api = dc.resources.get(api_version="v1", kind="Secret")
     sa_token_secret = secret_api.get(sa["secrets"][0]["name"], k8s_namespace)
     token = base64.b64decode(sa_token_secret["data"]["token"].encode()).decode()
@@ -148,6 +149,11 @@ def k8s_namespace():
     yield "default"
 
 
+@pytest.fixture(scope="session")
+def release_name():
+    yield "amalthea-test"
+
+
 @pytest.fixture
 def launch_session(k8s_amalthea_api, k8s_namespace):
     launched_sessions = []
@@ -211,7 +217,7 @@ def is_session_deleted(k8s_namespace, k8s_pod_api):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def create_amalthea_k8s_resources(load_k8s_config):
+def create_amalthea_k8s_resources(load_k8s_config, release_name):
     """This fixture configures the tests to use a serviceaccount
     with the same roles that the operator has when installed through
     the helm chart."""
@@ -220,6 +226,7 @@ def create_amalthea_k8s_resources(load_k8s_config):
         "default",
         ["default"],
         resources=["ServiceAccount", "Role", "RoleBinding", "CustomResourceDefinition"],
+        release_name=release_name,
     )
 
     # Cleanup after testing
@@ -227,6 +234,7 @@ def create_amalthea_k8s_resources(load_k8s_config):
         "default",
         ["default"],
         resources=["ServiceAccount", "Role", "RoleBinding", "CustomResourceDefinition"],
+        release_name=release_name,
     )
 
 

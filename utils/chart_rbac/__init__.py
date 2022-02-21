@@ -14,7 +14,12 @@ RELEASE_NAME = "amalthea-dev-local"
 DEV_CONTEXT_NAME = "amalthea-dev-local"
 
 
-def get_chart_resources(amalthea_namespace, server_namespaces, resource_kinds):
+def get_chart_resources(
+    amalthea_namespace,
+    server_namespaces,
+    resource_kinds,
+    release_name=RELEASE_NAME,
+):
     """
     Render the chart and filter the output to get crds,
     service accounts, roles and role bindings.
@@ -23,12 +28,11 @@ def get_chart_resources(amalthea_namespace, server_namespaces, resource_kinds):
     namespaces_string = "{" + ",".join(server_namespaces) + "}"
     resource_yamls = (
         sp.check_output(
-            f'helm template helm-chart/amalthea -n {amalthea_namespace} \
+            f'helm template {release_name} helm-chart/amalthea -n {amalthea_namespace} \
                 --set "scope.namespaces={namespaces_string}"',
             shell=True,
         )
         .decode("utf-8")
-        .replace("RELEASE-NAME", RELEASE_NAME)
         .split("---")
     )
     resource_dicts = [yaml.safe_load(_) for _ in resource_yamls]
@@ -41,6 +45,7 @@ def create_k8s_resources(
     amalthea_namespace,
     server_namespaces,
     resources=["ServiceAccount", "Role", "RoleBinding", "CustomResourceDefinition"],
+    release_name=RELEASE_NAME,
 ):
     """Create k8s resources from the amalthea helm chart."""
     config.load_kube_config()
@@ -48,7 +53,7 @@ def create_k8s_resources(
 
     # Create the rbac resources in the cluster using the original context
     for resource in get_chart_resources(
-        amalthea_namespace, server_namespaces, resources
+        amalthea_namespace, server_namespaces, resources, release_name
     ):
         utils.create_from_dict(k8s_client, resource, namespace=amalthea_namespace)
 
@@ -57,6 +62,7 @@ def cleanup_local_dev(
     amalthea_namespace,
     server_namespaces,
     resources=["ServiceAccount", "Role", "RoleBinding", "CustomResourceDefinition"],
+    release_name=RELEASE_NAME,
 ):
     """
     Remove k8s resources created to set amalthea up.
@@ -70,6 +76,7 @@ def cleanup_local_dev(
         amalthea_namespace,
         server_namespaces,
         resources,
+        release_name,
     ):
         res_api = dc.resources.get(api_version=resource["apiVersion"], kind=resource["kind"])
         res_api.delete(
@@ -77,7 +84,11 @@ def cleanup_local_dev(
         )
 
 
-def configure_local_shell(amalthea_namespace):
+def configure_local_shell(
+    amalthea_namespace,
+    release_name=RELEASE_NAME,
+    dev_context_name=DEV_CONTEXT_NAME,
+):
     """
     Set the current k8s context in the shell to use amalthea's service account.
     """
@@ -90,7 +101,7 @@ def configure_local_shell(amalthea_namespace):
     # Get the token for the newly created service account
     sa = json.loads(
         sp.check_output(
-            [f"kubectl get sa -n {amalthea_namespace} {RELEASE_NAME} -o json"],
+            [f"kubectl get sa -n {amalthea_namespace} {release_name} -o json"],
             shell=True,
         )
     )
@@ -106,23 +117,23 @@ def configure_local_shell(amalthea_namespace):
 
     # Use new context
     sp.check_output(
-        f"kubectl config set-credentials {DEV_CONTEXT_NAME} --token {token}", shell=True
+        f"kubectl config set-credentials {dev_context_name} --token {token}", shell=True
     )
     sp.check_output(
-        f"kubectl config set-context {DEV_CONTEXT_NAME} \
-            --user={DEV_CONTEXT_NAME} --cluster={current_cluster}",
+        f"kubectl config set-context {dev_context_name} \
+            --user={dev_context_name} --cluster={current_cluster}",
         shell=True,
     )
     sp.check_output(
-        f"kubectl config use-context {DEV_CONTEXT_NAME}",
+        f"kubectl config use-context {dev_context_name}",
         shell=True,
     )
 
 
-def cleanup_local_shell(admin_context_name):
+def cleanup_local_shell(admin_context_name, dev_context_name=DEV_CONTEXT_NAME):
     """
     Reset the previous context as default and clean up.
     """
     sp.check_output(f"kubectl config use-context {admin_context_name}", shell=True)
-    sp.check_output(f"kubectl config delete-context {DEV_CONTEXT_NAME}", shell=True)
-    sp.check_output(f"kubectl config delete-user {DEV_CONTEXT_NAME}", shell=True)
+    sp.check_output(f"kubectl config delete-context {dev_context_name}", shell=True)
+    sp.check_output(f"kubectl config delete-user {dev_context_name}", shell=True)
