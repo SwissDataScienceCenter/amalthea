@@ -79,11 +79,15 @@ def get_js_server_status(js_body):
             res["last_activity"][:-1] + "+00:00"
             if res["last_activity"].endswith("Z")
             else res["last_activity"]
-        ).astimezone(pytz.utc)  # ensure timestamp is UTC
+        ).astimezone(
+            pytz.utc
+        )  # ensure timestamp is UTC
     if type(res) is dict and "started" in res.keys():
         res["started"] = datetime.fromisoformat(
             res["started"][:-1] + "+00:00"
             if res["started"].endswith("Z")
             else res["started"]
-        ).astimezone(pytz.utc)  # ensure timestamp is UTC
+        ).astimezone(
+            pytz.utc
+        )  # ensure timestamp is UTC
     return res

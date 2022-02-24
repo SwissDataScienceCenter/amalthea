@@ -78,10 +78,10 @@ def cleanup_local_dev(
         resources,
         release_name,
     ):
-        res_api = dc.resources.get(api_version=resource["apiVersion"], kind=resource["kind"])
-        res_api.delete(
-            resource["metadata"]["name"], namespace=amalthea_namespace
+        res_api = dc.resources.get(
+            api_version=resource["apiVersion"], kind=resource["kind"]
         )
+        res_api.delete(resource["metadata"]["name"], namespace=amalthea_namespace)
 
 
 def configure_local_shell(
