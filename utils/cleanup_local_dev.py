@@ -2,7 +2,7 @@
 
 import argparse
 
-from chart_rbac import cleanup_local_dev
+from chart_rbac import cleanup_k8s_resources, cleanup_local_shell
 
 
 if __name__ == "__main__":
@@ -24,4 +24,5 @@ if __name__ == "__main__":
         help="The context to set as current context when removing the amalthea created one.",
     )
     args = parser.parse_args()
-    cleanup_local_dev(args.use_context, args.namespace, [args.namespace])
+    cleanup_local_shell(args.use_context)
+    cleanup_k8s_resources(args.namespace, [args.namespace])

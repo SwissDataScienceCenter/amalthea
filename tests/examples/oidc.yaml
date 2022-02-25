@@ -7,7 +7,7 @@ spec:
   routing:
     host: ## Add hostname
   auth:
-    kind: oidc
+    token: ""
     oidc:
       enabled: true
       issuerUrl: ## Issuer URL of OIDC provider

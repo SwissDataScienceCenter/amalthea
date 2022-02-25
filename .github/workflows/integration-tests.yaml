@@ -1,0 +1,78 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    types:
+    - opened
+    - edited
+    - synchronize
+    - reopened
+    - closed
+
+jobs:
+  run-integration-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        pytest-mark: ["examples", "culling"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - name: Make Kind Config File
+        run: |
+          cat <<EOF > kind-config.yaml
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+          - role: control-plane
+            kubeadmConfigPatches:
+            - |
+              kind: InitConfiguration
+              nodeRegistration:
+                kubeletExtraArgs:
+                  node-labels: "ingress-ready=true"
+            extraPortMappings:
+            - containerPort: 80
+              hostPort: 80
+              protocol: TCP
+            - containerPort: 443
+              hostPort: 443
+              protocol: TCP
+          EOF
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.2.0
+        with:
+          cluster_name: kind
+          wait: 10m0s
+          config: kind-config.yaml
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+
+      # TODO: Adapt the chart building action in Renku to work for this repo too.
+      - name: Build images, load in kind
+        env:
+          DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
+        run: |
+          python -m pip install --upgrade pip pipenv
+          pipenv install --deploy --system --dev
+          cd helm-chart/
+          helm dep update amalthea
+          pipenv run chartpress
+          kind load docker-image $(pipenv run chartpress --list-images) 
+
+      - name: Install metrics and nginx ingress chart
+        run: |
+          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          helm repo update
+          helm upgrade --install metrics-server metrics-server/metrics-server --set 'args[0]=--kubelet-insecure-tls' --wait --timeout 5m0s
+          VERSION=controller-v1.0.3
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/$VERSION/deploy/static/provider/kind/deploy.yaml
+          kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=5m0s
+
+      - name: Run tests
+        run: |
+          helm lint helm-chart/amalthea
+          pipenv install --deploy --system --dev
+          pipenv run pytest -s -v -m ${{ matrix.pytest-mark }} tests/integration

@@ -220,8 +220,7 @@ and restart kopf. Once you are done working and you want to remove any traces of
 Amalthea from your cluster and your kubectl context, run
 
 ```bash
-pipenv run utils/cleanup_local_dev.py -n amalthea-testing --use-context
-kind-kind
+pipenv run utils/cleanup_local_dev.py -n amalthea-testing --use-context kind-kind
 ```
 
 Note that `kind-kind` should be replaced with the name of the context that you
@@ -237,18 +236,41 @@ kind delete cluster
 
 A combination of unit- and integration tests are executed through pytest. The
 integration tests run in the `default` namespace of the cluster defined in your
-current kubectl context, and they will temporarily modify your kubectl config to
-use a dedicated context with mimimal access right for the test execution.
-Furthermore, the tests will temporarily install the `JupyterServer` custom
-resource definition (CRD), so if you already have that CRD installed, please
-delete it before running the tests. By installing the CRD in the \tests we
-ensure that the correct, up-to-date CRD is being tested and not an older version
-left over from past work or tests. Overall we thus recommend that you create a
-new kind cluster to run the tests.
+current kubectl context. Furthermore, the tests will temporarily install the 
+`JupyterServer` custom resource definition (CRD), so if you already have that 
+CRD installed, please delete it before running the tests. By installing the CRD 
+in the tests we ensure that the correct, up-to-date CRD is being tested and not 
+an older version left over from past work or tests. Overall we thus recommend 
+that you create a new kind cluster to run the tests.
 
 In a fresh cluster you can run the test suite by executing
 
 ```bash
+cat <<EOF | kind create cluster --config=-
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 80
+    protocol: TCP
+  - containerPort: 443
+    hostPort: 443
+    protocol: TCP
+EOF
+helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+helm repo update
+helm upgrade --install metrics-server metrics-server/metrics-server --set 'args[0]=--kubelet-insecure-tls' --wait --timeout 5m0s
+VERSION=controller-v1.0.3
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/$VERSION/deploy/static/provider/kind/deploy.yaml
+kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=5m0s
 pipenv run pytest
 ```
 
