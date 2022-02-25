@@ -58,7 +58,7 @@ def create_k8s_resources(
         utils.create_from_dict(k8s_client, resource, namespace=amalthea_namespace)
 
 
-def cleanup_local_dev(
+def cleanup_k8s_resources(
     amalthea_namespace,
     server_namespaces,
     resources=["ServiceAccount", "Role", "RoleBinding", "CustomResourceDefinition"],

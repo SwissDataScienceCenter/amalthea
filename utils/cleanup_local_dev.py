@@ -2,7 +2,7 @@
 
 import argparse
 
-from chart_rbac import cleanup_local_dev, cleanup_local_shell
+from chart_rbac import cleanup_k8s_resources, cleanup_local_shell
 
 
 if __name__ == "__main__":
@@ -25,4 +25,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     cleanup_local_shell(args.use_context)
-    cleanup_local_dev(args.namespace, [args.namespace])
+    cleanup_k8s_resources(args.namespace, [args.namespace])

@@ -16,7 +16,7 @@ import yaml
 
 from controller.culling import get_js_server_status
 from tests.integration.utils import find_resource
-from utils.chart_rbac import cleanup_local_dev, create_k8s_resources
+from utils.chart_rbac import cleanup_k8s_resources, create_k8s_resources
 
 
 @pytest.fixture(scope="session")
@@ -230,7 +230,7 @@ def create_amalthea_k8s_resources(load_k8s_config, release_name):
     )
 
     # Cleanup after testing
-    cleanup_local_dev(
+    cleanup_k8s_resources(
         "default",
         ["default"],
         resources=["ServiceAccount", "Role", "RoleBinding", "CustomResourceDefinition"],
