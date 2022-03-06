@@ -17,16 +17,15 @@ limitations under the License.
 package jupyterserver
 
 import (
-	"context"
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"net/url"
 	"os"
 	"path"
 	"strings"
 
 	api "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -45,45 +44,28 @@ type K8sClients struct {
 }
 
 type JypterServerType struct {
-	Manifest  api.JupyterServer
+	Manifest  *api.JupyterServer
 	Templates []byte
 	K8s       K8sClients
 	Children  []*unstructured.Unstructured
-	// OwnerRef  metav1.OwnerReference
 }
 
-func NewJupyterServerFromManifest(manifest api.JupyterServer) (JypterServerType, error) {
+func NewJupyterServerFromManifest(manifest *api.JupyterServer) (JypterServerType, error) {
 	k8sClients, err := SetupK8sClients()
 	if err != nil {
 		fmt.Println("Could not setup k8s clients")
 		return JypterServerType{}, err
 	}
-	// OwnerRefController := true
-	// OwnerRefBlockOwnerDeletion := false
 	js := JypterServerType{
 		Manifest: manifest,
 		K8s:      *k8sClients,
 		Children: make([]*unstructured.Unstructured, 0, 8),
-		// OwnerRef: metav1.OwnerReference{
-		// 	APIVersion:         manifest.APIVersion,
-		// 	Kind:               manifest.Kind,
-		// 	Name:               manifest.Name,
-		// 	UID:                manifest.UID,
-		// 	Controller:         &OwnerRefController,
-		// 	BlockOwnerDeletion: &OwnerRefBlockOwnerDeletion,
-		// },
 	}
-	manifest.Aux, err = getAuxFromManifest(manifest)
-	if err != nil {
-		fmt.Println("Could not get Aux from manifest")
-		return JypterServerType{}, err
-	}
-	manifest.Secrets = js.getSecrets()
 
 	return js, nil
 }
 
-func getAuxFromManifest(manifest api.JupyterServer) (api.JupyterServerAux, error) {
+func getAuxFromManifest(manifest *api.JupyterServer) (api.JupyterServerAux, error) {
 	http := "http"
 	if manifest.Spec.Routing.Tls.Enabled {
 		http += "s"
@@ -101,24 +83,41 @@ func getAuxFromManifest(manifest api.JupyterServer) (api.JupyterServerAux, error
 	}, nil
 }
 
-func (js *JypterServerType) getSecrets() api.JupyterServerSecrets {
-	secret, err := js.K8s.ClientSet.CoreV1().Secrets(js.Manifest.Namespace).Get(context.TODO(), js.Manifest.Name, metav1.GetOptions{})
+func generateServerSecrets() (api.JupyterServerSecrets, error) {
+	fmt.Println("Generating secrets!!!!!")
+	// there is no secret in the cluster, make the secrets
+	jsTokenSecret, err := GenerateRandomString(32)
 	if err != nil {
-		if k8sErrors.IsNotFound(err) {
-			// there is no secret in the cluster, make the secrets
-			return api.JupyterServerSecrets{
-				JupyterServerAppToken:     "fdf",
-				JupyterServerCookieSecret: "fdsfds",
-				AuthProviderCookieSecret:  "dsfasdfafa",
-			}
-		} else {
-			fmt.Println("Something went wront with locating secrets")
-		}
+		return api.JupyterServerSecrets{}, err
 	}
-	// the secret exists in the cluster
+	jsCookieSecret, err := GenerateRandomString(32)
+	if err != nil {
+		return api.JupyterServerSecrets{}, err
+	}
+	authCookieSecret, err := GenerateRandomString(32)
+	if err != nil {
+		return api.JupyterServerSecrets{}, err
+	}
+	fmt.Println("Secret values:!!!")
+	fmt.Println(jsTokenSecret, jsCookieSecret, authCookieSecret)
 	return api.JupyterServerSecrets{
-		JupyterServerAppToken:     secret.StringData["jupyterServerAppToken"],
-		JupyterServerCookieSecret: secret.StringData["jupyterServerCookieSecret"],
-		AuthProviderCookieSecret:  secret.StringData["authProviderCookieSecret"],
+		JupyterServerAppToken:     jsTokenSecret,
+		JupyterServerCookieSecret: jsCookieSecret,
+		AuthProviderCookieSecret:  authCookieSecret,
+	}, nil
+}
+
+func GenerateRandomString(n int) (string, error) {
+	// Taken from: https://gist.github.com/dopey/c69559607800d2f2f90b1b1ed4e550fb
+	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	ret := make([]byte, n)
+	for i := 0; i < n; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			return "", err
+		}
+		ret[i] = letters[num.Int64()]
 	}
+
+	return string(ret), nil
 }

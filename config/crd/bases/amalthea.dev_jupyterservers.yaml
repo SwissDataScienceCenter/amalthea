@@ -127,7 +127,6 @@ spec:
                 items:
                   properties:
                     patch:
-                      format: byte
                       type: string
                     type:
                       enum:

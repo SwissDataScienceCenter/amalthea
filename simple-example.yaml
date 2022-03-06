@@ -9,3 +9,11 @@ spec:
     path: /path
   auth:
     token: verysecerttoken123
+  patches: 
+    - type: "application/json-patch+json"
+      patch: |
+        - op: add
+          path: /statefulset/spec/template/spec/containers/0/env/-
+          value:
+            name: TEST_ENV_VAR
+            value: TEST_ENV_VAR_VALUE

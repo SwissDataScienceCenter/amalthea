@@ -78,6 +78,10 @@ func (js *JypterServerType) RenderTemplates() error {
 	t = template.Must(t.ParseFS(templates.Templates, "*"))
 	combinedJsonMap := make(map[string]json.RawMessage)
 	for _, it := range t.Templates() {
+		if it.Name() == "pvc.yaml" && !js.Manifest.Spec.Storage.Pvc.Enabled {
+			// NOTE: If PVCs are disabled do not render the PVC manifest at all
+			continue
+		}
 		renderedYaml := bytes.NewBufferString("")
 		err := it.Execute(renderedYaml, js.Manifest)
 		if err != nil {
@@ -103,12 +107,17 @@ func (js *JypterServerType) findGVR(gvk *schema.GroupVersionKind) (*meta.RESTMap
 }
 
 func (js *JypterServerType) ApplyPatches() error {
-	var err error
 	var parsedPatch jsonpatch.Patch
+	var patchJson []byte
+	var err error
 	for _, patch := range js.Manifest.Spec.Patches {
+		patchJson, err = sigsYaml.YAMLToJSON([]byte(patch.Patch))
+		if err != nil {
+			return err
+		}
 		switch patch.Type {
 		case "application/json-patch+json":
-			parsedPatch, err = jsonpatch.DecodePatch(patch.Patch)
+			parsedPatch, err = jsonpatch.DecodePatch(patchJson)
 			if err != nil {
 				return err
 			}
@@ -117,7 +126,7 @@ func (js *JypterServerType) ApplyPatches() error {
 				return err
 			}
 		case "application/merge-patch+json":
-			js.Templates, err = jsonpatch.MergePatch(js.Templates, patch.Patch)
+			js.Templates, err = jsonpatch.MergePatch(js.Templates, patchJson)
 			if err != nil {
 				return err
 			}

@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	api "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -50,12 +52,6 @@ func (r *JupyterServerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	log := log.FromContext(ctx)
 	manifest := &api.JupyterServer{}
 	err := r.Get(ctx, req.NamespacedName, manifest)
-	// the logic here will most likely be:
-	// 1 try to find js resource
-	// if you cannot find js resources error out
-	// if js resource is found then
-	// 2 look for child resources
-	// create child resources based on if found or not
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -67,8 +63,44 @@ func (r *JupyterServerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		log.Error(err, "Cannot get jupyterserver resource.")
 		return ctrl.Result{}, err
 	}
-	fmt.Printf("%+v\n", manifest)
-	js, err := NewJupyterServerFromManifest(*manifest)
+	secret := &corev1.Secret{}
+	err = r.Get(ctx, req.NamespacedName, secret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			newSecrets, err := generateServerSecrets()
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			fmt.Println("Generated secrets")
+			fmt.Printf("%+v\n", newSecrets)
+			manifest.Secrets = newSecrets
+		} else {
+			return ctrl.Result{}, err
+		}
+	} else {
+		fmt.Println("Found existing secret!!!")
+		fmt.Println(string(secret.Data["jupyterServerAppToken"]))
+		fmt.Println(string(secret.Data["jupyterServerCookieSecret"]))
+		fmt.Println(string(secret.Data["authProviderCookieSecret"]))
+		manifest.Secrets = api.JupyterServerSecrets{
+			JupyterServerAppToken:     string(secret.Data["jupyterServerAppToken"]),
+			JupyterServerCookieSecret: string(secret.Data["jupyterServerCookieSecret"]),
+			AuthProviderCookieSecret:  string(secret.Data["authProviderCookieSecret"]),
+		}
+	}
+	aux, err := getAuxFromManifest(manifest)
+	if err != nil {
+		fmt.Println("Could not get Aux from manifest")
+		return ctrl.Result{}, err
+	}
+	manifest.Aux = aux
+	js, err := NewJupyterServerFromManifest(manifest)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+	fmt.Printf("%+v\n", js.Manifest)
+	fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	err = js.RenderTemplates()
 	if err != nil {
 		return ctrl.Result{}, err
@@ -99,5 +131,7 @@ func (r *JupyterServerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 func (r *JupyterServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.JupyterServer{}).
+		Owns(&appsv1.StatefulSet{}).
+		Owns(&corev1.Secret{}).
 		Complete(r)
 }

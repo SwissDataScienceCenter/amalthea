@@ -114,7 +114,7 @@ type JupyterServerSpecJupyterServer struct {
 }
 
 type JupyterServerSpecPatch struct {
-	Patch []byte `json:"patch,omitempty"`
+	Patch string `json:"patch,omitempty"`
 	// +kubebuilder:validation:Enum=application/json-patch+json;application/merge-patch+json
 	Type string `json:"type,omitempty"`
 }
