@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "amalthea.fullname" . }}-config
-  labels:
-    {{- include "amalthea.labels" . | nindent 4 }}
-data:
-  kopf-operator-settings.yaml: {{ .Values.kopf.startupConfiguration | quote }}
