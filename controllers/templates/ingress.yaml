@@ -1,0 +1,30 @@
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: {{ .Name }}
+  annotations: {{ .Spec.Routing.IngressAnnotations | toJson }}
+  ownerReferences:
+    - apiVersion: {{ .APIVersion }}
+      blockOwnerDeletion: false
+      controller: true
+      kind: {{ .Kind }}
+      name: {{ .Name }}
+      uid: {{ .UID }}
+spec:
+{{- if .Spec.Routing.Tls.Enabled }}
+  tls:
+    - hosts:
+        - {{ .Spec.Routing.Host }}
+      secretName: {{ .Spec.Routing.Tls.SecretName }}
+{{- end }}
+  rules:
+    - host: {{ .Spec.Routing.Host }}
+      http:
+        paths:
+        - path: {{ .Spec.Routing.Path }}
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ .Name }}
+              port:
+                number: 80

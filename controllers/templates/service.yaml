@@ -1,0 +1,23 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .Name }}
+  labels:
+    app: {{ .Name }}
+  ownerReferences:
+    - apiVersion: {{ .APIVersion }}
+      blockOwnerDeletion: false
+      controller: true
+      kind: {{ .Kind }}
+      name: {{ .Name }}
+      uid: {{ .UID }}
+spec:
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 4180
+
+  selector:
+    app: {{ .Name }}
+  ClusterIP: None

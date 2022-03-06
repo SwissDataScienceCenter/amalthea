@@ -1,0 +1,60 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ .Name }}
+  ownerReferences:
+    - apiVersion: {{ .APIVersion }}
+      blockOwnerDeletion: false
+      controller: true
+      kind: {{ .Kind }}
+      name: {{ .Name }}
+      uid: {{ .UID }}
+data:
+  jupyter_notebook_config.py: |
+    import os
+    c.NotebookApp.ip="0.0.0.0"
+    c.NotebookApp.port=8888
+    c.NotebookApp.token=os.environ["SERVER_APP_TOKEN"]
+    c.NotebookApp.cookie_secret_file="/etc/jupyter_server_secrets/cookie_secret"
+    {{ if .Spec.Routing.Tls.Enabled -}}
+    c.NotebookApp.allow_origin="https://{{ .Spec.Routing.Host }}"
+    {{- else -}}
+    c.NotebookApp.allow_origin="http://{{ .Spec.Routing.Host }}"
+    {{- end }}
+    c.NotebookApp.base_url="{{ .Spec.Routing.Path }}"
+    c.NotebookApp.notebook_dir="{{ .Spec.JupyterServer.RootDir }}"
+    c.NotebookApp.default_url="{{ .Spec.JupyterServer.DefaultUrl }}"
+    c.NotebookApp.allow_remote_access=True
+  jupyter_server_config.py: |
+    import os
+    c.ServerApp.ip="0.0.0.0"
+    c.ServerApp.port=8888
+    c.ServerApp.token=os.environ["SERVER_APP_TOKEN"]
+    c.ServerApp.cookie_secret_file="/etc/jupyter_server_secrets/cookie_secret"
+    {{ if .Spec.Routing.Tls.Enabled -}}
+    c.ServerApp.allow_origin="https://{{ .Spec.Routing.Host }}"
+    {{- else -}}
+    c.ServerApp.allow_origin="http://{{ .Spec.Routing.Host }}"
+    {{- end }}
+    c.ServerApp.base_url="{{ .Spec.Routing.Path }}"
+    c.ServerApp.root_dir="{{ .Spec.JupyterServer.RootDir }}"
+    c.ServerApp.default_url="{{ .Spec.JupyterServer.DefaultUrl }}"
+    c.ServerApp.allow_remote_access=True
+  {{ if .Spec.Auth.Oidc.Enabled }}
+  authorized-users.txt: |
+    {{- range .Spec.Auth.Oidc.AuthorizedEmails -}}
+    {{ . }}
+    {{- end -}}
+  {{ else }}
+  traefik-dynamic-config.yaml: |
+    http:
+      routers:
+        to-passthrough:
+          rule: "PathPrefix(`/`)"
+          service: passthrough
+      services:
+        passthrough:
+          loadBalancer:
+            servers:
+            - url: http://localhost:8888
+  {{ end }}

@@ -1,0 +1,24 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ .Name }}
+  ownerReferences:
+    - apiVersion: {{ .APIVersion }}
+      blockOwnerDeletion: false
+      controller: true
+      kind: {{ .Kind }}
+      name: {{ .Name }}
+      uid: {{ .UID }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      {{ if and .Spec.Storage.Size (ne .Spec.Storage.Size "") }}
+      storage: {{ .Spec.Storage.Size }}
+      {{ else }}
+      storage: 100Mi
+      {{ end }}
+  {{- if .Spec.Storage.Pvc.StorageClassName }}
+  storageClassName: {{ .Spec.Storage.Pvc.StorageClassName }}
+  {{ end }}

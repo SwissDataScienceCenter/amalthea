@@ -1,0 +1,234 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: {{ .Name }}
+  ownerReferences:
+    - apiVersion: {{ .APIVersion }}
+      blockOwnerDeletion: false
+      controller: true
+      kind: {{ .Kind }}
+      name: {{ .Name }}
+      uid: {{ .UID }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Name }}
+  serviceName: {{ .Name }}
+  # Scaling up is not intended and won't work
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{ .Name }}
+    spec:
+      imagePullSecrets: []
+      initContainers: []
+      volumes:
+        {{ if .Spec.Auth.Oidc.Enabled }}
+        - name: oauth2-proxy-config
+          configMap:
+            name: {{ .Name }}
+            items:
+              - key: authorized-users.txt
+                path: authorized-users.txt
+        {{ else }}
+        - name: traefik-dynamic-config
+          configMap:
+            name: {{ .Name }}
+            items:
+              - key: traefik-dynamic-config.yaml
+                path: traefik-dynamic-config.yaml
+        {{ end }}
+        - name: jupyter-server-secrets
+          secret:
+            secretName: {{ .Name }}
+            items:
+              - key: jupyterServerCookieSecret
+                path: cookie_secret
+        - name: jupyter-config-notebook
+          configMap:
+            name: {{ .Name }}
+            items:
+              - key: jupyter_notebook_config.py
+                path: jupyter_notebook_config.py
+        - name: jupyter-config-server
+          configMap:
+            name: {{ .Name }}
+            items:
+              - key: jupyter_server_config.py
+                path: jupyter_server_config.py
+        - name: jupyter-config
+          emptyDir:
+            sizeLimit: "2Mi"
+        {{ if .Spec.Storage.Pvc.Enabled }}
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: {{ .Name }}
+        {{ else }}
+        - name: workspace
+          emptyDir:
+            {{ if and .Spec.Storage.Size (ne .Spec.Storage.Size "") }}
+            sizeLimit: {{ .Spec.Storage.Size }}
+            {{ end }}
+        {{ end }}
+      terminationGracePeriodSeconds: 30
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 100
+      enableServiceLinks: false
+      {{ if .Aux.SchedulerName }}
+      schedulerName: {{ .Aux.SchedulerName }}
+      {{ end }}
+      containers:
+        - name: jupyter-server
+          image: {{ .Spec.JupyterServer.Image }}
+          workingDir: {{ .Spec.JupyterServer.RootDir }}
+          volumeMounts:
+            - name: workspace
+              mountPath: {{ .Spec.Storage.Pvc.MountPath }}
+            - name: jupyter-server-secrets
+              mountPath: /etc/jupyter_server_secrets
+              readOnly: true
+            - name: jupyter-config
+              mountPath: {{ .Spec.Storage.Pvc.MountPath }}/.jupyter_config
+            - name: jupyter-config-server
+              mountPath: {{ .Spec.Storage.Pvc.MountPath }}/.jupyter_config/jupyter_server_config.py
+              subPath: jupyter_server_config.py
+            - name: jupyter-config-notebook
+              mountPath: {{ .Spec.Storage.Pvc.MountPath }}/.jupyter_config/jupyter_notebook_config.py
+              subPath: jupyter_notebook_config.py
+          env:
+            - name: SERVER_APP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Name }}
+                  key: jupyterServerAppToken
+            - name: JUPYTER_CONFIG_PATH
+              value: {{ .Spec.Storage.Pvc.MountPath }}/.jupyter_config
+          resources: {{ .Spec.JupyterServer.Resources | toJson }}
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 100
+            fsGroup: 100
+            allowPrivilegeEscalation: false
+
+          # We allow quite some time (5 + 1 minutes) for the jupyter container to come up in
+          # case the entrypoint contains a lot of code which has to be executed before the
+          # Jupyter server can even accept connections. However, really long running tasks
+          # should be put into an init container.
+          livenessProbe:
+            httpGet:
+              path: "{{ .Spec.Routing.Path }}/api/status"
+              port: 8888
+              {{ if not .Spec.Auth.Oidc.Enabled }}
+              httpHeaders:
+                - name: Authorization
+                  value: "token {{ .Secrets.JupyterServerAppToken }}"
+              {{ end }}
+            periodSeconds: 10
+            failureThreshold: 6
+            timeoutSeconds: 9
+          readinessProbe:
+            httpGet:
+              path: "{{ .Spec.Routing.Path }}/api/status"
+              port: 8888
+              {{ if not .Spec.Auth.Oidc.Enabled }}
+              httpHeaders:
+                - name: Authorization
+                  value: "token {{ .Secrets.JupyterServerAppToken }}"
+              {{ end }}
+            periodSeconds: 10
+            failureThreshold: 2
+            timeoutSeconds: 9
+          startupProbe:
+            httpGet:
+              path: "{{ .Spec.Routing.Path }}/api/status"
+              port: 8888
+              {{ if not .Spec.Auth.Oidc.Enabled }}
+              httpHeaders:
+                - name: Authorization
+                  value: "token {{ .Secrets.JupyterServerAppToken }}"
+              {{ end }}
+            periodSeconds: 10
+            failureThreshold: 30
+            timeoutSeconds: 9
+        
+        {{ if .Spec.Auth.Oidc.Enabled }}
+        - name: oauth2-proxy
+          image: "bitnami/oauth2-proxy:7.1.3"
+          args:
+            - "--provider=oidc"
+            - "--client-id={{ .Spec.Auth.Oidc.ClientId }}"
+            - "--oidc-issuer-url={{ .Spec.Auth.Oidc.IssuerUrl }}"
+            - "--session-cookie-minimal"
+            - "--http-address=:4180"
+            - "--skip-provider-button"
+            - "--upstream=http://127.0.0.1:8888"
+            - "--redirect-url={{ .Aux.FullUrl }}/oauth2/callback"
+            - "--cookie-path={{ .Spec.Routing.Path }}"
+            - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
+            {{ if eq .Spec.Routing.Path '/' }}
+            - "--proxy-prefix=/oauth2"
+            - "--skip-auth-route=^/api/status$"
+            {{ else }}
+            - "--proxy-prefix={{ .Spec.Routing.Path }}/oauth2"
+            - "--skip-auth-route=^{{ .Spec.Routing.Path }}/api/status$"
+            {{ end }}
+            {{ range .Spec.Auth.Oidc.AuthorizedGroups }}
+            - "--allowed-group={{ . }}"
+            {{ end }}
+          ports:
+            - name: http
+              containerPort: 4180
+              protocol: TCP
+          env:
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Name }}
+                  key: oauth2ProxyCookieSecret
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+              {{ if .Spec.Auth.Oidc.ClientSecret.Value }}
+                secretKeyRef:
+                  name: {{ .Name }}
+                  key: oidcClientSecret
+              {{ end }}
+              {{ if .Spec.Auth.Oidc.ClientSecret.SecretKeyRef }}
+                secretKeyRef:
+                  name: {{ .Spec.Auth.Oidc.ClientSecret.SecretKeyRef.Name }}
+                  key: {{ .Spec.Auth.Oidc.ClientSecret.SecretKeyRef.Key }}
+              {{ end }}
+          volumeMounts:
+            - name: oauth2-proxy-config
+              mountPath: /etc/oauth2-proxy/authorized-users.txt
+              subPath: authorized-users.txt
+          resources:
+            requests:
+              cpu: 20m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+        {{ else }}
+        - name: passthrough-proxy
+          image: traefik:v2.5
+          args:
+           - --entryPoints.web.address=:4180
+           - --providers.file.directory=/traefik
+          ports:
+            - name: http
+              containerPort: 4180
+              protocol: TCP
+          volumeMounts:
+            - name: traefik-dynamic-config
+              mountPath: /traefik/traefik-dynamic-config.yaml
+              subPath: traefik-dynamic-config.yaml
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+        {{ end }}

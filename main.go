@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	amaltheav1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
-	"github.com/SwissDataScienceCenter/amalthea/controllers"
+	"github.com/SwissDataScienceCenter/amalthea/controllers/jupyterserver"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -78,7 +78,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.JupyterServerReconciler{
+	if err = (&jupyterserver.JupyterServerReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

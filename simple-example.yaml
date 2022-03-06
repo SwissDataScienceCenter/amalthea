@@ -1,0 +1,11 @@
+apiVersion: amalthea.dev/v1alpha1
+kind: JupyterServer
+metadata:
+  name: test-amalthea-1
+  namespace: default
+spec:
+  routing:
+    host: test.host.com
+    path: /path
+  auth:
+    token: verysecerttoken123
