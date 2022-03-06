@@ -1,0 +1,20 @@
+# permissions for end users to view jupyterservers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jupyterserver-viewer-role
+rules:
+- apiGroups:
+  - amalthea.dev
+  resources:
+  - jupyterservers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - amalthea.dev
+  resources:
+  - jupyterservers/status
+  verbs:
+  - get

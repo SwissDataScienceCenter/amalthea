@@ -1,0 +1,24 @@
+# permissions for end users to edit jupyterservers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jupyterserver-editor-role
+rules:
+- apiGroups:
+  - amalthea.dev
+  resources:
+  - jupyterservers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - amalthea.dev
+  resources:
+  - jupyterservers/status
+  verbs:
+  - get

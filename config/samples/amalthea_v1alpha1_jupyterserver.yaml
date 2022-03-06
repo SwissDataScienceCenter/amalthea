@@ -1,0 +1,6 @@
+apiVersion: amalthea.dev/v1alpha1
+kind: JupyterServer
+metadata:
+  name: jupyterserver-sample
+spec:
+  # Add fields here
