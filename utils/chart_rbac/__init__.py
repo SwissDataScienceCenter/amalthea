@@ -4,7 +4,7 @@ import subprocess as sp
 import yaml
 
 from kubernetes import client, config, utils
-from kubernetes.dynamic import DynamicClient
+from kubernetes.dynamic import DynamicClient, exceptions as k8s_dynamic_exc
 
 
 # Fake release name which will be used for resource naming
@@ -78,10 +78,32 @@ def cleanup_k8s_resources(
         resources,
         release_name,
     ):
+        print(
+            f"Trying to cleanup {resource['kind']} with name {resource['metadata']['name']}"
+        )
         res_api = dc.resources.get(
             api_version=resource["apiVersion"], kind=resource["kind"]
         )
-        res_api.delete(resource["metadata"]["name"], namespace=amalthea_namespace)
+        try:
+            res_api.delete(
+                resource["metadata"]["name"],
+                namespace=amalthea_namespace,
+                propagation_policy="Foreground",
+                async_req=False,
+                grace_period_seconds=60,
+                timeout=120,
+                wait=True,
+            )
+        except k8s_dynamic_exc.NotFoundError:
+            print(
+                f"Could not find {resource['kind']} with name {resource['metadata']['name']}"
+                ", skipping."
+            )
+        else:
+            print(
+                f"Succesfully cleaned up {resource['kind']} "
+                f"with name {resource['metadata']['name']}"
+            )
 
 
 def configure_local_shell(
