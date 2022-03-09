@@ -5,7 +5,6 @@ import tempfile
 from time import sleep
 from uuid import uuid4
 import os
-from pathlib import Path
 from subprocess import Popen
 
 import pytest
@@ -33,9 +32,8 @@ def operator_env(operator_kubeconfig_fp):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def operator(k8s_namespace, operator_env, k8s_amalthea_api):
-    stdout = open(".kopf.stdout.txt", "w+b")
-    stderr = open(".kopf.stderr.txt", "w+b")
+def operator(k8s_namespace, operator_env, k8s_amalthea_api, kopf_log_files_fp):
+    stdout, stderr = kopf_log_files_fp
     p = Popen(
         args=f"kopf run -n {k8s_namespace} --verbose kopf_entrypoint.py",
         stdout=stdout,
@@ -71,8 +69,6 @@ def operator(k8s_namespace, operator_env, k8s_amalthea_api):
     stderr.seek(0)
     stdout_content = stdout.read()
     stderr_content = stderr.read()
-    Path(".kopf.stdout.txt").unlink(missing_ok=True)
-    Path(".kopf.stderr.txt").unlink(missing_ok=True)
     if type(stdout_content) is bytes:
         stdout = stdout_content.decode()
     if type(stderr_content) is bytes:
@@ -87,7 +83,16 @@ def operator(k8s_namespace, operator_env, k8s_amalthea_api):
 
 @pytest.fixture(scope="session", autouse=True)
 def operator_kubeconfig_fp():
-    return tempfile.NamedTemporaryFile("w")
+    with tempfile.NamedTemporaryFile("w") as fout:
+        yield fout
+
+
+@pytest.fixture(scope="session", autouse=True)
+def kopf_log_files_fp():
+    with tempfile.NamedTemporaryFile("w+b") as stdout, tempfile.NamedTemporaryFile(
+        "w+b"
+    ) as stderr:
+        yield stdout, stderr
 
 
 @pytest.fixture(scope="session", autouse=True)
