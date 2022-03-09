@@ -73,7 +73,10 @@ def operator(k8s_namespace, operator_env, k8s_amalthea_api, kopf_log_files_fp):
         stdout = stdout_content.decode()
     if type(stderr_content) is bytes:
         stderr_content = stderr_content.decode()
-    term_width = os.get_terminal_size().columns
+    try:
+        term_width = os.get_terminal_size().columns
+    except OSError:
+        term_width = 80
     print(" KOPF STDOUT ".center(term_width, "*"))
     print(stdout_content)
     print(" KOPF STDERR ".center(term_width, "*"))
