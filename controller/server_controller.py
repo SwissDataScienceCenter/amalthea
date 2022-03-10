@@ -1,7 +1,9 @@
 import kopf
+from enum import Enum
 from kubernetes.client.models import V1DeleteOptions
 from kubernetes.dynamic.exceptions import NotFoundError
 from datetime import datetime
+from prometheus_client import Counter, Gauge
 import pytz
 
 from controller import config
@@ -13,6 +15,60 @@ from controller.utils import (
     get_api,
     parse_pod_metrics,
 )
+
+total_launch = Counter("sessions_launch_total", "Number of sessions launched")
+total_failed = Counter(
+    "sessions_failed_total", "Number of sessions which have failed being launched"
+)
+num_of_sessions = Gauge("sessions_all", "Number of sessions")
+num_of_running_sessions = Gauge(
+    "sessions_running", "Number of sessions in running state"
+)
+num_of_starting_sessions = Gauge(
+    "sessions_starting",
+    "Number of sessions which have been scheduled but are still starting",
+)
+
+
+class SessionState(Enum):
+    """Enum to represent the current state of a session."""
+
+    CREATED = 1
+    STARTING = 2
+    RUNNNING = 3
+    STOPPED = 4
+
+
+sessions_state = dict()
+
+
+def _update_session_state(name, namespace, state):
+    session_key = f"{namespace}_{name}"
+    if session_key not in sessions_state:
+        num_of_sessions.inc()
+        num_of_starting_sessions.inc()
+
+        sessions_state[session_key] = SessionState.CREATED
+        return
+
+    if sessions_state[session_key] == state:
+        return
+
+    if state == SessionState.STARTING:
+        num_of_starting_sessions.dec()
+        sessions_state[session_key] = state
+
+    elif state == SessionState.RUNNNING:
+        num_of_running_sessions.inc()
+        sessions_state[session_key] = state
+
+    elif state == SessionState.STOPPED:
+        num_of_running_sessions.dec()
+        sessions_state[session_key] = state
+
+    else:
+        # we should raise exception here
+        raise ValueError(f"Unknown state type '{state}'!")
 
 
 def get_labels(
@@ -74,31 +130,37 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
     the necessary k8s child resources which make the actual jupyter server.
     """
     children_specs = get_children_specs(name, spec, logger)
+    total_launch.inc()
 
-    # We make sure the pod created from the statefulset gets labeled
-    # with the custom resource references and add a special label to
-    # distinguish it from direct children.
-    kopf.label(
-        children_specs["statefulset"]["spec"]["template"],
-        labels=get_labels(name, uid, labels, is_main_pod=True),
-    )
-
-    # Add the labels to all child resources and create them in the cluster
-    children_uids = {}
-
-    for child_key, child_spec in children_specs.items():
-        # TODO: look at the option of using subhandlers here.
+    try:
+        # We make sure the pod created from the statefulset gets labeled
+        # with the custom resource references and add a special label to
+        # distinguish it from direct children.
         kopf.label(
-            child_spec,
-            labels=get_labels(name, uid, labels, child_key=child_key),
+            children_specs["statefulset"]["spec"]["template"],
+            labels=get_labels(name, uid, labels, is_main_pod=True),
         )
-        kopf.adopt(child_spec)
 
-        children_uids[child_key] = create_namespaced_resource(
-            namespace=namespace, body=child_spec
-        ).metadata.uid
+        # Add the labels to all child resources and create them in the cluster
+        children_uids = {}
 
-    return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
+        for child_key, child_spec in children_specs.items():
+            # TODO: look at the option of using subhandlers here.
+            kopf.label(
+                child_spec,
+                labels=get_labels(name, uid, labels, child_key=child_key),
+            )
+            kopf.adopt(child_spec)
+
+            children_uids[child_key] = create_namespaced_resource(
+                namespace=namespace, body=child_spec
+            ).metadata.uid
+
+        _update_session_state(name, namespace, SessionState.CREATED)
+        return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
+    except Exception as e:
+        total_failed.inc()
+        raise e
 
 
 @kopf.timer(
@@ -113,6 +175,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     threshold). If the session is idle then update the jupyter server status with
     the idle duration. If any sessions have been idle for long enough, then cull them.
     """
+    _update_session_state(name, namespace, SessionState.STARTING)
     js_server_status = get_js_server_status(body)
     if js_server_status is None:
         return  # this means server is not fully up and running yet
@@ -122,6 +185,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
         pod_name = body["status"]["mainPod"]["name"]
     except KeyError:
         return
+    _update_session_state(name, namespace, SessionState.RUNNNING)
     cpu_usage = get_cpu_usage_for_culling(pod=pod_name, namespace=namespace)
     custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     idle_seconds = int(body["status"].get("idleSeconds", 0))
@@ -137,6 +201,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
         f"server status: {js_server_status}, "
         f"age: {jupyter_server_age_seconds} seconds"
     )
+    _update_session_state(name, namespace, SessionState.RUNNNING)
     jupyter_server_is_idle_now = (
         cpu_usage <= config.CPU_USAGE_MILLICORES_IDLE_THRESHOLD
         and type(js_server_status) is dict
@@ -163,6 +228,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
                 namespace=namespace,
                 body=V1DeleteOptions(propagation_policy="Foreground"),
             )
+            _update_session_state(name, namespace, SessionState.STOPPED)
         except NotFoundError:
             logger.warning(
                 f"Trying to delete Jupyter server {name} in namespace {namespace}, "
