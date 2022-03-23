@@ -1,0 +1,26 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ name }}
+data:
+  {% block configmap %}
+  {% endblock %}
+
+  {% if oidc["enabled"] %}
+  authorized-users.txt: |
+    {%- for email in oidc["authorizedEmails"] %}
+    {{ email }}
+    {%- endfor %}
+  {% else %}
+  traefik-dynamic-config.yaml: |
+    http:
+      routers:
+        to-passthrough:
+          rule: "PathPrefix(`/`)"
+          service: passthrough
+      services:
+        passthrough:
+          loadBalancer:
+            servers:
+            - url: http://localhost:8888
+  {% endif %}
