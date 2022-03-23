@@ -230,4 +230,12 @@ spec:
             session respectively.
           type: string
       type: object
+    
+    type:             
+      type: string
+      enum: 
+        - base
+        - jupyterlab
+      default: jupyterlab
+      description: "The type of template (jupyterlab, rstudio, base) to be used for the session."
   type: object
