@@ -1,0 +1,37 @@
+{% extends "base/configmap.yaml" %}
+{% block configmap %}
+  # To be mounted at /etc/rstudio/rserver.conf
+  rserver.conf: |
+    auth-none=1
+    auth-cookies-force-secure=1
+    www-address=0.0.0.0
+    www-port=8888
+    www-verify-user-agent=0
+    www-frame-origin={{ routing["host"] }}
+    www-same-site=none
+    www-root-path={{ path }}
+    www-enable-origin-check=0
+    database-config-file={{ storage["pvc"]["mountPath"] }}/db_config
+    server-data-dir={{ storage["pvc"]["mountPath"] }}/data_dir
+    server-daemonize=0
+    server-user=rstudio
+    secure-cookie-key-file=/etc/rstudio/cookie_secret
+
+  # To be mounted at /etc/rstudio/rsession.conf
+  rsession.conf: |
+    session-default-working-dir={{ jupyter_server["rootDir"] }}
+  
+  # To be mounted at /etc/rstudio/logging.conf
+  logging.conf: |
+    [*]
+    log-level=error
+    logger-type=stderr
+    [@rserver]
+    log-level=debug
+    logger-type=stderr
+  
+  # To be mounted at {{ storage["pvc"]["mountPath"] }}/db_config
+  db_config: |
+    provider=sqlite
+    directory={{ storage["pvc"]["mountPath"] }}/data_dir
+{% endblock %}

@@ -41,6 +41,7 @@ def expected_templates():
             "ingress": f"{template_type}/ingress.yaml",
             "statefulset": f"{template_type}/statefulset.yaml",
             "configmap": f"{template_type}/configmap.yaml",
+            "configmap-proxy": f"{template_type}/configmap-proxy.yaml",
             "secret": f"{template_type}/secret.yaml",
         }
         if pvc_enabled:
@@ -68,12 +69,10 @@ def test_create_template_values(valid_spec):
         "host_url",
         "ingress_annotations",
         "jupyter_server",
-        "jupyter_server_app_token",
         "jupyter_server_cookie_secret",
         "name",
         "oidc",
         "path",
-        "probe_path",
         "pvc",
         "routing",
         "scheduler_name",

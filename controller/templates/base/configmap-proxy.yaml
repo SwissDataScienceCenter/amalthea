@@ -1,0 +1,7 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ name }}-traefik-dynamic-config
+data:
+  {% block traefik_dynamic_config scoped %}
+  {% endblock %}

@@ -24,14 +24,16 @@ spec:
             items:
               - key: authorized-users.txt
                 path: authorized-users.txt
-        {% else %}
+        {% endif %}
         - name: traefik-dynamic-config
+          configMap:
+            name: {{ name }}-traefik-dynamic-config
+        - name: traefik-static-config
           configMap:
             name: {{ name }}
             items:
-              - key: traefik-dynamic-config.yaml
-                path: traefik-dynamic-config.yaml
-        {% endif %}
+              - key: traefik-static-config.yaml
+                path: traefik-static-config.yaml
         {% block volumes scoped %}
         {% endblock %}
         {% if pvc["enabled"] %}
@@ -54,7 +56,7 @@ spec:
       schedulerName: {{ scheduler_name }}
       {% endif %}
       containers:
-        {% block containers scoped required %}
+        {% block containers scoped %}
         {% endblock %}
         
         {% if oidc["enabled"] %}
@@ -72,8 +74,6 @@ spec:
             - "--cookie-path={{ path }}"
             - "--proxy-prefix={{ path if path != '/' else '' }}/oauth2"
             - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
-            {% block extraAuthProxyArgs scoped %}
-            {% endblock %}
             {% for group in oidc["authorizedGroups"] %}
             - "--allowed-group={{ group }}"
             {% endfor %}
@@ -110,25 +110,33 @@ spec:
             limits:
               cpu: 100m
               memory: 32Mi
-        {% else %}
-        - name: passthrough-proxy
-          image: traefik:v2.5
-          args:
-           - --entryPoints.web.address=:4180
-           - --providers.file.directory=/traefik
+        {% endif %}
+
+        - name: proxy
+          image: traefik:v2.6.2
           ports:
             - name: http
-              containerPort: 4180
+              containerPort: 4181
               protocol: TCP
           volumeMounts:
             - name: traefik-dynamic-config
-              mountPath: /traefik/traefik-dynamic-config.yaml
-              subPath: traefik-dynamic-config.yaml
+              mountPath: /traefik
+            - name: traefik-static-config
+              mountPath: /etc/traefik/traefik.yaml
+              subPath: traefik-static-config.yaml
           resources:
+            {% if basic_auth["enabled"] %}
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 1000m
+              memory: 200Mi
+            {% else %}
             requests:
               cpu: 20m
               memory: 32Mi
             limits:
               cpu: 100m
               memory: 64Mi
-        {% endif %}
+            {% endif %}

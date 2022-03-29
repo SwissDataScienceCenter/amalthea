@@ -9,7 +9,13 @@ spec:
     - name: http
       protocol: TCP
       port: 80
+      {% if oidc["enabled"] %}
+      # INFO: ingress goes through oauth proxy first, then traefik
       targetPort: 4180
+      {% else %}
+      # INFO: ingress goes straight through traefik
+      targetPort: 4181
+      {% endif %}
 
   selector:
     app: {{ name }}

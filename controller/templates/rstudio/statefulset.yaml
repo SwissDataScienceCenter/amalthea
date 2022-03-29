@@ -1,27 +1,36 @@
 {% extends "base/statefulset.yaml" %}
 
 {% block volumes %}
-        - name: jupyter-server-secrets
+        - name: cookie-secret
           secret:
             secretName: {{ name }}
             items:
               - key: cookieSecret
                 path: cookie_secret
-        - name: jupyter-config-notebook
+        - name: etc-rstudio-logging
           configMap:
             name: {{ name }}
             items:
-              - key: jupyter_notebook_config.py
-                path: jupyter_notebook_config.py
-        - name: jupyter-config-server
+              - key: logging.conf
+                path: logging.conf
+        - name: etc-rstudio-rserver
           configMap:
             name: {{ name }}
             items:
-              - key: jupyter_server_config.py
-                path: jupyter_server_config.py
-        - name: jupyter-config
-          emptyDir:
-            sizeLimit: "2Mi"
+              - key: rserver.conf
+                path: rserver.conf
+        - name: etc-rstudio-rsession
+          configMap:
+            name: {{ name }}
+            items:
+              - key: rsession.conf
+                path: rsession.conf
+        - name: rstudio-db-config
+          configMap:
+            name: {{ name }}
+            items:
+              - key: db_config
+                path: db_config
 {% endblock %}
 
 {% block containers %}
@@ -31,20 +40,26 @@
           volumeMounts:
             - name: workspace
               mountPath: {{ storage["pvc"]["mountPath"] }}
-            - name: jupyter-server-secrets
-              mountPath: /etc/jupyter_server_secrets
+            - name: cookie-secret
+              mountPath: /etc/rstudio/cookie_secret
+              subPath: cookie_secret
               readOnly: true
-            - name: jupyter-config
-              mountPath: {{ storage["pvc"]["mountPath"] }}/.jupyter_config
-            - name: jupyter-config-server
-              mountPath: {{ storage["pvc"]["mountPath"] }}/.jupyter_config/jupyter_server_config.py
-              subPath: jupyter_server_config.py
-            - name: jupyter-config-notebook
-              mountPath: {{ storage["pvc"]["mountPath"] }}/.jupyter_config/jupyter_notebook_config.py
-              subPath: jupyter_notebook_config.py
-          env:
-            - name: JUPYTER_CONFIG_PATH
-              value: {{ storage["pvc"]["mountPath"] }}/.jupyter_config
+            - name: etc-rstudio-logging
+              mountPath: /etc/rstudio/logging.conf
+              subPath: logging.conf
+              readOnly: true
+            - name: etc-rstudio-rserver
+              mountPath: /etc/rstudio/rserver.conf
+              subPath: rserver.conf
+              readOnly: true
+            - name: etc-rstudio-rsession
+              mountPath: /etc/rstudio/rsession.conf
+              subPath: rsession.conf
+              readOnly: true
+            - name: rstudio-db-config
+              mountPath: {{ storage["pvc"]["mountPath"] }}/db_config
+              subPath: db_config
+              readOnly: true
           resources: {{ jupyter_server["resources"] | default({}) | tojson }}
           securityContext:
             runAsUser: 1000
@@ -58,7 +73,7 @@
           # should be put into an init container.
           livenessProbe:
             httpGet:
-              path: {{ path }}
+              path: {{ path }}/images/favicon.ico
               port: 4181
               {% if basic_auth["enabled"] and not oidc["enabled"] %}
               httpHeaders:
@@ -70,7 +85,7 @@
             timeoutSeconds: 9
           readinessProbe:
             httpGet:
-              path: {{ path }}
+              path: {{ path }}/images/favicon.ico
               port: 4181
               {% if basic_auth["enabled"] and not oidc["enabled"] %}
               httpHeaders:
@@ -82,7 +97,7 @@
             timeoutSeconds: 9
           startupProbe:
             httpGet:
-              path: {{ path }}
+              path: {{ path }}/images/favicon.ico
               port: 4181
               {% if basic_auth["enabled"] and not oidc["enabled"] %}
               httpHeaders:

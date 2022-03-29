@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import re
 from urllib.parse import urljoin
 
 import jinja2
@@ -37,12 +38,17 @@ def get_children_templates(template_type="jupyterlab", pvc_enabled=False):
         "ingress": f"{template_type}/ingress.yaml",
         "statefulset": f"{template_type}/statefulset.yaml",
         "configmap": f"{template_type}/configmap.yaml",
+        "configmap-proxy": f"{template_type}/configmap-proxy.yaml",
         "secret": f"{template_type}/secret.yaml",
     }
     if pvc_enabled:
         children_templates["pvc"] = f"{template_type}/pvc.yaml"
 
     return children_templates
+
+
+def strip_all_trailing_slashes(input):
+    return re.sub(r"\/+$", "", input, 1)
 
 
 def create_template_values(name, spec):
@@ -53,6 +59,7 @@ def create_template_values(name, spec):
     """
 
     host_url, full_url = get_urls(spec)
+    spec["routing"]["path"] = strip_all_trailing_slashes(spec["routing"]["path"])
     # All we need for template rendering, alphabetically listed
     template_values = {
         "auth": spec["auth"],
@@ -63,19 +70,19 @@ def create_template_values(name, spec):
         "host_url": host_url,
         "ingress_annotations": json.dumps(spec["routing"]["ingressAnnotations"]),
         "jupyter_server": spec["jupyterServer"],
-        "jupyter_server_app_token": spec["auth"].get("token", os.urandom(32).hex()),
-        "jupyter_server_cookie_secret": os.urandom(32).hex(),
+        "cookie_secret": os.urandom(32).hex(),
         "name": name,
         "oidc": spec["auth"]["oidc"],
-        "path": os.path.join("/", spec["routing"]["path"].rstrip("/")),
-        "probe_path": os.path.join(
-            "/", spec["routing"]["path"].rstrip("/"), "api/status"
-        ),
+        "basic_auth": spec["auth"]["basicAuth"],
+        "path": os.path.join("/", spec["routing"]["path"]),
         "pvc": spec["storage"]["pvc"],
         "routing": spec["routing"],
         "scheduler_name": config.SERVER_SCHEDULER_NAME,
         "storage": spec["storage"],
     }
+    template_values["storage"]["pvc"]["mountPath"] = strip_all_trailing_slashes(
+        template_values["storage"]["pvc"]["mountPath"]
+    )
 
     return template_values
 
@@ -86,11 +93,16 @@ def render_template(template_file, template_values):
     a python dictionary specifying the resource.
     """
     import base64
+    import bcrypt
 
     tmpl_loader = jinja2.FileSystemLoader(TEMPLATE_DIR)
     tmpl_env = jinja2.Environment(loader=tmpl_loader)
     tmpl_env.filters["b64encode"] = lambda x: base64.b64encode(
         x.encode("utf-8")
+    ).decode("ascii")
+    tmpl_env.filters["bcrypt"] = lambda x: bcrypt.hashpw(
+        x.encode("utf-8"),
+        bcrypt.gensalt(),
     ).decode("ascii")
     yaml_string = tmpl_env.get_template(template_file).render(**template_values)
     resource_spec = yaml.safe_load(yaml_string)

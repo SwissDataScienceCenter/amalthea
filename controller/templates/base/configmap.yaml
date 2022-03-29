@@ -11,16 +11,27 @@ data:
     {%- for email in oidc["authorizedEmails"] %}
     {{ email }}
     {%- endfor %}
-  {% else %}
-  traefik-dynamic-config.yaml: |
-    http:
-      routers:
-        to-passthrough:
-          rule: "PathPrefix(`/`)"
-          service: passthrough
-      services:
-        passthrough:
-          loadBalancer:
-            servers:
-            - url: http://localhost:8888
   {% endif %}
+
+  traefik-static-config.yaml: |
+    accessLog: {} 
+    log:
+      level: DEBUG
+    entryPoints:
+      web:
+        address: :4181
+      metrics:
+        address: :4182
+    metrics:
+      prometheus:
+        entryPoint: metrics
+        addEntryPointsLabels: true
+        addRoutersLabels: true
+        addServicesLabels: true
+    api:
+      dashboard: true
+      insecure: true
+      debug: true
+    providers:
+      file:
+        directory: "/traefik"

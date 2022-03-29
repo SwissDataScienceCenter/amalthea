@@ -12,6 +12,7 @@ json-merge-patch = "*"
 expiringdict = "*"
 jinja2 = "*"
 pytz = "*"
+bcrypt = "*"
 
 [dev-packages]
 black = "*"

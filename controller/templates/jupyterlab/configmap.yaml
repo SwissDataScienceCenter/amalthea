@@ -4,7 +4,7 @@
     import os
     c.NotebookApp.ip="0.0.0.0"
     c.NotebookApp.port=8888
-    c.NotebookApp.token=os.environ["SERVER_APP_TOKEN"]
+    c.NotebookApp.token=""
     c.NotebookApp.cookie_secret_file="/etc/jupyter_server_secrets/cookie_secret"
     c.NotebookApp.allow_origin="{{ host_url }}"
     c.NotebookApp.base_url="{{ path }}"
@@ -16,7 +16,7 @@
     import os
     c.ServerApp.ip="0.0.0.0"
     c.ServerApp.port=8888
-    c.ServerApp.token=os.environ["SERVER_APP_TOKEN"]
+    c.ServerApp.token=""
     c.ServerApp.cookie_secret_file="/etc/jupyter_server_secrets/cookie_secret"
     c.ServerApp.allow_origin="{{ host_url }}"
     c.ServerApp.base_url="{{ path }}"
