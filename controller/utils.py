@@ -199,7 +199,7 @@ def get_api(api_version, kind, group=None):
         return api_cache[(api_version, kind, group)]
     except KeyError:
         client = dynamic.DynamicClient(api_client.ApiClient())
-        api_cache[(api_version, kind)] = client.resources.get(
+        api_cache[(api_version, kind, group)] = client.resources.get(
             api_version=api_version, kind=kind, group=group,
         )
         return api_cache[(api_version, kind, group)]
