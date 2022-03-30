@@ -35,16 +35,16 @@
               mountPath: /etc/jupyter_server_secrets
               readOnly: true
             - name: jupyter-config
-              mountPath: {{ storage["pvc"]["mountPath"] }}/.jupyter_config
+              mountPath: {{ storage["pvc"]["mountPath"] | pathjoin(".jupyter_config") }}
             - name: jupyter-config-server
-              mountPath: {{ storage["pvc"]["mountPath"] }}/.jupyter_config/jupyter_server_config.py
+              mountPath: {{ storage["pvc"]["mountPath"] | pathjoin(".jupyter_config/jupyter_server_config.py") }}
               subPath: jupyter_server_config.py
             - name: jupyter-config-notebook
-              mountPath: {{ storage["pvc"]["mountPath"] }}/.jupyter_config/jupyter_notebook_config.py
+              mountPath: {{ storage["pvc"]["mountPath"] | pathjoin(".jupyter_config/jupyter_notebook_config.py") }}
               subPath: jupyter_notebook_config.py
           env:
             - name: JUPYTER_CONFIG_PATH
-              value: {{ storage["pvc"]["mountPath"] }}/.jupyter_config
+              value: {{ storage["pvc"]["mountPath"] | pathjoin(".jupyter_config") }}
           resources: {{ jupyter_server["resources"] | default({}) | tojson }}
           securityContext:
             runAsUser: 1000

@@ -11,8 +11,8 @@
     www-same-site=none
     www-root-path={{ path }}
     www-enable-origin-check=0
-    database-config-file={{ storage["pvc"]["mountPath"] }}/db_config
-    server-data-dir={{ storage["pvc"]["mountPath"] }}/data_dir
+    database-config-file={{ storage["pvc"]["mountPath"] | pathjoin("db_config") }}
+    server-data-dir={{ storage["pvc"]["mountPath"] | pathjoin("data_dir") }}
     server-daemonize=0
     server-user=rstudio
     secure-cookie-key-file=/etc/rstudio/cookie_secret
@@ -33,5 +33,5 @@
   # To be mounted at {{ storage["pvc"]["mountPath"] }}/db_config
   db_config: |
     provider=sqlite
-    directory={{ storage["pvc"]["mountPath"] }}/data_dir
+    directory={{ storage["pvc"]["mountPath"] | pathjoin("data_dir") }}
 {% endblock %}

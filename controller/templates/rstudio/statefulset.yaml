@@ -57,7 +57,7 @@
               subPath: rsession.conf
               readOnly: true
             - name: rstudio-db-config
-              mountPath: {{ storage["pvc"]["mountPath"] }}/db_config
+              mountPath: {{ storage["pvc"]["mountPath"] | pathjoin("db_config") }}
               subPath: db_config
               readOnly: true
           resources: {{ jupyter_server["resources"] | default({}) | tojson }}
@@ -73,7 +73,7 @@
           # should be put into an init container.
           livenessProbe:
             httpGet:
-              path: {{ path }}/images/favicon.ico
+              path: {{ path | pathjoin("images/favicon.ico") }}
               port: 4181
               {% if basic_auth["enabled"] and not oidc["enabled"] %}
               httpHeaders:
@@ -85,7 +85,7 @@
             timeoutSeconds: 9
           readinessProbe:
             httpGet:
-              path: {{ path }}/images/favicon.ico
+              path: {{ path | pathjoin("images/favicon.ico") }}
               port: 4181
               {% if basic_auth["enabled"] and not oidc["enabled"] %}
               httpHeaders:
@@ -97,7 +97,7 @@
             timeoutSeconds: 9
           startupProbe:
             httpGet:
-              path: {{ path }}/images/favicon.ico
+              path: {{ path | pathjoin("images/favicon.ico") }}
               port: 4181
               {% if basic_auth["enabled"] and not oidc["enabled"] %}
               httpHeaders:

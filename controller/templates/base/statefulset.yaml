@@ -70,9 +70,9 @@ spec:
             - "--http-address=:4180"
             - "--skip-provider-button"
             - "--upstream=http://127.0.0.1:8888"
-            - "--redirect-url={{ full_url }}/oauth2/callback"
+            - "--redirect-url={{ full_url | pathjoin("oauth2/callback") }}"
             - "--cookie-path={{ path }}"
-            - "--proxy-prefix={{ path if path != '/' else '' }}/oauth2"
+            - "--proxy-prefix={{ path | pathjoin("oauth2") }}"
             - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
             {% for group in oidc["authorizedGroups"] %}
             - "--allowed-group={{ group }}"

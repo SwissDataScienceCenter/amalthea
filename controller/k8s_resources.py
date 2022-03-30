@@ -1,7 +1,6 @@
 import base64
 import json
 import os
-import re
 from urllib.parse import urljoin
 
 import jinja2
@@ -47,10 +46,6 @@ def get_children_templates(template_type="jupyterlab", pvc_enabled=False):
     return children_templates
 
 
-def strip_all_trailing_slashes(input):
-    return re.sub(r"\/+$", "", input, 1)
-
-
 def create_template_values(name, spec):
     """
     Create a single non-nested dictionary which contains all the
@@ -59,7 +54,6 @@ def create_template_values(name, spec):
     """
 
     host_url, full_url = get_urls(spec)
-    spec["routing"]["path"] = strip_all_trailing_slashes(spec["routing"]["path"])
     # All we need for template rendering, alphabetically listed
     template_values = {
         "auth": spec["auth"],
@@ -80,9 +74,6 @@ def create_template_values(name, spec):
         "scheduler_name": config.SERVER_SCHEDULER_NAME,
         "storage": spec["storage"],
     }
-    template_values["storage"]["pvc"]["mountPath"] = strip_all_trailing_slashes(
-        template_values["storage"]["pvc"]["mountPath"]
-    )
 
     return template_values
 
@@ -104,6 +95,7 @@ def render_template(template_file, template_values):
         x.encode("utf-8"),
         bcrypt.gensalt(),
     ).decode("ascii")
+    tmpl_env.filters["pathjoin"] = os.path.join
     yaml_string = tmpl_env.get_template(template_file).render(**template_values)
     resource_spec = yaml.safe_load(yaml_string)
     return resource_spec
