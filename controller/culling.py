@@ -1,6 +1,7 @@
 from collections import namedtuple
 import requests
 from urllib.parse import urlunparse, urlparse
+import logging
 
 from controller.utils import get_pod_metrics, parse_pod_metrics
 
@@ -75,6 +76,8 @@ def is_idle_probe_idle(spec) -> bool:
         headers=headers,
         allow_redirects=False,
     )
+    logging.info(f"Sending GET request to url: {url} with headers {headers}")
+    logging.info(f"Response from idleProbe GET request is {res.status_code}")
     # INFO: Logic is similar to livenessProbe in k8s. For a livenessProbe a value in the range
     # >=200 and <400 indicates that the session is alive. For an idleProbe a value in this
     # range indicates that the session is idle.
