@@ -189,20 +189,20 @@ def parse_du_command(capacity, bytes_multiplier=1024):
     return None
 
 
-def get_api(api_version, kind):
+def get_api(api_version, kind, group=None):
     """
     Get the proper API for a certain resource. We cache the resources
     availabe in the cluster for 60 seconds in order to reduce the amount
     of unnecessary requests in busy clusters.
     """
     try:
-        return api_cache[(api_version, kind)]
+        return api_cache[(api_version, kind, group)]
     except KeyError:
         client = dynamic.DynamicClient(api_client.ApiClient())
         api_cache[(api_version, kind)] = client.resources.get(
-            api_version=api_version, kind=kind
+            api_version=api_version, kind=kind, group=group,
         )
-        return api_cache[(api_version, kind)]
+        return api_cache[(api_version, kind, group)]
 
 
 def convert_to_bytes(value):
