@@ -1,9 +1,6 @@
-from datetime import datetime
-from json.decoder import JSONDecodeError
-import logging
-import pytz
+from collections import namedtuple
 import requests
-from requests.exceptions import RequestException
+from urllib.parse import urlunparse, urlparse
 
 from controller.utils import get_pod_metrics, parse_pod_metrics
 
@@ -36,58 +33,49 @@ def get_cpu_usage_for_culling(pod, namespace):
         return total_default_usage_millicores
 
 
-def get_js_server_status(js_body):
+def is_idle_probe_idle(spec) -> bool:
     """
-    Get the status for the jupyter server from the /api/status endpoint
-    by using the body of the jupyter server resource.
+    Check the idle probe (if defined) and determine whether the session is
+    idle (True) or active (False).
     """
-    try:
-        server_url = js_body["status"]["create_fn"]["fullServerURL"]
-    except KeyError:
-        return None
-    payload = (
-        {}
-        if js_body["spec"]["auth"].get("token") is None
-        or js_body["spec"]["auth"].get("token") == ""
-        else {"token": js_body["spec"]["auth"].get("token")}
+    # NOTE: By definition a value of 0 for the threshold means that the
+    # sesion will never be culled due to idleness. If this is the case return False
+    # to indicate the server is "active".
+    if spec["culling"]["idleSecondsThreshold"] == 0:
+        return False
+    host = spec["culling"]["idleProbe"]["httpGet"].get("host")
+    if host is None:
+        # INFO: host is not defined in spec, default to main pod IP
+        main_pod_ip = spec.get("status", {}).get("mainPod", {}).get("status", {}).get("podIP")
+        if main_pod_ip is None:
+            # INFO: main pod IP not present in status, assume session is starting up
+            # and therefore not idle
+            return False
+        host = main_pod_ip
+    headers = {
+        i["name"]: i["value"] for i in spec["culling"]["idleProbe"]["httpGet"]["httpHeaders"]
+    }
+    UrlParseResult = namedtuple(
+        "ParseResult",
+        ["scheme", "netloc", "path", "params", "query", "fragment"],
     )
-    try:
-        res = requests.get(f"{server_url.rstrip('/')}/api/status", params=payload)
-    except RequestException as err:
-        logging.warning(
-            f"Could not get js server status for {server_url}, because: {err}"
-        )
-        return None
-
-    if res.status_code != 200:
-        logging.warning(
-            f"Could not get js server status for {server_url}, "
-            f"response status code is {res.status_code}"
-        )
-        return None
-
-    try:
-        res = res.json()
-    except JSONDecodeError as err:
-        logging.warning(
-            f"Could not parse js server status for {server_url}, because: {err}"
-        )
-        return None
-
-    if type(res) is dict and "last_activity" in res.keys():
-        res["last_activity"] = datetime.fromisoformat(
-            res["last_activity"][:-1] + "+00:00"
-            if res["last_activity"].endswith("Z")
-            else res["last_activity"]
-        ).astimezone(
-            pytz.utc
-        )  # ensure timestamp is UTC
-    if type(res) is dict and "started" in res.keys():
-        res["started"] = datetime.fromisoformat(
-            res["started"][:-1] + "+00:00"
-            if res["started"].endswith("Z")
-            else res["started"]
-        ).astimezone(
-            pytz.utc
-        )  # ensure timestamp is UTC
-    return res
+    if spec["culling"]["idleProbe"]["httpGet"].get("port", False):
+        netloc = host + ":" + spec["culling"]["idleProbe"]["httpGet"]["port"]
+    parsed_path = urlparse(spec["culling"]["idleProbe"]["httpGet"]["path"])
+    url = urlunparse(UrlParseResult(
+        spec["culling"]["idleProbe"]["httpGet"]["scheme"],
+        netloc,
+        parsed_path.path,
+        parsed_path.params,
+        parsed_path.query,
+        parsed_path.fragment,
+    ))
+    res = requests.get(
+        url=url,
+        headers=headers,
+        allow_redirects=False,
+    )
+    # INFO: Logic is similar to livenessProbe in k8s. For a livenessProbe a value in the range
+    # >=200 and <400 indicates that the session is alive. For an idleProbe a value in this
+    # range indicates that the session is idle.
+    return res.status_code >= 200 and res.status_code < 400

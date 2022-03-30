@@ -6,7 +6,7 @@ import pytz
 
 from controller import config
 from controller.k8s_resources import CONTENT_TYPES, get_children_specs, get_urls
-from controller.culling import get_cpu_usage_for_culling, get_js_server_status
+from controller.culling import get_cpu_usage_for_culling, is_idle_probe_idle
 from controller.utils import (
     get_pod_metrics,
     get_volume_disk_capacity,
@@ -107,15 +107,12 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
     config.custom_resource_name,
     interval=config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS,
 )
-def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
+def cull_idle_servers(body, name, namespace, logger, **kwargs):
     """
     Check if a session is idle (has zero open connections in proxy and CPU is below
     threshold). If the session is idle then update the jupyter server status with
     the idle duration. If any sessions have been idle for long enough, then cull them.
     """
-    js_server_status = get_js_server_status(body)
-    if js_server_status is None:
-        return  # this means server is not fully up and running yet
     idle_seconds_threshold = body["spec"]["culling"]["idleSecondsThreshold"]
     max_age_seconds_threshold = body["spec"]["culling"].get("maxAgeSecondsThreshold", 0)
     try:
@@ -126,32 +123,33 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     custom_resource_api = get_api(config.api_version, config.custom_resource_name)
     idle_seconds = int(body["status"].get("idleSeconds", 0))
     now = pytz.UTC.localize(datetime.utcnow())
-    last_activity = js_server_status.get("last_activity", now)
-    jupyter_server_started = js_server_status.get("started", now)
-    jupyter_server_age_seconds = (now - jupyter_server_started).total_seconds()
-    last_activity_age_seconds = (now - last_activity).total_seconds()
+    server_started_at_str = body.get("metadata", {}).get("creationTimestamp", now.isoformat())
+    server_started_at = datetime.fromisoformat(
+        server_started_at_str[:-1] + "+00:00"
+        if server_started_at_str.endswith("Z")
+        else server_started_at_str
+    ).astimezone(pytz.utc)
+    server_age_seconds = (now - server_started_at).total_seconds()
+    idle_probe_idle = is_idle_probe_idle(body["spec"])
     logger.info(
         f"Checking idle status of session {name}, "
         f"idle seconds: {idle_seconds}, "
         f"cpu usage: {cpu_usage}m, "
-        f"server status: {js_server_status}, "
-        f"age: {jupyter_server_age_seconds} seconds"
+        f"idle probe shows idle: {idle_probe_idle}, "
+        f"age: {server_age_seconds} seconds"
     )
-    jupyter_server_is_idle_now = (
+    server_is_idle_now = (
         cpu_usage <= config.CPU_USAGE_MILLICORES_IDLE_THRESHOLD
-        and type(js_server_status) is dict
-        and js_server_status.get("connections", 0) == 0
-        and last_activity_age_seconds
-        > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
+        and idle_probe_idle
     )
     delete_idle_server = (
-        jupyter_server_is_idle_now
+        server_is_idle_now
         and idle_seconds_threshold > 0
         and idle_seconds >= idle_seconds_threshold
     )
     delete_old_server = (
         max_age_seconds_threshold > 0
-        and jupyter_server_age_seconds >= max_age_seconds_threshold
+        and server_age_seconds >= max_age_seconds_threshold
     )
 
     if delete_idle_server or delete_old_server:
@@ -171,9 +169,9 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
             pass
         return
 
-    if jupyter_server_is_idle_now:
+    if server_is_idle_now:
         logger.info(
-            f"Jupyter Server {name} in namespace {namespace} found to be idle for "
+            f"Server {name} in namespace {namespace} found to be idle for "
             f"{idle_seconds + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS}"
         )
         try:
@@ -192,7 +190,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
             )
         except NotFoundError:
             logger.warning(
-                f"Trying to update idle time for Jupyter server {name} in namespace {namespace}, "
+                f"Trying to update idle time for server {name} in namespace {namespace}, "
                 "but we cannot find it. Has it been deleted in the meantime?"
             )
             pass
@@ -200,7 +198,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
         if idle_seconds > 0:
             try:
                 logger.info(
-                    f"Resetting idle timer for Jupyter server {name} in namespace {namespace}."
+                    f"Resetting idle timer for server {name} in namespace {namespace}."
                 )
                 custom_resource_api.patch(
                     namespace=namespace,
@@ -212,7 +210,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
                 )
             except NotFoundError:
                 logger.warning(
-                    f"Trying to reset idle timer for Jupyter server {name} in namespace {namespace}"
+                    f"Trying to reset idle timer for server {name} in namespace {namespace}"
                     ", but we cannot find it. Has it been deleted in the meantime?"
                 )
                 pass

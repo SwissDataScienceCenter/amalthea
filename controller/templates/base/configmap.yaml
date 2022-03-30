@@ -20,14 +20,16 @@ data:
     entryPoints:
       web:
         address: :4181
-      metrics:
+      miscInternal:
         address: :4182
     metrics:
       prometheus:
-        entryPoint: metrics
+        entryPoint: miscInternal
         addEntryPointsLabels: true
         addRoutersLabels: true
-        addServicesLabels: true
+        addServicesLabels: false
+    ping:
+      entryPoint: miscInternal
     api:
       dashboard: true
       insecure: true

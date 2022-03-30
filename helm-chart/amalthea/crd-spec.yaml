@@ -112,6 +112,51 @@ spec:
             zero indicates that the server should never be culled for inactivity.
           minimum: 0
           type: integer
+        idleProbe:
+          type: object
+          default: {}
+          description: 
+            If idle culling is enabled this probe is used to determine if the
+            session is idle or not.
+          properties:
+            httpGet:
+              description:
+                Based on the status code from the GET request the session is considered
+                idle or not. A "successful" status code (i.e. >=200 or <400) indicates that the session is idle.
+              type: object
+              default: {}
+              properties:
+                host:
+                  type: string
+                  description: 
+                    Defaults to the IP address of the pod that runs the session
+                    that is checked for idleness.
+                path: 
+                  type: string
+                  default: /
+                scheme:
+                  enum:
+                    - http
+                    - https
+                  type: string
+                  default: http
+                port:
+                  type: number
+                  minimum: 1
+                  maximum: 65535
+                  description: 
+                    If undefined then no port is used in the request and the port actually used
+                    depends on the scheme.
+                httpHeaders:
+                  type: array
+                  default: []
+                  items:
+                    type: object
+                    parameters:
+                      name:
+                        type: string
+                      value:
+                        type: string
       type: object
     jupyterServer:
       default: {}

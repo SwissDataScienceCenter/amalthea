@@ -110,6 +110,27 @@ spec:
             limits:
               cpu: 100m
               memory: 32Mi
+          livenessProbe:
+            httpGet:
+              port: 4181
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 6
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              port: 4181
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 2
+            timeoutSeconds: 3
+          startupProbe:
+            httpGet:
+              port: 4181
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 30
+            timeoutSeconds: 3
         {% endif %}
 
         - name: proxy
@@ -140,3 +161,24 @@ spec:
               cpu: 100m
               memory: 64Mi
             {% endif %}
+          livenessProbe:
+            httpGet:
+              port: 4182
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 6
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              port: 4182
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 2
+            timeoutSeconds: 3
+          startupProbe:
+            httpGet:
+              port: 4182
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 30
+            timeoutSeconds: 3
