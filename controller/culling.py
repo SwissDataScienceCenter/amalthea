@@ -1,7 +1,6 @@
 from collections import namedtuple
 import requests
 from urllib.parse import urlunparse, urlparse
-import logging
 
 from controller.utils import get_pod_metrics, parse_pod_metrics
 
@@ -34,11 +33,12 @@ def get_cpu_usage_for_culling(pod, namespace):
         return total_default_usage_millicores
 
 
-def is_idle_probe_idle(spec) -> bool:
+def is_idle_probe_idle(manifest) -> bool:
     """
     Check the idle probe (if defined) and determine whether the session is
     idle (True) or active (False).
     """
+    spec = manifest["spec"]
     # NOTE: By definition a value of 0 for the threshold means that the
     # sesion will never be culled due to idleness. If this is the case return False
     # to indicate the server is "active".
@@ -47,7 +47,7 @@ def is_idle_probe_idle(spec) -> bool:
     host = spec["culling"]["idleProbe"]["httpGet"].get("host")
     if host is None:
         # INFO: host is not defined in spec, default to main pod IP
-        main_pod_ip = spec.get("status", {}).get("mainPod", {}).get("status", {}).get("podIP")
+        main_pod_ip = manifest.get("status", {}).get("mainPod", {}).get("status", {}).get("podIP")
         if main_pod_ip is None:
             # INFO: main pod IP not present in status, assume session is starting up
             # and therefore not idle
@@ -61,7 +61,7 @@ def is_idle_probe_idle(spec) -> bool:
         ["scheme", "netloc", "path", "params", "query", "fragment"],
     )
     if spec["culling"]["idleProbe"]["httpGet"].get("port", False):
-        netloc = host + ":" + spec["culling"]["idleProbe"]["httpGet"]["port"]
+        netloc = host + ":" + str(spec["culling"]["idleProbe"]["httpGet"]["port"])
     parsed_path = urlparse(spec["culling"]["idleProbe"]["httpGet"]["path"])
     url = urlunparse(UrlParseResult(
         spec["culling"]["idleProbe"]["httpGet"]["scheme"],
@@ -76,8 +76,6 @@ def is_idle_probe_idle(spec) -> bool:
         headers=headers,
         allow_redirects=False,
     )
-    logging.info(f"Sending GET request to url: {url} with headers {headers}")
-    logging.info(f"Response from idleProbe GET request is {res.status_code}")
     # INFO: Logic is similar to livenessProbe in k8s. For a livenessProbe a value in the range
     # >=200 and <400 indicates that the session is alive. For an idleProbe a value in this
     # range indicates that the session is idle.

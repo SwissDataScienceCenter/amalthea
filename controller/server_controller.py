@@ -130,7 +130,7 @@ def cull_idle_servers(body, name, namespace, logger, **kwargs):
         else server_started_at_str
     ).astimezone(pytz.utc)
     server_age_seconds = (now - server_started_at).total_seconds()
-    idle_probe_idle = is_idle_probe_idle(body["spec"])
+    idle_probe_idle = is_idle_probe_idle(body)
     logger.info(
         f"Checking idle status of session {name}, "
         f"idle seconds: {idle_seconds}, "
