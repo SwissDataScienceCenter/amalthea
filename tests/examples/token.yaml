@@ -4,6 +4,7 @@ metadata:
   name: ## ADD NAME
   namespace: ## ADD NAMESPACE
 spec:
+  type: jupyterlab
   routing:
     host: ## Add hostname
   auth:

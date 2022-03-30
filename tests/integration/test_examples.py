@@ -23,7 +23,3 @@ def test_example(
     assert (
         session["spec"]["routing"]["host"] == test_manifest["spec"]["routing"]["host"]
     )
-    if test_manifest["spec"]["auth"]["oidc"]["enabled"]:
-        assert (
-            session["spec"]["auth"]["token"] == test_manifest["spec"]["auth"]["token"]
-        )
