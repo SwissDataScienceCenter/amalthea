@@ -5,7 +5,7 @@ import pytest
 def default_spec():
     spec = {
         "auth": {
-            "token": "token",
+            "basicAuth": {"enabled": False},
             "oidc": {"enabled": False},
         },
         "jupyterServer": {
@@ -20,8 +20,12 @@ def default_spec():
             "tls": {"enabled": False},
             "ingressAnnotations": {},
         },
-        "storage": {"size": "1G", "pvc": {"enabled": False}},
+        "storage": {
+            "size": "1G",
+            "pvc": {"enabled": False, "mountPath": "/home/jovyan/"},
+        },
         "patches": [],
+        "type": "jupyterlab",
     }
     return spec
 

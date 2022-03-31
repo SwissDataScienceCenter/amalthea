@@ -1,0 +1,31 @@
+{% extends "base/configmap-proxy.yaml" %}
+{% block traefik_dynamic_config %}
+  traefik-dynamic-config.yaml: |
+    http:
+      routers:
+        toServer:
+          rule: "PathPrefix(`{{ path }}`)"
+          service: server
+          middlewares:
+            - removePath
+          {% if basic_auth["enabled"] and not oidc["enabled"] %}
+            - basicAuth
+          {% endif %}
+      services:
+        server:
+          loadBalancer:
+            servers:
+              - url: http://localhost:8888/
+      middlewares:
+        removePath:
+          stripPrefix:
+            prefixes:
+              - "{{ path }}"
+        {% if basic_auth["enabled"] and not oidc["enabled"] %}
+        basicAuth:
+          basicAuth:
+            users:
+              - "{{ basic_auth["username"] }}:{{ basic_auth["password"] | bcrypt }}"
+            removeHeader: true
+        {% endif %}
+{% endblock %}

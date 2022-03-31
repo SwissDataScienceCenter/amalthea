@@ -14,7 +14,7 @@ from kubernetes.dynamic import DynamicClient
 from kubernetes.dynamic.exceptions import NotFoundError
 import yaml
 
-from controller.culling import get_js_server_status
+from controller.culling import is_idle_probe_idle
 from tests.integration.utils import find_resource
 from utils.chart_rbac import cleanup_k8s_resources, create_k8s_resources
 
@@ -188,7 +188,7 @@ def is_session_ready(k8s_namespace, k8s_amalthea_api):
             session = find_resource(name, k8s_namespace, k8s_amalthea_api)
             if session is not None:
                 try:
-                    status = get_js_server_status(session)
+                    status = is_idle_probe_idle(session)
                 except KeyError:
                     return False
                 if status is not None:

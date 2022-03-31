@@ -12,7 +12,7 @@ def test_storage(storage_class, size, pvc_enabled, valid_spec):
         "pvc": {
             "enabled": pvc_enabled,
             "storageClassName": storage_class,
-            "mountPath": "/home/jovyan/work/",
+            "mountPath": "/home/jovyan/work",
         },
     }
     spec = valid_spec(storage=storage)
@@ -44,5 +44,5 @@ def test_storage(storage_class, size, pvc_enabled, valid_spec):
         assert "pvc" not in manifest.keys()
     assert {
         "name": "workspace",
-        "mountPath": "/home/jovyan/work/",
+        "mountPath": "/home/jovyan/work",
     } in volume_mounts

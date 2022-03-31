@@ -1,0 +1,184 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: {{ name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ name }}
+  serviceName: {{ name }}
+  # Scaling up is not intended and won't work
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{ name }}
+    spec:
+      imagePullSecrets: []
+      initContainers: []
+      volumes:
+        {% if oidc["enabled"] %}
+        - name: oauth2-proxy-config
+          configMap:
+            name: {{ name }}
+            items:
+              - key: authorized-users.txt
+                path: authorized-users.txt
+        {% endif %}
+        - name: traefik-dynamic-config
+          configMap:
+            name: {{ name }}-traefik-dynamic-config
+        - name: traefik-static-config
+          configMap:
+            name: {{ name }}
+            items:
+              - key: traefik-static-config.yaml
+                path: traefik-static-config.yaml
+        {% block volumes scoped %}
+        {% endblock %}
+        {% if pvc["enabled"] %}
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: {{ name }}
+        {% else %}
+        - name: workspace
+          emptyDir:
+            {% if storage["size"] is not none and storage["size"] != "" %}
+            sizeLimit: {{ storage["size"] }}
+            {% endif %}
+        {% endif %}
+      terminationGracePeriodSeconds: 30
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 100
+      enableServiceLinks: false
+      {% if scheduler_name %}
+      schedulerName: {{ scheduler_name }}
+      {% endif %}
+      containers:
+        {% block containers scoped %}
+        {% endblock %}
+        
+        {% if oidc["enabled"] %}
+        - name: oauth2-proxy
+          image: "bitnami/oauth2-proxy:7.1.3"
+          args:
+            - "--provider=oidc"
+            - "--client-id={{ oidc["clientId"] }}"
+            - "--oidc-issuer-url={{ oidc["issuerUrl"] }}"
+            - "--session-cookie-minimal"
+            - "--http-address=:4180"
+            - "--skip-provider-button"
+            - "--upstream=http://127.0.0.1:8888"
+            - "--redirect-url={{ full_url | pathjoin("oauth2/callback") }}"
+            - "--cookie-path={{ path }}"
+            - "--proxy-prefix={{ path | pathjoin("oauth2") }}"
+            - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
+            {% for group in oidc["authorizedGroups"] %}
+            - "--allowed-group={{ group }}"
+            {% endfor %}
+          ports:
+            - name: http
+              containerPort: 4180
+              protocol: TCP
+          env:
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ name }}
+                  key: oauth2ProxyCookieSecret
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+              {% if "value" in auth["oidc"]["clientSecret"] %}
+                secretKeyRef:
+                  name: {{ name }}
+                  key: oidcClientSecret
+              {% endif %}
+              {% if "secretKeyRef" in auth["oidc"]["clientSecret"] %}
+                secretKeyRef:
+                  name: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["name"] }}
+                  key: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["key"] }}
+              {% endif %}
+          volumeMounts:
+            - name: oauth2-proxy-config
+              mountPath: /etc/oauth2-proxy/authorized-users.txt
+              subPath: authorized-users.txt
+          resources:
+            requests:
+              cpu: 20m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+          livenessProbe:
+            httpGet:
+              port: 4181
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 6
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              port: 4181
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 2
+            timeoutSeconds: 3
+          startupProbe:
+            httpGet:
+              port: 4181
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 30
+            timeoutSeconds: 3
+        {% endif %}
+
+        - name: proxy
+          image: traefik:v2.6.2
+          ports:
+            - name: http
+              containerPort: 4181
+              protocol: TCP
+          volumeMounts:
+            - name: traefik-dynamic-config
+              mountPath: /traefik
+            - name: traefik-static-config
+              mountPath: /etc/traefik/traefik.yaml
+              subPath: traefik-static-config.yaml
+          resources:
+            {% if basic_auth["enabled"] %}
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 1000m
+              memory: 200Mi
+            {% else %}
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+            {% endif %}
+          livenessProbe:
+            httpGet:
+              port: 4182
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 6
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              port: 4182
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 2
+            timeoutSeconds: 3
+          startupProbe:
+            httpGet:
+              port: 4182
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 30
+            timeoutSeconds: 3
