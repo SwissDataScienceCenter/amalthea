@@ -123,7 +123,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     except KeyError:
         return
     cpu_usage = get_cpu_usage_for_culling(pod=pod_name, namespace=namespace)
-    custom_resource_api = get_api(config.api_version, config.custom_resource_name)
+    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     idle_seconds = int(body["status"].get("idleSeconds", 0))
     now = pytz.UTC.localize(datetime.utcnow())
     last_activity = js_server_status.get("last_activity", now)
@@ -279,7 +279,7 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 
     # We use the dynamic client for patching since we need
     # content_type="application/json-patch+json"
-    custom_resource_api = get_api(config.api_version, config.custom_resource_name)
+    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     try:
         custom_resource_api.patch(
             namespace=namespace,
@@ -334,7 +334,7 @@ def update_resource_usage(body, name, namespace, **kwargs):
             }
         }
     }
-    custom_resource_api = get_api(config.api_version, config.custom_resource_name)
+    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     try:
         custom_resource_api.patch(
             namespace=namespace,
