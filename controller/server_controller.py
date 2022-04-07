@@ -30,13 +30,17 @@ num_of_starting_sessions = Gauge(
 )
 
 
-class SessionState(Enum):
-    """Enum to represent the current state of a session."""
+class ServerStatusEnum(Enum):
+    """Simple Enum for server status."""
 
-    CREATED = 1
-    STARTING = 2
-    RUNNNING = 3
-    STOPPED = 4
+    Running = "running"
+    Starting = "starting"
+    Stopping = "stopping"
+    Failed = "failed"
+
+    @classmethod
+    def list(cls):
+        return list(map(lambda c: c.value, cls))
 
 
 sessions_state = dict()
@@ -45,24 +49,22 @@ sessions_state = dict()
 def _update_session_state(name, namespace, state):
     session_key = f"{namespace}_{name}"
     if session_key not in sessions_state:
+        total_launch.inc()
         num_of_sessions.inc()
         num_of_starting_sessions.inc()
 
-        sessions_state[session_key] = SessionState.CREATED
+        sessions_state[session_key] = state
         return
 
     if sessions_state[session_key] == state:
         return
 
-    if state == SessionState.STARTING:
+    elif state == ServerStatusEnum.RUNNNING:
         num_of_starting_sessions.dec()
-        sessions_state[session_key] = state
-
-    elif state == SessionState.RUNNNING:
         num_of_running_sessions.inc()
         sessions_state[session_key] = state
 
-    elif state == SessionState.STOPPED:
+    elif state == ServerStatusEnum.STOPPED:
         num_of_running_sessions.dec()
         sessions_state[session_key] = state
 
@@ -130,37 +132,31 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
     the necessary k8s child resources which make the actual jupyter server.
     """
     children_specs = get_children_specs(name, spec, logger)
-    total_launch.inc()
 
-    try:
-        # We make sure the pod created from the statefulset gets labeled
-        # with the custom resource references and add a special label to
-        # distinguish it from direct children.
+    # We make sure the pod created from the statefulset gets labeled
+    # with the custom resource references and add a special label to
+    # distinguish it from direct children.
+    kopf.label(
+        children_specs["statefulset"]["spec"]["template"],
+        labels=get_labels(name, uid, labels, is_main_pod=True),
+    )
+
+    # Add the labels to all child resources and create them in the cluster
+    children_uids = {}
+
+    for child_key, child_spec in children_specs.items():
+        # TODO: look at the option of using subhandlers here.
         kopf.label(
-            children_specs["statefulset"]["spec"]["template"],
-            labels=get_labels(name, uid, labels, is_main_pod=True),
+            child_spec,
+            labels=get_labels(name, uid, labels, child_key=child_key),
         )
+        kopf.adopt(child_spec)
 
-        # Add the labels to all child resources and create them in the cluster
-        children_uids = {}
+        children_uids[child_key] = create_namespaced_resource(
+            namespace=namespace, body=child_spec
+        ).metadata.uid
 
-        for child_key, child_spec in children_specs.items():
-            # TODO: look at the option of using subhandlers here.
-            kopf.label(
-                child_spec,
-                labels=get_labels(name, uid, labels, child_key=child_key),
-            )
-            kopf.adopt(child_spec)
-
-            children_uids[child_key] = create_namespaced_resource(
-                namespace=namespace, body=child_spec
-            ).metadata.uid
-
-        _update_session_state(name, namespace, SessionState.CREATED)
-        return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
-    except Exception as e:
-        total_failed.inc()
-        raise e
+    return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 
 
 @kopf.timer(
@@ -175,7 +171,6 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     threshold). If the session is idle then update the jupyter server status with
     the idle duration. If any sessions have been idle for long enough, then cull them.
     """
-    _update_session_state(name, namespace, SessionState.STARTING)
     js_server_status = get_js_server_status(body)
     if js_server_status is None:
         return  # this means server is not fully up and running yet
@@ -185,9 +180,10 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
         pod_name = body["status"]["mainPod"]["name"]
     except KeyError:
         return
-    _update_session_state(name, namespace, SessionState.RUNNNING)
     cpu_usage = get_cpu_usage_for_culling(pod=pod_name, namespace=namespace)
-    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
+    custom_resource_api = get_api(
+        config.api_version, config.custom_resource_name, config.api_group
+    )
     idle_seconds = int(body["status"].get("idleSeconds", 0))
     now = pytz.UTC.localize(datetime.utcnow())
     last_activity = js_server_status.get("last_activity", now)
@@ -201,7 +197,6 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
         f"server status: {js_server_status}, "
         f"age: {jupyter_server_age_seconds} seconds"
     )
-    _update_session_state(name, namespace, SessionState.RUNNNING)
     jupyter_server_is_idle_now = (
         cpu_usage <= config.CPU_USAGE_MILLICORES_IDLE_THRESHOLD
         and type(js_server_status) is dict
@@ -228,7 +223,6 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
                 namespace=namespace,
                 body=V1DeleteOptions(propagation_policy="Foreground"),
             )
-            _update_session_state(name, namespace, SessionState.STOPPED)
         except NotFoundError:
             logger.warning(
                 f"Trying to delete Jupyter server {name} in namespace {namespace}, "
@@ -301,6 +295,64 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
     and the statefulsets pod as only grand child.
     """
 
+    def get_all_container_statuses(js):
+        return js["status"].get("mainPod", {}).get("status", {}).get(
+            "containerStatuses", []
+        ) + js["status"].get("mainPod", {}).get("status", {}).get(
+            "initContainerStatuses", []
+        )
+
+    def get_failed_containers(container_statuses):
+        failed_containers = [
+            container_status
+            for container_status in container_statuses
+            if (
+                container_status.get("state", {})
+                .get("terminated", {})
+                .get("exitCode", 0)
+                != 0
+                or container_status.get("lastState", {})
+                .get("terminated", {})
+                .get("exitCode", 0)
+                != 0
+            )
+        ]
+        return failed_containers
+
+    def get_status(js) -> ServerStatusEnum:
+        """Get the status of the jupyterserver."""
+        # Is the server terminating?
+        if js["metadata"].get("deletionTimestamp") is not None:
+            return ServerStatusEnum.Stopping
+
+        pod_phase = js["status"].get("mainPod", {}).get("status", {}).get("phase")
+        pod_conditions = (
+            js["status"]
+            .get("mainPod", {})
+            .get("status", {})
+            .get("conditions", [{"status": "False"}])
+        )
+        container_statuses = get_all_container_statuses(js)
+        failed_containers = get_failed_containers(container_statuses)
+        all_pod_conditions_good = all(
+            [condition.get("status", "False") == "True" for condition in pod_conditions]
+        )
+
+        # Is the pod fully running?
+        if (
+            pod_phase == "Running"
+            and len(failed_containers) == 0
+            and all_pod_conditions_good
+        ):
+            return ServerStatusEnum.Running
+
+        # The pod has failed (either directly or by having containers stuck in restart loops)
+        if pod_phase == "Failed" or len(failed_containers) > 0:
+            return ServerStatusEnum.Failed
+
+        # If none of the above match the container must be starting
+        return ServerStatusEnum.Starting
+
     logger.info(f"{body['kind']}: {event['type']}")
 
     # Collect labels and other metainformation from the resource which
@@ -331,6 +383,9 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
         # work for not yet existing objects.
         op = "replace"
 
+    container_state = get_status(body)
+    _update_session_state(name, namespace, container_state)
+
     path = "/status/mainPod" if is_main_pod else f"/status/children/{child_key}"
     value = {
         "uid": uid,
@@ -338,6 +393,7 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
         "kind": body["kind"],
         "apiVersion": body["apiVersion"],
         "status": body.get("status", None),
+        "state": container_state.value,
     }
     patch_op = {"op": op, "path": path}
     if op in ["add", "replace"]:
@@ -345,7 +401,9 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 
     # We use the dynamic client for patching since we need
     # content_type="application/json-patch+json"
-    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
+    custom_resource_api = get_api(
+        config.api_version, config.custom_resource_name, config.api_group
+    )
     try:
         custom_resource_api.patch(
             namespace=namespace,
@@ -400,7 +458,9 @@ def update_resource_usage(body, name, namespace, **kwargs):
             }
         }
     }
-    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
+    custom_resource_api = get_api(
+        config.api_version, config.custom_resource_name, config.api_group
+    )
     try:
         custom_resource_api.patch(
             namespace=namespace,
