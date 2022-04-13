@@ -43,36 +43,6 @@ class ServerStatusEnum(Enum):
         return list(map(lambda c: c.value, cls))
 
 
-sessions_state = dict()
-
-
-def _update_session_state(name, namespace, state):
-    session_key = f"{namespace}_{name}"
-    if session_key not in sessions_state:
-        total_launch.inc()
-        num_of_sessions.inc()
-        num_of_starting_sessions.inc()
-
-        sessions_state[session_key] = state
-        return
-
-    if sessions_state[session_key] == state:
-        return
-
-    elif state == ServerStatusEnum.RUNNNING:
-        num_of_starting_sessions.dec()
-        num_of_running_sessions.inc()
-        sessions_state[session_key] = state
-
-    elif state == ServerStatusEnum.STOPPED:
-        num_of_running_sessions.dec()
-        sessions_state[session_key] = state
-
-    else:
-        # we should raise exception here
-        raise ValueError(f"Unknown state type '{state}'!")
-
-
 def get_labels(
     parent_name, parent_uid, parent_labels, child_key=None, is_main_pod=False
 ):
@@ -131,6 +101,10 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
     Watch the creation of jupyter server objects and create all
     the necessary k8s child resources which make the actual jupyter server.
     """
+    total_launch.inc()
+    num_of_sessions.inc()
+    num_of_starting_sessions.inc()
+
     children_specs = get_children_specs(name, spec, logger)
 
     # We make sure the pod created from the statefulset gets labeled
@@ -157,6 +131,34 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
         ).metadata.uid
 
     return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
+
+
+@kopf.on.delete(config.api_group, config.api_version, config.custom_resource_name)
+def delete_fn(**_):
+    """
+    The juptyer server has been deleted
+    """
+    num_of_sessions.dec()
+
+
+@kopf.on.field(
+    config.api_group,
+    config.api_version,
+    config.custom_resource_name,
+    field="status.state",
+)
+def state_changed(old, new, **_):
+    """
+    State of the juptyer server status has changed.
+    """
+    if new == ServerStatusEnum.Failed.value:
+        total_failed.inc()
+    elif old == ServerStatusEnum.Starting.value:
+        num_of_starting_sessions.dec()
+        if new == ServerStatusEnum.Running.value:
+            num_of_running_sessions.inc()
+    elif old == ServerStatusEnum.Running.value:
+        num_of_running_sessions.dec()
 
 
 @kopf.timer(
@@ -383,9 +385,6 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
         # work for not yet existing objects.
         op = "replace"
 
-    container_state = get_status(body)
-    _update_session_state(name, namespace, container_state)
-
     path = "/status/mainPod" if is_main_pod else f"/status/children/{child_key}"
     value = {
         "uid": uid,
@@ -393,8 +392,11 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
         "kind": body["kind"],
         "apiVersion": body["apiVersion"],
         "status": body.get("status", None),
-        "state": container_state.value,
     }
+    if is_main_pod:
+        container_state = get_status(body)
+        value["state"] = container_state.value
+
     patch_op = {"op": op, "path": path}
     if op in ["add", "replace"]:
         patch_op["value"] = value
