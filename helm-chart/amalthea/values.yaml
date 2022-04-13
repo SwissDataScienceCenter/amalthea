@@ -85,9 +85,12 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
+podSecurityContext:
+  runAsGroup: 1000
+  runAsUser: 1000
 
-securityContext: {}
+securityContext:
+  allowPrivilegeEscalation: false
 
 resources:
   limits:
