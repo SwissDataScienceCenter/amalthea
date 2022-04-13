@@ -32,27 +32,8 @@ spec:
               - key: traefik-dynamic-config.yaml
                 path: traefik-dynamic-config.yaml
         {% endif %}
-        - name: jupyter-server-secrets
-          secret:
-            secretName: {{ name }}
-            items:
-              - key: jupyterServerCookieSecret
-                path: cookie_secret
-        - name: jupyter-config-notebook
-          configMap:
-            name: {{ name }}
-            items:
-              - key: jupyter_notebook_config.py
-                path: jupyter_notebook_config.py
-        - name: jupyter-config-server
-          configMap:
-            name: {{ name }}
-            items:
-              - key: jupyter_server_config.py
-                path: jupyter_server_config.py
-        - name: jupyter-config
-          emptyDir:
-            sizeLimit: "2Mi"
+        {% block volumes scoped %}
+        {% endblock %}
         {% if pvc["enabled"] %}
         - name: workspace
           persistentVolumeClaim:
@@ -73,78 +54,8 @@ spec:
       schedulerName: {{ scheduler_name }}
       {% endif %}
       containers:
-        - name: jupyter-server
-          image: {{ jupyter_server["image"] }}
-          workingDir: {{ jupyter_server["rootDir"] }}
-          volumeMounts:
-            - name: workspace
-              mountPath: {{ storage["pvc"]["mountPath"] }}
-            - name: jupyter-server-secrets
-              mountPath: /etc/jupyter_server_secrets
-              readOnly: true
-            - name: jupyter-config
-              mountPath: {{ storage["pvc"]["mountPath"] }}/.jupyter_config
-            - name: jupyter-config-server
-              mountPath: {{ storage["pvc"]["mountPath"] }}/.jupyter_config/jupyter_server_config.py
-              subPath: jupyter_server_config.py
-            - name: jupyter-config-notebook
-              mountPath: {{ storage["pvc"]["mountPath"] }}/.jupyter_config/jupyter_notebook_config.py
-              subPath: jupyter_notebook_config.py
-          env:
-            - name: SERVER_APP_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ name }}
-                  key: jupyterServerAppToken
-            - name: JUPYTER_CONFIG_PATH
-              value: {{ storage["pvc"]["mountPath"] }}/.jupyter_config
-          resources: {{ jupyter_server["resources"] | default({}) | tojson }}
-          securityContext:
-            runAsUser: 1000
-            runAsGroup: 100
-            fsGroup: 100
-            allowPrivilegeEscalation: false
-
-          # We allow quite some time (5 + 1 minutes) for the jupyter container to come up in
-          # case the entrypoint contains a lot of code which has to be executed before the
-          # Jupyter server can even accept connections. However, really long running tasks
-          # should be put into an init container.
-          livenessProbe:
-            httpGet:
-              path: {{ probe_path }}
-              port: 8888
-              {% if not oidc["enabled"] %}
-              httpHeaders:
-                - name: Authorization
-                  value: {{ "token " ~ jupyter_server_app_token }}
-              {% endif %}
-            periodSeconds: 10
-            failureThreshold: 6
-            timeoutSeconds: 9
-          readinessProbe:
-            httpGet:
-              path: {{ probe_path }}
-              port: 8888
-              {% if not oidc["enabled"] %}
-              httpHeaders:
-                - name: Authorization
-                  value: {{ "token " ~ jupyter_server_app_token }}
-              {% endif %}
-            periodSeconds: 10
-            failureThreshold: 2
-            timeoutSeconds: 9
-          startupProbe:
-            httpGet:
-              path: {{ probe_path }}
-              port: 8888
-              {% if not oidc["enabled"] %}
-              httpHeaders:
-                - name: Authorization
-                  value: {{ "token " ~ jupyter_server_app_token }}
-              {% endif %}
-            periodSeconds: 10
-            failureThreshold: 30
-            timeoutSeconds: 9
+        {% block containers scoped required %}
+        {% endblock %}
         
         {% if oidc["enabled"] %}
         - name: oauth2-proxy
@@ -161,7 +72,8 @@ spec:
             - "--cookie-path={{ path }}"
             - "--proxy-prefix={{ path if path != '/' else '' }}/oauth2"
             - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
-            - "--skip-auth-route=^{{ path if path != '/' else '' }}/api/status$"
+            {% block extraAuthProxyArgs scoped %}
+            {% endblock %}
             {% for group in oidc["authorizedGroups"] %}
             - "--allowed-group={{ group }}"
             {% endfor %}

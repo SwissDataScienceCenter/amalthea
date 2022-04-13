@@ -22,6 +22,7 @@ def default_spec():
         },
         "storage": {"size": "1G", "pvc": {"enabled": False}},
         "patches": [],
+        "type": "jupyterlab",
     }
     return spec
 

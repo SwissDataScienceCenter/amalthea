@@ -35,16 +35,16 @@ def test_get_urls(tls, valid_spec):
 
 @pytest.fixture
 def expected_templates():
-    def _expected_templates(pvc_enabled):
+    def _expected_templates(template_type, pvc_enabled):
         output = {
-            "service": "service.yaml",
-            "ingress": "ingress.yaml",
-            "statefulset": "statefulset.yaml",
-            "configmap": "configmap.yaml",
-            "secret": "secret.yaml",
+            "service": f"{template_type}/service.yaml",
+            "ingress": f"{template_type}/ingress.yaml",
+            "statefulset": f"{template_type}/statefulset.yaml",
+            "configmap": f"{template_type}/configmap.yaml",
+            "secret": f"{template_type}/secret.yaml",
         }
         if pvc_enabled:
-            return {**output, "pvc": "pvc.yaml"}
+            return {**output, "pvc": f"{template_type}/pvc.yaml"}
         else:
             return output
 
@@ -53,8 +53,8 @@ def expected_templates():
 
 @pytest.mark.parametrize("pvc_enabled", [True, False])
 def test_get_children_templates(pvc_enabled, expected_templates):
-    templates = get_children_templates(pvc_enabled)
-    expected_templates = expected_templates(pvc_enabled)
+    templates = get_children_templates("jupyterlab", pvc_enabled)
+    expected_templates = expected_templates("jupyterlab", pvc_enabled)
     assert templates == expected_templates
 
 

@@ -28,19 +28,19 @@ def get_urls(spec):
     return host_url, full_url
 
 
-def get_children_templates(pvc_enabled=False):
+def get_children_templates(template_type="jupyterlab", pvc_enabled=False):
     """
     Define a list of all resources that should be created.
     """
     children_templates = {
-        "service": "service.yaml",
-        "ingress": "ingress.yaml",
-        "statefulset": "statefulset.yaml",
-        "configmap": "configmap.yaml",
-        "secret": "secret.yaml",
+        "service": f"{template_type}/service.yaml",
+        "ingress": f"{template_type}/ingress.yaml",
+        "statefulset": f"{template_type}/statefulset.yaml",
+        "configmap": f"{template_type}/configmap.yaml",
+        "secret": f"{template_type}/secret.yaml",
     }
     if pvc_enabled:
-        children_templates["pvc"] = "pvc.yaml"
+        children_templates["pvc"] = f"{template_type}/pvc.yaml"
 
     return children_templates
 
@@ -109,6 +109,7 @@ def get_children_specs(name, spec, logger):
     # Generate one big dictionary containing the specs of all child
     # resources to be created.
     children_templates = get_children_templates(
+        template_type=spec["type"],
         pvc_enabled=spec["storage"]["pvc"]["enabled"],
     )
     children_specs = {
