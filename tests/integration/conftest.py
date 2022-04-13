@@ -5,8 +5,7 @@ import tempfile
 from time import sleep
 from uuid import uuid4
 import os
-from subprocess import Popen, TimeoutExpired
-import sys
+from subprocess import Popen
 
 import pytest
 from kubernetes import config, client
@@ -33,35 +32,70 @@ def operator_env(operator_kubeconfig_fp):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def operator(k8s_namespace, operator_env):
+def operator(k8s_namespace, operator_env, k8s_amalthea_api, kopf_log_files_fp):
+    stdout, stderr = kopf_log_files_fp
     p = Popen(
         args=f"kopf run -n {k8s_namespace} --verbose kopf_entrypoint.py",
-        stdout=sys.stdout,
-        stderr=sys.stderr,
+        stdout=stdout,
+        stderr=stderr,
         shell=True,
         env={
             **os.environ,
             **operator_env,
         },
         bufsize=0,
+        # NOTE: os.setpgrp makes it so that Ctrl-C is ignored.
+        # This is needed because Ctrl-C gets picked up if the tests are stopped manually
+        # But stopping the operator the instant the tests are stopped results in
+        # incomplete cleanup of fixtures and leftover k8s resources
+        preexec_fn=os.setpgrp,
     )
-    # Give time for the operator to fully start up, call to Popen does not block
-    sleep(2)
+    # INFO: Give time for the operator to fully start up, call to Popen does not block
+    sleep(10)
     yield p
 
-    # We run the KopfRunner again for a short moment to remove all finalizers
-    # and allow cleanup.
-    sleep(10)
-    p.terminate()
+    # NOTE: Keep the kopf runner (i.e. operator) going until all sessions are cleaned up
+    sessions = k8s_amalthea_api.get(namespace=k8s_namespace)
+    print("Checking for the number of active sessions")
+    while len(sessions.items) > 0:
+        sessions = k8s_amalthea_api.get(namespace=k8s_namespace)
+        print(f"{len(sessions.items)} active sessions found")
+        sleep(10)
+    # NOTE: Ctrl-C is ignored - this is only way to stop operator
+    p.kill()
+    # INFO: Extract and post logs from controller - in most cases controller writes
+    # to standard error regardless of whether erors were present or not
+    stdout.seek(0)
+    stderr.seek(0)
+    stdout_content = stdout.read()
+    stderr_content = stderr.read()
+    if type(stdout_content) is bytes:
+        stdout = stdout_content.decode()
+    if type(stderr_content) is bytes:
+        stderr_content = stderr_content.decode()
     try:
-        p.wait(timeout=30)
-    except TimeoutExpired:
-        p.kill()
+        term_width = os.get_terminal_size().columns
+    except OSError:
+        term_width = 80
+    print(" KOPF STDOUT ".center(term_width, "*"))
+    print(stdout_content)
+    print(" KOPF STDERR ".center(term_width, "*"))
+    print(stderr_content)
+    print("*".center(term_width, "*"))
 
 
 @pytest.fixture(scope="session", autouse=True)
 def operator_kubeconfig_fp():
-    return tempfile.NamedTemporaryFile("w")
+    with tempfile.NamedTemporaryFile("w") as fout:
+        yield fout
+
+
+@pytest.fixture(scope="session", autouse=True)
+def kopf_log_files_fp():
+    with tempfile.NamedTemporaryFile("w+b") as stdout, tempfile.NamedTemporaryFile(
+        "w+b"
+    ) as stderr:
+        yield stdout, stderr
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -131,8 +165,8 @@ def get_k8s_api(load_k8s_config):
     yield _get_k8s_api
 
 
-@pytest.fixture
-def k8s_amalthea_api(get_k8s_api):
+@pytest.fixture(scope="session")
+def k8s_amalthea_api(get_k8s_api, create_amalthea_k8s_resources):
     yield get_k8s_api(
         "v1alpha1",
         "JupyterServer",
@@ -155,7 +189,7 @@ def release_name():
 
 
 @pytest.fixture
-def launch_session(k8s_amalthea_api, k8s_namespace):
+def launch_session(k8s_amalthea_api, k8s_namespace, is_session_deleted):
     launched_sessions = []
 
     def _launch_session(manifest):
@@ -166,6 +200,7 @@ def launch_session(k8s_amalthea_api, k8s_namespace):
 
     # cleanup
     for session in launched_sessions:
+        print(f"\nCleaning up session {session['metadata']['name']}")
         try:
             k8s_amalthea_api.delete(
                 session["metadata"]["name"],
@@ -173,8 +208,11 @@ def launch_session(k8s_amalthea_api, k8s_namespace):
                 propagation_policy="Foreground",
                 async_req=False,
             )
+            is_session_deleted(session["metadata"]["name"])
         except NotFoundError:
             pass
+        else:
+            print("Finished cleaning up sesssion.")
 
 
 @pytest.fixture
@@ -217,22 +255,22 @@ def is_session_deleted(k8s_namespace, k8s_pod_api):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def create_amalthea_k8s_resources(load_k8s_config, release_name):
+def create_amalthea_k8s_resources(load_k8s_config, release_name, k8s_namespace):
     """This fixture configures the tests to use a serviceaccount
     with the same roles that the operator has when installed through
     the helm chart."""
-
+    print("Creating custom resources for Amalthea.")
     yield create_k8s_resources(
-        "default",
-        ["default"],
+        k8s_namespace,
+        [k8s_namespace],
         resources=["ServiceAccount", "Role", "RoleBinding", "CustomResourceDefinition"],
         release_name=release_name,
     )
-
+    print("Removing custom resources for Amalthea.")
     # Cleanup after testing
     cleanup_k8s_resources(
-        "default",
-        ["default"],
+        k8s_namespace,
+        [k8s_namespace],
         resources=["ServiceAccount", "Role", "RoleBinding", "CustomResourceDefinition"],
         release_name=release_name,
     )
