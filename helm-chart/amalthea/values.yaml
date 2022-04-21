@@ -166,3 +166,9 @@ scheduler:
       weight: 1
     - name: TaintTolerationPriority
       weight: 1
+
+metrics:
+  enabled: false
+  # A list of labels that should be present on jupyter-server object which will then be used as metrics label
+  extraMetricsLabels: []
+  port: 8765

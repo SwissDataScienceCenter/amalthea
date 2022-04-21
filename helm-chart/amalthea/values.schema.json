@@ -320,6 +320,34 @@
             ],
             "additionalProperties": false
         },
+        "metrics": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "port": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "default": 8765
+                },
+                "extraMetricsLabels": {
+                    "type": "array",
+                    "default": [],
+                    "uniqueItems": true,
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "enabled",
+                "port",
+                "extraMetricsLabels"
+            ],
+            "additionalProperties": false
+        },
         "scheduler": {
             "type": "object",
             "required": [
@@ -421,7 +449,8 @@
         "crdApiGroup",
         "crdApiVersion",
         "crdNames",
-        "culling"
+        "culling",
+        "metrics"
     ],
     "title": "Values",
     "type": "object",

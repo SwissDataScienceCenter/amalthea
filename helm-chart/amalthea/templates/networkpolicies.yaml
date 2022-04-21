@@ -12,6 +12,16 @@ spec:
       app.kubernetes.io/component: controller
   policyTypes:
     - Ingress
+  {{- if .Values.metrics.enabled  }}
+  ingress:
+    - from:
+      # Allow ingress only to the metrics (if enabled)
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: {{ .Values.metrics.port }}
+  {{- end }}
 {{ if and .Values.networkPolicies.enabled ( not .Values.scope.clusterWide ) }}
 {{- range (.Values.scope.namespaces | default (list .Release.Namespace)) -}}
 ---
