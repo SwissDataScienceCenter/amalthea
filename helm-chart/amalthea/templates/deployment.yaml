@@ -82,6 +82,12 @@ spec:
             - name: KOPF_CREATE_RETRIES
               value: {{ .retries | quote }}
             {{- end }}
+            - name: METRICS_ENABLED
+              value: {{ .Values.metrics.enabled | quote }}
+            - name: METRICS_PORT
+              value: {{ .Values.metrics.port | quote }}
+            - name: METRICS_EXTRA_LABELS
+              value: {{ .Values.metrics.extraMetricsLabels | toJson | quote }}
             {{- if .Values.scheduler.enable}}
             - name: SERVER_SCHEDULER_NAME
               value: {{ include "amalthea.fullname" . }}-scheduler

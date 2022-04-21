@@ -3,7 +3,7 @@ from enum import Enum
 from kubernetes.client.models import V1DeleteOptions
 from kubernetes.dynamic.exceptions import NotFoundError
 from datetime import datetime
-from prometheus_client import Counter, Gauge
+from prometheus_client import start_http_server
 import pytz
 
 from controller import config
@@ -15,19 +15,9 @@ from controller.utils import (
     get_api,
     parse_pod_metrics,
 )
+from controller.metrics import Metrics
 
-total_launch = Counter("sessions_launch_total", "Number of sessions launched")
-total_failed = Counter(
-    "sessions_failed_total", "Number of sessions which have failed being launched"
-)
-num_of_sessions = Gauge("sessions_all", "Number of sessions")
-num_of_running_sessions = Gauge(
-    "sessions_running", "Number of sessions in running state"
-)
-num_of_starting_sessions = Gauge(
-    "sessions_starting",
-    "Number of sessions which have been scheduled but are still starting",
-)
+metrics = Metrics()
 
 
 class ServerStatusEnum(Enum):
@@ -101,9 +91,9 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
     Watch the creation of jupyter server objects and create all
     the necessary k8s child resources which make the actual jupyter server.
     """
-    total_launch.inc()
-    num_of_sessions.inc()
-    num_of_starting_sessions.inc()
+    metrics.manipulate("total_launch", "inc", labels)
+    metrics.manipulate("num_of_sessions", "inc", labels)
+    metrics.manipulate("num_of_starting_sessions", "inc", labels)
 
     children_specs = get_children_specs(name, spec, logger)
 
@@ -134,11 +124,27 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
 
 
 @kopf.on.delete(config.api_group, config.api_version, config.custom_resource_name)
-def delete_fn(**_):
+def delete_fn(labels, body, namespace, name, **_):
     """
-    The juptyer server has been deleted
+    The juptyer server has been deleted.
     """
-    num_of_sessions.dec()
+    current_state = body.get("status", {}).get("state", ServerStatusEnum.Starting.value)
+    api = get_api(config.api_version, config.custom_resource_name, config.api_group)
+    api.patch(
+        namespace=namespace,
+        name=name,
+        body={
+            "status": {
+                "state": ServerStatusEnum.Stopping.value,
+            },
+        },
+        content_type=CONTENT_TYPES["merge-patch"],
+    )
+    metrics.manipulate("num_of_sessions", "dec", labels)
+    if current_state == ServerStatusEnum.Running.value:
+        metrics.manipulate("num_of_running_sessions", "dec", labels)
+    elif current_state == ServerStatusEnum.Starting.value:
+        metrics.manipulate("num_of_starting_sessions", "dec", labels)
 
 
 @kopf.on.field(
@@ -147,18 +153,99 @@ def delete_fn(**_):
     config.custom_resource_name,
     field="status.state",
 )
-def state_changed(old, new, **_):
+def state_changed(old, new, labels, logger, **_):
     """
     State of the juptyer server status has changed.
     """
     if new == ServerStatusEnum.Failed.value:
-        total_failed.inc()
+        metrics.manipulate("total_failed", "inc", labels)
+    elif new == ServerStatusEnum.Running.value:
+        metrics.manipulate("num_of_running_sessions", "inc", labels)
+    elif new == ServerStatusEnum.Stopping.value:
+        # NOTE: When status goes from any to Stopping this is handled in the
+        # delete handler from kopf, not here. This is to avoid double counting.
+        return
+    if old == ServerStatusEnum.Running.value:
+        metrics.manipulate("num_of_running_sessions", "dec", labels)
     elif old == ServerStatusEnum.Starting.value:
-        num_of_starting_sessions.dec()
-        if new == ServerStatusEnum.Running.value:
-            num_of_running_sessions.inc()
-    elif old == ServerStatusEnum.Running.value:
-        num_of_running_sessions.dec()
+        metrics.manipulate("num_of_starting_sessions", "dec", labels)
+
+
+@kopf.on.event(
+    version="v1",
+    kind="Pod",
+    labels={config.PARENT_NAME_LABEL_KEY: kopf.PRESENT},
+)
+def update_server_state(body, labels, namespace, **_):
+    def get_all_container_statuses(pod):
+        return pod.get("status", {}).get(
+            "containerStatuses", []
+        ) + pod.get("status", {}).get(
+            "initContainerStatuses", []
+        )
+
+    def get_failed_containers(container_statuses):
+        failed_containers = [
+            container_status
+            for container_status in container_statuses
+            if (
+                container_status.get("state", {})
+                .get("terminated", {})
+                .get("exitCode", 0)
+                != 0
+                or container_status.get("lastState", {})
+                .get("terminated", {})
+                .get("exitCode", 0)
+                != 0
+            )
+        ]
+        return failed_containers
+
+    def get_status(pod) -> ServerStatusEnum:
+        """Get the status of the jupyterserver."""
+        # Is the server terminating?
+        if pod["metadata"].get("deletionTimestamp") is not None:
+            return ServerStatusEnum.Stopping
+
+        pod_phase = pod.get("status", {}).get("phase")
+        pod_conditions = (
+            pod.get("status", {})
+            .get("conditions", [{"status": "False"}])
+        )
+        container_statuses = get_all_container_statuses(pod)
+        failed_containers = get_failed_containers(container_statuses)
+        all_pod_conditions_good = all(
+            [condition.get("status", "False") == "True" for condition in pod_conditions]
+        )
+
+        # Is the pod fully running?
+        if (
+            pod_phase == "Running"
+            and len(failed_containers) == 0
+            and all_pod_conditions_good
+        ):
+            return ServerStatusEnum.Running
+
+        # The pod has failed (either directly or by having containers stuck in restart loops)
+        if pod_phase == "Failed" or len(failed_containers) > 0:
+            return ServerStatusEnum.Failed
+
+        # If none of the above match the container must be starting
+        return ServerStatusEnum.Starting
+
+    status = get_status(body)
+    server_name = labels[config.PARENT_NAME_LABEL_KEY]
+    api = get_api(config.api_version, config.custom_resource_name, config.api_group)
+    api.patch(
+        namespace=namespace,
+        name=server_name,
+        body={
+            "status": {
+                "state": status.value,
+            },
+        },
+        content_type=CONTENT_TYPES["merge-patch"],
+    )
 
 
 @kopf.timer(
@@ -297,64 +384,6 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
     and the statefulsets pod as only grand child.
     """
 
-    def get_all_container_statuses(js):
-        return js["status"].get("mainPod", {}).get("status", {}).get(
-            "containerStatuses", []
-        ) + js["status"].get("mainPod", {}).get("status", {}).get(
-            "initContainerStatuses", []
-        )
-
-    def get_failed_containers(container_statuses):
-        failed_containers = [
-            container_status
-            for container_status in container_statuses
-            if (
-                container_status.get("state", {})
-                .get("terminated", {})
-                .get("exitCode", 0)
-                != 0
-                or container_status.get("lastState", {})
-                .get("terminated", {})
-                .get("exitCode", 0)
-                != 0
-            )
-        ]
-        return failed_containers
-
-    def get_status(js) -> ServerStatusEnum:
-        """Get the status of the jupyterserver."""
-        # Is the server terminating?
-        if js["metadata"].get("deletionTimestamp") is not None:
-            return ServerStatusEnum.Stopping
-
-        pod_phase = js["status"].get("mainPod", {}).get("status", {}).get("phase")
-        pod_conditions = (
-            js["status"]
-            .get("mainPod", {})
-            .get("status", {})
-            .get("conditions", [{"status": "False"}])
-        )
-        container_statuses = get_all_container_statuses(js)
-        failed_containers = get_failed_containers(container_statuses)
-        all_pod_conditions_good = all(
-            [condition.get("status", "False") == "True" for condition in pod_conditions]
-        )
-
-        # Is the pod fully running?
-        if (
-            pod_phase == "Running"
-            and len(failed_containers) == 0
-            and all_pod_conditions_good
-        ):
-            return ServerStatusEnum.Running
-
-        # The pod has failed (either directly or by having containers stuck in restart loops)
-        if pod_phase == "Failed" or len(failed_containers) > 0:
-            return ServerStatusEnum.Failed
-
-        # If none of the above match the container must be starting
-        return ServerStatusEnum.Starting
-
     logger.info(f"{body['kind']}: {event['type']}")
 
     # Collect labels and other metainformation from the resource which
@@ -393,10 +422,6 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
         "apiVersion": body["apiVersion"],
         "status": body.get("status", None),
     }
-    if is_main_pod:
-        container_state = get_status(body)
-        value["state"] = container_state.value
-
     patch_op = {"op": op, "path": path}
     if op in ["add", "replace"]:
         patch_op["value"] = value
@@ -482,3 +507,8 @@ if config.JUPYTER_SERVER_RESOURCE_CHECK_ENABLED:
         config.custom_resource_name,
         interval=config.JUPYTER_SERVER_RESOURCE_CHECK_INTERVAL_SECONDS,
     )(update_resource_usage)
+
+
+# INFO: Start the prometheus metrics server if enabled
+if config.METRICS_ENABLED:
+    start_http_server(config.METRICS_PORT)
