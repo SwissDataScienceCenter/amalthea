@@ -33,7 +33,10 @@ spec:
       containers:
         - name: amalthea
           securityContext:
-            {}
+            allowPrivilegeEscalation: false
+            runAsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
           image: "renku/amalthea:latest"
           imagePullPolicy: IfNotPresent
           livenessProbe:
@@ -73,6 +76,12 @@ spec:
               value: "30"
             - name: CPU_USAGE_MILLICORES_IDLE_THRESHOLD
               value: "500"
+            - name: METRICS_ENABLED
+              value: "false"
+            - name: METRICS_PORT
+              value: "8765"
+            - name: METRICS_EXTRA_LABELS
+              value: "[]"
           volumeMounts:
             - name: config
               mountPath: /app/config
