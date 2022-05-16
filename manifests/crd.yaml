@@ -266,7 +266,7 @@ spec:
                       description:
                         Size of the PVC or sizeLimit of the emptyDir volume which backs the
                         session respectively.
-                      type: string
+                      x-kubernetes-int-or-string: true
                   type: object
               type: object
             status:
