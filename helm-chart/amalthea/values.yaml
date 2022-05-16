@@ -87,7 +87,11 @@ podAnnotations: {}
 
 podSecurityContext: {}
 
-securityContext: {}
+securityContext:
+  runAsGroup: 1000
+  runAsUser: 1000
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
 
 resources:
   limits:
