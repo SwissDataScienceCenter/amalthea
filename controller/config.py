@@ -75,7 +75,6 @@ MAIN_POD_LABEL_KEY = f"{api_group}/main-pod"
 METRICS_ENABLED = os.environ.get("METRICS_ENABLED", "false").lower() == "true"
 METRICS_EXTRA_LABELS = json.loads(os.environ.get("METRICS_EXTRA_LABELS", "[]"))
 METRICS_EXTRA_LABELS_SANITIZED = [
-    sanitize_prometheus_metric_label_name(i)
-    for i in METRICS_EXTRA_LABELS
+    sanitize_prometheus_metric_label_name(i) for i in METRICS_EXTRA_LABELS
 ]
 METRICS_PORT = int(os.environ.get("METRICS_PORT", 8765))

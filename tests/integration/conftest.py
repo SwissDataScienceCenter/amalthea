@@ -283,7 +283,11 @@ def custom_session_manifest(read_manifest, k8s_namespace):
         name=f"test-session-{uuid4()}",
         jupyter_server={"image": "jupyter/minimal-notebook:latest"},
         routing={},
-        culling={"idleSecondsThreshold": 30, "startingSecondsThreshold":90, "failedSecondsThreshold": 90},
+        culling={
+            "idleSecondsThreshold": 30,
+            "startingSecondsThreshold": 90,
+            "failedSecondsThreshold": 90,
+        },
         auth={
             "token": "test-auth-token",
             "oidc": {

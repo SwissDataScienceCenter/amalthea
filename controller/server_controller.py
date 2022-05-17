@@ -178,11 +178,9 @@ def state_changed(old, new, labels, logger, **_):
 )
 def update_server_state(body, labels, namespace, **_):
     def get_all_container_statuses(pod):
-        return pod.get("status", {}).get(
-            "containerStatuses", []
-        ) + pod.get("status", {}).get(
-            "initContainerStatuses", []
-        )
+        return pod.get("status", {}).get("containerStatuses", []) + pod.get(
+            "status", {}
+        ).get("initContainerStatuses", [])
 
     def get_failed_containers(container_statuses):
         failed_containers = [
@@ -208,10 +206,7 @@ def update_server_state(body, labels, namespace, **_):
             return ServerStatusEnum.Stopping
 
         pod_phase = pod.get("status", {}).get("phase")
-        pod_conditions = (
-            pod.get("status", {})
-            .get("conditions", [{"status": "False"}])
-        )
+        pod_conditions = pod.get("status", {}).get("conditions", [{"status": "False"}])
         container_statuses = get_all_container_statuses(pod)
         failed_containers = get_failed_containers(container_statuses)
         all_pod_conditions_good = all(
