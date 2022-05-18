@@ -238,8 +238,8 @@ def update_server_state(body, labels, namespace, **_):
         body={
             "status": {
                 "state": status.value,
-                "startingSince": now is status if ServerStatusEnum.Starting else None,
-                "failedSince": now is status if ServerStatusEnum.Failed else None,
+                "startingSince": now if status is ServerStatusEnum.Starting else None,
+                "failedSince": now if status is ServerStatusEnum.Failed else None,
             },
         },
         content_type=CONTENT_TYPES["merge-patch"],
@@ -371,7 +371,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     config.custom_resource_name,
     interval=config.JUPYTER_SERVER_PENDING_CHECK_INTERVAL_SECONDS,
 )
-def cull_pendinge_jupyter_servers(body, name, namespace, logger, **kwargs):
+def cull_pending_jupyter_servers(body, name, namespace, logger, **kwargs):
     """
     Check if a session is pending (starting or failed). If the session is pending then
     update the jupyter server status with the pending/failed duration. If any sessions
