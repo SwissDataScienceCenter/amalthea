@@ -570,7 +570,7 @@ Settings to define storage to back the jupyter server.
         <td>false</td>
       </tr><tr>
         <td><b>size</b></td>
-        <td>string</td>
+        <td>int or string</td>
         <td>
           Size of the PVC or sizeLimit of the emptyDir volume which backs the session respectively.<br/>
           <br/>

@@ -1,4 +1,14 @@
-#  (2022-02-04)
+## [0.3.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.2.3...0.3.0)  (2022-05-16)
+
+### Bug Fixes
+
+* **chart:** allow number or string for disk size in CRD ([#146](https://github.com/SwissDataScienceCenter/amalthea/issues/146)) ([8351f29](https://github.com/SwissDataScienceCenter/amalthea/commit/8351f29163dacec2af729f69f832dc8e40357773))
+* **app:** use group in dynamic k8s client ([#151](https://github.com/SwissDataScienceCenter/amalthea/issues/151)) ([31b5de1](https://github.com/SwissDataScienceCenter/amalthea/commit/31b5de11ffc4f889ee7bbdcc5c4cf31df10addd0))
+* **test:** cleanup of k8s resources in fixtures ([#144](https://github.com/SwissDataScienceCenter/amalthea/issues/144)) ([d632170](https://github.com/SwissDataScienceCenter/amalthea/commit/d6321700bfc78a4080064a8697ce6f7eb8b8e773))
+
+### Features
+
+* **app:** expose metrics to prometheus  ([#145](https://github.com/SwissDataScienceCenter/amalthea/issues/145)) ([a109b77](https://github.com/SwissDataScienceCenter/amalthea/commit/a109b77741eaac9aa9c6b19a8d553e205ae57e38))
 
 
 ## [0.2.3](https://github.com/SwissDataScienceCenter/amalthea/compare/0.2.2...0.2.3) (2022-01-04)
@@ -8,9 +18,6 @@
 ### Bug Fixes
 
 * **app:** Optional user-scheduler ([43ad69c](https://github.com/SwissDataScienceCenter/amalthea/commit/43ad69ca639acb90470abafce46005f8ee20fc3c))
-
-
-#  (2021-11-30)
 
 
 
