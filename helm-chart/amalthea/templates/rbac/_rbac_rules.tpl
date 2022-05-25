@@ -7,7 +7,7 @@
   # Amalthea: watching & handling for the custom resource we declare.
   - apiGroups: [{{ .Values.crdApiGroup }}]
     resources: [{{ .Values.crdNames.plural }}]
-    verbs: [list, watch, patch, delete]
+    verbs: [get, list, watch, patch, delete]
 
   - apiGroups: [""]
     resources: [pods]

@@ -1,11 +1,9 @@
-from datetime import datetime
 from json.decoder import JSONDecodeError
 import logging
-import pytz
 import requests
 from requests.exceptions import RequestException
 
-from controller.utils import get_pod_metrics, parse_pod_metrics
+from controller.utils import get_pod_metrics, parse_pod_metrics, k8s_timestamp_to_utc_datetime
 
 
 def get_cpu_usage_for_culling(pod, namespace):
@@ -75,19 +73,7 @@ def get_js_server_status(js_body):
         return None
 
     if type(res) is dict and "last_activity" in res.keys():
-        res["last_activity"] = datetime.fromisoformat(
-            res["last_activity"][:-1] + "+00:00"
-            if res["last_activity"].endswith("Z")
-            else res["last_activity"]
-        ).astimezone(
-            pytz.utc
-        )  # ensure timestamp is UTC
+        res["last_activity"] = k8s_timestamp_to_utc_datetime(res["last_activity"])
     if type(res) is dict and "started" in res.keys():
-        res["started"] = datetime.fromisoformat(
-            res["started"][:-1] + "+00:00"
-            if res["started"].endswith("Z")
-            else res["started"]
-        ).astimezone(
-            pytz.utc
-        )  # ensure timestamp is UTC
+        res["started"] = k8s_timestamp_to_utc_datetime(res["started"])
     return res
