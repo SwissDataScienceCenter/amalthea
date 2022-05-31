@@ -184,7 +184,7 @@ def state_changed(old, new, labels, body, **_):
             labels,
         )
 
-    if new == ServerStatusEnum.Starting.value:
+    elif new == ServerStatusEnum.Starting.value:
         cpu_request = body.get("spec", {}).get("jupyterServer", {}).get("resources", {})\
             .get("requests", {}).get("cpu")
         memory_request = body.get("spec", {}).get("jupyterServer", {}).get("resources", {})\
