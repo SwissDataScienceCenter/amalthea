@@ -1,4 +1,3 @@
-from datetime import datetime
 from expiringdict import ExpiringDict
 from kubernetes.client.rest import ApiException
 from kubernetes import config as k8s_config, dynamic
@@ -6,7 +5,6 @@ from kubernetes.client import api_client
 from kubernetes.client.api import core_v1_api
 from kubernetes.stream import stream
 import logging
-import pytz
 import re
 
 # A very simple in-memory cache to store the result of the
@@ -261,13 +259,3 @@ def sanitize_prometheus_metric_label_name(val):
     val = re.sub(first_letter, "_", val, count=1)
     val = re.sub(all_letters, "_", val)
     return val
-
-
-def k8s_timestamp_to_utc_datetime(timestamp: str) -> datetime:
-    return datetime.fromisoformat(
-        timestamp[:-1] + "+00:00"
-        if timestamp.endswith("Z")
-        else timestamp
-    ).astimezone(
-        pytz.utc
-    )

@@ -1,4 +1,5 @@
 import kopf
+from dateutil import parser
 from enum import Enum
 from kubernetes.client.models import V1DeleteOptions
 from kubernetes.dynamic.exceptions import NotFoundError
@@ -14,7 +15,6 @@ from controller.utils import (
     get_volume_disk_capacity,
     get_api,
     parse_pod_metrics,
-    k8s_timestamp_to_utc_datetime,
     convert_to_bytes,
     convert_to_millicores,
 )
@@ -138,7 +138,7 @@ def delete_fn(labels, body, namespace, name, **_):
         old_status = None
     if old_status != new_status:
         extra_labels = {
-            "status_from": str(old_status),
+            "status_from": str(old_status).lower(),
             "status_to": new_status,
         }
         metrics.manipulate(
@@ -172,7 +172,7 @@ def state_changed(old, new, labels, body, **_):
     State of the juptyer server status has changed.
     """
     if new == ServerStatusEnum.Running.value:
-        start_time = k8s_timestamp_to_utc_datetime(
+        start_time = parser.isoparse(
             body["metadata"].get("creationTimestamp")
         )
         now = pytz.UTC.localize(datetime.utcnow())
