@@ -238,8 +238,8 @@ def update_server_state(body, labels, namespace, **_):
         body={
             "status": {
                 "state": status.value,
-                "startingSince": now if status is ServerStatusEnum.Starting else None,
-                "failedSince": now if status is ServerStatusEnum.Failed else None,
+                "startingSince": now.isoformat() if status is ServerStatusEnum.Starting else None,
+                "failedSince": now.isoformat() if status is ServerStatusEnum.Failed else None,
             },
         },
         content_type=CONTENT_TYPES["merge-patch"],
@@ -380,11 +380,16 @@ def cull_pending_jupyter_servers(body, name, namespace, logger, **kwargs):
     starting_seconds_threshold = body["spec"]["culling"]["startingSecondsThreshold"]
     failed_seconds_threshold = body["spec"]["culling"]["failedSecondsThreshold"]
     now = pytz.UTC.localize(datetime.utcnow())
-    starting_since = int(body["status"].get("startingSince", now))
-    failed_since = int(body["status"].get("failedSince", now))
+    starting_since = body["status"].get("startingSince")
+    failed_since = body["status"].get("failedSince")
 
-    starting_seconds = (now - starting_since).total_seconds()
-    failed_seconds = (now - failed_since).total_seconds()
+    starting_seconds = 0
+    failed_seconds = 0
+
+    if starting_since is not None:
+        starting_seconds = (now - datetime.fromisoformat(starting_since)).total_seconds()
+    if failed_since is not None:
+        failed_seconds = (now - datetime.fromisoformat(failed_since)).total_seconds()
 
     custom_resource_api = get_api(
         config.api_version, config.custom_resource_name, config.api_group

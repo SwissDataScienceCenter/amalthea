@@ -52,7 +52,7 @@ def test_starting_culling(
     assert session["metadata"]["name"] == name
     # wait for session to be culled
     is_session_deleted(
-        name, test_manifest["spec"]["culling"]["failedSecondsThreshold"] + 30
+        name, test_manifest["spec"]["culling"]["startingSecondsThreshold"] + 30
     )
     # confirm session got culled
     session = find_resource(name, k8s_namespace, k8s_amalthea_api)
@@ -83,7 +83,7 @@ def test_failed_culling(
     assert session["metadata"]["name"] == name
     # wait for session to be culled
     is_session_deleted(
-        name, test_manifest["spec"]["culling"]["startingSecondsThreshold"] + 30
+        name, test_manifest["spec"]["culling"]["failedSecondsThreshold"] + 30
     )
     # confirm session got culled
     session = find_resource(name, k8s_namespace, k8s_amalthea_api)
