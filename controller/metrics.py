@@ -10,17 +10,17 @@ class Metrics:
     total_launch: Counter = Counter(
         "sessions_launch_total",
         "Number of sessions launched",
-        labelnames=config.METRICS_EXTRA_LABELS_SANITIZED
+        labelnames=config.METRICS_EXTRA_LABELS_SANITIZED,
     )
     total_failed: Counter = Counter(
         "sessions_failed_total",
         "Number of sessions which have failed being launched",
-        labelnames=config.METRICS_EXTRA_LABELS_SANITIZED
+        labelnames=config.METRICS_EXTRA_LABELS_SANITIZED,
     )
     num_of_sessions: Gauge = Gauge(
         "sessions_all",
         "Number of sessions",
-        labelnames=config.METRICS_EXTRA_LABELS_SANITIZED
+        labelnames=config.METRICS_EXTRA_LABELS_SANITIZED,
     )
     num_of_running_sessions: Gauge = Gauge(
         "sessions_running",
