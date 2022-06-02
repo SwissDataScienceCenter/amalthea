@@ -338,6 +338,16 @@ Options about culling idle servers
         </tr>
     </thead>
     <tbody><tr>
+        <td><b>failedSecondsThreshold</b></td>
+        <td>integer</td>
+        <td>
+          How long can a server be in failed state before it gets culled. A value of zero indicates that the server cannot be culled due failing.<br/>
+          <br/>
+            <i>Default</i>: 0<br/>
+            <i>Minimum</i>: 0<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>idleSecondsThreshold</b></td>
         <td>integer</td>
         <td>
@@ -352,6 +362,16 @@ Options about culling idle servers
         <td>integer</td>
         <td>
           The maximum allowed age for a session, regardless of whether it is active or not. A value of zero indicates that the server cannot be culled due to its age.<br/>
+          <br/>
+            <i>Default</i>: 0<br/>
+            <i>Minimum</i>: 0<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>startingSecondsThreshold</b></td>
+        <td>integer</td>
+        <td>
+          How long can a server be in starting state before it gets culled. A value of zero indicates that the server cannot be culled due to starting too long.<br/>
           <br/>
             <i>Default</i>: 0<br/>
             <i>Minimum</i>: 0<br/>
