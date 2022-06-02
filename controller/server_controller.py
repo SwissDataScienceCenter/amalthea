@@ -1,9 +1,9 @@
 import kopf
 from dateutil import parser
+from datetime import datetime
 from enum import Enum
 from kubernetes.client.models import V1DeleteOptions
 from kubernetes.dynamic.exceptions import NotFoundError
-from datetime import datetime
 from prometheus_client import start_http_server
 import pytz
 
@@ -243,11 +243,31 @@ def update_server_state(body, labels, namespace, **_):
         ]
         return failed_containers
 
+    def is_pod_unschedulable(pod) -> bool:
+        """Determines is a server pod is unschedulable."""
+        phase = pod.get("status", {}).get("phase")
+        conditions = pod.get("status", {}).get("conditions", [])
+        sorted_conditions = sorted(
+            conditions,
+            key=lambda x: datetime.fromisoformat(x["lastTransitionTime"].rstrip("Z")),
+            reverse=True,
+        )
+        if (
+            phase == "Pending"
+            and len(sorted_conditions) >= 1
+            and sorted_conditions[0].get("reason") == "Unschedulable"
+        ):
+            return True
+        return False
+
     def get_status(pod) -> ServerStatusEnum:
         """Get the status of the jupyterserver."""
         # Is the server terminating?
         if pod["metadata"].get("deletionTimestamp") is not None:
             return ServerStatusEnum.Stopping
+        # Is the pod unschedulable?
+        if is_pod_unschedulable(pod):
+            return ServerStatusEnum.Failed
 
         pod_phase = pod.get("status", {}).get("phase")
         pod_conditions = (
