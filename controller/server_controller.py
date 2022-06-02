@@ -220,11 +220,9 @@ def state_changed(old, new, labels, body, **_):
 )
 def update_server_state(body, labels, namespace, **_):
     def get_all_container_statuses(pod):
-        return pod.get("status", {}).get(
-            "containerStatuses", []
-        ) + pod.get("status", {}).get(
-            "initContainerStatuses", []
-        )
+        return pod.get("status", {}).get("containerStatuses", []) + pod.get(
+            "status", {}
+        ).get("initContainerStatuses", [])
 
     def get_failed_containers(container_statuses):
         failed_containers = [
@@ -270,10 +268,7 @@ def update_server_state(body, labels, namespace, **_):
             return ServerStatusEnum.Failed
 
         pod_phase = pod.get("status", {}).get("phase")
-        pod_conditions = (
-            pod.get("status", {})
-            .get("conditions", [{"status": "False"}])
-        )
+        pod_conditions = pod.get("status", {}).get("conditions", [{"status": "False"}])
         container_statuses = get_all_container_statuses(pod)
         failed_containers = get_failed_containers(container_statuses)
         all_pod_conditions_good = all(
@@ -450,6 +445,68 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
                     ", but we cannot find it. Has it been deleted in the meantime?"
                 )
                 pass
+
+
+@kopf.timer(
+    config.api_group,
+    config.api_version,
+    config.custom_resource_name,
+    interval=config.JUPYTER_SERVER_PENDING_CHECK_INTERVAL_SECONDS,
+)
+def cull_pending_jupyter_servers(body, name, namespace, logger, **kwargs):
+    """
+    Check if a session is pending (starting or failed). If the session is pending then
+    update the jupyter server status with the pending/failed duration. If any sessions
+    have been pending for long enough, then cull them.
+    """
+    starting_seconds_threshold = body["spec"]["culling"]["startingSecondsThreshold"]
+    failed_seconds_threshold = body["spec"]["culling"]["failedSecondsThreshold"]
+    now = pytz.UTC.localize(datetime.utcnow())
+    starting_since = body["status"].get("startingSince")
+    failed_since = body["status"].get("failedSince")
+
+    starting_seconds = 0
+    failed_seconds = 0
+
+    if starting_since is not None:
+        starting_seconds = (now - datetime.fromisoformat(starting_since)).total_seconds()
+    if failed_since is not None:
+        failed_seconds = (now - datetime.fromisoformat(failed_since)).total_seconds()
+
+    custom_resource_api = get_api(
+        config.api_version, config.custom_resource_name, config.api_group
+    )
+
+    if starting_seconds_threshold > 0 and starting_seconds > starting_seconds_threshold:
+        logger.info(f"Deleting Jupyter server {name} due to starting too long")
+        try:
+            custom_resource_api.delete(
+                name=name,
+                namespace=namespace,
+                body=V1DeleteOptions(propagation_policy="Foreground"),
+            )
+        except NotFoundError:
+            logger.warning(
+                f"Trying to delete Jupyter server {name} in namespace {namespace}, "
+                "but we cannot find it. Has it been deleted in the meantime?"
+            )
+            pass
+        return
+    if failed_seconds_threshold > 0 and failed_seconds > failed_seconds_threshold:
+        logger.info(f"Deleting Jupyter server {name} due to being failed too long")
+        try:
+            custom_resource_api.delete(
+                name=name,
+                namespace=namespace,
+                body=V1DeleteOptions(propagation_policy="Foreground"),
+            )
+        except NotFoundError:
+            logger.warning(
+                f"Trying to delete Jupyter server {name} in namespace {namespace}, "
+                "but we cannot find it. Has it been deleted in the meantime?"
+            )
+            pass
+        return
 
 
 # create @kopf.on.event(...) type of decorators

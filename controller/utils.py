@@ -200,7 +200,9 @@ def get_api(api_version, kind, group=None):
     except KeyError:
         client = dynamic.DynamicClient(api_client.ApiClient())
         api_cache[(api_version, kind, group)] = client.resources.get(
-            api_version=api_version, kind=kind, group=group,
+            api_version=api_version,
+            kind=kind,
+            group=group,
         )
         return api_cache[(api_version, kind, group)]
 
@@ -254,8 +256,8 @@ def convert_to_millicores(value):
 
 
 def sanitize_prometheus_metric_label_name(val):
-    first_letter = re.compile(r'^[^a-zA-Z_]')
-    all_letters = re.compile(r'[^a-zA-Z0-9_]')
+    first_letter = re.compile(r"^[^a-zA-Z_]")
+    all_letters = re.compile(r"[^a-zA-Z0-9_]")
     val = re.sub(first_letter, "_", val, count=1)
     val = re.sub(all_letters, "_", val)
     return val
