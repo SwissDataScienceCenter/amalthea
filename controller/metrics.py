@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import logging
 from prometheus_client import Counter, Histogram
 from typing import Dict, Union
 
@@ -60,8 +61,8 @@ class Metrics:
         extra_labels: Dict[str, str] = {},
     ):
         metric = getattr(self, metric_name)
+        labels = {}
         if len(config.METRICS_EXTRA_LABELS) > 0:
-            labels = {}
             for i in range(len(config.METRICS_EXTRA_LABELS)):
                 try:
                     labels[config.METRICS_EXTRA_LABELS_SANITIZED[i]] = manifest_labels[
@@ -69,8 +70,19 @@ class Metrics:
                     ]
                 except KeyError:
                     # NOTE: We should not be super sensitive to k8s label changes, so if a
-                    # lable that is exepected to exist in the manifest does not then
+                    # label that is exepected to exist in the manifest does not then
                     # the metric label will not be applied, but the metric will be counted
                     labels[config.METRICS_EXTRA_LABELS_SANITIZED[i]] = "Unknown"
-            metric = metric.labels(**labels, **extra_labels)
-        getattr(metric, operation)(value)
+        labels = {**labels, **extra_labels}
+        if len(labels.keys()) > 0:
+            metric = metric.labels(**labels)
+        try:
+            getattr(metric, operation)(value)
+        except Exception as err:
+            # NOTE: Failure to manipulate the metrics should not result in an exception that
+            # can then disrupt the whole functioning of the operator. A better more involved
+            # safer process for handling and persisting metrics will be implemented in the future.
+            logging.error(
+                f"Could not manipulate metric {metric} for operation "
+                f"{operation} with value {value} because {err}."
+            )

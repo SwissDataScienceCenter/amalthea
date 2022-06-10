@@ -27,6 +27,7 @@ def operator_env(operator_kubeconfig_fp):
     available environment variables that can be overriden."""
     yield {
         "KUBECONFIG": operator_kubeconfig_fp.name,
+        "JUPYTER_SERVER_PENDING_CHECK_INTERVAL_SECONDS": "5",
         "JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS": "5",
     }
 
@@ -238,14 +239,15 @@ def is_session_ready(k8s_namespace, k8s_amalthea_api):
 
 
 @pytest.fixture
-def is_session_deleted(k8s_namespace, k8s_pod_api):
+def is_session_deleted(k8s_namespace, k8s_pod_api, k8s_amalthea_api):
     def _is_session_deleted(name, timeout_mins=5):
         """Has the session been fully shut down"""
         tstart = datetime.now()
         timeout = timedelta(minutes=timeout_mins)
         while datetime.now() - tstart < timeout:
             pod = find_resource(name + "-0", k8s_namespace, k8s_pod_api)
-            if pod is not None:
+            session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+            if pod is not None or session is not None:
                 sleep(2)
             else:
                 return True
