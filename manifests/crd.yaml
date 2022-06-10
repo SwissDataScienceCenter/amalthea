@@ -154,6 +154,22 @@ spec:
                         zero indicates that the server should never be culled for inactivity.
                       minimum: 0
                       type: integer
+                    startingSecondsThreshold:
+                      default: 0
+                      description:
+                        How long can a server be in starting state before it gets culled. A
+                        value of zero indicates that the server cannot be culled due to
+                        starting too long.
+                      minimum: 0
+                      type: integer
+                    failedSecondsThreshold:
+                      default: 0
+                      description:
+                        How long can a server be in failed state before it gets culled. A
+                        value of zero indicates that the server cannot be culled due
+                        failing.
+                      minimum: 0
+                      type: integer
                   type: object
                 jupyterServer:
                   default: {}
