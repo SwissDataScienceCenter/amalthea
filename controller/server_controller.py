@@ -302,6 +302,7 @@ def update_server_state(body, labels, namespace, **_):
         old_status = server.get("status", {}).get("state")
     # NOTE: Updating the status for deletions is handled in a specific delete handler
     if old_status != new_status.value and new_status.value != ServerStatusEnum.Stopping.value:
+        now = pytz.UTC.localize(datetime.utcnow())
         try:
             api.patch(
                 namespace=namespace,
@@ -309,6 +310,12 @@ def update_server_state(body, labels, namespace, **_):
                 body={
                     "status": {
                         "state": new_status.value,
+                        "startingSince": (
+                            now.isoformat() if new_status is ServerStatusEnum.Starting else None
+                        ),
+                        "failedSince": (
+                            now.isoformat() if new_status is ServerStatusEnum.Failed else None
+                        ),
                     },
                 },
                 content_type=CONTENT_TYPES["merge-patch"],
