@@ -70,14 +70,21 @@ class Metrics:
                     ]
                 except KeyError:
                     # NOTE: We should not be super sensitive to k8s label changes, so if a
-                    # label that is exepected to exist in the manifest does not then
+                    # label that is expected to exist in the manifest does not then
                     # the metric label will not be applied, but the metric will be counted
                     labels[config.METRICS_EXTRA_LABELS_SANITIZED[i]] = "Unknown"
         labels = {**labels, **extra_labels}
         if len(labels.keys()) > 0:
             metric = metric.labels(**labels)
+        operation_method = getattr(metric, operation, None)
+        if not operation_method:
+            logging.error(
+                f"Could not manipulate metric {metric} because the operation "
+                f"{operation} does not exist."
+            )
+            return
         try:
-            getattr(metric, operation)(value)
+            operation_method(value)
         except Exception as err:
             # NOTE: Failure to manipulate the metrics should not result in an exception that
             # can then disrupt the whole functioning of the operator. A better more involved
