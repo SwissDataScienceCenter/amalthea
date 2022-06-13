@@ -55,7 +55,14 @@ def create_k8s_resources(
     for resource in get_chart_resources(
         amalthea_namespace, server_namespaces, resources, release_name
     ):
-        utils.create_from_dict(k8s_client, resource, namespace=amalthea_namespace)
+        try:
+            utils.create_from_dict(k8s_client, resource, namespace=amalthea_namespace)
+        except utils.FailToCreateError as err:
+            if all([exc.reason == "Conflict" for exc in err.api_exceptions]):
+                # NOTE: All required resources already exist, do not error out
+                pass
+            else:
+                raise
 
 
 def cleanup_k8s_resources(

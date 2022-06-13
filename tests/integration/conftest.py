@@ -27,6 +27,7 @@ def operator_env(operator_kubeconfig_fp):
     available environment variables that can be overriden."""
     yield {
         "KUBECONFIG": operator_kubeconfig_fp.name,
+        "JUPYTER_SERVER_PENDING_CHECK_INTERVAL_SECONDS": "5",
         "JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS": "5",
     }
 
@@ -238,14 +239,15 @@ def is_session_ready(k8s_namespace, k8s_amalthea_api):
 
 
 @pytest.fixture
-def is_session_deleted(k8s_namespace, k8s_pod_api):
+def is_session_deleted(k8s_namespace, k8s_pod_api, k8s_amalthea_api):
     def _is_session_deleted(name, timeout_mins=5):
         """Has the session been fully shut down"""
         tstart = datetime.now()
         timeout = timedelta(minutes=timeout_mins)
         while datetime.now() - tstart < timeout:
             pod = find_resource(name + "-0", k8s_namespace, k8s_pod_api)
-            if pod is not None:
+            session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+            if pod is not None or session is not None:
                 sleep(2)
             else:
                 return True
@@ -284,9 +286,10 @@ def custom_session_manifest(read_manifest, k8s_namespace):
         jupyter_server={"image": "jupyter/minimal-notebook:latest"},
         routing={},
         culling={
-            "idleSecondsThreshold": 30,
-            "startingSecondsThreshold": 90,
-            "failedSecondsThreshold": 90,
+            "idleSecondsThreshold": 0,
+            "startingSecondsThreshold": 0,
+            "failedSecondsThreshold": 0,
+            "maxAgeSecondsThreshold": 0,
         },
         auth={
             "token": "test-auth-token",
@@ -346,3 +349,24 @@ def test_manifest(request, custom_session_manifest):
         manifest_file=request.param["manifest_file"],
         auth=request.param["auth"],
     )
+
+
+@pytest.fixture
+def patch_sleep_init_container():
+    def _patch_sleep_init_container(sleep_duration_seconds):
+        return {
+            "type": "application/json-patch+json",
+            "patch": [
+                {
+                    "op": "add",
+                    "path": "/statefulset/spec/template/spec/initContainers/-",
+                    "value": {
+                        "image": "busybox",
+                        "name": "sleep",
+                        "command": ["sleep"],
+                        "args": [str(sleep_duration_seconds)],
+                    },
+                },
+            ],
+        }
+    yield _patch_sleep_init_container

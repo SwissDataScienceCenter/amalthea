@@ -212,25 +212,28 @@ def convert_to_bytes(value):
     Convert values from k8s like Ki,K,M,G,Gi etc to bytes
     """
     factors = {
-        None: 1,
-        "K": 1e3,
-        "M": 1e6,
-        "G": 1e9,
-        "T": 1e12,
-        "Ki": 2**10,
-        "Mi": 2**20,
-        "Gi": 2**30,
-        "Ti": 2**40,
+        "K": 1000,
+        "M": 1000**2,
+        "G": 1000**3,
+        "T": 1000**4,
+        "P": 1000**5,
+        "E": 1000**6,
+        "Ki": 1024,
+        "Mi": 1024**2,
+        "Gi": 1024**3,
+        "Ti": 1024**4,
+        "Pi": 1024**5,
+        "Ei": 1024**6,
     }
-    res = re.match(r"^([^\sKMGTi]+)\s*([KMGT][i]*)?$", value.strip())
+    res = re.match(r"^(?<!-)([0-9]*\.?[0-9]*)((?<=[0-9.])[EPTGMKi]*)$", str(value).strip())
     if res is None:
         raise ValueError(f"Cannot convert value {value} to bytes.")
     value, unit = res.groups()
-    if unit not in factors.keys():
+    if unit and unit not in factors.keys():
         raise ValueError(
             f"Cannot convert value {value} to bytes because unit {unit} is not known."
         )
-    return int(float(value)) * factors[unit]
+    return float(value) * (factors[unit] if unit else 1)
 
 
 def convert_to_millicores(value):
@@ -238,19 +241,18 @@ def convert_to_millicores(value):
     Convert values from k8s like 1, 100m, 1000000n etc to millicores
     """
     factors = {
-        None: 1000,
         "m": 1,
         "n": 1e-6,
     }
-    res = re.match(r"^([^\smn]+)\s*([mn]*)?$", value.strip())
+    res = re.match(r"^(?<!-)([0-9]*\.?[0-9]*)([mn]?)$", str(value).strip())
     if res is None:
         raise ValueError(f"Cannot convert value {value} to millicores.")
     value, unit = res.groups()
-    if unit not in factors.keys():
+    if unit and unit not in factors.keys():
         raise ValueError(
             f"Cannot convert value {value} to millicores because unit {unit} is not known."
         )
-    return float(value) * factors[unit]
+    return float(value) * (factors[unit] if unit else 1000)
 
 
 def sanitize_prometheus_metric_label_name(val):

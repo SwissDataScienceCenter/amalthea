@@ -1,4 +1,5 @@
 import kopf
+from dateutil import parser
 from datetime import datetime
 from enum import Enum
 from kubernetes.client.models import V1DeleteOptions
@@ -14,6 +15,8 @@ from controller.utils import (
     get_volume_disk_capacity,
     get_api,
     parse_pod_metrics,
+    convert_to_bytes,
+    convert_to_millicores,
 )
 from controller.metrics import Metrics
 
@@ -91,9 +94,6 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
     Watch the creation of jupyter server objects and create all
     the necessary k8s child resources which make the actual jupyter server.
     """
-    metrics.manipulate("total_launch", "inc", labels)
-    metrics.manipulate("num_of_sessions", "inc", labels)
-    metrics.manipulate("num_of_starting_sessions", "inc", labels)
 
     children_specs = get_children_specs(name, spec, logger)
 
@@ -120,6 +120,8 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
             namespace=namespace, body=child_spec
         ).metadata.uid
 
+    metrics.manipulate("sessions_total_created", "inc", 1, labels)
+
     return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 
 
@@ -128,23 +130,35 @@ def delete_fn(labels, body, namespace, name, **_):
     """
     The juptyer server has been deleted.
     """
-    current_state = body.get("status", {}).get("state", ServerStatusEnum.Starting.value)
     api = get_api(config.api_version, config.custom_resource_name, config.api_group)
+    new_status = ServerStatusEnum.Stopping.value
+    if body:
+        old_status = body.get("status", {}).get("state")
+    else:
+        old_status = None
+    if old_status != new_status:
+        extra_labels = {
+            "status_from": str(old_status).lower(),
+            "status_to": new_status,
+        }
+        metrics.manipulate(
+            "sessions_status_changes",
+            "inc",
+            1,
+            manifest_labels=labels,
+            extra_labels=extra_labels
+        )
     api.patch(
         namespace=namespace,
         name=name,
         body={
             "status": {
-                "state": ServerStatusEnum.Stopping.value,
+                "state": new_status,
             },
         },
         content_type=CONTENT_TYPES["merge-patch"],
     )
-    metrics.manipulate("num_of_sessions", "dec", labels)
-    if current_state == ServerStatusEnum.Running.value:
-        metrics.manipulate("num_of_running_sessions", "dec", labels)
-    elif current_state == ServerStatusEnum.Starting.value:
-        metrics.manipulate("num_of_starting_sessions", "dec", labels)
+    metrics.manipulate("sessions_total_deleted", "inc", 1, labels)
 
 
 @kopf.on.field(
@@ -153,22 +167,50 @@ def delete_fn(labels, body, namespace, name, **_):
     config.custom_resource_name,
     field="status.state",
 )
-def state_changed(old, new, labels, logger, **_):
+def state_changed(old, new, labels, body, **_):
     """
     State of the juptyer server status has changed.
     """
-    if new == ServerStatusEnum.Failed.value:
-        metrics.manipulate("total_failed", "inc", labels)
-    elif new == ServerStatusEnum.Running.value:
-        metrics.manipulate("num_of_running_sessions", "inc", labels)
-    elif new == ServerStatusEnum.Stopping.value:
-        # NOTE: When status goes from any to Stopping this is handled in the
-        # delete handler from kopf, not here. This is to avoid double counting.
-        return
-    if old == ServerStatusEnum.Running.value:
-        metrics.manipulate("num_of_running_sessions", "dec", labels)
-    elif old == ServerStatusEnum.Starting.value:
-        metrics.manipulate("num_of_starting_sessions", "dec", labels)
+    if new == ServerStatusEnum.Running.value:
+        start_time = parser.isoparse(
+            body["metadata"].get("creationTimestamp")
+        )
+        now = pytz.UTC.localize(datetime.utcnow())
+        start_duration = (now - start_time).total_seconds()
+        metrics.manipulate(
+            "sessions_launch_duration",
+            "observe",
+            start_duration,
+            labels,
+        )
+
+    elif new == ServerStatusEnum.Starting.value:
+        cpu_request = body.get("spec", {}).get("jupyterServer", {}).get("resources", {})\
+            .get("requests", {}).get("cpu")
+        memory_request = body.get("spec", {}).get("jupyterServer", {}).get("resources", {})\
+            .get("requests", {}).get("memory")
+        disk_request = body.get("spec", {}).get("storage", {}).get("size")
+        if cpu_request:
+            metrics.manipulate(
+                "sessions_cpu_request",
+                "observe",
+                convert_to_millicores(cpu_request),
+                labels,
+            )
+        if memory_request:
+            metrics.manipulate(
+                "sessions_memory_request",
+                "observe",
+                convert_to_bytes(memory_request),
+                labels,
+            )
+        if disk_request:
+            metrics.manipulate(
+                "sessions_disk_request",
+                "observe",
+                convert_to_bytes(disk_request),
+                labels,
+            )
 
 
 @kopf.on.event(
@@ -251,22 +293,49 @@ def update_server_state(body, labels, namespace, **_):
         # If none of the above match the container must be starting
         return ServerStatusEnum.Starting
 
-    status = get_status(body)
+    new_status = get_status(body)
     server_name = labels[config.PARENT_NAME_LABEL_KEY]
-    now = pytz.UTC.localize(datetime.utcnow())
     api = get_api(config.api_version, config.custom_resource_name, config.api_group)
-    api.patch(
-        namespace=namespace,
-        name=server_name,
-        body={
-            "status": {
-                "state": status.value,
-                "startingSince": now.isoformat() if status is ServerStatusEnum.Starting else None,
-                "failedSince": now.isoformat() if status is ServerStatusEnum.Failed else None,
-            },
-        },
-        content_type=CONTENT_TYPES["merge-patch"],
-    )
+    try:
+        server = api.get(namespace=namespace, name=server_name)
+    except NotFoundError:
+        server = None
+        old_status = None
+    if server:
+        old_status = server.get("status", {}).get("state")
+    # NOTE: Updating the status for deletions is handled in a specific delete handler
+    if old_status != new_status.value and new_status.value != ServerStatusEnum.Stopping.value:
+        now = pytz.UTC.localize(datetime.utcnow())
+        try:
+            api.patch(
+                namespace=namespace,
+                name=server_name,
+                body={
+                    "status": {
+                        "state": new_status.value,
+                        "startingSince": (
+                            now.isoformat() if new_status is ServerStatusEnum.Starting else None
+                        ),
+                        "failedSince": (
+                            now.isoformat() if new_status is ServerStatusEnum.Failed else None
+                        ),
+                    },
+                },
+                content_type=CONTENT_TYPES["merge-patch"],
+            )
+        except NotFoundError:
+            pass
+        extra_labels = {
+            "status_from": str(old_status),
+            "status_to": str(new_status.value),
+        }
+        metrics.manipulate(
+            "sessions_status_changes",
+            "inc",
+            1,
+            manifest_labels=labels,
+            extra_labels=extra_labels
+        )
 
 
 @kopf.timer(

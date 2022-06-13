@@ -1,7 +1,6 @@
-from datetime import datetime
+from dateutil import parser
 from json.decoder import JSONDecodeError
 import logging
-import pytz
 import requests
 from requests.exceptions import RequestException
 
@@ -75,19 +74,7 @@ def get_js_server_status(js_body):
         return None
 
     if type(res) is dict and "last_activity" in res.keys():
-        res["last_activity"] = datetime.fromisoformat(
-            res["last_activity"][:-1] + "+00:00"
-            if res["last_activity"].endswith("Z")
-            else res["last_activity"]
-        ).astimezone(
-            pytz.utc
-        )  # ensure timestamp is UTC
+        res["last_activity"] = parser.isoparse(res["last_activity"])
     if type(res) is dict and "started" in res.keys():
-        res["started"] = datetime.fromisoformat(
-            res["started"][:-1] + "+00:00"
-            if res["started"].endswith("Z")
-            else res["started"]
-        ).astimezone(
-            pytz.utc
-        )  # ensure timestamp is UTC
+        res["started"] = parser.isoparse(res["started"])
     return res
