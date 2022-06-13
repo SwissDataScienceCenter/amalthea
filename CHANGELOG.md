@@ -1,3 +1,16 @@
+## [0.4.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.3.0...0.4.0)  (2022-06-13)
+
+### Bug Fixes
+
+* **app:** avoid temporary fail state when starting ([#168](https://github.com/SwissDataScienceCenter/amalthea/issues/168)) ([46e0d8d](https://github.com/SwissDataScienceCenter/amalthea/commit/46e0d8d9486c78b6114dd2ab74cadd7da0cb92eb))
+
+
+### Features
+
+* **app:** add and modify prometheus metrics ([#164](https://github.com/SwissDataScienceCenter/amalthea/issues/164)) ([1f34d84](https://github.com/SwissDataScienceCenter/amalthea/commit/1f34d84ab8fcaff7654f149d8e67d4166bf01771))
+* **app:** cull sessions pending too long ([#158](https://github.com/SwissDataScienceCenter/amalthea/issues/158)) ([8fc359e](https://github.com/SwissDataScienceCenter/amalthea/commit/8fc359ea83e9c643b1b7c34b2573c5e829baa35f))
+
+
 ## [0.3.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.2.3...0.3.0)  (2022-05-16)
 
 ### Bug Fixes
