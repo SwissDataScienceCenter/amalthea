@@ -19,7 +19,7 @@ rules:
   # Amalthea: watching & handling for the custom resource we declare.
   - apiGroups: [amalthea.dev]
     resources: [jupyterservers]
-    verbs: [list, watch, patch, delete]
+    verbs: [get, list, watch, patch, delete]
 
   - apiGroups: [""]
     resources: [pods]
