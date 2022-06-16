@@ -213,3 +213,7 @@ examples-private/
 # Cypress
 acceptance-tests/cypress/screenshots
 acceptance-tests/cypress/videos
+
+# Helm requirements lock files
+helm-chart/amalthea/requirements.lock
+helm-chart/amalthea/Chart.lock
