@@ -78,3 +78,13 @@ METRICS_EXTRA_LABELS_SANITIZED = tuple([
     sanitize_prometheus_metric_label_name(i) for i in METRICS_EXTRA_LABELS
 ])
 METRICS_PORT = int(os.environ.get("METRICS_PORT", 8765))
+
+"""How long should a session be unschedulable after it has been created
+before it is marked as failed. All session pods are initially unschedulable for a short duration.
+This occurs mostly because PV provisioning takes time or because of other reasons.
+Therefore, a session should not fail for being unschedulable right after it is created.
+If this is set to zero then the session status usually goes from
+Starting -> Failed (for a few seconds) -> Starting -> Running."""
+UNSCHEDULABLE_FAILURE_THRESHOLD_SECONDS = int(
+    os.environ.get("UNSCHEDULABLE_FAILURE_THRESHOLD_SECONDS", 60)
+)

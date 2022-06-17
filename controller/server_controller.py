@@ -254,9 +254,6 @@ def update_server_state(body, labels, namespace, **_):
             phase == "Pending"
             and len(sorted_conditions) >= 1
             and sorted_conditions[0].get("reason") == "Unschedulable"
-            # NOTE: every pod is initially unschedulable until a PV is provisioned
-            # therefore to avoid "flashing" this state when a sessions starts this case is ignored
-            and "persistentvolumeclaim" not in sorted_conditions[0]
         ):
             return True
         return False
@@ -267,9 +264,19 @@ def update_server_state(body, labels, namespace, **_):
         if pod["metadata"].get("deletionTimestamp") is not None:
             return ServerStatusEnum.Stopping
         # Is the pod unschedulable?
-        if is_pod_unschedulable(pod):
+        now = pytz.UTC.localize(datetime.utcnow())
+        creation_tstamp = pod["metadata"].get("creationTimestamp")
+        unschedulable_duration_seconds = 0
+        # NOTE: every session is initially unschedulable for a brief period after it is created.
+        # Therefore to avoid "flashing" a failed state when a session starts, the unschedulable
+        # state is ignored for some time when the session is first created
+        if creation_tstamp:
+            unschedulable_duration_seconds = (now - parser.isoparse(creation_tstamp)).total_seconds
+        if (
+            is_pod_unschedulable(pod)
+            and unschedulable_duration_seconds > config.UNSCHEDULABLE_FAILURE_THRESHOLD_SECONDS
+        ):
             return ServerStatusEnum.Failed
-
         pod_phase = pod.get("status", {}).get("phase")
         pod_conditions = pod.get("status", {}).get("conditions", [{"status": "False"}])
         container_statuses = get_all_container_statuses(pod)
