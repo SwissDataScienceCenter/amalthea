@@ -255,9 +255,3 @@ def convert_to_millicores(value):
     return float(value) * (factors[unit] if unit else 1000)
 
 
-def sanitize_prometheus_metric_label_name(val):
-    first_letter = re.compile(r"^[^a-zA-Z_]")
-    all_letters = re.compile(r"[^a-zA-Z0-9_]")
-    val = re.sub(first_letter, "_", val, count=1)
-    val = re.sub(all_letters, "_", val)
-    return val

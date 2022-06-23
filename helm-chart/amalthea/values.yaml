@@ -176,3 +176,14 @@ metrics:
   # A list of labels that should be present on jupyter-server object which will then be used as metrics label
   extraMetricsLabels: []
   port: 8765
+
+auditLog:
+  # Auditlog that is saved in a s3 bucket, new log files are created daily
+  enabled: false
+  s3:
+    # If auditlog is enabled then s3 configuration should be provided
+    endpoint: ""
+    bucket: ""
+    pathPrefix: ""
+    accessKeyId: ""
+    secretAccessKey: ""

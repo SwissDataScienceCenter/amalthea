@@ -92,6 +92,20 @@ spec:
             - name: SERVER_SCHEDULER_NAME
               value: {{ include "amalthea.fullname" . }}-scheduler
             {{- end }}
+            - name: AUDITLOG_ENABLED
+              value: {{ .Values.auditLog.enabled | quote }}
+            {{- if .Values.auditLog.enabled }}
+            - name: AUDITLOG_S3_ENDPOINT
+              value: {{ .Values.auditLog.s3.endpoint | quote }}
+            - name: AUDITLOG_S3_BUCKET
+              value: {{ .Values.auditLog.s3.bucket | quote }}
+            - name: AUDITLOG_S3_PATH_PREFIX
+              value: {{ .Values.auditLog.s3.pathPrefix | quote }}
+            - name: AUDITLOG_S3_ACCESS_KEY_ID
+              value: {{ .Values.auditLog.s3.accessKeyId | quote }}
+            - name: AUDITLOG_S3_SECRET_ACCESS_KEY
+              value: {{ .Values.auditLog.s3.secretAccessKey | quote }}
+            {{- end }}
           volumeMounts:
             - name: config
               mountPath: /app/config

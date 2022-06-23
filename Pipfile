@@ -13,6 +13,8 @@ expiringdict = "*"
 jinja2 = "*"
 pytz = "*"
 prometheus_client = "*"
+smart-open = {extras = ["s3"], version = "*"}
+dataconf = "*"
 
 [dev-packages]
 black = "*"

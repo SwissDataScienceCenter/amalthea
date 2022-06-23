@@ -348,6 +348,40 @@
             ],
             "additionalProperties": false
         },
+        "auditLog": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "s3": {
+                    "type": "object",
+                    "default": {},
+                    "properties": {
+                        "endpoint": {
+                            "type": "string"
+                        },
+                        "bucket": {
+                            "type": "string"
+                        },
+                        "pathPrefix": {
+                            "type": "string"
+                        },
+                        "accessKeyId": {
+                            "type": "string"
+                        },
+                        "secretAccessKey": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "required": [
+                "enabled"
+            ],
+            "additionalProperties": false
+        },
         "scheduler": {
             "type": "object",
             "required": [
