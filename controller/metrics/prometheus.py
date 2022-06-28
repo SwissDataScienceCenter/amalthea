@@ -10,6 +10,7 @@ from controller.metrics.utils import resource_request_from_manifest
 
 
 class PrometheusMetricAction(Enum):
+    """The different methods that can be used to manipulate prometheus metrics."""
     inc = "inc"
     dec = "dec"
     set = "set"
@@ -17,11 +18,14 @@ class PrometheusMetricAction(Enum):
 
 
 class PrometheusMetricType(NamedTuple):
+    """A generic prometheus metric "struct" with its allowed
+    methods and the specific metric type."""
     type: MetricWrapperBase
     actions: List[PrometheusMetricAction]
 
 
 class PrometheusMetricTypesEnum(Enum):
+    """All the different prometheus metrics supported."""
     counter = PrometheusMetricType(Counter, [PrometheusMetricAction.inc])
     gauge = PrometheusMetricType(
         Gauge,
@@ -32,6 +36,7 @@ class PrometheusMetricTypesEnum(Enum):
 
 
 class PrometheusMetric():
+    """A generic wrapper class for all prometheus metrics."""
     _label_name_invalid_first_letter = re.compile(r"^[^a-zA-Z_]")
     _label_name_invalid_all_letters = re.compile(r"[^a-zA-Z0-9_]")
 
@@ -61,6 +66,8 @@ class PrometheusMetric():
         )
 
     def sanitize_label_name(self, val: str) -> str:
+        """Certain characters are not allowed in prometheus metric labels.
+        This method removes those values and replaces them with underscores."""
         val = re.sub(self._label_name_invalid_first_letter, "_", val, count=1)
         val = re.sub(self._label_name_invalid_all_letters, "_", val)
         return val
@@ -76,6 +83,10 @@ class PrometheusMetric():
         value: Union[int, float],
         labels: Dict[str, str] = None,
     ):
+        """Manipulates the actual prometheus metric so that
+        the metric is actually published and can be scraped by prometheus or similar
+        applications.
+        """
         if type(action) is str:
             metric_action = PrometheusMetricAction(action)
         elif type(action) is PrometheusMetricAction:
@@ -102,24 +113,38 @@ class PrometheusMetric():
         operation_method(value)
 
 
+class PrometheusMetricNames(Enum):
+    """Used to avoid errors in metric names and to ensure
+    that always the same set of metric names are used."""
+    sessions_total_created = "sessions_total_created"
+    sessions_total_deleted = "sessions_total_deleted"
+    sessions_status_changes = "sessions_status_changes"
+    sessions_launch_duration_seconds = "sessions_launch_duration_seconds"
+    sessions_cpu_request_millicores = "sessions_cpu_request_millicores"
+    sessions_memory_request_bytes = "sessions_memory_request_bytes"
+    sessions_gpu_request = "sessions_gpu_request"
+    sessions_disk_request_bytes = "sessions_disk_request_bytes"
+
+
 class PrometheusMetricHandler(MetricEventHandler):
+    """Handles metric events from the queue that are created by amalthea."""
     def __init__(self, manifest_labelnames: List[str] = []):
         self.manifest_labelnames = manifest_labelnames
         self._sessions_total_created = PrometheusMetric(
             PrometheusMetricTypesEnum["counter"].value,
-            "sessions_total_created",
+            PrometheusMetricNames["sessions_total_created"].value,
             "Number of sessions created",
             self.manifest_labelnames,
         )
         self._sessions_total_deleted = PrometheusMetric(
             PrometheusMetricTypesEnum["counter"].value,
-            "sessions_total_deleted",
+            PrometheusMetricNames["sessions_total_deleted"].value,
             "Number of sessions deleted",
             self.manifest_labelnames,
         )
         self._sessions_status_changes = PrometheusMetric(
             PrometheusMetricTypesEnum["counter"].value,
-            "sessions_status_changes",
+            PrometheusMetricNames["sessions_status_changes"].value,
             "Number of times a status change has occured",
             [
                 *self.manifest_labelnames,
@@ -129,34 +154,34 @@ class PrometheusMetricHandler(MetricEventHandler):
         )
         self._sessions_launch_duration = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
-            "sessions_launch_duration_seconds",
+            PrometheusMetricNames["sessions_launch_duration_seconds"].value,
             "How long did it take for a session to transition into running state",
             self.manifest_labelnames,
             unit="seconds",
         )
         self._sessions_cpu_request = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
-            "sessions_cpu_request_millicores",
+            PrometheusMetricNames["sessions_cpu_request_millicores"].value,
             "CPU millicores requested by a user for a session.",
             self.manifest_labelnames,
             unit="m",
         )
         self._sessions_memory_request = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
-            "sessions_memory_request_bytes",
+            PrometheusMetricNames["sessions_memory_request_bytes"].value,
             "Memory requested by a user for a session.",
             self.manifest_labelnames,
             unit="byte",
         )
         self._sessions_gpu_request = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
-            "sessions_gpu_request",
+            PrometheusMetricNames["sessions_gpu_request"].value,
             "GPUs requested by a user for a session.",
             self.manifest_labelnames,
         )
         self._sessions_disk_request = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
-            "sessions_disk_request_bytes",
+            PrometheusMetricNames["sessions_disk_request_bytes"].value,
             "Disk space requested by a user for a session.",
             self.manifest_labelnames,
             unit="byte",
@@ -224,6 +249,8 @@ class PrometheusMetricHandler(MetricEventHandler):
             self._sessions_status_changes(PrometheusMetricAction.inc, 1, status_change_labels)
 
     def publish(self, metric_event: MetricEvent):
+        """Publishes (i.e. persists) the proper prometheus metrics
+        depending on the old and new statuses of the jupyterserver."""
         old_status = metric_event.old_status
         new_status = metric_event.session.get("status", {}).get("state")
         if new_status == old_status:

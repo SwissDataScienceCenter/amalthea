@@ -7,6 +7,8 @@ from controller.utils import convert_to_bytes, convert_to_millicores
 
 @dataclass
 class ResourceRequest:
+    """The structure of the parsed resource requests when they
+    are extracted from a jupyterserver manifest."""
     cpu_millicores: float
     memory_bytes: float
     disk_bytes: float
@@ -14,6 +16,7 @@ class ResourceRequest:
 
 
 def resource_request_from_manifest(manifest: Dict[str, Any]) -> Optional[ResourceRequest]:
+    """Parses the resource requests from an amalthea manifest."""
     resources = manifest.get("spec", {}).get("jupyterServer", {}).get("resources", {}).get(
         "requests", {}
     )

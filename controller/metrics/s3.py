@@ -18,6 +18,7 @@ from controller.metrics.utils import ResourceRequest, resource_request_from_mani
 
 @dataclass
 class S3Config:
+    """The configuration needed to upload metrics to S3."""
     endpoint: str
     bucket: str
     path_prefix: str
@@ -31,6 +32,7 @@ class S3Config:
 
 @dataclass
 class SesionMetricData:
+    """The data that is included for each metric event uploaded to S3."""
     name: str
     namespace: str
     uid: str
@@ -153,6 +155,9 @@ s3_formatter = Formatter(
 
 
 class S3MetricHandler(MetricEventHandler):
+    """A simple metric handler that persists the metrics
+    that are published by Amalthea to a S3 bucket.
+    """
     def __init__(self, logger: Logger):
         self.logger = logger
 
