@@ -488,5 +488,5 @@
     ],
     "title": "Values",
     "type": "object",
-    "additionalProperties": false
+    "additionalProperties": true
 }
