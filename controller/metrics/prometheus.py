@@ -74,7 +74,7 @@ class PrometheusMetric():
         self,
         action: Union[str, PrometheusMetricAction],
         value: Union[int, float],
-        labels: Dict[str, str] = {},
+        labels: Dict[str, str] = None,
     ):
         if type(action) is str:
             metric_action = PrometheusMetricAction(action)
@@ -90,7 +90,10 @@ class PrometheusMetric():
                 f"Action {metric_action} is not allowed on metric {self._metric_type}. "
                 f"Allowed operations are {self._metric_type.actions}."
             )
-        sanitized_labels = self._sanitize_labels(labels)
+        if labels:
+            sanitized_labels = self._sanitize_labels(labels)
+        else:
+            sanitized_labels = {}
         operation_method = getattr(
             self._metric if len(sanitized_labels) == 0 else self._metric.labels(**sanitized_labels),
             action,

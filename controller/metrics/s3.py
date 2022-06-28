@@ -62,6 +62,7 @@ class SesionMetricData:
             manifest.get("metadata", {}).get("uid"),
             manifest.get("metadata", {}).get("creationTimestamp"),
             resource_request_from_manifest(manifest),
+            manifest.get("spec", {}).get("jupyterServer", {}).get("image"),
             metric_event.status,
             metric_event.old_status,
             manifest.get("metadata", {}).get("annotations", {}).get("renku.io/commit-sha"),
