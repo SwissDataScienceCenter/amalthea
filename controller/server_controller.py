@@ -1,3 +1,4 @@
+import logging
 import kopf
 from datetime import datetime
 from kubernetes.client.models import V1DeleteOptions
@@ -14,7 +15,7 @@ from controller.utils import (
     get_api,
     parse_pod_metrics,
 )
-from controller.metrics.s3 import S3MetricHandler, RotatingS3Log, S3Config
+from controller.metrics.s3 import S3MetricHandler, S3RotatingLogHandler, S3Config, s3_formatter
 from controller.metrics.prometheus import PrometheusMetricHandler
 from controller.metrics.events import MetricEvent
 from controller.metrics.queue import MetricsQueue
@@ -23,7 +24,10 @@ from controller.server_status_enum import ServerStatusEnum
 
 metric_handlers = []
 s3_config = S3Config.dataconf_from_env()
-s3_metric_logger = RotatingS3Log(s3_config, 24)
+s3_metric_logger = logging.getLogger("s3")
+s3_logging_handler = S3RotatingLogHandler("/tmp/amalthea_audit_log.txt", "a", s3_config)
+s3_logging_handler.setFormatter(s3_formatter)
+s3_metric_logger.addHandler(s3_logging_handler)
 if config.METRICS_ENABLED:
     metric_handlers.append(PrometheusMetricHandler(config.METRICS_EXTRA_LABELS))
 if config.AUDITLOG_ENABLED:
@@ -146,7 +150,9 @@ def delete_fn(labels, body, namespace, name, **_):
         },
         content_type=CONTENT_TYPES["merge-patch"],
     )
-    body["state"]["status"] = new_status
+    if not body.get("status", {}):
+        body["status"] = {}
+    body["status"]["state"] = new_status
     metric_events_queue.add_to_queue(
         MetricEvent(
             pytz.UTC.localize(datetime.utcnow()),

@@ -1,15 +1,15 @@
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, asdict
 from typing import Optional
-from dateutil import parser
 from datetime import datetime, timedelta
 import boto3
-from smart_open import open as sopen
 import pytz
-from uuid import uuid4
 from pathlib import Path
 import json
 import dataconf
+from logging.handlers import BaseRotatingHandler
+from logging import Logger, Formatter
+import os
+import atexit
 
 from controller.server_status_enum import ServerStatusEnum
 from controller.metrics.events import MetricEventHandler, MetricEvent
@@ -43,6 +43,7 @@ class SesionMetricData:
     repository_url: Optional[str]
     user: Optional[str]
 
+    @staticmethod
     def _default_json_serializer(obj):
         if type(obj) is datetime:
             return obj.isoformat()
@@ -59,14 +60,9 @@ class SesionMetricData:
             manifest.get("metadata", {}).get("name"),
             manifest.get("metadata", {}).get("namespace"),
             manifest.get("metadata", {}).get("uid"),
-            parser.isoparse(manifest.get("metadata", {}).get("creationTimestamp")),
+            manifest.get("metadata", {}).get("creationTimestamp"),
             resource_request_from_manifest(manifest),
-            manifest.get("spec", {}).get("jupyterServer", {}).get("image"),
-            (
-                ServerStatusEnum(manifest.get("status", {}).get("state"))
-                if manifest.get("status", {}).get("state")
-                else None
-            ),
+            metric_event.status,
             metric_event.old_status,
             manifest.get("metadata", {}).get("annotations", {}).get("renku.io/commit-sha"),
             manifest.get("metadata", {}).get("annotations", {}).get("renku.io/repository"),
@@ -74,20 +70,22 @@ class SesionMetricData:
         )
 
 
-class BaseMetricLogger(ABC):
-    @abstractmethod
-    def log(val: str):
-        pass
+class S3RotatingLogHandler(BaseRotatingHandler):
+    """Rotating log handler that uploads files to AWS S3 bucket
+    when a rotation occurs. After every rotation the copy of the logs is
+    not kept locally. The maximum rotation period (in seconds) can be
+    specified.
+    """
+    _datetime_format = "_%Y%m%d_%H%M%S%z"
 
-
-class RotatingS3Log(BaseMetricLogger):
-    _datetime_format = "%Y%m%d_%H%M%S%z"
-
-    def __init__(self, config: S3Config, period_hours: 24):
-        self.config = config
-        self.period_hours = period_hours
+    def __init__(
+        self, filename, mode, config: S3Config, encoding=None, period_seconds: int = 86400
+    ):
+        super().__init__(filename, mode, encoding, delay=False)
+        self._period_timedelta = timedelta(seconds=period_seconds)
+        self._start_timestamp = pytz.UTC.localize(datetime.utcnow())
         self._session = boto3.Session(
-            aws_secret_access_key=config.secret_access_key, 
+            aws_secret_access_key=config.secret_access_key,
             aws_access_key_id=config.access_key_id,
         )
         self._client = self._session.client(
@@ -96,50 +94,67 @@ class RotatingS3Log(BaseMetricLogger):
         )
         # INFO: Ensure that bucket exists by calling head_bucket
         self._client.head_bucket(Bucket=config.bucket)
-        self._current_log_start_timestamp = None
-        self._current_log_id = uuid4()
-        self.__file_object = None
+        self._bucket = config.bucket
+        self._s3_path_prefix = config.path_prefix
+        self.rotator = self._rotator
+        self.namer = self._namer
+        # NOTE: doRollover persists the data in S3, call at exit
+        atexit.register(self.doRollover)
 
-    @property
-    def _file_object(self):
-        if not self._current_log_start_timestamp:
-            self._current_log_start_timestamp = pytz.UTC.localize(datetime.utcnow())
+    def _rotator(self, source: str, dest: str):
+        os.rename(source, dest)
+        self._upload(dest, remove_after_upload=True)
+
+    def _upload(self, fname: str, remove_after_upload: bool = False):
+        file_stats = os.stat(fname)
+        resp = None
+        if file_stats.st_size > 0:
+            resp = self._client.upload_file(
+                fname,
+                self._bucket,
+                self._s3_path_prefix + "/" + Path(fname).name
+            )
+        if remove_after_upload:
+            os.remove(fname)
+        return resp
+
+    def _namer(self, default_name: str) -> str:
+        path = Path(default_name)
+        new_file = path.parent / (
+            path.stem + self._start_timestamp.strftime(self._datetime_format) + path.suffix
+        )
+        return os.fspath(new_file)
+
+    def doRollover(self):
+        if self.stream:
+            self.stream.close()
+            self.stream = None
+        # NOTE: self.rotation_filename calls self.namer
+        dfn = self.rotation_filename(self.baseFilename)
+        if os.path.exists(dfn):
+            os.remove(dfn)
+        # NOTE: self.rotate calls self.rotator
+        self.rotate(self.baseFilename, dfn)
+        self._start_timestamp = pytz.UTC.localize(datetime.utcnow())
+        self.stream = self._open()
+
+    def shouldRollover(self, _: str) -> bool:
         now = pytz.UTC.localize(datetime.utcnow())
-        if (now - self._current_log_start_timestamp).total_seconds() / 3600 > self.period_hours:
-            # INFO: It is time to rotate logs
-            self._current_log_start_timestamp += timedelta(hours=self.period_hours)
-            if self.__file_object:
-                self.__file_object.close()
-            self.__file_object = self._open_s3_file()
-            return self.__file_object
-        if not self.__file_object:
-            # INFO: S3 file is not open at all
-            self.__file_object = self._open_s3_file()
-            return self.__file_object
+        if now - self._start_timestamp > self._period_timedelta:
+            return True
+        return False
 
-    def _open_s3_file(self):
-        uri = "s3://{}/{}".format(
-            self.config.bucket,
-            str(
-                Path(self.config.path_prefix) / "{}_{}.txt".format(
-                    self._current_log_start_timestamp.strftime(self._datetime_format),
-                    self._current_log_id,
-                )
-            ),
-        )
-        return sopen(
-            uri, mode="w", buffering=0, transport_params={'client': self._client}
-        )
 
-    def log(self, val: str):
-        self._file_object.write(val)
+s3_formatter = Formatter(
+    fmt="{time:\"%(asctime)s\" message:%(message)s}",
+    datefmt="%Y-%m-%dT%H:%M:%S%z"
+)
 
 
 class S3MetricHandler(MetricEventHandler):
-    def __init__(self, logger: BaseMetricLogger):
+    def __init__(self, logger: Logger):
         self.logger = logger
 
     def publish(self, metric_event: MetricEvent):
         session_metric_data = SesionMetricData.from_metric_event(metric_event)
-        self.logger.log(session_metric_data.to_json())
-        self.logger.log("\n")
+        self.logger.info(session_metric_data.to_json())
