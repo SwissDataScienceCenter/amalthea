@@ -7,9 +7,10 @@ from pathlib import Path
 import json
 import dataconf
 from logging.handlers import BaseRotatingHandler
-from logging import Logger, Formatter
+from logging import Logger, Formatter, LogRecord
 import os
 import atexit
+import re
 
 from controller.server_status_enum import ServerStatusEnum
 from controller.metrics.events import MetricEventHandler, MetricEvent
@@ -24,6 +25,13 @@ class S3Config:
     path_prefix: str
     access_key_id: str
     secret_access_key: str
+    rotation_period_seconds: Optional[str] = None
+
+    def __post_init__(self):
+        if not self.rotation_period_seconds:
+            self.rotation_period_seconds = 86400
+        if type(self.rotation_period_seconds) is str:
+            self.rotation_period_seconds = int(self.rotation_period_seconds)
 
     @classmethod
     def dataconf_from_env(cls, prefix="AUDITLOG_S3_"):
@@ -52,7 +60,7 @@ class SesionMetricData:
         if type(obj) is ServerStatusEnum:
             return obj.value
 
-    def to_json(self):
+    def __str__(self):
         return json.dumps(asdict(self), default=self._default_json_serializer, indent=None)
 
     @classmethod
@@ -62,7 +70,7 @@ class SesionMetricData:
             manifest.get("metadata", {}).get("name"),
             manifest.get("metadata", {}).get("namespace"),
             manifest.get("metadata", {}).get("uid"),
-            manifest.get("metadata", {}).get("creationTimestamp"),
+            metric_event.sessionCreationTimestamp,
             resource_request_from_manifest(manifest),
             manifest.get("spec", {}).get("jupyterServer", {}).get("image"),
             metric_event.status,
@@ -82,10 +90,10 @@ class S3RotatingLogHandler(BaseRotatingHandler):
     _datetime_format = "_%Y%m%d_%H%M%S%z"
 
     def __init__(
-        self, filename, mode, config: S3Config, encoding=None, period_seconds: int = 86400
+        self, filename, mode, config: S3Config, encoding=None
     ):
         super().__init__(filename, mode, encoding, delay=False)
-        self._period_timedelta = timedelta(seconds=period_seconds)
+        self._period_timedelta = timedelta(seconds=config.rotation_period_seconds)
         self._start_timestamp = pytz.UTC.localize(datetime.utcnow())
         self._session = boto3.Session(
             aws_secret_access_key=config.secret_access_key,
@@ -148,10 +156,22 @@ class S3RotatingLogHandler(BaseRotatingHandler):
         return False
 
 
-s3_formatter = Formatter(
-    fmt="{time:\"%(asctime)s\" message:%(message)s}",
-    datefmt="%Y-%m-%dT%H:%M:%S%z"
-)
+class S3Formatter(Formatter):
+    """Logging formatter that has ISO8601 timestamps and produces valid json logs."""
+    def __init__(self, validate: bool = True) -> None:
+        datefmt = "%Y-%m-%dT%H:%M:%S%z"
+        style = "%"
+        fmt = "{\"time\":\"%(asctime)s\", \"message\":%(message)s}"
+        super().__init__(fmt, datefmt, style, validate)
+
+    def formatTime(self, record: LogRecord, datefmt: Optional[str] = None) -> str:
+        output = super().formatTime(record, datefmt)
+        m = re.match(r"^[\+\-]{1}[0-9]{4}$", output[-5:])
+        if m:
+            return output[:-2] + ":" + output[-2:]
+        # NOTE if the datetime is not timezone aware the match will fail and there
+        # is no need to cleanup the time offset to match ISO8601
+        return output
 
 
 class S3MetricHandler(MetricEventHandler):
@@ -163,4 +183,4 @@ class S3MetricHandler(MetricEventHandler):
 
     def publish(self, metric_event: MetricEvent):
         session_metric_data = SesionMetricData.from_metric_event(metric_event)
-        self.logger.info(session_metric_data.to_json())
+        self.logger.info(session_metric_data)

@@ -20,6 +20,7 @@ def resource_request_from_manifest(manifest: Dict[str, Any]) -> Optional[Resourc
     resources = manifest.get("spec", {}).get("jupyterServer", {}).get("resources", {}).get(
         "requests", {}
     )
+    resources = {**resources}
     disk_request = manifest.get("spec", {}).get("storage", {}).get("size")
     if disk_request:
         resources["disk_request"] = disk_request
@@ -27,6 +28,7 @@ def resource_request_from_manifest(manifest: Dict[str, Any]) -> Optional[Resourc
         "cpu": "cpu_millicores",
         "memory": "memory_bytes",
         "nvidia.com/gpu": "gpus",
+        "disk_request": "disk_bytes",
     }
     resource_value_converters = {
         "cpu": convert_to_millicores,
@@ -44,12 +46,14 @@ def resource_request_from_manifest(manifest: Dict[str, Any]) -> Optional[Resourc
             continue
         try:
             resources_parsed[parsed_resource_name] = value_converter(resource_value)
-        except ValueError:
+        except ValueError as err:
             logging.warning(
-                f"Could not covert the metric value {resource_value} "
-                f"for resource {resource} with converter {value_converter}"
+                f"Could not convert the metric value {resource_value} "
+                f"for resource {resource} with converter {value_converter} "
+                f"because of {err}"
             )
     try:
         return ResourceRequest(**resources_parsed)
-    except TypeError:
+    except TypeError as err:
+        logging.warning(f"Could not create resource requests dataclass because {err}")
         return None

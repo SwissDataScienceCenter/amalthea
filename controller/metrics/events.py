@@ -14,6 +14,7 @@ class MetricEvent:
     structure."""
     event_timestamp: datetime
     session: Dict[str, Any]
+    sessionCreationTimestamp: Optional[datetime] = None
     old_status: Optional[ServerStatusEnum] = None
     status: Optional[ServerStatusEnum] = None
 
@@ -23,11 +24,16 @@ class MetricEvent:
         if self.old_status and type(self.old_status) is str:
             self.old_status = ServerStatusEnum(self.old_status)
         if self.session.get("metadata", {}).get("creationTimestamp"):
-            if not self.session.get("metadata"):
-                self.session["metadata"] = {}
-            self.session["metadata"]["creationTimestamp"] = parser.isoparse(
+            self.sessionCreationTimestamp = parser.isoparse(
                 self.session.get("metadata", {}).get("creationTimestamp")
             )
+
+    def __repr__(self) -> str:
+        return (
+            f"MetricEvent(event_timestamp={self.event_timestamp}, old_status={self.old_status}, "
+            f"status={self.status}, sessionCreationTimestamp={self.sessionCreationTimestamp}, "
+            "session=<redacted>)"
+        )
 
 
 class MetricEventHandler(ABC):

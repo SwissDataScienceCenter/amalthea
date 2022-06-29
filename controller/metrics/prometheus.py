@@ -107,7 +107,7 @@ class PrometheusMetric():
             sanitized_labels = {}
         operation_method = getattr(
             self._metric if len(sanitized_labels) == 0 else self._metric.labels(**sanitized_labels),
-            action,
+            action.value,
             None,
         )
         operation_method(value)
@@ -232,9 +232,10 @@ class PrometheusMetricHandler(MetricEventHandler):
             metric_event.old_status == ServerStatusEnum.Starting
             and metric_event.status == ServerStatusEnum.Running
         ):
-            started_at = metric_event.session.get("metadata", {}).get("creationTimestamp")
-            if started_at:
-                launch_duration = (metric_event.event_timestamp - started_at).total_seconds()
+            if metric_event.sessionCreationTimestamp:
+                launch_duration = (
+                    metric_event.event_timestamp - metric_event.sessionCreationTimestamp
+                ).total_seconds()
                 self._sessions_launch_duration(
                     PrometheusMetricAction.observe,
                     launch_duration,
