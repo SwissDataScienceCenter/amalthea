@@ -197,7 +197,7 @@ class PrometheusMetricHandler(MetricEventHandler):
 
     def _on_start(self, metric_event: MetricEvent):
         manifest_labels = self._collect_labels_from_manifest(metric_event.session)
-        self._sessions_total_created("inc", 1, manifest_labels)
+        self._sessions_total_created(PrometheusMetricAction.inc, 1, manifest_labels)
         resource_request = resource_request_from_manifest(metric_event.session)
         if not resource_request:
             return
@@ -252,7 +252,7 @@ class PrometheusMetricHandler(MetricEventHandler):
         """Publishes (i.e. persists) the proper prometheus metrics
         depending on the old and new statuses of the jupyterserver."""
         old_status = metric_event.old_status
-        new_status = metric_event.session.get("status", {}).get("state")
+        new_status = metric_event.status
         if new_status == old_status:
             return
         if old_status is None and new_status == ServerStatusEnum.Starting:
