@@ -94,6 +94,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
     the necessary k8s child resources which make the actual jupyter server.
     """
     api = get_api(config.api_version, config.custom_resource_name, config.api_group)
+    now = pytz.UTC.localize(datetime.utcnow())
     try:
         api.patch(
             namespace=namespace,
@@ -101,6 +102,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
             body={
                 "status": {
                     "state": ServerStatusEnum.Starting.value,
+                    "startingSince": now.isoformat(),
                 },
             },
             content_type=CONTENT_TYPES["merge-patch"],
@@ -286,9 +288,6 @@ def update_server_state(body, labels, namespace, **_):
                 body={
                     "status": {
                         "state": new_status.value,
-                        "startingSince": (
-                            now.isoformat() if new_status is ServerStatusEnum.Starting else None
-                        ),
                         "failedSince": (
                             now.isoformat() if new_status is ServerStatusEnum.Failed else None
                         ),
