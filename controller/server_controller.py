@@ -15,7 +15,7 @@ from controller.utils import (
     get_api,
     parse_pod_metrics,
 )
-from controller.metrics.s3 import S3MetricHandler, S3RotatingLogHandler, S3Config, S3Formatter
+from controller.metrics.s3 import S3MetricHandler, S3RotatingLogHandler, S3Formatter
 from controller.metrics.prometheus import PrometheusMetricHandler
 from controller.metrics.events import MetricEvent
 from controller.metrics.queue import MetricsQueue
@@ -23,15 +23,16 @@ from controller.server_status_enum import ServerStatusEnum
 
 
 metric_handlers = []
-if config.METRICS_ENABLED:
-    metric_handlers.append(PrometheusMetricHandler(config.METRICS_EXTRA_LABELS))
-if config.AUDITLOG_ENABLED:
-    s3_config = S3Config.dataconf_from_env()
+if config.METRICS.enabled:
+    metric_handlers.append(PrometheusMetricHandler(config.METRICS.extra_labels))
+if config.AUDITLOG.enabled:
     s3_metric_logger = logging.getLogger("s3")
-    s3_logging_handler = S3RotatingLogHandler("/tmp/amalthea_audit_log.txt", "a", s3_config)
+    s3_logging_handler = S3RotatingLogHandler(
+        "/tmp/amalthea_audit_log.txt", "a", config.AUDITLOG.s3
+    )
     s3_logging_handler.setFormatter(S3Formatter())
     s3_metric_logger.addHandler(s3_logging_handler)
-    metric_handlers.append(S3MetricHandler(s3_metric_logger))
+    metric_handlers.append(S3MetricHandler(s3_metric_logger, config.AUDITLOG))
 metric_events_queue = MetricsQueue(metric_handlers)
 
 
@@ -634,8 +635,8 @@ if config.JUPYTER_SERVER_RESOURCE_CHECK_ENABLED:
 
 
 # INFO: Start the prometheus metrics server if enabled
-if config.METRICS_ENABLED:
-    start_http_server(config.METRICS_PORT)
+if config.METRICS.enabled:
+    start_http_server(config.METRICS.port)
 
 if len(metric_handlers) > 0:
     metric_events_queue.start_workers()

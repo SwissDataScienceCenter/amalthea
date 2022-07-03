@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from controller.utils import convert_to_bytes, convert_to_millicores
 
@@ -57,3 +57,35 @@ def resource_request_from_manifest(manifest: Dict[str, Any]) -> Optional[Resourc
     except TypeError as err:
         logging.warning(f"Could not create resource requests dataclass because {err}")
         return None
+
+
+def additional_labels_from_manifest(
+    manifest: Dict[str, Any],
+    label_names: Optional[List[str]] = None,
+    prefer_k8s_labels: bool = True,
+) -> Dict[str, str]:
+    """Extract metric labels from the manifest annotations and labels. Since the
+    values from the k8s labels and annotations are combined this function accepts only
+    a single list of annotation/label names. Then it will try to find such values in
+    both the k8s annotations and labels. In case of duplicates the value from the label will
+    be used."""
+
+    def _filter_labels(labels: Dict[str, str], label_names: List[str]) -> Dict[str, str]:
+        output = {}
+        for label_name in label_names:
+            label_value = labels.get(label_name)
+            if label_value:
+                output[label_name] = label_value
+        return output
+
+    if prefer_k8s_labels:
+        label_dict = {
+            **manifest.get("metadata", {}).get("annotations", {}),
+            **manifest.get("metadata", {}).get("labels", {}),
+        }
+    else:
+        label_dict = {
+            **manifest.get("metadata", {}).get("labels", {}),
+            **manifest.get("metadata", {}).get("annotations", {}),
+        }
+    return _filter_labels(label_dict, label_names if label_names else [])

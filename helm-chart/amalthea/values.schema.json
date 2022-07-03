@@ -355,6 +355,14 @@
                     "type": "boolean",
                     "default": false
                 },
+                "extraLabels": {
+                    "type": "array",
+                    "default": [],
+                    "uniqueItems": true,
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "s3": {
                     "type": "object",
                     "default": {},
@@ -378,7 +386,8 @@
                 }
             },
             "required": [
-                "enabled"
+                "enabled",
+                "extraLabels"
             ],
             "additionalProperties": false
         },

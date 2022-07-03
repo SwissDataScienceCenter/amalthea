@@ -1,11 +1,10 @@
 from dataclasses import dataclass, asdict
-from typing import Optional
+from typing import Optional, Dict, List
 from datetime import datetime, timedelta
 import boto3
 import pytz
 from pathlib import Path
 import json
-import dataconf
 from logging.handlers import BaseRotatingHandler
 from logging import Logger, Formatter, LogRecord
 import os
@@ -13,29 +12,13 @@ import atexit
 import re
 
 from controller.server_status_enum import ServerStatusEnum
+from controller.config_types import S3Config, AuditlogConfig
 from controller.metrics.events import MetricEventHandler, MetricEvent
-from controller.metrics.utils import ResourceRequest, resource_request_from_manifest
-
-
-@dataclass
-class S3Config:
-    """The configuration needed to upload metrics to S3."""
-    endpoint: str
-    bucket: str
-    path_prefix: str
-    access_key_id: str
-    secret_access_key: str
-    rotation_period_seconds: Optional[str] = None
-
-    def __post_init__(self):
-        if not self.rotation_period_seconds:
-            self.rotation_period_seconds = 86400
-        if type(self.rotation_period_seconds) is str:
-            self.rotation_period_seconds = int(self.rotation_period_seconds)
-
-    @classmethod
-    def dataconf_from_env(cls, prefix="AUDITLOG_S3_"):
-        return dataconf.env(prefix, cls)
+from controller.metrics.utils import (
+    ResourceRequest,
+    resource_request_from_manifest,
+    additional_labels_from_manifest,
+)
 
 
 @dataclass
@@ -49,9 +32,11 @@ class SesionMetricData:
     image: str
     status: Optional[ServerStatusEnum]
     old_status: Optional[ServerStatusEnum]
-    commit: Optional[str]
-    repository_url: Optional[str]
-    user: Optional[str]
+    additional_labels: Optional[Dict[str, str]]
+
+    def __post_init__(self):
+        if not self.additional_labels:
+            self.additional_labels = {}
 
     @staticmethod
     def _default_json_serializer(obj):
@@ -64,7 +49,11 @@ class SesionMetricData:
         return json.dumps(asdict(self), default=self._default_json_serializer, indent=None)
 
     @classmethod
-    def from_metric_event(cls, metric_event: MetricEvent):
+    def from_metric_event(
+        cls,
+        metric_event: MetricEvent,
+        additional_label_names: Optional[List[str]] = None,
+    ):
         manifest = metric_event.session
         return cls(
             manifest.get("metadata", {}).get("name"),
@@ -75,9 +64,9 @@ class SesionMetricData:
             manifest.get("spec", {}).get("jupyterServer", {}).get("image"),
             metric_event.status,
             metric_event.old_status,
-            manifest.get("metadata", {}).get("annotations", {}).get("renku.io/commit-sha"),
-            manifest.get("metadata", {}).get("annotations", {}).get("renku.io/repository"),
-            manifest.get("metadata", {}).get("annotations", {}).get("renku.io/username"),
+            additional_labels_from_manifest(
+                metric_event.session, additional_label_names,
+            ),
         )
 
 
@@ -178,9 +167,17 @@ class S3MetricHandler(MetricEventHandler):
     """A simple metric handler that persists the metrics
     that are published by Amalthea to a S3 bucket.
     """
-    def __init__(self, logger: Logger):
+    def __init__(
+        self,
+        logger: Logger,
+        config: AuditlogConfig,
+    ):
         self.logger = logger
+        self._config = config
 
     def publish(self, metric_event: MetricEvent):
-        session_metric_data = SesionMetricData.from_metric_event(metric_event)
+        session_metric_data = SesionMetricData.from_metric_event(
+            metric_event,
+            additional_label_names=self._config.extra_labels,
+        )
         self.logger.info(session_metric_data)

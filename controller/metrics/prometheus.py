@@ -6,7 +6,7 @@ from enum import Enum
 
 from controller.server_status_enum import ServerStatusEnum
 from controller.metrics.events import MetricEventHandler, MetricEvent
-from controller.metrics.utils import resource_request_from_manifest
+from controller.metrics.utils import resource_request_from_manifest, additional_labels_from_manifest
 
 
 class PrometheusMetricAction(Enum):
@@ -188,12 +188,7 @@ class PrometheusMetricHandler(MetricEventHandler):
         )
 
     def _collect_labels_from_manifest(self, manifest: Dict[str, Any]) -> Dict[str, str]:
-        metric_labels = {}
-        manifest_labels = manifest.get("metadata", {}).get("labels", {})
-        if len(self.manifest_labelnames) > 0:
-            for label_name in self.manifest_labelnames:
-                metric_labels[label_name] = manifest_labels.get(label_name, "Unknown")
-        return metric_labels
+        return additional_labels_from_manifest(manifest, self.manifest_labelnames)
 
     def _on_start(self, metric_event: MetricEvent):
         manifest_labels = self._collect_labels_from_manifest(metric_event.session)

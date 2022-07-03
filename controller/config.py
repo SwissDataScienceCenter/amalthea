@@ -2,6 +2,8 @@ import json
 import os
 import yaml
 
+from controller.config_types import AuditlogConfig, PrometheusMetricsConfig
+
 api_group = os.getenv("CRD_API_GROUP", "amalthea.dev")
 api_version = os.getenv("CRD_API_VERSION", "v1alpha1")
 custom_resource_name = os.getenv("CRD_NAME", "JupyterServer")
@@ -70,8 +72,5 @@ PARENT_NAME_LABEL_KEY = f"{api_group}/parent-name"
 CHILD_KEY_LABEL_KEY = f"{api_group}/child-key"
 MAIN_POD_LABEL_KEY = f"{api_group}/main-pod"
 
-METRICS_ENABLED = os.environ.get("METRICS_ENABLED", "false").lower() == "true"
-METRICS_EXTRA_LABELS = json.loads(os.environ.get("METRICS_EXTRA_LABELS", "[]"))
-METRICS_PORT = int(os.environ.get("METRICS_PORT", 8765))
-
-AUDITLOG_ENABLED = os.environ.get("AUDITLOG_ENABLED", "false").lower() == "true"
+METRICS = PrometheusMetricsConfig.dataconf_from_env()
+AUDITLOG = AuditlogConfig.dataconf_from_env()

@@ -97,16 +97,18 @@ spec:
             {{- end }}
             - name: AUDITLOG_ENABLED
               value: {{ .Values.auditLog.enabled | quote }}
+            - name: AUDITLOG_EXTRA_LABELS
+              value: {{ .Values.auditLog.extraLabels | toJson | quote }}
             {{- if .Values.auditLog.enabled }}
-            - name: AUDITLOG_S3_ENDPOINT
+            - name: AUDITLOG_S3__ENDPOINT
               value: {{ .Values.auditLog.s3.endpoint | quote }}
-            - name: AUDITLOG_S3_BUCKET
+            - name: AUDITLOG_S3__BUCKET
               value: {{ .Values.auditLog.s3.bucket | quote }}
-            - name: AUDITLOG_S3_PATH_PREFIX
+            - name: AUDITLOG_S3__PATH_PREFIX
               value: {{ .Values.auditLog.s3.pathPrefix | quote }}
-            - name: AUDITLOG_S3_ACCESS_KEY_ID
+            - name: AUDITLOG_S3__ACCESS_KEY_ID
               value: {{ .Values.auditLog.s3.accessKeyId | quote }}
-            - name: AUDITLOG_S3_SECRET_ACCESS_KEY
+            - name: AUDITLOG_S3__SECRET_ACCESS_KEY
               value: {{ .Values.auditLog.s3.secretAccessKey | quote }}
             {{- end }}
           volumeMounts:
