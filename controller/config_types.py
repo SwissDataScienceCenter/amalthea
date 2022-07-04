@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import dataconf
 import json
 from typing import Optional, Union, List
@@ -12,11 +12,9 @@ class S3Config:
     path_prefix: str
     access_key_id: str
     secret_access_key: str
-    rotation_period_seconds: Optional[str] = None
+    rotation_period_seconds: Union[str, int] = 86400
 
     def __post_init__(self):
-        if not self.rotation_period_seconds:
-            self.rotation_period_seconds = 86400
         if type(self.rotation_period_seconds) is str:
             self.rotation_period_seconds = int(self.rotation_period_seconds)
 
@@ -25,15 +23,13 @@ class S3Config:
 class MetricsBaseConfig:
     """Base metrics/auditlog configuration."""
     enabled: Union[str, bool] = False
-    extra_labels: Union[str, List[str]] = None
+    extra_labels: Union[str, List[str]] = field(default_factory=list)
 
     def __post_init__(self):
         if type(self.enabled) is str:
             self.enabled = self.enabled.lower() == "true"
         if type(self.extra_labels) is str:
             self.extra_labels = json.loads(self.extra_labels)
-        if not self.extra_labels:
-            self.extra_labels = []
 
 
 @dataclass

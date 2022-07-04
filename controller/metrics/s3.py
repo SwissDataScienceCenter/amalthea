@@ -1,4 +1,4 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Optional, Dict, List
 from datetime import datetime, timedelta
 import boto3
@@ -32,7 +32,7 @@ class SesionMetricData:
     image: str
     status: Optional[ServerStatusEnum]
     old_status: Optional[ServerStatusEnum]
-    additional_labels: Optional[Dict[str, str]]
+    additional_labels: Optional[Dict[str, str]] = field(default_factory=dict)
 
     def __post_init__(self):
         if not self.additional_labels:
