@@ -2,6 +2,7 @@ import logging
 from queue import Queue
 from typing import List
 import threading
+import traceback
 
 from controller.metrics.events import MetricEventHandler, MetricEvent
 
@@ -25,7 +26,8 @@ class MetricsQueue:
                 except Exception as err:
                     logging.warning(
                         f"Could not handle metric event {metric_event} "
-                        f"with handler {handler}, because {err}."
+                        f"with handler {handler}, because {err}. "
+                        f"Full traceback: {traceback.format_exc()}"
                     )
 
     def start_workers(self):

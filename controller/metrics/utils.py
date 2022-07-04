@@ -1,4 +1,3 @@
-from copy import deepcopy
 from dataclasses import dataclass
 import logging
 from typing import Any, Dict, Optional, List
@@ -21,7 +20,7 @@ def resource_request_from_manifest(manifest: Dict[str, Any]) -> Optional[Resourc
     resources = manifest.get("spec", {}).get("jupyterServer", {}).get("resources", {}).get(
         "requests", {}
     )
-    resources = deepcopy(resources)
+    resources = dict(**resources)
     disk_request = manifest.get("spec", {}).get("storage", {}).get("size")
     if disk_request:
         resources["disk_request"] = disk_request
