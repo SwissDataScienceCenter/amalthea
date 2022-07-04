@@ -186,6 +186,23 @@ scheduler:
 
 metrics:
   enabled: false
-  # A list of labels that should be present on jupyter-server object which will then be used as metrics label
+  # A list of label names that should be present on the jupyter-server object annotation or labels
+  # which will then be used as metrics labels. In the case where the same name is present in the server
+  # labels and annotations the value from the labels will be used.
   extraMetricsLabels: []
   port: 8765
+
+auditLog:
+  # Auditlog that is saved in a s3 bucket, new log files are created daily
+  enabled: false
+  # A list of label names that should be present on the jupyter-server object annotation or labels
+  # which will then be used as metrics labels. In the case where the same name is present in the server
+  # labels and annotations the value from the labels will be used.
+  extraLabels: []
+  s3:
+    # If auditlog is enabled then s3 configuration should be provided
+    endpoint: ""
+    bucket: ""
+    pathPrefix: ""
+    accessKeyId: ""
+    secretAccessKey: ""

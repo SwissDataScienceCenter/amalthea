@@ -348,6 +348,49 @@
             ],
             "additionalProperties": false
         },
+        "auditLog": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "extraLabels": {
+                    "type": "array",
+                    "default": [],
+                    "uniqueItems": true,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "s3": {
+                    "type": "object",
+                    "default": {},
+                    "properties": {
+                        "endpoint": {
+                            "type": "string"
+                        },
+                        "bucket": {
+                            "type": "string"
+                        },
+                        "pathPrefix": {
+                            "type": "string"
+                        },
+                        "accessKeyId": {
+                            "type": "string"
+                        },
+                        "secretAccessKey": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "required": [
+                "enabled",
+                "extraLabels"
+            ],
+            "additionalProperties": false
+        },
         "scheduler": {
             "type": "object",
             "required": [

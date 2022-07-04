@@ -1,7 +1,6 @@
+import logging
 import kopf
-from dateutil import parser
 from datetime import datetime
-from enum import Enum
 from kubernetes.client.models import V1DeleteOptions
 from kubernetes.dynamic.exceptions import NotFoundError
 from prometheus_client import start_http_server
@@ -15,25 +14,26 @@ from controller.utils import (
     get_volume_disk_capacity,
     get_api,
     parse_pod_metrics,
-    convert_to_bytes,
-    convert_to_millicores,
 )
-from controller.metrics import Metrics
+from controller.metrics.s3 import S3MetricHandler, S3RotatingLogHandler, S3Formatter
+from controller.metrics.prometheus import PrometheusMetricHandler
+from controller.metrics.events import MetricEvent
+from controller.metrics.queue import MetricsQueue
+from controller.server_status_enum import ServerStatusEnum
 
-metrics = Metrics()
 
-
-class ServerStatusEnum(Enum):
-    """Simple Enum for server status."""
-
-    Running = "running"
-    Starting = "starting"
-    Stopping = "stopping"
-    Failed = "failed"
-
-    @classmethod
-    def list(cls):
-        return list(map(lambda c: c.value, cls))
+metric_handlers = []
+if config.METRICS.enabled:
+    metric_handlers.append(PrometheusMetricHandler(config.METRICS.extra_labels))
+if config.AUDITLOG.enabled:
+    s3_metric_logger = logging.getLogger("s3")
+    s3_logging_handler = S3RotatingLogHandler(
+        "/tmp/amalthea_audit_log.txt", "a", config.AUDITLOG.s3
+    )
+    s3_logging_handler.setFormatter(S3Formatter())
+    s3_metric_logger.addHandler(s3_logging_handler)
+    metric_handlers.append(S3MetricHandler(s3_metric_logger, config.AUDITLOG))
+metric_events_queue = MetricsQueue(metric_handlers)
 
 
 def get_labels(
@@ -89,11 +89,37 @@ def configure(logger, settings, **_):
     retries=config.KOPF_CREATE_RETRIES,
     backoff=config.KOPF_CREATE_BACKOFF,
 )
-def create_fn(labels, logger, name, namespace, spec, uid, **_):
+def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
     """
     Watch the creation of jupyter server objects and create all
     the necessary k8s child resources which make the actual jupyter server.
     """
+    api = get_api(config.api_version, config.custom_resource_name, config.api_group)
+    now = pytz.UTC.localize(datetime.utcnow())
+    try:
+        api.patch(
+            namespace=namespace,
+            name=name,
+            body={
+                "status": {
+                    "state": ServerStatusEnum.Starting.value,
+                    "startingSince": now.isoformat(),
+                },
+            },
+            content_type=CONTENT_TYPES["merge-patch"],
+        )
+    except NotFoundError:
+        pass
+    metric_event = MetricEvent(
+        pytz.UTC.localize(datetime.utcnow()),
+        body,
+        old_status=None,
+        status=ServerStatusEnum.Starting,
+    )
+    logging.info(
+        f"Adding event {metric_event} for server {name} to metrics queue from create handler."
+    )
+    metric_events_queue.add_to_queue(metric_event)
 
     children_specs = get_children_specs(name, spec, logger)
 
@@ -120,8 +146,6 @@ def create_fn(labels, logger, name, namespace, spec, uid, **_):
             namespace=namespace, body=child_spec
         ).metadata.uid
 
-    metrics.manipulate("sessions_total_created", "inc", 1, labels)
-
     return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 
 
@@ -131,86 +155,36 @@ def delete_fn(labels, body, namespace, name, **_):
     The juptyer server has been deleted.
     """
     api = get_api(config.api_version, config.custom_resource_name, config.api_group)
-    new_status = ServerStatusEnum.Stopping.value
+    new_status = ServerStatusEnum.Stopping
     if body:
         old_status = body.get("status", {}).get("state")
+        old_status = ServerStatusEnum(old_status) if old_status else None
     else:
         old_status = None
-    if old_status != new_status:
-        extra_labels = {
-            "status_from": str(old_status).lower(),
-            "status_to": new_status,
-        }
-        metrics.manipulate(
-            "sessions_status_changes",
-            "inc",
-            1,
-            manifest_labels=labels,
-            extra_labels=extra_labels
-        )
     api.patch(
         namespace=namespace,
         name=name,
         body={
             "status": {
-                "state": new_status,
+                "state": new_status.value,
             },
         },
         content_type=CONTENT_TYPES["merge-patch"],
     )
-    metrics.manipulate("sessions_total_deleted", "inc", 1, labels)
-
-
-@kopf.on.field(
-    config.api_group,
-    config.api_version,
-    config.custom_resource_name,
-    field="status.state",
-)
-def state_changed(old, new, labels, body, **_):
-    """
-    State of the juptyer server status has changed.
-    """
-    if new == ServerStatusEnum.Running.value:
-        start_time = parser.isoparse(
-            body["metadata"].get("creationTimestamp")
+    if not body.get("status", {}):
+        body["status"] = {}
+    body["status"]["state"] = new_status.value
+    if new_status != old_status:
+        metric_event = MetricEvent(
+            pytz.UTC.localize(datetime.utcnow()),
+            body,
+            old_status=old_status,
+            status=new_status,
         )
-        now = pytz.UTC.localize(datetime.utcnow())
-        start_duration = (now - start_time).total_seconds()
-        metrics.manipulate(
-            "sessions_launch_duration",
-            "observe",
-            start_duration,
-            labels,
+        logging.info(
+            f"Adding event {metric_event} for server {name} to metrics queue from delete handler."
         )
-
-    elif new == ServerStatusEnum.Starting.value:
-        cpu_request = body.get("spec", {}).get("jupyterServer", {}).get("resources", {})\
-            .get("requests", {}).get("cpu")
-        memory_request = body.get("spec", {}).get("jupyterServer", {}).get("resources", {})\
-            .get("requests", {}).get("memory")
-        disk_request = body.get("spec", {}).get("storage", {}).get("size")
-        if cpu_request:
-            metrics.manipulate(
-                "sessions_cpu_request",
-                "observe",
-                convert_to_millicores(cpu_request),
-                labels,
-            )
-        if memory_request:
-            metrics.manipulate(
-                "sessions_memory_request",
-                "observe",
-                convert_to_bytes(memory_request),
-                labels,
-            )
-        if disk_request:
-            metrics.manipulate(
-                "sessions_disk_request",
-                "observe",
-                convert_to_bytes(disk_request),
-                labels,
-            )
+        metric_events_queue.add_to_queue(metric_event)
 
 
 @kopf.on.event(
@@ -303,8 +277,10 @@ def update_server_state(body, labels, namespace, **_):
         old_status = None
     if server:
         old_status = server.get("status", {}).get("state")
+        if old_status:
+            old_status = ServerStatusEnum(old_status)
     # NOTE: Updating the status for deletions is handled in a specific delete handler
-    if old_status != new_status.value and new_status.value != ServerStatusEnum.Stopping.value:
+    if old_status != new_status and new_status != ServerStatusEnum.Stopping:
         now = pytz.UTC.localize(datetime.utcnow())
         try:
             api.patch(
@@ -313,9 +289,6 @@ def update_server_state(body, labels, namespace, **_):
                 body={
                     "status": {
                         "state": new_status.value,
-                        "startingSince": (
-                            now.isoformat() if new_status is ServerStatusEnum.Starting else None
-                        ),
                         "failedSince": (
                             now.isoformat() if new_status is ServerStatusEnum.Failed else None
                         ),
@@ -325,17 +298,17 @@ def update_server_state(body, labels, namespace, **_):
             )
         except NotFoundError:
             pass
-        extra_labels = {
-            "status_from": str(old_status),
-            "status_to": str(new_status.value),
-        }
-        metrics.manipulate(
-            "sessions_status_changes",
-            "inc",
-            1,
-            manifest_labels=labels,
-            extra_labels=extra_labels
+        metric_event = MetricEvent(
+            pytz.UTC.localize(datetime.utcnow()),
+            {} if not server else server,
+            old_status=old_status,
+            status=new_status,
         )
+        logging.info(
+            f"Adding event {metric_event} for server {server_name} "
+            "to metrics queue from pod handler."
+        )
+        metric_events_queue.add_to_queue(metric_event)
 
 
 @kopf.timer(
@@ -662,5 +635,8 @@ if config.JUPYTER_SERVER_RESOURCE_CHECK_ENABLED:
 
 
 # INFO: Start the prometheus metrics server if enabled
-if config.METRICS_ENABLED:
-    start_http_server(config.METRICS_PORT)
+if config.METRICS.enabled:
+    start_http_server(config.METRICS.port)
+
+if len(metric_handlers) > 0:
+    metric_events_queue.start_workers()
