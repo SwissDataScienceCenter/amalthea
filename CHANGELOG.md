@@ -1,3 +1,11 @@
+## [0.5.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.4.0...0.5.0)  (2022-07-04)
+
+
+### Features
+
+* **app:** long term metric storage ([#173](https://github.com/SwissDataScienceCenter/amalthea/issues/173)) ([6335ec5](https://github.com/SwissDataScienceCenter/amalthea/commit/6335ec5b3657e5d8dba1adb239b9f9e87dbf428b))
+
+
 ## [0.4.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.3.0...0.4.0)  (2022-06-13)
 
 ### Bug Fixes
