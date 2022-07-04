@@ -3,9 +3,9 @@ name: amalthea
 description: A helm chart for deploying the amalthea jupyter server operator
 
 dependencies:
-- name: certificates
-  version: "0.0.2"
-  repository: "https://swissdatasciencecenter.github.io/helm-charts/"
+  - name: certificates
+    version: "0.0.2"
+    repository: "https://swissdatasciencecenter.github.io/helm-charts/"
 
 # A chart can be either an 'application' or a 'library' chart.
 #
