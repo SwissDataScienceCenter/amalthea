@@ -2,8 +2,8 @@ name: Autogenerate the manifests and documentation for the CRD
 
 on:
   push:
-    # branches:
-    #   - main
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
