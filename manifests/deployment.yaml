@@ -30,6 +30,12 @@ spec:
       serviceAccountName: amalthea
       securityContext:
         {}
+      initContainers:
+        - name: init-certificates
+          image: "renku/certificates:0.0.1"
+          volumeMounts:
+            - name: etc-ssl-certs
+              mountPath: /etc/ssl/certs/
       containers:
         - name: amalthea
           securityContext:
@@ -82,10 +88,24 @@ spec:
               value: "8765"
             - name: METRICS_EXTRA_LABELS
               value: "[]"
+            - name: REQUESTS_CA_BUNDLE
+              value: /etc/ssl/certs/ca-certificates.crt
+            - name: SSL_CERT_FILE
+              value: /etc/ssl/certs/ca-certificates.crt
+            - name: AUDITLOG_ENABLED
+              value: "false"
+            - name: AUDITLOG_EXTRA_LABELS
+              value: "[]"
           volumeMounts:
             - name: config
               mountPath: /app/config
+            - name: etc-ssl-certs
+              mountPath: /etc/ssl/certs/
+              readOnly: true
       volumes:
         - name: config
           configMap:
             name: amalthea-config
+        - name: etc-ssl-certs
+          emptyDir:
+            medium: "Memory"
