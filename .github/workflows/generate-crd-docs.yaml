@@ -18,6 +18,7 @@ jobs:
           python -m pip install --upgrade pip pipenv
           pipenv install --dev
           cd helm-chart/
+          helm dep update ./amalthea
           pipenv run chartpress --reset
           cd ../
           pipenv run python utils/render-chart-manifests.py
