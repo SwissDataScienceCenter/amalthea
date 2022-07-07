@@ -26,6 +26,7 @@ data:
     c.ServerApp.root_dir="{{ jupyter_server["rootDir"] }}"
     c.ServerApp.default_url="{{ jupyter_server["defaultUrl"] }}"
     c.ServerApp.allow_remote_access=True
+    c.ContentsManager.allow_hidden=True
 
   {% if oidc["enabled"] %}
   authorized-users.txt: |
