@@ -230,7 +230,7 @@ def update_server_state(body, labels, namespace, **_):
             and sorted_conditions[0].get("reason") == "Unschedulable"
             # NOTE: every pod is initially unschedulable until a PV is provisioned
             # therefore to avoid "flashing" this state when a sessions starts this case is ignored
-            and "persistentvolumeclaim" not in sorted_conditions[0]
+            and "persistentvolumeclaim" not in sorted_conditions[0].get("message", "").lower()
         ):
             return True
         return False
