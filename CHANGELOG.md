@@ -1,4 +1,14 @@
-## [0.5.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.4.0...0.5.0)  (2022-07-04)
+## [0.5.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.5.0...0.5.1) (2022-07-22)
+
+
+### Bug Fixes
+
+* **app:** prevent flashing error message on startup ([#182](https://github.com/SwissDataScienceCenter/amalthea/issues/182)) ([ce7e809](https://github.com/SwissDataScienceCenter/amalthea/commit/ce7e80935d94fb4a03a1430bb56019e8082a109c))
+* **general**: upgrade base image in Dockerfile to reduce vulnerabilities ([#183](https://github.com/SwissDataScienceCenter/amalthea/issues/183)) ([c975ef0](https://github.com/SwissDataScienceCenter/amalthea/commit/c975ef0e53e9baa2c938fd9c3510b014ddc7b917))
+
+
+
+## [0.5.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.4.0...0.5.0) (2022-07-04)
 
 
 ### Features
@@ -6,7 +16,7 @@
 * **app:** long term metric storage ([#173](https://github.com/SwissDataScienceCenter/amalthea/issues/173)) ([6335ec5](https://github.com/SwissDataScienceCenter/amalthea/commit/6335ec5b3657e5d8dba1adb239b9f9e87dbf428b))
 
 
-## [0.4.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.3.0...0.4.0)  (2022-06-13)
+## [0.4.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.3.0...0.4.0) (2022-06-13)
 
 ### Bug Fixes
 
@@ -19,7 +29,7 @@
 * **app:** cull sessions pending too long ([#158](https://github.com/SwissDataScienceCenter/amalthea/issues/158)) ([8fc359e](https://github.com/SwissDataScienceCenter/amalthea/commit/8fc359ea83e9c643b1b7c34b2573c5e829baa35f))
 
 
-## [0.3.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.2.3...0.3.0)  (2022-05-16)
+## [0.3.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.2.3...0.3.0) (2022-05-16)
 
 ### Bug Fixes
 
