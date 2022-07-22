@@ -3,7 +3,7 @@
 
 ### Bug Fixes
 
-* **app:** flashing error message on startup ([#182](https://github.com/SwissDataScienceCenter/amalthea/issues/182)) ([ce7e809](https://github.com/SwissDataScienceCenter/amalthea/commit/ce7e80935d94fb4a03a1430bb56019e8082a109c))
+* **app:** prevent flashing error message on startup ([#182](https://github.com/SwissDataScienceCenter/amalthea/issues/182)) ([ce7e809](https://github.com/SwissDataScienceCenter/amalthea/commit/ce7e80935d94fb4a03a1430bb56019e8082a109c))
 * **general**: upgrade base image in Dockerfile to reduce vulnerabilities ([#183](https://github.com/SwissDataScienceCenter/amalthea/issues/183)) ([c975ef0](https://github.com/SwissDataScienceCenter/amalthea/commit/c975ef0e53e9baa2c938fd9c3510b014ddc7b917))
 
 
