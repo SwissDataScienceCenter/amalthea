@@ -148,7 +148,7 @@ spec:
         
         {% if oidc["enabled"] %}
         - name: oauth2-proxy
-          image: "bitnami/oauth2-proxy:7.1.3"
+          image: "bitnami/oauth2-proxy:7.3.0"
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
