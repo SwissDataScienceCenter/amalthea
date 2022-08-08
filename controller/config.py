@@ -72,5 +72,5 @@ PARENT_NAME_LABEL_KEY = f"{api_group}/parent-name"
 CHILD_KEY_LABEL_KEY = f"{api_group}/child-key"
 MAIN_POD_LABEL_KEY = f"{api_group}/main-pod"
 
-METRICS = PrometheusMetricsConfig.dataconf_from_env()
-AUDITLOG = AuditlogConfig.dataconf_from_env()
+METRICS: PrometheusMetricsConfig = PrometheusMetricsConfig.dataconf_from_env()
+AUDITLOG: AuditlogConfig = AuditlogConfig.dataconf_from_env()

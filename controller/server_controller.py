@@ -617,8 +617,8 @@ if config.JUPYTER_SERVER_RESOURCE_CHECK_ENABLED:
     )(update_resource_usage)
 
 
-# INFO: Start the prometheus metrics server if enabled
-if config.METRICS.enabled:
+# INFO: Register the functions that publish metric events into the metric events queue
+if config.METRICS.enabled or config.AUDITLOG.enabled:
     kopf.on.field(
         config.api_group,
         config.api_version,
@@ -632,6 +632,9 @@ if config.METRICS.enabled:
         config.custom_resource_name,
         field='status.state',
     )(publish_metrics)
+# INFO: Start the prometheus metrics server if enabled
+if config.METRICS.enabled:
     start_http_server(config.METRICS.port)
-    if len(metric_handlers) > 0:
-        metric_events_queue.start_workers()
+# INFO: Start a thread to watch the metric events queue and process metrics if handlers are present
+if len(metric_handlers) > 0:
+    metric_events_queue.start_workers()
