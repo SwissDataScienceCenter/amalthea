@@ -158,6 +158,7 @@ class PrometheusMetricHandler(MetricEventHandler):
             "How long did it take for a session to transition into running state",
             self.manifest_labelnames,
             unit="seconds",
+            buckets=[30, 60, 90, 120, 180, 240, 300, 480]
         )
         self._sessions_cpu_request = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
@@ -165,6 +166,7 @@ class PrometheusMetricHandler(MetricEventHandler):
             "CPU millicores requested by a user for a session.",
             self.manifest_labelnames,
             unit="m",
+            buckets=[100, 500, 1000, 2000, 3000, 4000]
         )
         self._sessions_memory_request = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
@@ -172,12 +174,14 @@ class PrometheusMetricHandler(MetricEventHandler):
             "Memory requested by a user for a session.",
             self.manifest_labelnames,
             unit="byte",
+            buckets=[500e6, 1e9, 2e9, 4e9, 8e9, 16e9, 32e9]
         )
         self._sessions_gpu_request = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
             PrometheusMetricNames["sessions_gpu_request"].value,
             "GPUs requested by a user for a session.",
             self.manifest_labelnames,
+            buckets=[0, 1, 2, 3, 4]
         )
         self._sessions_disk_request = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
@@ -185,6 +189,7 @@ class PrometheusMetricHandler(MetricEventHandler):
             "Disk space requested by a user for a session.",
             self.manifest_labelnames,
             unit="byte",
+            buckets=[1e9, 4e9, 16e9, 32e9, 64e9, 128e9]
         )
 
     def _collect_labels_from_manifest(self, manifest: Dict[str, Any]) -> Dict[str, str]:
