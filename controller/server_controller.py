@@ -110,16 +110,6 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
         )
     except NotFoundError:
         pass
-    metric_event = MetricEvent(
-        pytz.UTC.localize(datetime.utcnow()),
-        body,
-        old_status=None,
-        status=ServerStatusEnum.Starting,
-    )
-    logging.info(
-        f"Adding event {metric_event} for server {name} to metrics queue from create handler."
-    )
-    metric_events_queue.add_to_queue(metric_event)
 
     children_specs = get_children_specs(name, spec, logger)
 
@@ -171,20 +161,6 @@ def delete_fn(labels, body, namespace, name, **_):
         },
         content_type=CONTENT_TYPES["merge-patch"],
     )
-    if not body.get("status", {}):
-        body["status"] = {}
-    body["status"]["state"] = new_status.value
-    if new_status != old_status:
-        metric_event = MetricEvent(
-            pytz.UTC.localize(datetime.utcnow()),
-            body,
-            old_status=old_status,
-            status=new_status,
-        )
-        logging.info(
-            f"Adding event {metric_event} for server {name} to metrics queue from delete handler."
-        )
-        metric_events_queue.add_to_queue(metric_event)
 
 
 @kopf.on.event(
@@ -298,17 +274,6 @@ def update_server_state(body, labels, namespace, **_):
             )
         except NotFoundError:
             pass
-        metric_event = MetricEvent(
-            pytz.UTC.localize(datetime.utcnow()),
-            {} if not server else server,
-            old_status=old_status,
-            status=new_status,
-        )
-        logging.info(
-            f"Adding event {metric_event} for server {server_name} "
-            "to metrics queue from pod handler."
-        )
-        metric_events_queue.add_to_queue(metric_event)
 
 
 @kopf.timer(
@@ -625,6 +590,24 @@ def update_resource_usage(body, name, namespace, **kwargs):
         pass
 
 
+def publish_metrics(old, new, body, name, **_):
+    """Handler to publish prometheus and auditlog metrics on server status change."""
+    if old == new:
+        # INFO: This is highly unlikely to occur, but if for some reason the status hasn't changed
+        # then we do not want to publish a metric. Metrics are published only on status changes.
+        return
+    metric_event = MetricEvent(
+        pytz.UTC.localize(datetime.utcnow()),
+        body,
+        old_status=old,
+        status=new,
+    )
+    logging.info(
+        f"Adding event {metric_event} for server {name} to metrics queue from delete handler."
+    )
+    metric_events_queue.add_to_queue(metric_event)
+
+
 if config.JUPYTER_SERVER_RESOURCE_CHECK_ENABLED:
     kopf.timer(
         config.api_group,
@@ -634,9 +617,24 @@ if config.JUPYTER_SERVER_RESOURCE_CHECK_ENABLED:
     )(update_resource_usage)
 
 
+# INFO: Register the functions that publish metric events into the metric events queue
+if config.METRICS.enabled or config.AUDITLOG.enabled:
+    kopf.on.field(
+        config.api_group,
+        config.api_version,
+        config.custom_resource_name,
+        field='status.state',
+    )(publish_metrics)
+    # NOTE: The 'on.field' handler cannot catch the server deletion so this is needed.
+    kopf.on.delete(
+        config.api_group,
+        config.api_version,
+        config.custom_resource_name,
+        field='status.state',
+    )(publish_metrics)
 # INFO: Start the prometheus metrics server if enabled
 if config.METRICS.enabled:
     start_http_server(config.METRICS.port)
-
+# INFO: Start a thread to watch the metric events queue and process metrics if handlers are present
 if len(metric_handlers) > 0:
     metric_events_queue.start_workers()
