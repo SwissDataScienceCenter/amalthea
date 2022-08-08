@@ -593,7 +593,7 @@ def update_resource_usage(body, name, namespace, **kwargs):
 def publish_metrics(old, new, body, name, **_):
     """Handler to publish prometheus and auditlog metrics on server status change."""
     if old == new:
-        # INFO: This is highly unlikely to occur, but if for some reason the status has changed
+        # INFO: This is highly unlikely to occur, but if for some reason the status hasn't changed
         # then we do not want to publish a metric. Metrics are published only on status changes.
         return
     metric_event = MetricEvent(
