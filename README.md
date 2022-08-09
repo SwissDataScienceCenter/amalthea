@@ -287,3 +287,34 @@ Amalthea stands for:
 - a container ship
 
 Also, it's another Greek name for something Kubernetes related.
+
+## Roadmap
+
+This is a list of larger features and themes for future development. 
+
+**NOTE**: Features at the top of the list are considered to be higher priority.
+
+1. Expand Cypress tests
+    - Tests for R studio sessions
+    - Expand test scenarios
+
+2. Use [container canary](https://github.com/NVIDIA/container-canary)
+    - Could be (optionally) used as an init container to check session image before starting
+    - Use in CI/tests in the repo
+
+3. Fully working updates:
+    - Changing PVC size
+    - Changing any other parameter in the JupyterServer manifest that may (or may not) require a restart
+
+4. Wrap up R-native sessions:
+    - Re-visit PR for generalizing Jinja templates
+    - Re-visit PR for R-studio native sessions
+
+5. Standardized support for exposing more than 1 service in a session
+    - This would make it easier to use dashboards and similar services without
+    having to resort to `jupyter-server-proxy`
+
+6. Splash screen for "loading" or similar cases
+    - Currently only 404 or something very basic is shown when the session is not available
+    but we could optionally show a loading or similar screen if a user accesses the session
+    before it is ready
