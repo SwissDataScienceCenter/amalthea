@@ -85,13 +85,8 @@ EOF`);
     const {stdout, stderr, error} = await exec(`npx cypress run --spec cypress/integration/${testSpec} --env URL=${url}`);
     console.log(`\n\n--------------------------------------------Cypress stdout--------------------------------------------\n${stdout}`)
     console.log(`\n\n--------------------------------------------Cypress stderr--------------------------------------------\n${stderr}`)
-    console.log(`\n\n--------------------------------------------Cypress error--------------------------------------------\n${error}`)
     console.log(`\n\n-----------------------------------------------------------------------------------------------------\n`)
-    if (error || stderr) {
-      console.log(`Something went wrong trying to launch tests.\nError: ${error}\nStderr: ${stderr}\nStdout:${stdout}`)  
-    }
-    assert(!error)
-    assert(!stderr)
+    assert(!error, `Tests failed with error:\n${error}`)
   });
   after(async function () {
     console.log(`Stopping session with image ${image}.`)

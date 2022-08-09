@@ -97,11 +97,11 @@ jobs:
           helm dep update helm-chart/amalthea
           helm install amalthea helm-chart/amalthea --wait
       - name: Run Acceptance Tests
-        uses: cypress-io/github-action@v2
+        uses: cypress-io/github-action@v4
         env:
           TEST_IMAGE_NAME: ${{ matrix.test-image.image }}
           TEST_SPEC: ${{ matrix.test-image.spec }}
           ENVIRONMENT: ${{ matrix.test-image.env }}
         with:
           working-directory: acceptance-tests
-          command: npx browserslist@latest --update-db && npx mocha test.js
+          command: npx mocha test.js
