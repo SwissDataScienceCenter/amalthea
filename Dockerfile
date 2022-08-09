@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.10.6-slim
 
 LABEL maintainer="info@datascience.ch"
 
