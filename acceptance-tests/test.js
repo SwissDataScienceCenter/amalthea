@@ -7,7 +7,7 @@ const token = "testtoken123456";
 const host = "localhost";
 const k8sNamespace = process.env.K8S_NAMESPACE || "default";
 const image = process.env.TEST_IMAGE_NAME || "jupyter/base-notebook:latest";
-const testSpec = process.env.TEST_SPEC || "jupyterlab.spec.js";
+const testSpec = process.env.TEST_SPEC || "jupyterlab.cy.js";
 const env = process.env.ENVIRONMENT || "lab"
 const sessionName = "test";
 const timeoutSeconds = process.env.TIMEOUT_SECS || 600;
@@ -82,7 +82,7 @@ EOF`);
   });
   it('Should pass all acceptance tests', async function () {
     console.log("Starting cypress tests")
-    const {stdout, stderr, error} = await exec(`npx cypress run --spec cypress/integration/${testSpec} --env URL=${url}`);
+    const {stdout, stderr, error} = await exec(`npx cypress run --spec cypress/e2e/${testSpec} --env URL=${url}`);
     console.log(`\n\n--------------------------------------------Cypress stdout--------------------------------------------\n${stdout}`)
     console.log(`\n\n--------------------------------------------Cypress stderr--------------------------------------------\n${stderr}`)
     console.log(`\n\n-----------------------------------------------------------------------------------------------------\n`)

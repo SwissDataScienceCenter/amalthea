@@ -45,9 +45,10 @@ jobs:
           cluster_name: kind
           wait: 10m0s
           config: kind-config.yaml
-      - uses: actions/setup-python@v1
+      - uses: actions/setup-python@v4
         with:
           python-version: 3.8
+          cache: pipenv
 
       # TODO: Adapt the chart building action in Renku to work for this repo too.
       - name: Build images, load in kind
