@@ -1,3 +1,13 @@
+## [0.5.2](https://github.com/SwissDataScienceCenter/amalthea/compare/0.5.1...0.5.2) (2022-08-11)
+
+
+### Bug Fixes
+
+* **metrics:** buckets for prometheus histogram metrics ([#189](https://github.com/SwissDataScienceCenter/amalthea/issues/189)) ([7b34872](https://github.com/SwissDataScienceCenter/amalthea/commit/7b3487207d902919e2934fda7654850d20cdd903))
+* **metrics:** do not publish same metric more than once ([#190](https://github.com/SwissDataScienceCenter/amalthea/issues/190)) ([148d214](https://github.com/SwissDataScienceCenter/amalthea/commit/148d214a01f8ab97008b18c1b1089c481337d047))
+
+
+
 ## [0.5.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.5.0...0.5.1) (2022-07-22)
 
 
