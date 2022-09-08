@@ -9,16 +9,22 @@ from controller.utils import convert_to_bytes, convert_to_millicores
 class ResourceRequest:
     """The structure of the parsed resource requests when they
     are extracted from a jupyterserver manifest."""
+
     cpu_millicores: float
     memory_bytes: float
     disk_bytes: float
     gpus: int = 0
 
 
-def resource_request_from_manifest(manifest: Dict[str, Any]) -> Optional[ResourceRequest]:
+def resource_request_from_manifest(
+    manifest: Dict[str, Any]
+) -> Optional[ResourceRequest]:
     """Parses the resource requests from an amalthea manifest."""
-    resources = manifest.get("spec", {}).get("jupyterServer", {}).get("resources", {}).get(
-        "requests", {}
+    resources = (
+        manifest.get("spec", {})
+        .get("jupyterServer", {})
+        .get("resources", {})
+        .get("requests", {})
     )
     resources = dict(**resources)
     disk_request = manifest.get("spec", {}).get("storage", {}).get("size")
@@ -70,7 +76,9 @@ def additional_labels_from_manifest(
     both the k8s annotations and labels. In case of duplicates the value from the label will
     be used."""
 
-    def _filter_labels(labels: Dict[str, str], label_names: List[str]) -> Dict[str, str]:
+    def _filter_labels(
+        labels: Dict[str, str], label_names: List[str]
+    ) -> Dict[str, str]:
         output = {}
         for label_name in label_names:
             label_value = labels.get(label_name)

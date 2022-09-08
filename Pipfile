@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-kopf = "*"
+kopf = { version = "*", extras = ["dev"]}
 pyyaml = "*"
 kubernetes = "*"
 jsonpatch = "*"
@@ -18,7 +18,7 @@ boto3 = "*"
 
 [dev-packages]
 black = "*"
-flake8 = "*"
+flake8 = ">=4.0.0,<5.0.0"
 pytest = "*"
 pylint = "*"
 pytest-black = "*"

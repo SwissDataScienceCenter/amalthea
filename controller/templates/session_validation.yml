@@ -1,0 +1,15 @@
+apiVersion: container-canary.nvidia.com/v1
+kind: Validator
+
+# Metadata
+name: renku-sessions  # The name of the platform that this manifest validates for
+description: Checks that a session image is compatible with renku  # A description of that platform
+ports:
+  - port: 8888
+    protocol: TCP
+checks:
+  - name: tcp
+    description: Is listening via TCP on port 8888
+    probe:
+      tcpSocket:
+        port: 8888

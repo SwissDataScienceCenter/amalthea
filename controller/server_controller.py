@@ -1,4 +1,5 @@
 import logging
+import subprocess
 import kopf
 from datetime import datetime
 from kubernetes.client.models import V1DeleteOptions
@@ -7,7 +8,12 @@ from prometheus_client import start_http_server
 import pytz
 
 from controller import config
-from controller.k8s_resources import CONTENT_TYPES, get_children_specs, get_urls
+from controller.k8s_resources import (
+    CONTENT_TYPES,
+    TEMPLATE_DIR,
+    get_children_specs,
+    get_urls,
+)
 from controller.culling import get_cpu_usage_for_culling, get_js_server_status
 from controller.utils import (
     get_pod_metrics,
@@ -79,6 +85,9 @@ def configure(logger, settings, **_):
                 getattr(settings, key).__dict__.update(val)
         except AttributeError as e:
             logger.error(f"Problem when configuring the Operator: {e}")
+
+    settings.admission.server = kopf.WebhookAutoTunnel(addr="0.0.0.0", port=8181)
+    settings.admission.managed = "auto.kopf.dev"
 
 
 @kopf.on.create(
@@ -206,7 +215,8 @@ def update_server_state(body, labels, namespace, **_):
             and sorted_conditions[0].get("reason") == "Unschedulable"
             # NOTE: every pod is initially unschedulable until a PV is provisioned
             # therefore to avoid "flashing" this state when a sessions starts this case is ignored
-            and "persistentvolumeclaim" not in sorted_conditions[0].get("message", "").lower()
+            and "persistentvolumeclaim"
+            not in sorted_conditions[0].get("message", "").lower()
         ):
             return True
         return False
@@ -266,7 +276,9 @@ def update_server_state(body, labels, namespace, **_):
                     "status": {
                         "state": new_status.value,
                         "failedSince": (
-                            now.isoformat() if new_status is ServerStatusEnum.Failed else None
+                            now.isoformat()
+                            if new_status is ServerStatusEnum.Failed
+                            else None
                         ),
                     },
                 },
@@ -417,7 +429,9 @@ def cull_pending_jupyter_servers(body, name, namespace, logger, **kwargs):
     failed_seconds = 0
 
     if starting_since is not None:
-        starting_seconds = (now - datetime.fromisoformat(starting_since)).total_seconds()
+        starting_seconds = (
+            now - datetime.fromisoformat(starting_since)
+        ).total_seconds()
     if failed_since is not None:
         failed_seconds = (now - datetime.fromisoformat(failed_since)).total_seconds()
 
@@ -455,6 +469,20 @@ def cull_pending_jupyter_servers(body, name, namespace, logger, **kwargs):
             )
             pass
         return
+
+
+@kopf.on.validate(config.api_group, config.api_version, config.custom_resource_name)
+def validate_session_image(spec, **_):
+    """Validate session image."""
+    try:
+        image = spec["jupyterServer"]["image"]
+        subprocess.check_output(
+            ["canary", "validate", "--file", f"{TEMPLATE_DIR}/session_validation.yml", f"{image}"],
+            stderr=subprocess.STDOUT,
+            shell=True
+        )
+    except subprocess.CalledProcessError as e:
+        raise kopf.AdmissionError(f"Invalid session image:\n{e.output}")
 
 
 # create @kopf.on.event(...) type of decorators
@@ -623,14 +651,14 @@ if config.METRICS.enabled or config.AUDITLOG.enabled:
         config.api_group,
         config.api_version,
         config.custom_resource_name,
-        field='status.state',
+        field="status.state",
     )(publish_metrics)
     # NOTE: The 'on.field' handler cannot catch the server deletion so this is needed.
     kopf.on.delete(
         config.api_group,
         config.api_version,
         config.custom_resource_name,
-        field='status.state',
+        field="status.state",
     )(publish_metrics)
 # INFO: Start the prometheus metrics server if enabled
 if config.METRICS.enabled:

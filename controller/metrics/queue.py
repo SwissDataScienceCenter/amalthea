@@ -12,6 +12,7 @@ class MetricsQueue:
     metrics handlers subscribe to this queue and persist or further
     publish the metrics to the proper place.
     """
+
     def __init__(self, metric_handlers=List[MetricEventHandler]):
         self.q = Queue()
         self.metric_handlers = metric_handlers
