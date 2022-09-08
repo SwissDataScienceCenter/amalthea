@@ -225,7 +225,9 @@ def convert_to_bytes(value):
         "Pi": 1024**5,
         "Ei": 1024**6,
     }
-    res = re.match(r"^(?<!-)([0-9]*\.?[0-9]*)((?<=[0-9.])[EPTGMKi]*)$", str(value).strip())
+    res = re.match(
+        r"^(?<!-)([0-9]*\.?[0-9]*)((?<=[0-9.])[EPTGMKi]*)$", str(value).strip()
+    )
     if res is None:
         raise ValueError(f"Cannot convert value {value} to bytes.")
     value, unit = res.groups()
@@ -253,5 +255,3 @@ def convert_to_millicores(value):
             f"Cannot convert value {value} to millicores because unit {unit} is not known."
         )
     return float(value) * (factors[unit] if unit else 1000)
-
-

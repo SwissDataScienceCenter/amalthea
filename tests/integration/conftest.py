@@ -265,7 +265,7 @@ def create_amalthea_k8s_resources(load_k8s_config, release_name, k8s_namespace):
     yield create_k8s_resources(
         k8s_namespace,
         [k8s_namespace],
-        resources=["ServiceAccount", "Role", "RoleBinding", "CustomResourceDefinition"],
+        resources=["ServiceAccount", "Role", "RoleBinding", "CustomResourceDefinition", "ClusterRole", "ClusterRoleBinding"],
         release_name=release_name,
     )
     print("Removing custom resources for Amalthea.")
@@ -369,4 +369,5 @@ def patch_sleep_init_container():
                 },
             ],
         }
+
     yield _patch_sleep_init_container

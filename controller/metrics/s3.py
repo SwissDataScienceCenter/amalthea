@@ -24,6 +24,7 @@ from controller.metrics.utils import (
 @dataclass
 class SesionMetricData:
     """The data that is included for each metric event uploaded to S3."""
+
     name: str
     namespace: str
     uid: str
@@ -46,7 +47,9 @@ class SesionMetricData:
             return obj.value
 
     def __str__(self):
-        return json.dumps(asdict(self), default=self._default_json_serializer, indent=None)
+        return json.dumps(
+            asdict(self), default=self._default_json_serializer, indent=None
+        )
 
     @classmethod
     def from_metric_event(
@@ -65,7 +68,8 @@ class SesionMetricData:
             metric_event.status,
             metric_event.old_status,
             additional_labels_from_manifest(
-                metric_event.session, additional_label_names,
+                metric_event.session,
+                additional_label_names,
             ),
         )
 
@@ -76,11 +80,10 @@ class S3RotatingLogHandler(BaseRotatingHandler):
     not kept locally. The maximum rotation period (in seconds) can be
     specified.
     """
+
     _datetime_format = "_%Y%m%d_%H%M%S%z"
 
-    def __init__(
-        self, filename, mode, config: S3Config, encoding=None
-    ):
+    def __init__(self, filename, mode, config: S3Config, encoding=None):
         super().__init__(filename, mode, encoding, delay=False)
         self._period_timedelta = timedelta(seconds=config.rotation_period_seconds)
         self._start_timestamp = pytz.UTC.localize(datetime.utcnow())
@@ -110,9 +113,7 @@ class S3RotatingLogHandler(BaseRotatingHandler):
         resp = None
         if file_stats.st_size > 0:
             resp = self._client.upload_file(
-                fname,
-                self._bucket,
-                self._s3_path_prefix + "/" + Path(fname).name
+                fname, self._bucket, self._s3_path_prefix + "/" + Path(fname).name
             )
         if remove_after_upload:
             os.remove(fname)
@@ -121,7 +122,9 @@ class S3RotatingLogHandler(BaseRotatingHandler):
     def _namer(self, default_name: str) -> str:
         path = Path(default_name)
         new_file = path.parent / (
-            path.stem + self._start_timestamp.strftime(self._datetime_format) + path.suffix
+            path.stem
+            + self._start_timestamp.strftime(self._datetime_format)
+            + path.suffix
         )
         return os.fspath(new_file)
 
@@ -147,10 +150,11 @@ class S3RotatingLogHandler(BaseRotatingHandler):
 
 class S3Formatter(Formatter):
     """Logging formatter that has ISO8601 timestamps and produces valid json logs."""
+
     def __init__(self, validate: bool = True) -> None:
         datefmt = "%Y-%m-%dT%H:%M:%S%z"
         style = "%"
-        fmt = "{\"time\":\"%(asctime)s\", \"message\":%(message)s}"
+        fmt = '{"time":"%(asctime)s", "message":%(message)s}'
         super().__init__(fmt, datefmt, style, validate)
 
     def formatTime(self, record: LogRecord, datefmt: Optional[str] = None) -> str:
@@ -167,6 +171,7 @@ class S3MetricHandler(MetricEventHandler):
     """A simple metric handler that persists the metrics
     that are published by Amalthea to a S3 bucket.
     """
+
     def __init__(
         self,
         logger: Logger,

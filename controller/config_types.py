@@ -7,6 +7,7 @@ from typing import Optional, Union, List
 @dataclass
 class S3Config:
     """The configuration needed to upload metrics to S3."""
+
     endpoint: str
     bucket: str
     path_prefix: str
@@ -22,6 +23,7 @@ class S3Config:
 @dataclass
 class MetricsBaseConfig:
     """Base metrics/auditlog configuration."""
+
     enabled: Union[str, bool] = False
     extra_labels: Union[str, List[str]] = field(default_factory=list)
 
@@ -35,12 +37,15 @@ class MetricsBaseConfig:
 @dataclass
 class AuditlogConfig(MetricsBaseConfig):
     """The configuration used for the auditlogs."""
+
     s3: Optional[S3Config] = None
 
     def __post_init__(self):
         super().__post_init__()
         if self.enabled and not self.s3:
-            raise ValueError("If auditlog is enabled then the S3 configuration has to be provided.")
+            raise ValueError(
+                "If auditlog is enabled then the S3 configuration has to be provided."
+            )
 
     @classmethod
     def dataconf_from_env(cls, prefix="AUDITLOG_"):
@@ -50,6 +55,7 @@ class AuditlogConfig(MetricsBaseConfig):
 @dataclass
 class PrometheusMetricsConfig(MetricsBaseConfig):
     """The configuration for prometheus metrics"""
+
     port: Union[str, int] = 8765
 
     def __post_init__(self):
