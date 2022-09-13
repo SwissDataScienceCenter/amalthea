@@ -5,6 +5,7 @@ from kubernetes.client.models import V1DeleteOptions
 from kubernetes.dynamic.exceptions import NotFoundError
 from prometheus_client import start_http_server
 import pytz
+from typing import Dict, Any
 
 from controller import config
 from controller.k8s_resources import CONTENT_TYPES, get_children_specs, get_urls
@@ -169,27 +170,37 @@ def delete_fn(labels, body, namespace, name, **_):
     labels={config.PARENT_NAME_LABEL_KEY: kopf.PRESENT},
 )
 def update_server_state(body, labels, namespace, **_):
-    def get_all_container_statuses(pod):
-        return pod.get("status", {}).get("containerStatuses", []) + pod.get(
-            "status", {}
-        ).get("initContainerStatuses", [])
-
-    def get_failed_containers(container_statuses):
-        failed_containers = [
-            container_status
-            for container_status in container_statuses
-            if (
-                container_status.get("state", {})
-                .get("terminated", {})
-                .get("exitCode", 0)
-                != 0
-                or container_status.get("lastState", {})
-                .get("terminated", {})
-                .get("exitCode", 0)
-                != 0
+    def is_container_failed(
+        container_status: Dict[str, Any], is_init_container: bool = False
+    ) -> bool:
+        current_status_failed = (
+            container_status.get("state", {}).get("terminated", {}).get("exitCode", 0) != 0
+            if is_init_container
+            else container_status.get("state", {}).get("running", None) is None
+        )
+        if is_init_container:
+            init_container_restart_limit = config.JUPYTER_SERVER_INIT_CONTAINER_RESTART_LIMIT
+            init_container_restart_count = container_status.get(
+                "restartCount", init_container_restart_limit
             )
+            if (
+                init_container_restart_count >= init_container_restart_limit
+            ):
+                return True
+        return current_status_failed
+
+    def get_failed_containers(pod):
+        failed_init_containers = [
+            container_status
+            for container_status in pod.get("status", {}).get("initContainerStatuses", [])
+            if is_container_failed(container_status, is_init_container=True)
         ]
-        return failed_containers
+        failed_regular_containers = [
+            container_status
+            for container_status in pod.get("status", {}).get("containerStatuses", [])
+            if is_container_failed(container_status, is_init_container=False)
+        ]
+        return failed_init_containers + failed_regular_containers
 
     def is_pod_unschedulable(pod) -> bool:
         """Determines is a server pod is unschedulable."""
@@ -222,8 +233,7 @@ def update_server_state(body, labels, namespace, **_):
 
         pod_phase = pod.get("status", {}).get("phase")
         pod_conditions = pod.get("status", {}).get("conditions", [{"status": "False"}])
-        container_statuses = get_all_container_statuses(pod)
-        failed_containers = get_failed_containers(container_statuses)
+        failed_containers = get_failed_containers(pod)
         all_pod_conditions_good = all(
             [condition.get("status", "False") == "True" for condition in pod_conditions]
         )
