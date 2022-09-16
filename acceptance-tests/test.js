@@ -1,9 +1,9 @@
 var assert = require('assert');
+const cypress = require('cypress');
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const axios = require('axios').default;
 
-const token = "testtoken123456";
 const host = "localhost";
 const k8sNamespace = process.env.K8S_NAMESPACE || "default";
 const image = process.env.TEST_IMAGE_NAME || "jupyter/base-notebook:latest";
@@ -12,7 +12,7 @@ const env = process.env.ENVIRONMENT || "lab"
 const sessionName = "test";
 const timeoutSeconds = process.env.TIMEOUT_SECS || 600;
 
-const url = `http://${host}/${sessionName}/${env}?token=${token}`
+const url = `http://${host}/${sessionName}/${env}`
 const manifest = `apiVersion: amalthea.dev/v1alpha1
 kind: JupyterServer
 metadata:
@@ -27,7 +27,7 @@ spec:
     ingressAnnotations:
       kubernetes.io/ingress.class: "nginx"
   auth:
-    token: ${token}
+    token: ""
 `
 
 
@@ -82,11 +82,14 @@ EOF`);
   });
   it('Should pass all acceptance tests', async function () {
     console.log("Starting cypress tests")
-    const {stdout, stderr, error} = await exec(`npx cypress run --spec cypress/e2e/${testSpec} --env URL=${url}`);
-    console.log(`\n\n--------------------------------------------Cypress stdout--------------------------------------------\n${stdout}`)
-    console.log(`\n\n--------------------------------------------Cypress stderr--------------------------------------------\n${stderr}`)
-    console.log(`\n\n-----------------------------------------------------------------------------------------------------\n`)
-    assert(!error, `Tests failed with error:\n${error}`)
+    const results = await cypress.run({
+      env: {
+        URL: url
+      },
+      spec: `cypress/e2e/${testSpec}`,
+      configFile: "cypress.config.js"
+    })
+    assert(!results.totalFailed, `Tests failed with errors`)
   });
   after(async function () {
     console.log(`Stopping session with image ${image}.`)
