@@ -20,7 +20,7 @@ jobs:
           - image: jupyter/minimal-notebook
             env: lab
             spec: jupyterlab.cy.js
-          - image: jupyter/r-notebook
+          - image: renku/renkulab-r:4.2.0-0.12.0
             env: rstudio
             spec: rstudio.cy.js
         include:

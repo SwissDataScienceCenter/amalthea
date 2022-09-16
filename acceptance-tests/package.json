@@ -8,9 +8,11 @@
   },
   "author": "",
   "devDependencies": {
-    "@renku/notebooks-cypress-tests": "^0.0.5",
+    "@renku/notebooks-cypress-tests": "^0.0.6",
     "axios": "^0.27.2",
+    "axios-cookiejar-support": "^4.0.3",
     "cypress": "^10.8.0",
-    "mocha": "^10.0.0"
+    "mocha": "^10.0.0",
+    "tough-cookie": "^4.1.2"
   }
 }
