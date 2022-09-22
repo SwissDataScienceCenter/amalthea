@@ -5,6 +5,8 @@ from kubernetes.client.models import V1DeleteOptions
 from kubernetes.dynamic.exceptions import NotFoundError
 from prometheus_client import start_http_server
 import pytz
+import requests
+from time import sleep
 from typing import Dict, Any
 
 from controller import config
@@ -165,47 +167,46 @@ def delete_fn(labels, body, namespace, name, **_):
 
 
 @kopf.on.event(
-    version="v1",
-    kind="Pod",
-    labels={config.PARENT_NAME_LABEL_KEY: kopf.PRESENT},
+    version=config.api_version, kind=config.custom_resource_name, group=config.api_group
 )
-def update_server_state(body, labels, namespace, **_):
+def update_server_state(body, labels, namespace, name, **_):
     def is_container_failed(
         container_status: Dict[str, Any], is_init_container: bool = False
     ) -> bool:
-        current_status_failed = (
-            container_status.get("state", {}).get("terminated", {}).get("exitCode", 0) != 0
-            if is_init_container
-            else container_status.get("state", {}).get("running", None) is None
-        )
-        if is_init_container:
-            init_container_restart_limit = config.JUPYTER_SERVER_INIT_CONTAINER_RESTART_LIMIT
-            init_container_restart_count = container_status.get(
-                "restartCount", init_container_restart_limit
-            )
-            if (
-                init_container_restart_count >= init_container_restart_limit
-            ):
-                return True
-        return current_status_failed
+        """The pod has a restart policy that applies to all conatiners. This policy is set to Always.
+        Therefore we mark a container as failed based on the restart counter. Otherwise if the
+        container is failing the current status keeps changing between running/starting as it
+        is continuously being restarted. If a container is running then it's restart counter
+        is zero or lower than the threshold.
 
-    def get_failed_containers(pod):
+        If a container has restarted many times we consider the sessions as failed."""
+        restart_limit = (
+            config.JUPYTER_SERVER_INIT_CONTAINER_RESTART_LIMIT
+            if is_init_container
+            else config.JUPYTER_SERVER_CONTAINER_RESTART_LIMIT
+        )
+        restart_count = container_status.get("restartCount", 0)
+        if restart_count > restart_limit:
+            return True
+        return False
+
+    def get_failed_containers(pod_status):
         failed_init_containers = [
             container_status
-            for container_status in pod.get("status", {}).get("initContainerStatuses", [])
+            for container_status in pod_status.get("initContainerStatuses", [])
             if is_container_failed(container_status, is_init_container=True)
         ]
         failed_regular_containers = [
             container_status
-            for container_status in pod.get("status", {}).get("containerStatuses", [])
+            for container_status in pod_status.get("containerStatuses", [])
             if is_container_failed(container_status, is_init_container=False)
         ]
         return failed_init_containers + failed_regular_containers
 
-    def is_pod_unschedulable(pod) -> bool:
+    def is_pod_unschedulable(pod_status) -> bool:
         """Determines is a server pod is unschedulable."""
-        phase = pod.get("status", {}).get("phase")
-        conditions = pod.get("status", {}).get("conditions", [])
+        phase = pod_status.get("phase")
+        conditions = pod_status.get("conditions", [])
         sorted_conditions = sorted(
             conditions,
             key=lambda x: datetime.fromisoformat(x["lastTransitionTime"].rstrip("Z")),
@@ -222,18 +223,19 @@ def update_server_state(body, labels, namespace, **_):
             return True
         return False
 
-    def get_status(pod) -> ServerStatusEnum:
+    def get_status(body) -> ServerStatusEnum:
         """Get the status of the jupyterserver."""
         # Is the server terminating?
-        if pod["metadata"].get("deletionTimestamp") is not None:
+        if body["metadata"].get("deletionTimestamp") is not None:
             return ServerStatusEnum.Stopping
         # Is the pod unschedulable?
-        if is_pod_unschedulable(pod):
+        pod_status = body.get("status", {}).get("mainPod", {}).get("status", {})
+        if is_pod_unschedulable(pod_status):
             return ServerStatusEnum.Failed
 
-        pod_phase = pod.get("status", {}).get("phase")
-        pod_conditions = pod.get("status", {}).get("conditions", [{"status": "False"}])
-        failed_containers = get_failed_containers(pod)
+        pod_phase = pod_status.get("phase")
+        pod_conditions = pod_status.get("conditions", [{"status": "False"}])
+        failed_containers = get_failed_containers(pod_status)
         all_pod_conditions_good = all(
             [condition.get("status", "False") == "True" for condition in pod_conditions]
         )
@@ -254,24 +256,41 @@ def update_server_state(body, labels, namespace, **_):
         return ServerStatusEnum.Starting
 
     new_status = get_status(body)
-    server_name = labels[config.PARENT_NAME_LABEL_KEY]
-    api = get_api(config.api_version, config.custom_resource_name, config.api_group)
-    try:
-        server = api.get(namespace=namespace, name=server_name)
-    except NotFoundError:
-        server = None
-        old_status = None
-    if server:
-        old_status = server.get("status", {}).get("state")
-        if old_status:
-            old_status = ServerStatusEnum(old_status)
+    old_status = body.get("status", {}).get("state")
+    if old_status:
+        old_status = ServerStatusEnum(old_status)
+    if old_status != ServerStatusEnum.Running and new_status == ServerStatusEnum.Running:
+        # NOTE: This is ugly but necessary because you can actually catch the sessions
+        # before it is ready fully by just a few seconds and get a 503. Even though all
+        # statuses in k8s and probes are perfectly all in the green. This prevents the
+        # server from being marked as running if it cannot be accessed via its URL.
+        check_url = body.get("status", {}).get("create_fn", {}).get("fullServerURL")
+        url_check_passed = False
+        if check_url:
+            for _ in range(30):
+                try:
+                    res = requests.get(check_url, timeout=1)
+                except (requests.exceptions.RequestException, TimeoutError) as err:
+                    logging.warning(
+                        f"Could not check session full URL {check_url} because error: {type(err)}"
+                    )
+                else:
+                    if res.status_code >= 200 and res.status_code < 400:
+                        url_check_passed = True
+                        break
+                sleep(1)
+        if not url_check_passed:
+            new_status = ServerStatusEnum.Failed
     # NOTE: Updating the status for deletions is handled in a specific delete handler
     if old_status != new_status and new_status != ServerStatusEnum.Stopping:
         now = pytz.UTC.localize(datetime.utcnow())
+        api = get_api(
+            config.api_version, config.custom_resource_name, config.api_group
+        )
         try:
             api.patch(
                 namespace=namespace,
-                name=server_name,
+                name=name,
                 body={
                     "status": {
                         "state": new_status.value,
