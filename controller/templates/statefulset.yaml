@@ -118,9 +118,8 @@ spec:
                 - name: Authorization
                   value: {{ "token " ~ jupyter_server_app_token }}
               {% endif %}
-            periodSeconds: 10
-            failureThreshold: 6
-            timeoutSeconds: 9
+            periodSeconds: 2
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: {{ probe_path }}
@@ -130,9 +129,9 @@ spec:
                 - name: Authorization
                   value: {{ "token " ~ jupyter_server_app_token }}
               {% endif %}
-            periodSeconds: 10
-            failureThreshold: 2
-            timeoutSeconds: 9
+            periodSeconds: 2
+            failureThreshold: 10
+            successThreshold: 2
           startupProbe:
             httpGet:
               path: {{ probe_path }}
@@ -142,9 +141,10 @@ spec:
                 - name: Authorization
                   value: {{ "token " ~ jupyter_server_app_token }}
               {% endif %}
-            periodSeconds: 10
-            failureThreshold: 30
-            timeoutSeconds: 9
+            # NOTE: if the startup probe does not succeed within periodSeconds X failureThreshold
+            # Then the container is killed and restarted according to the pod's restartPolicy
+            periodSeconds: 2
+            failureThreshold: 150
         
         {% if oidc["enabled"] %}
         - name: oauth2-proxy
@@ -201,6 +201,25 @@ spec:
             limits:
               cpu: 100m
               memory: 32Mi
+          livenessProbe:
+            httpGet:
+              port: 4180
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              port: 4180
+              path: /ping
+            periodSeconds: 2
+            failureThreshold: 30
+            successThreshold: 2
+          startupProbe:
+            httpGet:
+              port: 4180
+              path: /ping
+            periodSeconds: 2
+            failureThreshold: 150
         {% else %}
         - name: passthrough-proxy
           image: traefik:v2.5
@@ -212,6 +231,7 @@ spec:
           args:
            - --entryPoints.web.address=:4180
            - --providers.file.directory=/traefik
+           - --ping.entryPoint=web
           ports:
             - name: http
               containerPort: 4180
@@ -227,4 +247,23 @@ spec:
             limits:
               cpu: 100m
               memory: 64Mi
+          livenessProbe:
+            httpGet:
+              port: 4180
+              path: /ping
+            periodSeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              port: 4180
+              path: /ping
+            periodSeconds: 2
+            failureThreshold: 30
+            successThreshold: 2
+          startupProbe:
+            httpGet:
+              port: 4180
+              path: /ping
+            periodSeconds: 2
+            failureThreshold: 150
         {% endif %}
