@@ -78,3 +78,6 @@ AUDITLOG: AuditlogConfig = AuditlogConfig.dataconf_from_env()
 JUPYTER_SERVER_INIT_CONTAINER_RESTART_LIMIT: int = int(
     os.environ.get("JUPYTER_SERVER_INIT_CONTAINER_RESTART_LIMIT", 1)
 )
+JUPYTER_SERVER_CONTAINER_RESTART_LIMIT: int = int(
+    os.environ.get("JUPYTER_SERVER_CONTAINER_RESTART_LIMIT", 5)
+)
