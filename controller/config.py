@@ -75,9 +75,14 @@ MAIN_POD_LABEL_KEY = f"{api_group}/main-pod"
 METRICS: PrometheusMetricsConfig = PrometheusMetricsConfig.dataconf_from_env()
 AUDITLOG: AuditlogConfig = AuditlogConfig.dataconf_from_env()
 
+# NOTE: K8s attemts restarts with a exponentially increasing delay
+# so a restart limit of 5 for example takes some 10 mins to go through
+# and show a failed status. This is because every subsequent restart
+# has a longer expontentially incrreasing delay and the container is not
+# considered failed until it exceeds the restart limits below
 JUPYTER_SERVER_INIT_CONTAINER_RESTART_LIMIT: int = int(
     os.environ.get("JUPYTER_SERVER_INIT_CONTAINER_RESTART_LIMIT", 1)
 )
 JUPYTER_SERVER_CONTAINER_RESTART_LIMIT: int = int(
-    os.environ.get("JUPYTER_SERVER_CONTAINER_RESTART_LIMIT", 5)
+    os.environ.get("JUPYTER_SERVER_CONTAINER_RESTART_LIMIT", 3)
 )
