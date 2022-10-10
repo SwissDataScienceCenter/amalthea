@@ -174,7 +174,7 @@ def update_server_state(body, labels, namespace, name, **_):
         config.JUPYTER_SERVER_CONTAINER_RESTART_LIMIT,
     )
     new_status = server_status.overall_status
-    old_status = body.get("status", {}).get("state")
+    old_status = ServerStatusEnum(body.get("status", {}).get("state"))
     new_summary = server_status.get_container_summary()
     old_summary = body.get("status", {}).get("containerStates", {})
     # NOTE: Updating the status for deletions is handled in a specific delete handler
@@ -195,7 +195,7 @@ def update_server_state(body, labels, namespace, name, **_):
                         "state": new_status.value,
                         "containerStates": new_summary,
                         "failedSince": (
-                            now.isoformat() if new_status is ServerStatusEnum.Failed else None
+                            now.isoformat() if new_status == ServerStatusEnum.Failed else None
                         ),
                     },
                 },
