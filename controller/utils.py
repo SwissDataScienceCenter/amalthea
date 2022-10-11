@@ -25,7 +25,8 @@ def get_pod_metrics(pod_name, namespace):
         )
     except ApiException as err:
         logging.warning(
-            f"Could not get metrics for pod {pod_name} in namespace {namespace}, because: {err}"
+            f"Could not get metrics for pod {pod_name} "
+            f"in namespace {namespace}, because: {type(err)}"
         )
         return None
 
