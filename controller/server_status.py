@@ -23,6 +23,7 @@ Usually deals with data like the following:
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from itertools import chain
 from time import sleep
 from typing import Any, ClassVar, Dict, List, Optional, Union
 import logging
@@ -285,32 +286,23 @@ class ServerStatus:
             return ServerStatusEnum.Stopping
         if self.is_unschedulable:
             return ServerStatusEnum.Failed
-        failed_statuses = []
-        failed_init_statuses = []
-        ok_statuses = []
-        ok_init_statuses = []
-        for status in self.statuses:
+        num_failed_statuses = 0
+        num_ok_statuses = 0
+        for status in chain(self.init_statuses, self.statuses):
             if status.failed:
-                failed_statuses.append(status)
+                num_failed_statuses += 1
             elif status.running_ready or status.completed_successfully:
-                ok_statuses.append(status)
-        for status in self.init_statuses:
-            if status.failed:
-                failed_init_statuses.append(status)
-            elif status.running_ready or status.completed_successfully:
-                ok_init_statuses.append(status)
+                num_ok_statuses += 1
         if (
             self.pod_phase == K8sPodPhaseEnum.running
-            and len(ok_init_statuses) == len(self.init_statuses)
-            and len(ok_statuses) == len(self.statuses)
+            and num_ok_statuses == len(self.init_statuses) + len(self.statuses)
             and all([condition.status == "True" for condition in self.pod_conditions])
             and self.server_url_is_eventually_responsive()
         ):
             return ServerStatusEnum.Running
         if (
             self.pod_phase == K8sPodPhaseEnum.failed
-            or len(failed_statuses) > 0
-            or len(failed_init_statuses) > 0
+            or num_failed_statuses > 0
         ):
             return ServerStatusEnum.Failed
         return ServerStatusEnum.Starting
