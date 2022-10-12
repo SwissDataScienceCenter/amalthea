@@ -1,3 +1,17 @@
+## [0.6.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.5.2...0.6.0) (2022-10-12)
+
+
+### Bug Fixes
+
+* **app:** do not use previous status for state ([#243](https://github.com/SwissDataScienceCenter/amalthea/issues/243)) ([ec78326](https://github.com/SwissDataScienceCenter/amalthea/commit/ec7832674538a0788f79996ff30faf59179f351b))
+
+
+### Features
+
+* detailed status messages ([#258](https://github.com/SwissDataScienceCenter/amalthea/issues/258)) ([95371dd](https://github.com/SwissDataScienceCenter/amalthea/commit/95371ddea8e09cdbccfed658a55f85ea73094cad))
+
+
+
 ## [0.5.2](https://github.com/SwissDataScienceCenter/amalthea/compare/0.5.1...0.5.2) (2022-08-11)
 
 
