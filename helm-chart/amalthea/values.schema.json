@@ -23,9 +23,9 @@
                             "clusterWide": {
                                 "const": false
                             },
-                            "namespaces": {
+                            "additionalNamespaces": {
                                 "type": "array",
-                                "minItems": 1,
+                                "minItems": 0,
                                 "items": [
                                     {
                                         "type": "string"
@@ -35,8 +35,7 @@
                             }
                         },
                         "required": [
-                            "clusterWide",
-                            "namespaces"
+                            "clusterWide"
                         ],
                         "additionalProperties": false
                     },

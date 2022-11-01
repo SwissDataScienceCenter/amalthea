@@ -50,7 +50,7 @@ spec:
             {{- if .Values.scope.clusterWide }}
             - "--all-namespaces"
             {{- else }}
-            {{- range (.Values.scope.namespaces | default (list .Release.Namespace)) }}
+            {{- range (append .Values.scope.additionalNamespaces .Release.Namespace | uniq) }}
             - "--namespace={{ . }}"
             {{- end }}
             {{- end }}
