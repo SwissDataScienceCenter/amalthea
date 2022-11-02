@@ -1,9 +1,13 @@
 var assert = require('assert');
+const cypress = require('cypress');
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const axios = require('axios').default;
+const wrapper = require("axios-cookiejar-support").wrapper
+const CookieJar = require("tough-cookie").CookieJar
 
-const token = "testtoken123456";
+const jar = new CookieJar();
+const client = wrapper(axios.create({ jar }));
 const host = "localhost";
 const k8sNamespace = process.env.K8S_NAMESPACE || "default";
 const image = process.env.TEST_IMAGE_NAME || "jupyter/base-notebook:latest";
@@ -12,7 +16,7 @@ const env = process.env.ENVIRONMENT || "lab"
 const sessionName = "test";
 const timeoutSeconds = process.env.TIMEOUT_SECS || 600;
 
-const url = `http://${host}/${sessionName}/${env}?token=${token}`
+const url = `http://${host}/${sessionName}/${env}`
 const manifest = `apiVersion: amalthea.dev/v1alpha1
 kind: JupyterServer
 metadata:
@@ -25,9 +29,17 @@ spec:
     host: ${host}
     path: /${sessionName}
     ingressAnnotations:
-      kubernetes.io/ingress.class: "nginx"
+      kubernetes.io/ingress.class: "nginx"  
+  patches:
+    - patch:
+        - op: add
+          path: /statefulset/spec/template/spec/containers/0/command
+          value: 
+            - jupyter
+            - notebook
+      type: application/json-patch+json
   auth:
-    token: ${token}
+    token: ""
 `
 
 
@@ -41,7 +53,7 @@ const checkStatusCode = async function (url) {
   while (true) {
     console.log("Waiting for container to become ready...")
     try {
-      res = await axios.get(url)
+      res = await client.get(url)
       if (res.status < 300) {
         console.log(`Response from starting container succeeded with status code: ${res.status}`)
         return {"status": res.status};
@@ -80,13 +92,16 @@ EOF`);
     const {status} = await checkStatusCode(url);
     assert(status < 300)
   });
-  it('Should pass all acceptance tests', async function () {
-    console.log("Starting cypress tests")
-    const {stdout, stderr, error} = await exec(`npx cypress run --spec cypress/e2e/${testSpec} --env URL=${url}`);
-    console.log(`\n\n--------------------------------------------Cypress stdout--------------------------------------------\n${stdout}`)
-    console.log(`\n\n--------------------------------------------Cypress stderr--------------------------------------------\n${stderr}`)
-    console.log(`\n\n-----------------------------------------------------------------------------------------------------\n`)
-    assert(!error, `Tests failed with error:\n${error}`)
+  it('Should pass all Cypress tests on chrome', async function () {
+    const results = await cypress.run({
+      env: {
+        URL: url
+      },
+      spec: `cypress/e2e/${testSpec}`,
+      configFile: "cypress.config.js",
+      browser: "chrome"
+    })
+    assert(!results.totalFailed, `Tests failed with errors on chrome.`)
   });
   after(async function () {
     console.log(`Stopping session with image ${image}.`)
