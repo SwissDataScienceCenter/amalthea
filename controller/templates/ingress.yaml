@@ -8,6 +8,9 @@ spec:
   tls:
     - hosts:
         - {{ routing["host"] }}
+        {% if "wildcard_host" in routing %}
+        - {{ routing["wildcard_host"]}}
+        {% endif %}
       secretName: {{ routing["tls"]["secretName"] }}
 {% endif %}
   rules:
