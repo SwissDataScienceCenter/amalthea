@@ -4,11 +4,8 @@ import argparse
 
 from chart_rbac import cleanup_k8s_resources, cleanup_local_shell
 
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="""Clean up after using `configure_local_dev`."""
-    )
+    parser = argparse.ArgumentParser(description="""Clean up after using `configure_local_dev`.""")
     parser.add_argument(
         "-n",
         "--namespace",

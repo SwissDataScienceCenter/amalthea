@@ -1,27 +1,22 @@
 import logging
-import kopf
 from datetime import datetime
+
+import kopf
+import pytz
 from kubernetes.client.models import V1DeleteOptions
 from kubernetes.dynamic.exceptions import NotFoundError
 from prometheus_client import start_http_server
-import pytz
 
 from controller import config
-from controller.k8s_resources import CONTENT_TYPES, get_children_specs, get_urls
 from controller.culling import get_cpu_usage_for_culling, get_js_server_status
-from controller.utils import (
-    get_pod_metrics,
-    get_volume_disk_capacity,
-    get_api,
-    parse_pod_metrics,
-)
-from controller.metrics.s3 import S3MetricHandler, S3RotatingLogHandler, S3Formatter
-from controller.metrics.prometheus import PrometheusMetricHandler
+from controller.k8s_resources import CONTENT_TYPES, get_children_specs, get_urls
 from controller.metrics.events import MetricEvent
+from controller.metrics.prometheus import PrometheusMetricHandler
 from controller.metrics.queue import MetricsQueue
-from controller.server_status_enum import ServerStatusEnum
+from controller.metrics.s3 import S3Formatter, S3MetricHandler, S3RotatingLogHandler
 from controller.server_status import ServerStatus
-
+from controller.server_status_enum import ServerStatusEnum
+from controller.utils import get_api, get_pod_metrics, get_volume_disk_capacity, parse_pod_metrics
 
 metric_handlers = []
 if config.METRICS.enabled:
@@ -37,9 +32,7 @@ if config.AUDITLOG.enabled:
 metric_events_queue = MetricsQueue(metric_handlers)
 
 
-def get_labels(
-    parent_name, parent_uid, parent_labels, child_key=None, is_main_pod=False
-):
+def get_labels(parent_name, parent_uid, parent_labels, child_key=None, is_main_pod=False):
     """Create the appropriate labels per resource"""
     # Add labels from lowest to highest priority
     labels = {}
@@ -164,9 +157,7 @@ def delete_fn(labels, body, namespace, name, **_):
     )
 
 
-@kopf.on.event(
-    version=config.api_version, kind=config.custom_resource_name, group=config.api_group
-)
+@kopf.on.event(version=config.api_version, kind=config.custom_resource_name, group=config.api_group)
 def update_server_state(body, labels, namespace, name, **_):
     server_status = ServerStatus.from_server_spec(
         body,
@@ -179,13 +170,10 @@ def update_server_state(body, labels, namespace, name, **_):
     old_summary = body.get("status", {}).get("containerStates", {})
     # NOTE: Updating the status for deletions is handled in a specific delete handler
     if (
-        (old_status != new_status or new_summary != old_summary)
-        and new_status != ServerStatusEnum.Stopping
-    ):
+        old_status != new_status or new_summary != old_summary
+    ) and new_status != ServerStatusEnum.Stopping:
         now = pytz.UTC.localize(datetime.utcnow())
-        api = get_api(
-            config.api_version, config.custom_resource_name, config.api_group
-        )
+        api = get_api(config.api_version, config.custom_resource_name, config.api_group)
         try:
             api.patch(
                 namespace=namespace,
@@ -227,9 +215,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     except KeyError:
         return
     cpu_usage = get_cpu_usage_for_culling(pod=pod_name, namespace=namespace)
-    custom_resource_api = get_api(
-        config.api_version, config.custom_resource_name, config.api_group
-    )
+    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     idle_seconds = int(body["status"].get("idleSeconds", 0))
     now = pytz.UTC.localize(datetime.utcnow())
     last_activity = js_server_status.get("last_activity", now)
@@ -247,8 +233,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
         cpu_usage <= config.CPU_USAGE_MILLICORES_IDLE_THRESHOLD
         and type(js_server_status) is dict
         and js_server_status.get("connections", 0) == 0
-        and last_activity_age_seconds
-        > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
+        and last_activity_age_seconds > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
     )
     delete_idle_server = (
         jupyter_server_is_idle_now
@@ -256,8 +241,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
         and idle_seconds >= idle_seconds_threshold
     )
     delete_old_server = (
-        max_age_seconds_threshold > 0
-        and jupyter_server_age_seconds >= max_age_seconds_threshold
+        max_age_seconds_threshold > 0 and jupyter_server_age_seconds >= max_age_seconds_threshold
     )
 
     if delete_idle_server or delete_old_server:
@@ -289,8 +273,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
                 body={
                     "status": {
                         "idleSeconds": str(
-                            idle_seconds
-                            + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
+                            idle_seconds + config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
                         ),
                     },
                 },
@@ -350,9 +333,7 @@ def cull_pending_jupyter_servers(body, name, namespace, logger, **kwargs):
     if failed_since is not None:
         failed_seconds = (now - datetime.fromisoformat(failed_since)).total_seconds()
 
-    custom_resource_api = get_api(
-        config.api_version, config.custom_resource_name, config.api_group
-    )
+    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
 
     if starting_seconds_threshold > 0 and starting_seconds > starting_seconds_threshold:
         logger.info(f"Deleting Jupyter server {name} due to starting too long")
@@ -447,9 +428,7 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 
     # We use the dynamic client for patching since we need
     # content_type="application/json-patch+json"
-    custom_resource_api = get_api(
-        config.api_version, config.custom_resource_name, config.api_group
-    )
+    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     try:
         custom_resource_api.patch(
             namespace=namespace,
@@ -485,9 +464,7 @@ def update_resource_usage(body, name, namespace, **kwargs):
     disk_capacity = get_volume_disk_capacity(pod_name, namespace, "workspace")
     pod_metrics = get_pod_metrics(pod_name, namespace)
     parsed_pod_metrics = parse_pod_metrics(pod_metrics)
-    cpu_memory = list(
-        filter(lambda x: x.get("name") == "jupyter-server", parsed_pod_metrics)
-    )
+    cpu_memory = list(filter(lambda x: x.get("name") == "jupyter-server", parsed_pod_metrics))
     cpu_memory = cpu_memory[0] if len(cpu_memory) == 1 else {}
     patch = {
         "status": {
@@ -504,9 +481,7 @@ def update_resource_usage(body, name, namespace, **kwargs):
             }
         }
     }
-    custom_resource_api = get_api(
-        config.api_version, config.custom_resource_name, config.api_group
-    )
+    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     try:
         custom_resource_api.patch(
             namespace=namespace,
@@ -552,14 +527,14 @@ if config.METRICS.enabled or config.AUDITLOG.enabled:
         config.api_group,
         config.api_version,
         config.custom_resource_name,
-        field='status.state',
+        field="status.state",
     )(publish_metrics)
     # NOTE: The 'on.field' handler cannot catch the server deletion so this is needed.
     kopf.on.delete(
         config.api_group,
         config.api_version,
         config.custom_resource_name,
-        field='status.state',
+        field="status.state",
     )(publish_metrics)
 # INFO: Start the prometheus metrics server if enabled
 if config.METRICS.enabled:

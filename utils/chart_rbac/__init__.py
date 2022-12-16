@@ -1,11 +1,11 @@
 import base64
 import json
 import subprocess as sp
+
 import yaml
-
 from kubernetes import client, config, utils
-from kubernetes.dynamic import DynamicClient, exceptions as k8s_dynamic_exc
-
+from kubernetes.dynamic import DynamicClient
+from kubernetes.dynamic import exceptions as k8s_dynamic_exc
 
 # Fake release name which will be used for resource naming
 # (note that we're not installing a helm release).
@@ -85,12 +85,8 @@ def cleanup_k8s_resources(
         resources,
         release_name,
     ):
-        print(
-            f"Trying to cleanup {resource['kind']} with name {resource['metadata']['name']}"
-        )
-        res_api = dc.resources.get(
-            api_version=resource["apiVersion"], kind=resource["kind"]
-        )
+        print(f"Trying to cleanup {resource['kind']} with name {resource['metadata']['name']}")
+        res_api = dc.resources.get(api_version=resource["apiVersion"], kind=resource["kind"])
         try:
             res_api.delete(
                 resource["metadata"]["name"],
@@ -123,9 +119,9 @@ def configure_local_shell(
     """
     config = yaml.safe_load(sp.check_output("kubectl config view", shell=True))
     current_context = config["current-context"]
-    current_cluster = [_ for _ in config["contexts"] if _["name"] == current_context][
-        0
-    ]["context"]["cluster"]
+    current_cluster = [_ for _ in config["contexts"] if _["name"] == current_context][0]["context"][
+        "cluster"
+    ]
 
     # Get the token for the newly created service account
     sa = json.loads(
@@ -136,9 +132,7 @@ def configure_local_shell(
     )
     sa_token_secret = yaml.safe_load(
         sp.check_output(
-            [
-                f"kubectl get secret -n {amalthea_namespace} {sa['secrets'][0]['name']} -o yaml"
-            ],
+            [f"kubectl get secret -n {amalthea_namespace} {sa['secrets'][0]['name']} -o yaml"],
             shell=True,
         )
     )

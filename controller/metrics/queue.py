@@ -1,10 +1,10 @@
 import logging
-from queue import Queue
-from typing import List
 import threading
 import traceback
+from queue import Queue
+from typing import List
 
-from controller.metrics.events import MetricEventHandler, MetricEvent
+from controller.metrics.events import MetricEvent, MetricEventHandler
 
 
 class MetricsQueue:
@@ -12,6 +12,7 @@ class MetricsQueue:
     metrics handlers subscribe to this queue and persist or further
     publish the metrics to the proper place.
     """
+
     def __init__(self, metric_handlers=List[MetricEventHandler]):
         self.q = Queue()
         self.metric_handlers = metric_handlers

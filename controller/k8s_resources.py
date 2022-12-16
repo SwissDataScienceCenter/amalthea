@@ -4,12 +4,11 @@ import os
 from urllib.parse import urljoin
 
 import jinja2
-import jsonpatch
 import json_merge_patch
+import jsonpatch
 import yaml
 
 from controller import config
-
 
 CONTENT_TYPES = {
     "json-patch": "application/json-patch+json",
@@ -56,9 +55,7 @@ def create_template_values(name, spec):
     # All we need for template rendering, alphabetically listed
     template_values = {
         "auth": spec["auth"],
-        "authentication_plugin_cookie_secret": base64.urlsafe_b64encode(
-            os.urandom(32)
-        ).decode(),
+        "authentication_plugin_cookie_secret": base64.urlsafe_b64encode(os.urandom(32)).decode(),
         "full_url": full_url,
         "host_url": host_url,
         "ingress_annotations": json.dumps(spec["routing"]["ingressAnnotations"]),
@@ -68,9 +65,7 @@ def create_template_values(name, spec):
         "name": name,
         "oidc": spec["auth"]["oidc"],
         "path": os.path.join("/", spec["routing"]["path"].rstrip("/")),
-        "probe_path": urljoin(
-            spec["routing"]["path"] + "/", "api/status"
-        ),
+        "probe_path": urljoin(spec["routing"]["path"] + "/", "api/status"),
         "pvc": spec["storage"]["pvc"],
         "routing": spec["routing"],
         "scheduler_name": config.SERVER_SCHEDULER_NAME,
@@ -89,9 +84,7 @@ def render_template(template_file, template_values):
 
     tmpl_loader = jinja2.FileSystemLoader(TEMPLATE_DIR)
     tmpl_env = jinja2.Environment(loader=tmpl_loader)
-    tmpl_env.filters["b64encode"] = lambda x: base64.b64encode(
-        x.encode("utf-8")
-    ).decode("ascii")
+    tmpl_env.filters["b64encode"] = lambda x: base64.b64encode(x.encode("utf-8")).decode("ascii")
     yaml_string = tmpl_env.get_template(template_file).render(**template_values)
     resource_spec = yaml.safe_load(yaml_string)
     return resource_spec
@@ -112,23 +105,18 @@ def get_children_specs(name, spec, logger):
         pvc_enabled=spec["storage"]["pvc"]["enabled"],
     )
     children_specs = {
-        key: render_template(tpl, template_values)
-        for key, tpl in children_templates.items()
+        key: render_template(tpl, template_values) for key, tpl in children_templates.items()
     }
 
     # Apply all the patches and return the result
     # TODO: Enable strategic merge patches if possible
     for patch in spec["patches"]:
         if patch["type"] == CONTENT_TYPES["json-patch"]:
-            children_specs = jsonpatch.apply_patch(
-                children_specs, json.dumps(patch["patch"])
-            )
+            children_specs = jsonpatch.apply_patch(children_specs, json.dumps(patch["patch"]))
         elif patch["type"] == CONTENT_TYPES["merge-patch"]:
             children_specs = json_merge_patch.merge(children_specs, patch["patch"])
         else:
             # This should actually already be caught at the CRD validation level.
-            logger.debug(
-                f"Invalid patch type - ignoring this patch: {json.dumps(patch)}"
-            )
+            logger.debug(f"Invalid patch type - ignoring this patch: {json.dumps(patch)}")
 
     return children_specs

@@ -1,11 +1,13 @@
-from expiringdict import ExpiringDict
-from kubernetes.client.rest import ApiException
-from kubernetes import config as k8s_config, dynamic
-from kubernetes.client import api_client
-from kubernetes.client.api import core_v1_api
-from kubernetes.stream import stream
 import logging
 import re
+
+from expiringdict import ExpiringDict
+from kubernetes import config as k8s_config
+from kubernetes import dynamic
+from kubernetes.client import api_client
+from kubernetes.client.api import core_v1_api
+from kubernetes.client.rest import ApiException
+from kubernetes.stream import stream
 
 # A very simple in-memory cache to store the result of the
 # "resources" query of the dynamic API client.
@@ -46,9 +48,7 @@ def parse_pod_metrics(metrics):
     for container in containers:
         try:
             parsed_data = {"name": container.name}
-            parsed_data["cpu_millicores"] = convert_to_millicores(
-                container["usage"]["cpu"]
-            )
+            parsed_data["cpu_millicores"] = convert_to_millicores(container["usage"]["cpu"])
             parsed_data["memory_bytes"] = convert_to_bytes(container["usage"]["memory"])
             parsed_metrics.append(parsed_data)
         except (KeyError, ValueError, AttributeError) as err:
@@ -80,10 +80,7 @@ def get_volume_disk_capacity(pod_name, namespace, volume_name):
                 mount_path = volume_mount.get("mountPath")
                 volume = list(filter(lambda x: x.name == volume_name, pod.spec.volumes))
                 volume = volume[0] if len(volume) == 1 else {}
-                if (
-                    "emptyDir" in volume.keys()
-                    and volume["emptyDir"].get("sizeLimit") is not None
-                ):
+                if "emptyDir" in volume.keys() and volume["emptyDir"].get("sizeLimit") is not None:
                     # empty dir is used for the session
                     command = ["sh", "-c", f"du -sb {mount_path}"]
                     used_bytes = parse_du_command(
@@ -231,9 +228,7 @@ def convert_to_bytes(value):
         raise ValueError(f"Cannot convert value {value} to bytes.")
     value, unit = res.groups()
     if unit and unit not in factors.keys():
-        raise ValueError(
-            f"Cannot convert value {value} to bytes because unit {unit} is not known."
-        )
+        raise ValueError(f"Cannot convert value {value} to bytes because unit {unit} is not known.")
     return float(value) * (factors[unit] if unit else 1)
 
 
@@ -254,5 +249,3 @@ def convert_to_millicores(value):
             f"Cannot convert value {value} to millicores because unit {unit} is not known."
         )
     return float(value) * (factors[unit] if unit else 1000)
-
-

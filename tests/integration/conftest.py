@@ -1,17 +1,17 @@
 import base64
+import os
+import tempfile
 from datetime import datetime, timedelta
 from os.path import expanduser
-import tempfile
+from subprocess import Popen
 from time import sleep
 from uuid import uuid4
-import os
-from subprocess import Popen
 
 import pytest
-from kubernetes import config, client
+import yaml
+from kubernetes import client, config
 from kubernetes.dynamic import DynamicClient
 from kubernetes.dynamic.exceptions import NotFoundError
-import yaml
 
 from controller.culling import get_js_server_status
 from tests.integration.utils import find_resource
@@ -93,9 +93,7 @@ def operator_kubeconfig_fp():
 
 @pytest.fixture(scope="session", autouse=True)
 def kopf_log_files_fp():
-    with tempfile.NamedTemporaryFile("w+b") as stdout, tempfile.NamedTemporaryFile(
-        "w+b"
-    ) as stderr:
+    with tempfile.NamedTemporaryFile("w+b") as stdout, tempfile.NamedTemporaryFile("w+b") as stderr:
         yield stdout, stderr
 
 
@@ -369,4 +367,5 @@ def patch_sleep_init_container():
                 },
             ],
         }
+
     yield _patch_sleep_init_container

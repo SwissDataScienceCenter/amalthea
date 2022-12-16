@@ -1,5 +1,6 @@
 import json
 import os
+
 import yaml
 
 from controller.config_types import AuditlogConfig, PrometheusMetricsConfig
@@ -32,19 +33,13 @@ CHILD_RESOURCES = [
 CHILD_RESOURCES += json.loads(os.getenv("EXTRA_CHILD_RESOURCES", "[]"))
 
 KOPF_CREATE_TIMEOUT = (
-    None
-    if os.getenv("KOPF_CREATE_TIMEOUT", "") == ""
-    else float(os.getenv("KOPF_CREATE_TIMEOUT"))
+    None if os.getenv("KOPF_CREATE_TIMEOUT", "") == "" else float(os.getenv("KOPF_CREATE_TIMEOUT"))
 )
 KOPF_CREATE_BACKOFF = (
-    None
-    if os.getenv("KOPF_CREATE_BACKOFF", "") == ""
-    else float(os.getenv("KOPF_CREATE_BACKOFF"))
+    None if os.getenv("KOPF_CREATE_BACKOFF", "") == "" else float(os.getenv("KOPF_CREATE_BACKOFF"))
 )
 KOPF_CREATE_RETRIES = (
-    None
-    if os.getenv("KOPF_CREATE_RETRIES", "") == ""
-    else int(os.getenv("KOPF_CREATE_RETRIES"))
+    None if os.getenv("KOPF_CREATE_RETRIES", "") == "" else int(os.getenv("KOPF_CREATE_RETRIES"))
 )
 
 JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS = int(
@@ -53,9 +48,7 @@ JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS = int(
 JUPYTER_SERVER_PENDING_CHECK_INTERVAL_SECONDS = int(
     os.getenv("JUPYTER_SERVER_PENDING_CHECK_INTERVAL_SECONDS", 300)
 )
-CPU_USAGE_MILLICORES_IDLE_THRESHOLD = int(
-    os.getenv("CPU_USAGE_MILLICORES_IDLE_THRESHOLD", 200)
-)
+CPU_USAGE_MILLICORES_IDLE_THRESHOLD = int(os.getenv("CPU_USAGE_MILLICORES_IDLE_THRESHOLD", 200))
 SERVER_SCHEDULER_NAME = os.getenv("SERVER_SCHEDULER_NAME", None)
 JUPYTER_SERVER_RESOURCE_CHECK_ENABLED = (
     os.getenv("JUPYTER_SERVER_RESOURCE_CHECK_ENABLED", "true").lower() == "true"

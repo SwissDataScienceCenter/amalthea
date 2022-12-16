@@ -2,8 +2,7 @@
 
 import argparse
 
-from chart_rbac import create_k8s_resources, configure_local_shell
-
+from chart_rbac import configure_local_shell, create_k8s_resources
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

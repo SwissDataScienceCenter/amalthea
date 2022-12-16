@@ -1,13 +1,14 @@
-import pytest
-import yaml
 import json
 from typing import Any, Dict, List, Optional, Union
 
+import pytest
+import yaml
+
 from controller.server_status import (
-    ServerStatus,
-    K8sPodPhaseEnum,
     ContainerStatus,
     ContainerTypeEnum,
+    K8sPodPhaseEnum,
+    ServerStatus,
 )
 from controller.server_status_enum import ServerStatusEnum
 
@@ -227,9 +228,7 @@ status:
         ),
     ],
 )
-def test_container_status(
-    container_status_dict, container_type, property_name, expected_value
-):
+def test_container_status(container_status_dict, container_type, property_name, expected_value):
     status = ContainerStatus.from_k8s_container_status(
         container_status_dict, container_type=container_type
     )

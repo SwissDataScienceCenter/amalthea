@@ -1,16 +1,18 @@
-from typing import Any, Dict, List, Union, NamedTuple, Optional
-from prometheus_client import Counter, Histogram, Summary, Gauge
-from prometheus_client.metrics import MetricWrapperBase
 import re
 from enum import Enum
+from typing import Any, Dict, List, NamedTuple, Optional, Union
 
+from prometheus_client import Counter, Gauge, Histogram, Summary
+from prometheus_client.metrics import MetricWrapperBase
+
+from controller.metrics.events import MetricEvent, MetricEventHandler
+from controller.metrics.utils import additional_labels_from_manifest, resource_request_from_manifest
 from controller.server_status_enum import ServerStatusEnum
-from controller.metrics.events import MetricEventHandler, MetricEvent
-from controller.metrics.utils import resource_request_from_manifest, additional_labels_from_manifest
 
 
 class PrometheusMetricAction(Enum):
     """The different methods that can be used to manipulate prometheus metrics."""
+
     inc = "inc"
     dec = "dec"
     set = "set"
@@ -20,23 +22,30 @@ class PrometheusMetricAction(Enum):
 class PrometheusMetricType(NamedTuple):
     """A generic prometheus metric "struct" with its allowed
     methods and the specific metric type."""
+
     type: MetricWrapperBase
     actions: List[PrometheusMetricAction]
 
 
 class PrometheusMetricTypesEnum(Enum):
     """All the different prometheus metrics supported."""
+
     counter = PrometheusMetricType(Counter, [PrometheusMetricAction.inc])
     gauge = PrometheusMetricType(
         Gauge,
-        [PrometheusMetricAction.inc, PrometheusMetricAction.dec, PrometheusMetricAction.set],
+        [
+            PrometheusMetricAction.inc,
+            PrometheusMetricAction.dec,
+            PrometheusMetricAction.set,
+        ],
     )
     histogram = PrometheusMetricType(Histogram, [PrometheusMetricAction.observe])
     summary = PrometheusMetricType(Summary, [PrometheusMetricAction.observe])
 
 
-class PrometheusMetric():
+class PrometheusMetric:
     """A generic wrapper class for all prometheus metrics."""
+
     _label_name_invalid_first_letter = re.compile(r"^[^a-zA-Z_]")
     _label_name_invalid_all_letters = re.compile(r"[^a-zA-Z0-9_]")
 
@@ -47,7 +56,7 @@ class PrometheusMetric():
         documentation: str,
         labelnames: Optional[List[str]],
         *args,
-        **kwargs
+        **kwargs,
     ):
         if type(metric_type) is str:
             self._metric_type = PrometheusMetricTypesEnum[metric_type].value
@@ -73,9 +82,7 @@ class PrometheusMetric():
         return val
 
     def _sanitize_labels(self, labels: Dict[str, str]) -> Dict[str, str]:
-        return {
-            self.sanitize_label_name(name): val for name, val in labels.items()
-        }
+        return {self.sanitize_label_name(name): val for name, val in labels.items()}
 
     def __call__(
         self,
@@ -116,6 +123,7 @@ class PrometheusMetric():
 class PrometheusMetricNames(Enum):
     """Used to avoid errors in metric names and to ensure
     that always the same set of metric names are used."""
+
     sessions_total_created = "sessions_total_created"
     sessions_total_deleted = "sessions_total_deleted"
     sessions_status_changes = "sessions_status_changes"
@@ -128,6 +136,7 @@ class PrometheusMetricNames(Enum):
 
 class PrometheusMetricHandler(MetricEventHandler):
     """Handles metric events from the queue that are created by amalthea."""
+
     def __init__(self, manifest_labelnames: List[str] = []):
         self.manifest_labelnames = manifest_labelnames
         self._sessions_total_created = PrometheusMetric(
@@ -150,7 +159,7 @@ class PrometheusMetricHandler(MetricEventHandler):
                 *self.manifest_labelnames,
                 "status_from",
                 "status_to",
-            ]
+            ],
         )
         self._sessions_launch_duration = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
@@ -158,7 +167,7 @@ class PrometheusMetricHandler(MetricEventHandler):
             "How long did it take for a session to transition into running state",
             self.manifest_labelnames,
             unit="seconds",
-            buckets=[30, 60, 90, 120, 180, 240, 300, 480]
+            buckets=[30, 60, 90, 120, 180, 240, 300, 480],
         )
         self._sessions_cpu_request = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
@@ -166,7 +175,7 @@ class PrometheusMetricHandler(MetricEventHandler):
             "CPU millicores requested by a user for a session.",
             self.manifest_labelnames,
             unit="m",
-            buckets=[100, 500, 1000, 2000, 3000, 4000]
+            buckets=[100, 500, 1000, 2000, 3000, 4000],
         )
         self._sessions_memory_request = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
@@ -174,14 +183,14 @@ class PrometheusMetricHandler(MetricEventHandler):
             "Memory requested by a user for a session.",
             self.manifest_labelnames,
             unit="byte",
-            buckets=[500e6, 1e9, 2e9, 4e9, 8e9, 16e9, 32e9]
+            buckets=[500e6, 1e9, 2e9, 4e9, 8e9, 16e9, 32e9],
         )
         self._sessions_gpu_request = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
             PrometheusMetricNames["sessions_gpu_request"].value,
             "GPUs requested by a user for a session.",
             self.manifest_labelnames,
-            buckets=[0, 1, 2, 3, 4]
+            buckets=[0, 1, 2, 3, 4],
         )
         self._sessions_disk_request = PrometheusMetric(
             PrometheusMetricTypesEnum["histogram"].value,
@@ -189,7 +198,7 @@ class PrometheusMetricHandler(MetricEventHandler):
             "Disk space requested by a user for a session.",
             self.manifest_labelnames,
             unit="byte",
-            buckets=[1e9, 4e9, 16e9, 32e9, 64e9, 128e9]
+            buckets=[1e9, 4e9, 16e9, 32e9, 64e9, 128e9],
         )
 
     def _collect_labels_from_manifest(self, manifest: Dict[str, Any]) -> Dict[str, str]:

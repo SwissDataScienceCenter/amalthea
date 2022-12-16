@@ -1,7 +1,8 @@
-from dateutil import parser
-from json.decoder import JSONDecodeError
 import logging
+from json.decoder import JSONDecodeError
+
 import requests
+from dateutil import parser
 from requests.exceptions import RequestException
 
 from controller.utils import get_pod_metrics, parse_pod_metrics
@@ -53,9 +54,7 @@ def get_js_server_status(js_body):
     try:
         res = requests.get(f"{server_url.rstrip('/')}/api/status", params=payload)
     except RequestException as err:
-        logging.warning(
-            f"Could not get js server status for {server_url}, because: {err}"
-        )
+        logging.warning(f"Could not get js server status for {server_url}, because: {err}")
         return None
 
     if res.status_code != 200:
@@ -68,9 +67,7 @@ def get_js_server_status(js_body):
     try:
         res = res.json()
     except JSONDecodeError as err:
-        logging.warning(
-            f"Could not parse js server status for {server_url}, because: {err}"
-        )
+        logging.warning(f"Could not parse js server status for {server_url}, because: {err}")
         return None
 
     if type(res) is dict and "last_activity" in res.keys():

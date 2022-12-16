@@ -20,10 +20,6 @@ def test_example(
     session = find_resource(name, k8s_namespace, k8s_amalthea_api)
     assert session is not None
     assert session["metadata"]["name"] == test_manifest["metadata"]["name"]
-    assert (
-        session["spec"]["routing"]["host"] == test_manifest["spec"]["routing"]["host"]
-    )
+    assert session["spec"]["routing"]["host"] == test_manifest["spec"]["routing"]["host"]
     if test_manifest["spec"]["auth"]["oidc"]["enabled"]:
-        assert (
-            session["spec"]["auth"]["token"] == test_manifest["spec"]["auth"]["token"]
-        )
+        assert session["spec"]["auth"]["token"] == test_manifest["spec"]["auth"]["token"]

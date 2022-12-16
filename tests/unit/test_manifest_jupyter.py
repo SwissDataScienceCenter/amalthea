@@ -1,7 +1,9 @@
-import pytest
-import re
-from controller.k8s_resources import get_children_specs
 import logging
+import re
+
+import pytest
+
+from controller.k8s_resources import get_children_specs
 
 
 @pytest.mark.parametrize(

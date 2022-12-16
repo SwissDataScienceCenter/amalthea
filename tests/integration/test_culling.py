@@ -30,11 +30,7 @@ def test_idle_culling(
     # confirm session got culled
     session = find_resource(name, k8s_namespace, k8s_amalthea_api)
     pod = find_resource(name + "-0", k8s_namespace, k8s_pod_api)
-    assert (
-        session is None
-        or pod is None
-        or pod["metadata"].get("deletionTimestamp") is not None
-    )
+    assert session is None or pod is None or pod["metadata"].get("deletionTimestamp") is not None
 
 
 @pytest.mark.culling
@@ -66,11 +62,7 @@ def test_starting_culling(
     # confirm session got culled
     session = find_resource(name, k8s_namespace, k8s_amalthea_api)
     pod = find_resource(name + "-0", k8s_namespace, k8s_pod_api)
-    assert (
-        session is None
-        or pod is None
-        or pod["metadata"].get("deletionTimestamp") is not None
-    )
+    assert session is None or pod is None or pod["metadata"].get("deletionTimestamp") is not None
 
 
 @pytest.mark.culling
@@ -101,8 +93,4 @@ def test_failed_culling(
     # confirm session got culled
     session = find_resource(name, k8s_namespace, k8s_amalthea_api)
     pod = find_resource(name + "-0", k8s_namespace, k8s_pod_api)
-    assert (
-        session is None
-        or pod is None
-        or pod["metadata"].get("deletionTimestamp") is not None
-    )
+    assert session is None or pod is None or pod["metadata"].get("deletionTimestamp") is not None

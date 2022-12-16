@@ -1,6 +1,8 @@
-import pytest
-from controller.k8s_resources import get_children_specs
 import logging
+
+import pytest
+
+from controller.k8s_resources import get_children_specs
 
 
 @pytest.mark.parametrize(
@@ -131,9 +133,7 @@ def test_add_container(patch, valid_spec):
                 "statefulset": {
                     "spec": {
                         "template": {
-                            "spec": {
-                                "imagePullSecrets": [{"name": "image_pull_secret_name"}]
-                            }
+                            "spec": {"imagePullSecrets": [{"name": "image_pull_secret_name"}]}
                         }
                     }
                 },
@@ -157,8 +157,6 @@ def test_add_image_pull_secret(patch, valid_spec):
         assert manifest["image_pull_secret"] == patch["patch"]["image_pull_secret"]
         assert (
             manifest["statefulset"]["spec"]["template"]["spec"]["imagePullSecrets"][0]
-            == patch["patch"]["statefulset"]["spec"]["template"]["spec"][
-                "imagePullSecrets"
-            ][0]
+            == patch["patch"]["statefulset"]["spec"]["template"]["spec"]["imagePullSecrets"][0]
         )
         assert len(manifest.keys()) > 1

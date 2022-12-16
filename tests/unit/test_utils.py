@@ -1,12 +1,12 @@
 import pytest
 
-from controller.server_controller import get_labels
 from controller.config import (
-    PARENT_NAME_LABEL_KEY,
-    PARENT_UID_LABEL_KEY,
     CHILD_KEY_LABEL_KEY,
     MAIN_POD_LABEL_KEY,
+    PARENT_NAME_LABEL_KEY,
+    PARENT_UID_LABEL_KEY,
 )
+from controller.server_controller import get_labels
 
 
 @pytest.fixture

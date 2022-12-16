@@ -20,13 +20,14 @@ Usually deals with data like the following:
         startedAt: "2022-09-07T11:12:19Z"
 """
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from itertools import chain
 from time import sleep
 from typing import Any, ClassVar, Dict, List, Optional, Union
-import logging
+
 import requests
 
 from controller import config
@@ -36,6 +37,7 @@ from controller.server_status_enum import ServerStatusEnum
 class K8sPodPhaseEnum(Enum):
     """K8s pod phases based on
     https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase"""
+
     pending: str = "Pending"
     running: str = "Running"
     succeeded: str = "Succeeded"
@@ -51,6 +53,7 @@ class ContainerTypeEnum(Enum):
 class K8sContainerStateNamesEnum(Enum):
     """K8s container states based on
     https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-states"""
+
     waiting: str = "waiting"
     running: str = "running"
     terminated: str = "terminated"
@@ -108,9 +111,13 @@ class ContainerStatus:
     state: Union[K8sContainerStateRunning, K8sContainerStateWaiting, K8sContainerStateTerminated]
     restarts: int
     container_type: ContainerTypeEnum
-    last_state: Optional[Union[
-        K8sContainerStateRunning, K8sContainerStateWaiting, K8sContainerStateTerminated
-    ]] = None
+    last_state: Optional[
+        Union[
+            K8sContainerStateRunning,
+            K8sContainerStateWaiting,
+            K8sContainerStateTerminated,
+        ]
+    ] = None
     restart_limit: int = config.JUPYTER_SERVER_CONTAINER_RESTART_LIMIT
 
     @classmethod
@@ -152,6 +159,7 @@ class PodConditionsEnum(Enum):
     Pod contidions based on:
     https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions
     """
+
     initialized: str = "Initialized"  # All init containers done
     scheduled: str = "PodScheduled"  # Pod was scheduled to a node
     has_network: str = "PodHasNetwork"  # Pod networking successfully configured
@@ -191,7 +199,10 @@ class ServerStatus:
 
     @classmethod
     def from_server_spec(
-        cls, server: Dict[str, Any], init_container_restart_limit: int, container_restart_limit: int
+        cls,
+        server: Dict[str, Any],
+        init_container_restart_limit: int,
+        container_restart_limit: int,
     ):
         init_container_statuses = []
         container_statuses = []
@@ -205,16 +216,16 @@ class ServerStatus:
             init_container_statuses.append(status)
         for i in main_pod_status.get("containerStatuses", []):
             status = ContainerStatus.from_k8s_container_status(
-                i, restart_limit=container_restart_limit, container_type=ContainerTypeEnum.regular,
+                i,
+                restart_limit=container_restart_limit,
+                container_type=ContainerTypeEnum.regular,
             )
             container_statuses.append(status)
         deletion_timestamp = server.get("metadata", {}).get("deletionTimestamp")
         if deletion_timestamp:
             deletion_timestamp = datetime.fromisoformat(deletion_timestamp.rstrip("Z"))
         pod_conditions = main_pod_status.get("conditions", [])
-        pod_conditions = [
-            PodCondition.from_dict(condition) for condition in pod_conditions
-        ]
+        pod_conditions = [PodCondition.from_dict(condition) for condition in pod_conditions]
         pod_conditions = sorted(
             pod_conditions,
             key=lambda x: x.last_transition_time,
@@ -263,7 +274,7 @@ class ServerStatus:
 
     def server_url_is_eventually_responsive(self, timeout_seconds: int = 5) -> bool:
         start = datetime.now()
-        while(True):
+        while True:
             try:
                 res = requests.get(self.server_url, timeout=1)
             except (requests.exceptions.RequestException, TimeoutError) as err:
@@ -300,9 +311,6 @@ class ServerStatus:
             and self.server_url_is_eventually_responsive()
         ):
             return ServerStatusEnum.Running
-        if (
-            self.pod_phase == K8sPodPhaseEnum.failed
-            or num_failed_statuses > 0
-        ):
+        if self.pod_phase == K8sPodPhaseEnum.failed or num_failed_statuses > 0:
             return ServerStatusEnum.Failed
         return ServerStatusEnum.Starting
