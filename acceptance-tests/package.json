@@ -9,7 +9,7 @@
   "author": "",
   "devDependencies": {
     "axios": "^0.27.2",
-    "cypress": "^11.1.0",
+    "cypress": "^12.3.0",
     "mocha": "^10.0.0"
   },
   "dependencies": {}
