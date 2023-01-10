@@ -131,7 +131,11 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
             child_spec,
             labels=get_labels(name, uid, labels, child_key=child_key),
         )
-        kopf.adopt(child_spec)
+        if child_spec.get("kind") != "PersistentVolume":
+            # NOTE: PeristentVolumes are cluster scoped and can only be dependents
+            # of other cluster scoped resources. Since the JupyterServers are not
+            # cluster scoped then they cannot be owners of PersistentVolumes.
+            kopf.adopt(child_spec)
 
         children_uids[child_key] = create_namespaced_resource(
             namespace=namespace, body=child_spec
@@ -162,6 +166,22 @@ def delete_fn(labels, body, namespace, name, **_):
         },
         content_type=CONTENT_TYPES["merge-patch"],
     )
+    for patch_collection in body.get("spec", {}).get("patches", []):
+        if patch_collection.get("type") != "application/json-patch+json":
+            continue
+        for patch in patch_collection.get("patch", []):
+            patch_value = patch.get("value")
+            if not isinstance(patch_value, dict):
+                continue
+            if patch_value.get("kind") != "PersistentVolume" or patch.get("op") != "add":
+                continue
+            pv_api = get_api(
+                api_version=patch_value.get("apiVersion"), kind="PersistentVolume", group=""
+            )
+            try:
+                pv_api.delete(name=patch_value.get("metadata", {}).get("name"))
+            except NotFoundError:
+                pass
 
 
 @kopf.on.event(
