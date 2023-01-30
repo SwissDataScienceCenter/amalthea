@@ -246,7 +246,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **kwargs):
     jupyter_server_is_idle_now = (
         cpu_usage <= config.CPU_USAGE_MILLICORES_IDLE_THRESHOLD
         and type(js_server_status) is dict
-        and js_server_status.get("connections", 0) == 0
+        and js_server_status.get("connections", 0) <= 0
         and last_activity_age_seconds
         > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
     )
