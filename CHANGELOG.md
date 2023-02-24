@@ -1,3 +1,12 @@
+## [0.6.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.6.0...0.6.1) (2023-02-24)
+
+
+### Bug Fixes
+
+* **app:** consider idle when connections are <= 0 ([#314](https://github.com/SwissDataScienceCenter/amalthea/issues/314)) ([edafb45](https://github.com/SwissDataScienceCenter/amalthea/commit/edafb45f28ab55ec2e03ff8af60c113b1fbdb97a))
+
+
+
 ## [0.6.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.5.2...0.6.0) (2022-10-12)
 
 
