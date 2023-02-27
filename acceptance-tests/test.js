@@ -4,7 +4,7 @@ const exec = util.promisify(require('child_process').exec);
 const axios = require('axios').default;
 
 const token = "testtoken123456";
-const host = "localhost";
+const hostName = process.env.HOSTNAME || process.env.HOST || "localhost";
 const k8sNamespace = process.env.K8S_NAMESPACE || "default";
 const image = process.env.TEST_IMAGE_NAME || "jupyter/base-notebook:latest";
 const testSpec = process.env.TEST_SPEC || "jupyterlab.cy.js";
@@ -12,7 +12,7 @@ const env = process.env.ENVIRONMENT || "lab"
 const sessionName = "test";
 const timeoutSeconds = process.env.TIMEOUT_SECS || 600;
 
-const url = `http://${host}/${sessionName}/${env}?token=${token}`
+const url = `http://${hostName}/${sessionName}/${env}?token=${token}`
 const manifest = `apiVersion: amalthea.dev/v1alpha1
 kind: JupyterServer
 metadata:
@@ -22,7 +22,7 @@ spec:
   jupyterServer:
     image: ${image}
   routing:
-    host: ${host}
+    host: ${hostName}
     path: /${sessionName}
     ingressAnnotations:
       kubernetes.io/ingress.class: "nginx"
