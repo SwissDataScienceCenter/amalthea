@@ -35,7 +35,7 @@ EOF
 2. Install ingress-nginx
 
 ```
-VERSION=$(curl https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/stable.txt)
+VERSION=controller-v1.0.3
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/$VERSION/deploy/static/provider/kind/deploy.yaml
 ```
 
@@ -59,7 +59,7 @@ Alternatively to specify an image, environment (i.e. lab/rstudio) and a cypress 
 Set the following environment variables:
 
 ```
-TEST_IMAGE_NAME=renku/renkulab-py:3.8-0.8.0 TEST_SPEC=jupyterlab.spec.js ENVIRONMENT=lab npx mocha test.js
+TEST_IMAGE_NAME=renku/renkulab-py:3.8-0.8.0 TEST_SPEC=jupyterlab.cy.js ENVIRONMENT=lab npx mocha test.js
 ```
 
 5. Cleanup
