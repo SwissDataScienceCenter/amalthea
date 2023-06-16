@@ -174,7 +174,8 @@ def update_server_state(body, labels, namespace, name, **_):
         config.JUPYTER_SERVER_CONTAINER_RESTART_LIMIT,
     )
     new_status = server_status.overall_status
-    old_status = ServerStatusEnum(body.get("status", {}).get("state"))
+    old_status_raw = body.get("status", {}).get("state")
+    old_status = None if old_status_raw is None else ServerStatusEnum(old_status_raw)
     new_summary = server_status.get_container_summary()
     old_summary = body.get("status", {}).get("containerStates", {})
     # NOTE: Updating the status for deletions is handled in a specific delete handler
@@ -468,7 +469,99 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 
 # Add the actual decorators
 for child_resource_kind in config.CHILD_RESOURCES:
-    update_status = get_update_decorator(child_resource_kind)(update_status)
+    get_update_decorator(child_resource_kind)(update_status)
+
+
+@kopf.on.event("events", field="involvedObject.kind", value="StatefulSet")
+def handle_statefulset_events(event, namespace, logger, **_):
+    """Used to update the jupyterserver status when a resource quota is full and the pod cannot be scheduled."""
+    custom_resource_api = get_api(
+        config.api_version, config.custom_resource_name, config.api_group
+    )
+    ss_api = get_api("apps/v1", "StatefulSet")
+    body = event.get("object", {})
+    tp = body.get("type")
+    ss_belongs_to_amalthea = False
+    ss = None
+    if tp in ["Warning", "Normal"]:
+        name=body.get("involvedObject", {}).get("name")
+        if name is None:
+            return
+        try:
+            ss = ss_api.get(name=name, namespace=namespace)
+        except NotFoundError:
+            return
+        if ss is None:
+            return
+        ss_belongs_to_amalthea = ss.metadata.get("labels", {}).get(config.PARENT_NAME_LABEL_KEY) is not None
+    if not ss_belongs_to_amalthea:
+        return
+    
+    patch = None
+
+    try:
+        js = custom_resource_api.get(name=name, namespace=namespace)
+    except NotFoundError:
+        return
+    new_message_timestamp = datetime.fromisoformat(body["lastTimestamp"].rstrip("Z"))
+    old_message = js.get("status", {}).get("events", {}).get("statefulset", {}).get("message")
+    old_message_timestamp_raw = js.get("status", {}).get("events", {}).get("statefulset", {}).get("timestamp")
+    old_message_timestamp = None
+    if old_message_timestamp_raw is not None:
+        old_message_timestamp = datetime.fromisoformat(old_message_timestamp_raw.rstrip("Z"))
+    is_event_newer = (
+        old_message_timestamp_raw is None or
+        (
+            new_message_timestamp is not None 
+            and old_message_timestamp_raw is not None 
+            and old_message_timestamp is not None 
+            and new_message_timestamp > old_message_timestamp
+        )
+    )
+    if not is_event_newer:
+        return
+
+    if body.get("reason") == "FailedCreate":
+        # Add the failing status because the quota is exceeded
+        raw_message = body.get("message")
+        if raw_message is not None and "exceeded quota" in str(raw_message).lower():
+            patch = {
+                "status": {
+                    "events": {
+                        "statefulset": {
+                            "message":  config.QUOTA_EXCEEDED_MESSAGE,
+                            "timestamp": body["lastTimestamp"],
+                        }
+                    },
+                }
+            }
+    elif body.get("reason") == "SuccessfulCreate":
+        # Remove the failing status if it exists because the statefulset was scheduled
+        if old_message == config.QUOTA_EXCEEDED_MESSAGE:
+            patch = {
+                "status": {
+                    "events": {
+                        "statefulset": {
+                            "message":  None,
+                            "timestamp": body["lastTimestamp"],
+                        }
+                    },
+                }
+            }
+
+    if patch is None:
+        return
+    
+    try:
+        custom_resource_api.patch(
+            namespace=namespace,
+            name=ss.metadata["name"],
+            body=patch,
+            content_type=CONTENT_TYPES["merge-patch"],
+        )
+    # Handle the case when the custom resource is already gone
+    except NotFoundError:
+        pass
 
 
 def update_resource_usage(body, name, namespace, **kwargs):
