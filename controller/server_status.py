@@ -267,7 +267,7 @@ class ServerStatus:
 
     def server_url_is_eventually_responsive(self, timeout_seconds: int = 5) -> bool:
         start = datetime.now()
-        while(True):
+        while (True):
             try:
                 res = requests.get(self.server_url, timeout=1)
             except (requests.exceptions.RequestException, TimeoutError) as err:

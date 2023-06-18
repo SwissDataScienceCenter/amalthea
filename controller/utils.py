@@ -254,5 +254,3 @@ def convert_to_millicores(value):
             f"Cannot convert value {value} to millicores because unit {unit} is not known."
         )
     return float(value) * (factors[unit] if unit else 1000)
-
-

@@ -87,4 +87,4 @@ JUPYTER_SERVER_CONTAINER_RESTART_LIMIT: int = int(
     os.environ.get("JUPYTER_SERVER_CONTAINER_RESTART_LIMIT", 3)
 )
 
-QUOTA_EXCEEDED_MESSAGE="The resource quota has been exceeded."
+QUOTA_EXCEEDED_MESSAGE = "The resource quota has been exceeded."

@@ -474,7 +474,8 @@ for child_resource_kind in config.CHILD_RESOURCES:
 
 @kopf.on.event("events", field="involvedObject.kind", value="StatefulSet")
 def handle_statefulset_events(event, namespace, logger, **_):
-    """Used to update the jupyterserver status when a resource quota is full and the pod cannot be scheduled."""
+    """Used to update the jupyterserver status when a resource quota is full
+    and the pod cannot be scheduled."""
     custom_resource_api = get_api(
         config.api_version, config.custom_resource_name, config.api_group
     )
@@ -484,7 +485,7 @@ def handle_statefulset_events(event, namespace, logger, **_):
     ss_belongs_to_amalthea = False
     ss = None
     if tp in ["Warning", "Normal"]:
-        name=body.get("involvedObject", {}).get("name")
+        name = body.get("involvedObject", {}).get("name")
         if name is None:
             return
         try:
@@ -493,10 +494,12 @@ def handle_statefulset_events(event, namespace, logger, **_):
             return
         if ss is None:
             return
-        ss_belongs_to_amalthea = ss.metadata.get("labels", {}).get(config.PARENT_NAME_LABEL_KEY) is not None
+        ss_belongs_to_amalthea = (
+            ss.metadata.get("labels", {}).get(config.PARENT_NAME_LABEL_KEY) is not None
+        )
     if not ss_belongs_to_amalthea:
         return
-    
+
     patch = None
 
     try:
@@ -505,16 +508,18 @@ def handle_statefulset_events(event, namespace, logger, **_):
         return
     new_message_timestamp = datetime.fromisoformat(body["lastTimestamp"].rstrip("Z"))
     old_message = js.get("status", {}).get("events", {}).get("statefulset", {}).get("message")
-    old_message_timestamp_raw = js.get("status", {}).get("events", {}).get("statefulset", {}).get("timestamp")
+    old_message_timestamp_raw = (
+        js.get("status", {}).get("events", {}).get("statefulset", {}).get("timestamp")
+    )
     old_message_timestamp = None
     if old_message_timestamp_raw is not None:
         old_message_timestamp = datetime.fromisoformat(old_message_timestamp_raw.rstrip("Z"))
     is_event_newer = (
-        old_message_timestamp_raw is None or
-        (
-            new_message_timestamp is not None 
-            and old_message_timestamp_raw is not None 
-            and old_message_timestamp is not None 
+        old_message_timestamp_raw is None
+        or (
+            new_message_timestamp is not None
+            and old_message_timestamp_raw is not None
+            and old_message_timestamp is not None
             and new_message_timestamp > old_message_timestamp
         )
     )
@@ -529,7 +534,7 @@ def handle_statefulset_events(event, namespace, logger, **_):
                 "status": {
                     "events": {
                         "statefulset": {
-                            "message":  config.QUOTA_EXCEEDED_MESSAGE,
+                            "message": config.QUOTA_EXCEEDED_MESSAGE,
                             "timestamp": body["lastTimestamp"],
                         }
                     },
@@ -542,7 +547,7 @@ def handle_statefulset_events(event, namespace, logger, **_):
                 "status": {
                     "events": {
                         "statefulset": {
-                            "message":  None,
+                            "message": None,
                             "timestamp": body["lastTimestamp"],
                         }
                     },
@@ -551,7 +556,7 @@ def handle_statefulset_events(event, namespace, logger, **_):
 
     if patch is None:
         return
-    
+
     try:
         custom_resource_api.patch(
             namespace=namespace,
