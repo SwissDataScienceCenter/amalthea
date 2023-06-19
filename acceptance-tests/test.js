@@ -3,6 +3,9 @@ const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const axios = require('axios').default;
 
+const dns = require('node:dns');
+dns.setDefaultResultOrder('ipv4first');
+
 const token = "testtoken123456";
 const hostName = process.env.HOSTNAME || process.env.HOST || "localhost";
 const k8sNamespace = process.env.K8S_NAMESPACE || "default";
