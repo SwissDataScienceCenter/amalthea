@@ -193,7 +193,7 @@ def parse_du_command(capacity, bytes_multiplier=1024):
 def get_api(api_version, kind, group=None):
     """
     Get the proper API for a certain resource. We cache the resources
-    availabe in the cluster for 60 seconds in order to reduce the amount
+    available in the cluster for 60 seconds in order to reduce the amount
     of unnecessary requests in busy clusters.
     """
     try:

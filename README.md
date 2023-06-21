@@ -86,8 +86,7 @@ resources:
 - A configmap to hold some non-secret configuration
 - A secret to hold some secret configuration
 - A service to expose the pod defined in the statefulSet
-- An ingress to make the Jupyter server outside reachable from outside of the
-  cluster
+- An ingress to make the Jupyter server outside reachable from outside the cluster
 
 ## Patching a JupyterServer
 
@@ -140,7 +139,7 @@ logic of that operator which is based on the very nice
 ## Testing Amalthea
 
 The easiest way to try amalthea out is to install it in a K8s cluster. If you
-dont have a K8s cluster handy you can also just use
+don't have a K8s cluster handy you can also just use
 [kind](https://kind.sigs.k8s.io/). Further sections in the documentation give
 more details and information on how to do this.
 

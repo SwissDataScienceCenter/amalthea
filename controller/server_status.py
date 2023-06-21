@@ -149,7 +149,7 @@ class ContainerStatus:
 
 class PodConditionsEnum(Enum):
     """
-    Pod contidions based on:
+    Pod conditions based on:
     https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions
     """
     initialized: str = "Initialized"  # All init containers done
@@ -189,6 +189,7 @@ class ServerStatus:
     events: Dict[str, Any] = field(default_factory=lambda: {})
     deletion_timestamp: Optional[datetime] = None
     server_url: Optional[str] = None
+    hibernated: bool = False
 
     @classmethod
     def from_server_spec(
@@ -210,6 +211,7 @@ class ServerStatus:
             )
             container_statuses.append(status)
         deletion_timestamp = server.get("metadata", {}).get("deletionTimestamp")
+
         if deletion_timestamp:
             deletion_timestamp = datetime.fromisoformat(deletion_timestamp.rstrip("Z"))
         pod_conditions = main_pod_status.get("conditions", [])
@@ -221,6 +223,7 @@ class ServerStatus:
             key=lambda x: x.last_transition_time,
             reverse=True,
         )
+        hibernated = server.get("spec", {}).get("jupyterServer", {}).get("hibernated", False)
         return cls(
             init_statuses=init_container_statuses,
             statuses=container_statuses,
@@ -229,6 +232,7 @@ class ServerStatus:
             deletion_timestamp=deletion_timestamp,
             events=server.get("status", {}).get("events", {}),
             server_url=server.get("status", {}).get("create_fn", {}).get("fullServerURL"),
+            hibernated=hibernated,
         )
 
     def get_container_summary(self) -> Dict[str, Dict[str, str]]:
@@ -258,7 +262,7 @@ class ServerStatus:
             and len(self.pod_conditions) >= 1
             and self.pod_conditions[0].reason == "Unschedulable"
             # NOTE: every pod is initially unschedulable until a PV is provisioned
-            # therefore to avoid "flashing" this state when a sessions starts this case is ignored
+            # therefore to avoid "flashing" this state when a session starts this case is ignored
             and isinstance(self.pod_conditions[0].message, str)
             and "persistentvolumeclaim" not in self.pod_conditions[0].message.lower()
         ) or (
@@ -267,7 +271,7 @@ class ServerStatus:
 
     def server_url_is_eventually_responsive(self, timeout_seconds: int = 5) -> bool:
         start = datetime.now()
-        while (True):
+        while True:
             try:
                 res = requests.get(self.server_url, timeout=1)
             except (requests.exceptions.RequestException, TimeoutError) as err:
@@ -275,7 +279,7 @@ class ServerStatus:
                     f"Could not check session full URL {self.server_url} because error: {type(err)}"
                 )
             else:
-                if res.status_code >= 200 and res.status_code < 400:
+                if 200 <= res.status_code < 400:
                     return True
             if (datetime.now() - start).total_seconds() > timeout_seconds:
                 return False
@@ -297,6 +301,8 @@ class ServerStatus:
                 num_failed_statuses += 1
             elif status.running_ready or status.completed_successfully:
                 num_ok_statuses += 1
+        if self.hibernated:
+            return ServerStatusEnum.Hibernated
         if (
             self.pod_phase == K8sPodPhaseEnum.running
             and num_ok_statuses == len(self.init_statuses) + len(self.statuses)
