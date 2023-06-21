@@ -23,3 +23,6 @@ jobs:
           python -m pip install --upgrade pip pipenv
           pipenv install --deploy --system --dev
           pipenv run pytest tests/unit
+      - name: Run flake8
+        run: |
+          pipenv run flake8 ./

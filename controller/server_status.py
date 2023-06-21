@@ -186,6 +186,7 @@ class ServerStatus:
     init_statuses: List[ContainerStatus] = field(default_factory=lambda: [])
     statuses: List[ContainerStatus] = field(default_factory=lambda: [])
     pod_conditions: List[PodCondition] = field(default_factory=lambda: [])
+    events: Dict[str, Any] = field(default_factory=lambda: {})
     deletion_timestamp: Optional[datetime] = None
     server_url: Optional[str] = None
 
@@ -226,6 +227,7 @@ class ServerStatus:
             pod_phase=K8sPodPhaseEnum(main_pod_status.get("phase", "Pending")),
             pod_conditions=pod_conditions,
             deletion_timestamp=deletion_timestamp,
+            events=server.get("status", {}).get("events", {}),
             server_url=server.get("status", {}).get("create_fn", {}).get("fullServerURL"),
         )
 
@@ -259,11 +261,13 @@ class ServerStatus:
             # therefore to avoid "flashing" this state when a sessions starts this case is ignored
             and isinstance(self.pod_conditions[0].message, str)
             and "persistentvolumeclaim" not in self.pod_conditions[0].message.lower()
+        ) or (
+            self.events.get("statefulset", {}).get("message") == config.QUOTA_EXCEEDED_MESSAGE
         )
 
     def server_url_is_eventually_responsive(self, timeout_seconds: int = 5) -> bool:
         start = datetime.now()
-        while(True):
+        while (True):
             try:
                 res = requests.get(self.server_url, timeout=1)
             except (requests.exceptions.RequestException, TimeoutError) as err:

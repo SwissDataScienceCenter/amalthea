@@ -2,7 +2,7 @@
   # Kopf: posting the events about the handlers progress/errors.
   - apiGroups: [""]
     resources: [events]
-    verbs: [create]
+    verbs: [create, get, list, watch]
 
   # Amalthea: watching & handling for the custom resource we declare.
   - apiGroups: [{{ .Values.crdApiGroup }}]
