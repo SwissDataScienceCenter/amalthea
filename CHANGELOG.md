@@ -1,3 +1,11 @@
+## [0.7.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.6.1...0.7.0) (2023-06-27)
+
+### Features
+
+* **app:** add error and update status when resource quota is exceeded ([#336](https://github.com/SwissDataScienceCenter/amalthea/issues/336)) ([cf6e7ca](https://github.com/SwissDataScienceCenter/amalthea/commit/cf6e7ca788359d6544f4b27319a34f4e9e246d39))
+
+
+
 ## [0.6.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.6.0...0.6.1) (2023-02-24)
 
 
