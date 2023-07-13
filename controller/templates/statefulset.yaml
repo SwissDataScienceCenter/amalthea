@@ -165,6 +165,7 @@ spec:
             - "--proxy-prefix={{ path if path != '/' else '' }}/oauth2"
             - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
             - "--skip-auth-route=^{{ path if path != '/' else '' }}/api/status$"
+            - "--exclude-logging-path=/ping"
             {% for group in oidc["authorizedGroups"] %}
             - "--allowed-group={{ group }}"
             {% endfor %}
