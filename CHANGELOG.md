@@ -1,3 +1,9 @@
+## [0.7.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.7.0...0.7.1) (2023-07-18)
+
+### Bug Fixes
+
+* **app:** upgrade OAuth2 proxy to 7.4.0 to prevent unnecessary proxy restarting ([#341](https://github.com/SwissDataScienceCenter/amalthea/issues/341)) ([091909f](https://github.com/SwissDataScienceCenter/amalthea/commit/091909fde471992c007141db842988b1234a7aea))
+
 ## [0.7.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.6.1...0.7.0) (2023-06-27)
 
 ### Features
