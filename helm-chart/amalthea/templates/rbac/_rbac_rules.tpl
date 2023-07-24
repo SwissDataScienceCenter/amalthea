@@ -37,6 +37,10 @@
       - configmaps
     verbs: [create, get, list, watch]
 
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: [patch]
+
     {{- range .Values.extraChildResources }}
   - apiGroups:
       - {{ .group }}
