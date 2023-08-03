@@ -5,7 +5,7 @@ Cypress.on('uncaught:exception', (err, runnable) => {
 })
 
 describe('Basic functionality', function() {
-    before(function() {
+    beforeEach(function() {
       cy.visit(Cypress.env("URL"))
     })
     it('Can find launcher icons', function() {
