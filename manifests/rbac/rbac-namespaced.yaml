@@ -48,6 +48,11 @@ rules:
       - secrets
       - configmaps
     verbs: [create, get, list, watch]
+
+  # Required for hibernating sessions
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: [patch]
 ---
 # This manifest is auto-generated from the helm chart, do not modify! 
 # Source: amalthea/templates/rbac/rbac-namespaced.yaml
