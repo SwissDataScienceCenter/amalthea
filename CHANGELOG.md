@@ -1,3 +1,13 @@
+#  (2023-08-03)
+
+## [0.8.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.7.1...0.8.0) (2023-08-03)
+
+### Features
+
+* update CRD to support session hibernation ([#347](https://github.com/SwissDataScienceCenter/amalthea/issues/347)) ([64b65d7](https://github.com/SwissDataScienceCenter/amalthea/commit/64b65d7ed260a7d5103d61a26228c6e912d4dc22))
+
+
+
 ## [0.7.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.7.0...0.7.1) (2023-07-18)
 
 ### Bug Fixes
