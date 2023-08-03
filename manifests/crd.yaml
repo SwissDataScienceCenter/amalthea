@@ -84,7 +84,7 @@ spec:
                             provider. This secret can be given here explicitly as string or
                             through a reference to an existing secret. Using the secret
                             reference is the preferred option because it avoids storing the
-                            secret in cleartext on the custom resource specification. See
+                            secret in clear text on the custom resource specification. See
                             `--client-secret` here:
                             https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#command-line-options
                           oneOf:
@@ -184,6 +184,10 @@ spec:
                         The default URL to redirect to from '/'. Frequently used values are
                         '/lab' or '/rstudio'. Translates to `--ServerApp.default_url`.
                       type: string
+                    hibernated:
+                      default: false
+                      description: Whether the server is hibernated or not.
+                      type: boolean
                     image:
                       default: jupyter/minimal-notebook:latest
                       type: string
@@ -262,7 +266,7 @@ spec:
                         enabled:
                           default: false
                           description:
-                            Wether a PVC should be used to back the session. Defaults to
+                            Whether a PVC should be used to back the session. Defaults to
                             'false' in which case an emptyDir volume will be used.
                           type: boolean
                         mountPath:
