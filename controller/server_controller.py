@@ -1,6 +1,8 @@
 import logging
 import kopf
 from datetime import datetime
+
+import kubernetes.client
 from kubernetes.client.models import V1DeleteOptions
 from kubernetes.dynamic.exceptions import NotFoundError
 from prometheus_client import start_http_server
@@ -73,6 +75,7 @@ def configure(logger, settings, **_):
     Configure the operator - see https://kopf.readthedocs.io/en/stable/configuration/
     for options.
     """
+    settings.posting.level = logging.INFO
 
     if config.kopf_operator_settings:
         try:
@@ -143,15 +146,11 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
 @kopf.on.delete(config.api_group, config.api_version, config.custom_resource_name)
 def delete_fn(labels, body, namespace, name, **_):
     """
-    The juptyer server has been deleted.
+    The jupyter server has been deleted.
     """
     api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     new_status = ServerStatusEnum.Stopping
-    if body:
-        old_status = body.get("status", {}).get("state")
-        old_status = ServerStatusEnum(old_status) if old_status else None
-    else:
-        old_status = None
+
     api.patch(
         namespace=namespace,
         name=name,
@@ -175,7 +174,7 @@ def update_server_state(body, labels, namespace, name, **_):
     )
     new_status = server_status.overall_status
     old_status_raw = body.get("status", {}).get("state")
-    old_status = None if old_status_raw is None else ServerStatusEnum(old_status_raw)
+    old_status = ServerStatusEnum.from_string(old_status_raw)
     new_summary = server_status.get_container_summary()
     old_summary = body.get("status", {}).get("containerStates", {})
     # NOTE: Updating the status for deletions is handled in a specific delete handler
@@ -204,6 +203,44 @@ def update_server_state(body, labels, namespace, name, **_):
             )
         except NotFoundError:
             pass
+
+
+@kopf.on.field(
+    group=config.api_group,
+    version=config.api_version,
+    kind=config.custom_resource_name,
+    field="spec.jupyterServer.hibernated",
+)
+def hibernation_field_handler(body, logger, name, namespace, **_):
+    hibernated = body.get("spec", {}).get("jupyterServer", {}).get("hibernated")
+
+    # NOTE: Don't do anything if ``hibernated`` field isn't set
+    if hibernated is None:
+        return
+
+    if hibernated:
+        action = "Hibernating"
+        replicas = 0
+    else:
+        action = "Resuming hibernated"
+        replicas = 1
+
+    message = f"{action} Jupyter server {name} in namespace {namespace}"
+    body = {"spec": {"replicas": replicas}}
+
+    try:
+        statefulset_api = kubernetes.client.AppsV1Api(kubernetes.client.ApiClient())
+        statefulset_api.patch_namespaced_stateful_set(
+            name=name,
+            namespace=namespace,
+            body=body,
+        )
+    except NotFoundError:
+        logger.warning(f"{message} failed because we cannot find it")
+    except kubernetes.client.ApiException as e:
+        logger.error(f"{message} failed with error {e}")
+    else:
+        logger.info(message)
 
 
 @kopf.timer(
@@ -417,7 +454,7 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 
     # Check if the jupyter server is the actual parent (ie owner) in order
     # to exclude the grand children of the jupyter server. The only grand child
-    # resource we're hanlding here is the statefulset pod.
+    # resource we're handling here is the statefulset pod.
     if (parent_uid not in owner_uids) and not is_main_pod:
         logger.info(
             f"Ignoring event for non-child resource of \
@@ -572,7 +609,7 @@ def handle_statefulset_events(event, namespace, logger, **_):
 def update_resource_usage(body, name, namespace, **kwargs):
     """
     Periodically check the resource usage of the server pod and update the status of the
-    JupyterServer resource. Assumes that the relevant container is called juyter-server
+    JupyterServer resource. Assumes that the relevant container is called jupyter-server
     and that the volume mount in the pod manifest is called workspace.
     """
     try:

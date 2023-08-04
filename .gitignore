@@ -219,3 +219,10 @@ helm-chart/amalthea/requirements.lock
 helm-chart/amalthea/Chart.lock
 
 __pycache__
+
+# macOS
+.DS_Store
+
+# JetBrains IDEs
+.idea
+
