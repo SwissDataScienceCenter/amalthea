@@ -37,6 +37,7 @@
       - configmaps
     verbs: [create, get, list, watch]
 
+  # Required for hibernating sessions
   - apiGroups: ["apps"]
     resources: ["statefulsets"]
     verbs: [patch]

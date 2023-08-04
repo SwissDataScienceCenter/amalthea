@@ -109,6 +109,7 @@ jobs:
           TEST_IMAGE_NAME: ${{ matrix.test-image.image }}
           TEST_SPEC: ${{ matrix.test-image.spec }}
           ENVIRONMENT: ${{ matrix.test-image.env }}
+          ELECTRON_EXTRA_LAUNCH_ARGS: '--disable-gpu'
         with:
           working-directory: acceptance-tests
           command: npx mocha test.js

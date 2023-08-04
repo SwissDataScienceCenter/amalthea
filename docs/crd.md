@@ -230,7 +230,7 @@ Configuration for an OpenID connect provider to be used for access control to th
         <td><b><a href="#jupyterserverspecauthoidcclientsecret">clientSecret</a></b></td>
         <td>object</td>
         <td>
-          The client secret of the application registered with the OIDC provider. This secret can be given here explicitly as string or through a reference to an existing secret. Using the secret reference is the preferred option because it avoids storing the secret in cleartext on the custom resource specification. See `--client-secret` here: https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#command-line-options<br/>
+          The client secret of the application registered with the OIDC provider. This secret can be given here explicitly as string or through a reference to an existing secret. Using the secret reference is the preferred option because it avoids storing the secret in clear text on the custom resource specification. See `--client-secret` here: https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#command-line-options<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -258,7 +258,7 @@ Configuration for an OpenID connect provider to be used for access control to th
 
 
 
-The client secret of the application registered with the OIDC provider. This secret can be given here explicitly as string or through a reference to an existing secret. Using the secret reference is the preferred option because it avoids storing the secret in cleartext on the custom resource specification. See `--client-secret` here: https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#command-line-options
+The client secret of the application registered with the OIDC provider. This secret can be given here explicitly as string or through a reference to an existing secret. Using the secret reference is the preferred option because it avoids storing the secret in clear text on the custom resource specification. See `--client-secret` here: https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#command-line-options
 
 <table>
     <thead>
@@ -404,6 +404,15 @@ Configuration options (such as image to run) for the Jupyter server. See also ht
           The default URL to redirect to from '/'. Frequently used values are '/lab' or '/rstudio'. Translates to `--ServerApp.default_url`.<br/>
           <br/>
             <i>Default</i>: /lab<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hibernated</b></td>
+        <td>boolean</td>
+        <td>
+          Whether the server is hibernated or not.<br/>
+          <br/>
+            <i>Default</i>: false<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -621,7 +630,7 @@ Settings to define storage to back the jupyter server.
         <td><b>enabled</b></td>
         <td>boolean</td>
         <td>
-          Wether a PVC should be used to back the session. Defaults to 'false' in which case an emptyDir volume will be used.<br/>
+          Whether a PVC should be used to back the session. Defaults to 'false' in which case an emptyDir volume will be used.<br/>
           <br/>
             <i>Default</i>: false<br/>
         </td>
