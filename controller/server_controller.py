@@ -166,7 +166,9 @@ def delete_fn(labels, body, namespace, name, **_):
 @kopf.on.event(
     version=config.api_version, kind=config.custom_resource_name, group=config.api_group
 )
-def update_server_state(body, labels, namespace, name, **_):
+def update_server_state(body, labels, namespace, name, logger, **_):
+    logger.warning(f"UPDATE for {namespace}::{name}:\n\n{body}\n\n")  # TODO: Delete-me
+
     server_status = ServerStatus.from_server_spec(
         body,
         config.JUPYTER_SERVER_INIT_CONTAINER_RESTART_LIMIT,
