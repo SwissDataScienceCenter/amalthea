@@ -256,6 +256,34 @@ def is_session_deleted(k8s_namespace, k8s_pod_api, k8s_amalthea_api):
     yield _is_session_deleted
 
 
+@pytest.fixture
+def wait_for_pod_deletion(k8s_namespace, k8s_pod_api):
+    def is_pod_deleted(name, timeout):
+        end = datetime.now() + timedelta(seconds=timeout)
+        while datetime.now() < end:
+            pod = find_resource(f"{name}-0", k8s_namespace, k8s_pod_api)
+            if not pod:
+                return True
+            sleep(2)
+        return False
+
+    yield is_pod_deleted
+
+
+@pytest.fixture
+def wait_for_session_deletion(k8s_namespace, k8s_amalthea_api):
+    def is_session_deleted(name, timeout):
+        end = datetime.now() + timedelta(seconds=timeout)
+        while datetime.now() < end:
+            session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+            if not session:
+                return True
+            sleep(2)
+        return False
+
+    yield is_session_deleted
+
+
 @pytest.fixture(scope="session", autouse=True)
 def create_amalthea_k8s_resources(load_k8s_config, release_name, k8s_namespace):
     """This fixture configures the tests to use a serviceaccount
@@ -290,6 +318,7 @@ def custom_session_manifest(read_manifest, k8s_namespace):
             "startingSecondsThreshold": 0,
             "failedSecondsThreshold": 0,
             "maxAgeSecondsThreshold": 0,
+            "hibernatedSecondsThreshold": 0,
         },
         auth={
             "token": "test-auth-token",
