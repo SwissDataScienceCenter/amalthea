@@ -240,10 +240,10 @@ def is_session_ready(k8s_namespace, k8s_amalthea_api):
 
 @pytest.fixture
 def is_session_deleted(k8s_namespace, k8s_pod_api, k8s_amalthea_api):
-    def _is_session_deleted(name, timeout_mins=5):
+    def _is_session_deleted(name, timeout=300):
         """Has the session been fully shut down"""
         tstart = datetime.now()
-        timeout = timedelta(minutes=timeout_mins)
+        timeout = timedelta(seconds=timeout)
         while datetime.now() - tstart < timeout:
             pod = find_resource(name + "-0", k8s_namespace, k8s_pod_api)
             session = find_resource(name, k8s_namespace, k8s_amalthea_api)
@@ -268,20 +268,6 @@ def wait_for_pod_deletion(k8s_namespace, k8s_pod_api):
         return False
 
     yield is_pod_deleted
-
-
-@pytest.fixture
-def wait_for_session_deletion(k8s_namespace, k8s_amalthea_api):
-    def is_session_deleted(name, timeout):
-        end = datetime.now() + timedelta(seconds=timeout)
-        while datetime.now() < end:
-            session = find_resource(name, k8s_namespace, k8s_amalthea_api)
-            if not session:
-                return True
-            sleep(2)
-        return False
-
-    yield is_session_deleted
 
 
 @pytest.fixture(scope="session", autouse=True)

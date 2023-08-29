@@ -43,8 +43,8 @@ metric_events_queue = MetricsQueue(metric_handlers)
 
 
 def patch_jupyter_servers(
-    *, action: str, name: str, namespace: str, logger, body: Dict, custom_resource_api=None
-):
+    *, name: str, namespace: str, body: Dict, custom_resource_api=None
+) -> bool:
     """Patch a server with the given body."""
     custom_resource_api = custom_resource_api or get_api(
         config.api_version, config.custom_resource_name, config.api_group
@@ -58,10 +58,9 @@ def patch_jupyter_servers(
             content_type=CONTENT_TYPES["merge-patch"],
         )
     except NotFoundError:
-        logger.warning(
-            f"Trying to {action} for Jupyter server {name} in namespace {namespace}, "
-            "but we cannot find it. Has it been deleted in the meantime?"
-        )
+        return False
+    else:
+        return True
 
 
 def get_labels(
@@ -236,7 +235,7 @@ def update_server_state(body, namespace, name, **_):
     kind=config.custom_resource_name,
     field="spec.jupyterServer.hibernated",
 )
-def hibernation_field_handler(body, logger, name, namespace, old, new, **_):
+def hibernation_field_handler(body, logger, name, namespace, **_):
     hibernated = body.get("spec", {}).get("jupyterServer", {}).get("hibernated")
 
     # NOTE: Don't do anything if ``hibernated`` field isn't set
@@ -284,18 +283,21 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
     the idle duration. If any sessions have been idle for long enough, then cull them.
     """
 
-    def update_idle_seconds(seconds, action="update"):
-        patch_jupyter_servers(
-            action=f"{action} idle timer",
+    def update_idle_seconds(seconds):
+        if not patch_jupyter_servers(
             name=name,
             namespace=namespace,
-            logger=logger,
             body={
                 "status": {
                     "idleSeconds": str(seconds),
                 },
             },
-        )
+        ):
+            action = "reset" if seconds == 0 else "update"
+            logger.warning(
+                f"Trying to {action} idle timer for Jupyter server {name} in namespace "
+                f"{namespace}, but we cannot find it. Has it been deleted in the meantime?"
+            )
 
     hibernated = body.get("spec", {}).get("jupyterServer", {}).get("hibernated")
     idle_seconds = int(body.get("status", {}).get("idleSeconds", "0"))
@@ -303,7 +305,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
     # NOTE: Do nothing if the server is hibernated
     if hibernated:
         if idle_seconds:
-            update_idle_seconds(0, action="reset")
+            update_idle_seconds(0)
         return
 
     js_server_status = get_js_server_status(body)
@@ -336,9 +338,9 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
         > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
     )
     hibernate_idle_server = (
-        jupyter_server_is_idle_now and 0 < idle_seconds_threshold <= idle_seconds
+        jupyter_server_is_idle_now and idle_seconds >= idle_seconds_threshold > 0
     )
-    hibernate_old_server = 0 < max_age_seconds_threshold <= jupyter_server_age_seconds
+    hibernate_old_server = jupyter_server_age_seconds >= max_age_seconds_threshold > 0
 
     if hibernate_idle_server or hibernate_old_server:
         culling_reason = "inactivity" if hibernate_idle_server else "age"
@@ -348,11 +350,9 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
         # sidecar in Amalthea
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         hibernation = {"branch": "", "commit": "", "dirty": "", "synchronized": "", "date": now}
-        patch_jupyter_servers(
-            action="hibernate",
+        if not patch_jupyter_servers(
             name=name,
             namespace=namespace,
-            logger=logger,
             body={
                 "metadata": {
                     "annotations": {
@@ -370,7 +370,11 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
                     },
                 },
             },
-        )
+        ):
+            logger.warning(
+                f"Trying to hibernate idle timer for Jupyter server {name} in namespace "
+                f"{namespace}, but we cannot find it. Has it been deleted in the meantime?"
+            )
         return
 
     if jupyter_server_is_idle_now:
@@ -383,7 +387,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
         logger.info(
             f"Resetting idle timer for Jupyter server {name} in namespace {namespace}."
         )
-        update_idle_seconds(0, action="reset")
+        update_idle_seconds(0)
 
 
 @kopf.timer(
@@ -395,18 +399,21 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
 def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
     """Check if a server is hibernated for long enough, then cull it."""
 
-    def update_hibernated_seconds(seconds, action="update"):
-        patch_jupyter_servers(
-            action=f"{action} hibernated timer",
+    def update_hibernated_seconds(seconds):
+        if not patch_jupyter_servers(
             name=name,
             namespace=namespace,
-            logger=logger,
             body={
                 "status": {
                     "hibernatedSeconds": str(seconds),
                 },
             },
-        )
+        ):
+            action = "reset" if seconds == 0 else "update"
+            logger.warning(
+                f"Trying to {action} hibernated timer for Jupyter server {name} in namespace "
+                f"{namespace}, but we cannot find it. Has it been deleted in the meantime?"
+            )
 
     hibernated = body.get("spec", {}).get("jupyterServer", {}).get("hibernated")
     hibernated_seconds = int(body.get("status", {}).get("hibernatedSeconds", "0"))
@@ -414,7 +421,7 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
     # NOTE: Do nothing if the server isn't hibernated
     if not hibernated:
         if hibernated_seconds:
-            update_hibernated_seconds(0, action="reset")
+            update_hibernated_seconds(0)
         return
 
     hibernated_seconds_threshold = body["spec"]["culling"].get("hibernatedSecondsThreshold", 0)

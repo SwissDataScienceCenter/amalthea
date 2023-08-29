@@ -173,7 +173,7 @@ spec:
                     hibernatedSecondsThreshold:
                       default: 0
                       description:
-                        Number of seconds where a can server be in hibernated state before
+                        Number of seconds where a server can be in hibernated state before
                         it gets culled. A value of zero indicates that hibernated servers
                         cannot be culled.
                       minimum: 0

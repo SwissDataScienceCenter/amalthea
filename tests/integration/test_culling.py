@@ -14,7 +14,7 @@ def test_idle_culling(
     k8s_pod_api,
     test_manifest,
     wait_for_pod_deletion,
-    wait_for_session_deletion,
+    is_session_deleted,
 ):
     """Test that the session is culled when idle. It gets hibernated first and then deleted."""
     name = test_manifest["metadata"]["name"]
@@ -50,7 +50,7 @@ def test_idle_culling(
     assert pod is None or pod["metadata"].get("deletionTimestamp") is not None
 
     # NOTE: Wait for the hibernated session to be deleted due to culling
-    wait_for_session_deletion(name, timeout=60)
+    is_session_deleted(name, timeout=60)
 
     session = find_resource(name, k8s_namespace, k8s_amalthea_api)
 
