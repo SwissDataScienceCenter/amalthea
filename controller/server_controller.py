@@ -123,15 +123,20 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
     the necessary k8s child resources which make the actual jupyter server.
     """
     api = get_api(config.api_version, config.custom_resource_name, config.api_group)
-    now = pytz.UTC.localize(datetime.utcnow())
+    now = pytz.UTC.localize(datetime.utcnow()).isoformat(timespec="seconds")
     try:
         api.patch(
             namespace=namespace,
             name=name,
             body={
+                "metadata": {
+                    "annotations": {
+                        "renku.io/last-activity-date": now,
+                    },
+                },
                 "status": {
                     "state": ServerStatusEnum.Starting.value,
-                    "startingSince": now.isoformat(),
+                    "startingSince": now,
                 },
             },
             content_type=CONTENT_TYPES["merge-patch"],
@@ -283,46 +288,53 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
     the idle duration. If any sessions have been idle for long enough, then cull them.
     """
 
-    def update_idle_seconds(seconds):
+    def update_last_activity_date(date_str: str):
         if not patch_jupyter_servers(
             name=name,
             namespace=namespace,
             body={
-                "status": {
-                    "idleSeconds": str(seconds),
+                "metadata": {
+                    "annotations": {
+                        "renku.io/last-activity-date": date_str,
+                    },
                 },
             },
         ):
-            action = "reset" if seconds == 0 else "update"
+            action = "reset" if date_str == "" else "update"
             logger.warning(
-                f"Trying to {action} idle timer for Jupyter server {name} in namespace "
+                f"Trying to {action} last activity date for Jupyter server {name} in namespace "
                 f"{namespace}, but we cannot find it. Has it been deleted in the meantime?"
             )
 
     hibernated = body.get("spec", {}).get("jupyterServer", {}).get("hibernated")
-    idle_seconds = int(body.get("status", {}).get("idleSeconds", "0"))
 
     # NOTE: Do nothing if the server is hibernated
     if hibernated:
-        if idle_seconds:
-            update_idle_seconds(0)
+        last_activity_date = body.get("metadata", {}).get("annotations", {}).get(
+            "renku.io/last-activity-date"
+        )
+        if last_activity_date:
+            update_last_activity_date("")
         return
 
     js_server_status = get_js_server_status(body)
-    if js_server_status is None:
+    if js_server_status is None or not isinstance(js_server_status, dict):
         return  # this means server is not fully up and running yet
+
     idle_seconds_threshold = body["spec"]["culling"]["idleSecondsThreshold"]
     max_age_seconds_threshold = body["spec"]["culling"].get("maxAgeSecondsThreshold", 0)
+
     try:
         pod_name = body["status"]["mainPod"]["name"]
     except KeyError:
         return
     cpu_usage = get_cpu_usage_for_culling(pod=pod_name, namespace=namespace)
+
     now = pytz.UTC.localize(datetime.utcnow())
     last_activity = js_server_status.get("last_activity", now)
     jupyter_server_started = js_server_status.get("started", now)
     jupyter_server_age_seconds = (now - jupyter_server_started).total_seconds()
-    last_activity_age_seconds = (now - last_activity).total_seconds()
+    idle_seconds = (now - last_activity).total_seconds()
     logger.info(
         f"Checking idle status of session {name}, "
         f"idle seconds: {idle_seconds}, "
@@ -332,10 +344,8 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
     )
     jupyter_server_is_idle_now = (
         cpu_usage <= config.CPU_USAGE_MILLICORES_IDLE_THRESHOLD
-        and type(js_server_status) is dict
         and js_server_status.get("connections", 0) <= 0
-        and last_activity_age_seconds
-        > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
+        and idle_seconds > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
     )
     hibernate_idle_server = (
         jupyter_server_is_idle_now and idle_seconds >= idle_seconds_threshold > 0
@@ -362,6 +372,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
                         "renku.io/hibernation-dirty": "",
                         "renku.io/hibernation-synchronized": "",
                         "renku.io/hibernation-date": now,
+                        "renku.io/last-activity-date": "",
                     },
                 },
                 "spec": {
@@ -378,16 +389,15 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
         return
 
     if jupyter_server_is_idle_now:
-        idle_seconds += config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
         logger.info(
             f"Jupyter Server {name} in namespace {namespace} found to be idle for {idle_seconds}"
         )
-        update_idle_seconds(idle_seconds)
+        update_last_activity_date(last_activity.isoformat(timespec="seconds"))
     elif idle_seconds > 0:
         logger.info(
-            f"Resetting idle timer for Jupyter server {name} in namespace {namespace}."
+            f"Resetting last activity date for Jupyter server {name} in namespace {namespace}."
         )
-        update_idle_seconds(0)
+        update_last_activity_date("")
 
 
 @kopf.timer(
@@ -398,30 +408,10 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
 )
 def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
     """Check if a server is hibernated for long enough, then cull it."""
-
-    def update_hibernated_seconds(seconds):
-        if not patch_jupyter_servers(
-            name=name,
-            namespace=namespace,
-            body={
-                "status": {
-                    "hibernatedSeconds": str(seconds),
-                },
-            },
-        ):
-            action = "reset" if seconds == 0 else "update"
-            logger.warning(
-                f"Trying to {action} hibernated timer for Jupyter server {name} in namespace "
-                f"{namespace}, but we cannot find it. Has it been deleted in the meantime?"
-            )
-
     hibernated = body.get("spec", {}).get("jupyterServer", {}).get("hibernated")
-    hibernated_seconds = int(body.get("status", {}).get("hibernatedSeconds", "0"))
 
     # NOTE: Do nothing if the server isn't hibernated
     if not hibernated:
-        if hibernated_seconds:
-            update_hibernated_seconds(0)
         return
 
     hibernated_seconds_threshold = body["spec"]["culling"].get("hibernatedSecondsThreshold", 0)
@@ -438,7 +428,8 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
     now = datetime.now(timezone.utc)
     hibernation_date = datetime.fromisoformat(hibernation_date_str)
 
-    can_be_deleted = (now - hibernation_date).total_seconds() > hibernated_seconds_threshold
+    hibernated_seconds = (now - hibernation_date).total_seconds()
+    can_be_deleted = hibernated_seconds >= hibernated_seconds_threshold
 
     if can_be_deleted:
         logger.info(f"Deleting hibernated Jupyter server {name} due to age")
@@ -457,12 +448,10 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
                 "but we cannot find it. Has it been deleted in the meantime?"
             )
     else:
-        hibernated_seconds += config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
         logger.info(
             f"Jupyter Server {name} in namespace {namespace} found to be hibernated for "
             f"{hibernated_seconds}"
         )
-        update_hibernated_seconds(hibernated_seconds)
 
 
 @kopf.timer(

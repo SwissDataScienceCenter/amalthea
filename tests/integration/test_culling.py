@@ -37,7 +37,7 @@ def test_idle_culling(
     # NOTE: Wait for session to be hibernated due to culling
     wait_for_pod_deletion(name, timeout=culling_threshold_seconds + 30)
 
-    # NOTE: Wait for some updates to the hibernatedSeconds
+    # NOTE: Wait for some hibernated culling handler executions
     time.sleep(15)
 
     session = find_resource(name, k8s_namespace, k8s_amalthea_api)
@@ -45,8 +45,7 @@ def test_idle_culling(
     assert session is not None
     assert session["metadata"]["annotations"]["renku.io/hibernation"]
     assert session["spec"]["jupyterServer"]["hibernated"] is True
-    assert int(session["status"]["hibernatedSeconds"]) > 0
-    assert int(session["status"]["idleSeconds"]) == 0
+    assert session["metadata"]["annotations"]["renku.io/last-activity-date"] == ""
     assert pod is None or pod["metadata"].get("deletionTimestamp") is not None
 
     # NOTE: Wait for the hibernated session to be deleted due to culling
