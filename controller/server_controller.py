@@ -419,14 +419,16 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
         return
 
     annotations = body.get("metadata", {}).get("annotations", {})
+    # NOTE: ``hibernation-date`` is ``""`` when session isn't hibernated; it might not be set when
+    # hibernation is enabled by an admin.
     hibernation_date_str = annotations.get("renku.io/hibernation-date", "")
 
-    # NOTE: ``hibernation-date`` is ``""`` when session isn't hibernated
-    if not hibernation_date_str:
-        return
-
     now = datetime.now(timezone.utc)
-    hibernation_date = datetime.fromisoformat(hibernation_date_str)
+    hibernation_date = (
+        datetime.fromisoformat(hibernation_date_str)
+        if hibernation_date_str
+        else now
+    )
 
     hibernated_seconds = (now - hibernation_date).total_seconds()
     can_be_deleted = hibernated_seconds >= hibernated_seconds_threshold
@@ -452,6 +454,22 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
             f"Jupyter Server {name} in namespace {namespace} found to be hibernated for "
             f"{hibernated_seconds}"
         )
+        if not hibernation_date_str:
+            if not patch_jupyter_servers(
+                name=name,
+                namespace=namespace,
+                body={
+                    "metadata": {
+                        "annotations": {
+                            "renku.io/hibernation-date": now,
+                        },
+                    },
+                },
+            ):
+                logger.warning(
+                    f"Trying to set hibernation date for Jupyter server {name} in namespace "
+                    f"{namespace}, but we cannot find it. Has it been deleted in the meantime?"
+                )
 
 
 @kopf.timer(
