@@ -341,7 +341,17 @@ Options about culling idle servers
         <td><b>failedSecondsThreshold</b></td>
         <td>integer</td>
         <td>
-          How long can a server be in failed state before it gets culled. A value of zero indicates that the server cannot be culled due failing.<br/>
+          How long can a server be in failed state before it gets culled. A value of zero indicates that the server cannot be culled due to failing.<br/>
+          <br/>
+            <i>Default</i>: 0<br/>
+            <i>Minimum</i>: 0<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>hibernatedSecondsThreshold</b></td>
+        <td>integer</td>
+        <td>
+          Number of seconds where a server can be in hibernated state before it gets culled. A value of zero indicates that hibernated servers cannot be culled.<br/>
           <br/>
             <i>Default</i>: 0<br/>
             <i>Minimum</i>: 0<br/>
