@@ -1,3 +1,13 @@
+#  (2023-08-31)
+
+## [0.9.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.8.0...0.9.0) (2023-08-31)
+
+### Features
+
+* add two-step culling for sessions ([#366](https://github.com/SwissDataScienceCenter/amalthea/issues/366)) ([64b65d7](https://github.com/SwissDataScienceCenter/amalthea/commit/bfd88f3a0c3f65dca929cadaafaf14f570443559))
+
+
+
 #  (2023-08-03)
 
 ## [0.8.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.7.1...0.8.0) (2023-08-03)
