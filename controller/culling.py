@@ -44,12 +44,10 @@ def get_js_server_status(js_body):
         server_url = js_body["status"]["create_fn"]["fullServerURL"]
     except KeyError:
         return None
-    payload = (
-        {}
-        if js_body["spec"]["auth"].get("token") is None
-        or js_body["spec"]["auth"].get("token") == ""
-        else {"token": js_body["spec"]["auth"].get("token")}
-    )
+
+    token = js_body["spec"]["auth"].get("token")
+    payload = {} if not token else {"token": token}
+
     try:
         res = requests.get(f"{server_url.rstrip('/')}/api/status", params=payload)
     except RequestException as err:
@@ -66,6 +64,12 @@ def get_js_server_status(js_body):
         return None
 
     try:
+        # {
+        #     "connections": 0,
+        #     "kernels": 0,
+        #     "last_activity": "2023-08-30T15:37:04.583006Z",
+        #     "started": "2023-08-30T15:37:04.583006Z",
+        # }
         res = res.json()
     except JSONDecodeError as err:
         logging.warning(
@@ -73,8 +77,10 @@ def get_js_server_status(js_body):
         )
         return None
 
-    if type(res) is dict and "last_activity" in res.keys():
-        res["last_activity"] = parser.isoparse(res["last_activity"])
-    if type(res) is dict and "started" in res.keys():
-        res["started"] = parser.isoparse(res["started"])
+    if isinstance(res, dict):
+        if "last_activity" in res.keys():
+            res["last_activity"] = parser.isoparse(res["last_activity"])
+        if "started" in res.keys():
+            res["started"] = parser.isoparse(res["started"])
+
     return res

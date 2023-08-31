@@ -239,7 +239,9 @@ class ServerStatus:
         def _get_summary(statuses) -> Dict[str, str]:
             output = {}
             for status in statuses:
-                if status.completed_successfully or status.running_ready:
+                if self.hibernated:
+                    output[status.container_name] = "waiting"
+                elif status.completed_successfully or status.running_ready:
                     output[status.container_name] = "ready"
                 elif status.failed:
                     output[status.container_name] = "failed"

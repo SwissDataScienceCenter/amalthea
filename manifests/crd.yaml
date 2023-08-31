@@ -166,8 +166,16 @@ spec:
                       default: 0
                       description:
                         How long can a server be in failed state before it gets culled. A
-                        value of zero indicates that the server cannot be culled due
+                        value of zero indicates that the server cannot be culled due to
                         failing.
+                      minimum: 0
+                      type: integer
+                    hibernatedSecondsThreshold:
+                      default: 0
+                      description:
+                        Number of seconds where a server can be in hibernated state before
+                        it gets culled. A value of zero indicates that hibernated servers
+                        cannot be culled.
                       minimum: 0
                       type: integer
                   type: object

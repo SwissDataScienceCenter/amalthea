@@ -85,8 +85,6 @@ def render_template(template_file, template_values):
     Render a template given the template strings and return
     a python dictionary specifying the resource.
     """
-    import base64
-
     tmpl_loader = jinja2.FileSystemLoader(TEMPLATE_DIR)
     tmpl_env = jinja2.Environment(loader=tmpl_loader)
     tmpl_env.filters["b64encode"] = lambda x: base64.b64encode(
