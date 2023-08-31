@@ -78,10 +78,10 @@ extraChildResources: []
   #   group: amalthea.dev
 
 image:
-  repository: mohammadsdsc/amalthea
+  repository: renku/amalthea
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "0.8.0-0.dev.git.196.h1a465aa"
+  tag: ""
 
 imagePullSecrets: []
 nameOverride: ""
