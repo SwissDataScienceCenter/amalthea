@@ -45,7 +45,7 @@ def test_idle_culling(
     assert session is not None
     assert session["metadata"]["annotations"]["renku.io/hibernation"]
     assert session["spec"]["jupyterServer"]["hibernated"] is True
-    assert session["metadata"]["annotations"]["renku.io/last-activity-date"] == ""
+    assert session["metadata"]["annotations"]["renku.io/lastActivityDate"] == ""
     assert pod is None or pod["metadata"].get("deletionTimestamp") is not None
 
     # NOTE: Wait for the hibernated session to be deleted due to culling

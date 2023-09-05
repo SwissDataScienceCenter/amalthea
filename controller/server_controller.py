@@ -131,7 +131,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
             body={
                 "metadata": {
                     "annotations": {
-                        "renku.io/last-activity-date": now,
+                        "renku.io/lastActivityDate": now,
                     },
                 },
                 "status": {
@@ -195,7 +195,7 @@ def delete_fn(labels, body, namespace, name, **_):
 @kopf.on.event(
     version=config.api_version, kind=config.custom_resource_name, group=config.api_group
 )
-def update_server_state(body, namespace, name, **_):
+def update_server_state(body, namespace, name, logger, **_):
     server_status = ServerStatus.from_server_spec(
         body,
         config.JUPYTER_SERVER_INIT_CONTAINER_RESTART_LIMIT,
@@ -232,6 +232,35 @@ def update_server_state(body, namespace, name, **_):
             )
         except NotFoundError:
             pass
+
+        hibernated = body.get("spec", {}).get("jupyterServer", {}).get("hibernated")
+        hibernation_date = body.get("metadata", {}).get("annotations", {}).get(
+            "renku.io/hibernationDate"
+        )
+        # NOTE: We clear hibernation annotations here (and not in the notebooks service) to avoid
+        # flickering in the UI (showing the repository as dirty when resuming a session for a short
+        # period of time).
+        if hibernated is False and hibernation_date:
+            if not patch_jupyter_servers(
+                name=name,
+                namespace=namespace,
+                body={
+                    "metadata": {
+                        "annotations": {
+                            "renku.io/hibernation": "",
+                            "renku.io/hibernationBranch": "",
+                            "renku.io/hibernationCommitSha": "",
+                            "renku.io/hibernationDirty": "",
+                            "renku.io/hibernationSynchronized": "",
+                            "renku.io/hibernationDate": "",
+                        },
+                    },
+                },
+            ):
+                logger.warning(
+                    f"Trying to clear hibernation annotations for Jupyter server {name} in "
+                    f"namespace {namespace} when updating state, but we cannot find it."
+                )
 
 
 @kopf.on.field(
@@ -274,6 +303,31 @@ def hibernation_field_handler(body, logger, name, namespace, **_):
     else:
         logger.info(message)
 
+    # NOTE: We clear hibernation annotations here (and not in the notebooks service) to avoid
+    # flickering in the UI (showing the repository as dirty when resuming a session for a short
+    # period of time).
+    if not hibernated:
+        if not patch_jupyter_servers(
+            name=name,
+            namespace=namespace,
+            body={
+                "metadata": {
+                    "annotations": {
+                        "renku.io/hibernation": "",
+                        "renku.io/hibernationBranch": "",
+                        "renku.io/hibernationCommitSha": "",
+                        "renku.io/hibernationDirty": "",
+                        "renku.io/hibernationSynchronized": "",
+                        "renku.io/hibernationDate": "",
+                    },
+                },
+            },
+        ):
+            logger.warning(
+                f"Trying to clear hibernation annotations for Jupyter server {name} in "
+                f"namespace {namespace} when handling hibernation, but we cannot find it."
+            )
+
 
 @kopf.timer(
     config.api_group,
@@ -295,7 +349,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
             body={
                 "metadata": {
                     "annotations": {
-                        "renku.io/last-activity-date": date_str,
+                        "renku.io/lastActivityDate": date_str,
                     },
                 },
             },
@@ -311,7 +365,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
     # NOTE: Do nothing if the server is hibernated
     if hibernated:
         last_activity_date = body.get("metadata", {}).get("annotations", {}).get(
-            "renku.io/last-activity-date"
+            "renku.io/lastActivityDate"
         )
         if last_activity_date:
             update_last_activity_date("")
@@ -367,12 +421,12 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
                 "metadata": {
                     "annotations": {
                         "renku.io/hibernation": json.dumps(hibernation),
-                        "renku.io/hibernation-branch": "",
-                        "renku.io/hibernation-commit-sha": "",
-                        "renku.io/hibernation-dirty": "",
-                        "renku.io/hibernation-synchronized": "",
-                        "renku.io/hibernation-date": now,
-                        "renku.io/last-activity-date": "",
+                        "renku.io/hibernationBranch": "",
+                        "renku.io/hibernationCommitSha": "",
+                        "renku.io/hibernationDirty": "",
+                        "renku.io/hibernationSynchronized": "",
+                        "renku.io/hibernationDate": now,
+                        "renku.io/lastActivityDate": "",
                     },
                 },
                 "spec": {
@@ -419,9 +473,9 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
         return
 
     annotations = body.get("metadata", {}).get("annotations", {})
-    # NOTE: ``hibernation-date`` is ``""`` when session isn't hibernated; it might not be set when
+    # NOTE: ``hibernationDate`` is ``""`` when session isn't hibernated; it might not be set when
     # hibernation is enabled by an admin.
-    hibernation_date_str = annotations.get("renku.io/hibernation-date", "")
+    hibernation_date_str = annotations.get("renku.io/hibernationDate", "")
 
     now = datetime.now(timezone.utc)
     hibernation_date = (
@@ -461,7 +515,7 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
                 body={
                     "metadata": {
                         "annotations": {
-                            "renku.io/hibernation-date": now,
+                            "renku.io/hibernationDate": now,
                         },
                     },
                 },
