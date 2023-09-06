@@ -1,10 +1,20 @@
+#  (2023-09-06)
+
+## [0.9.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.9.0...0.9.1) (2023-09-06)
+
+### Bug Fixes
+
+* clear hibernation annotations when resuming pods to avoid a flicker in UI ([#383](https://github.com/SwissDataScienceCenter/amalthea/issues/383)) ([7819332](https://github.com/SwissDataScienceCenter/amalthea/commit/78193320d8e587d89a613de8bd670e48196c69ee))
+
+
+
 #  (2023-08-31)
 
 ## [0.9.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.8.0...0.9.0) (2023-08-31)
 
 ### Features
 
-* add two-step culling for sessions ([#366](https://github.com/SwissDataScienceCenter/amalthea/issues/366)) ([64b65d7](https://github.com/SwissDataScienceCenter/amalthea/commit/bfd88f3a0c3f65dca929cadaafaf14f570443559))
+* add two-step culling for sessions ([#366](https://github.com/SwissDataScienceCenter/amalthea/issues/366)) ([bfd88f3](https://github.com/SwissDataScienceCenter/amalthea/commit/bfd88f3a0c3f65dca929cadaafaf14f570443559))
 
 
 
