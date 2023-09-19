@@ -6,7 +6,7 @@ name = "pypi"
 [packages]
 kopf = "*"
 pyyaml = "*"
-kubernetes = "==24.2.0"
+kubernetes = "==28.1.0"
 jsonpatch = "*"
 json-merge-patch = "*"
 expiringdict = "*"
