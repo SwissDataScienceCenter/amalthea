@@ -18,12 +18,9 @@ spec:
       initContainers: []
       volumes:
         {% if oidc["enabled"] %}
-        - name: oauth2-proxy-config
+        - name: config
           configMap:
             name: {{ name }}
-            items:
-              - key: authorized-users.txt
-                path: authorized-users.txt
         {% else %}
         - name: traefik-dynamic-config
           configMap:
@@ -64,6 +61,14 @@ spec:
             sizeLimit: {{ storage["size"] }}
             {% endif %}
         {% endif %}
+        {% if "secretKeyRef" in auth["oidc"]["clientSecret"] %}
+        - name: oidc-client-secret
+          secret:
+            secretName: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["name"] }}
+        {% endif %}
+        - name: secret
+          secret:
+            secretName: {{ name }}
       terminationGracePeriodSeconds: 30
       automountServiceAccountToken: false
       securityContext:
@@ -148,27 +153,21 @@ spec:
         
         {% if oidc["enabled"] %}
         - name: oauth2-proxy
-          image: "bitnami/oauth2-proxy:7.4.0"
+          image: "bitnami/oauth2-proxy:7.5.1"
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
           args:
-            - "--provider=oidc"
-            - "--client-id={{ oidc["clientId"] }}"
-            - "--oidc-issuer-url={{ oidc["issuerUrl"] }}"
+            - "--alpha-config=/etc/secret/oauth2ProxyConfig.yaml"
             - "--session-cookie-minimal"
             - "--http-address=:4180"
             - "--skip-provider-button"
-            - "--upstream=http://127.0.0.1:8888"
             - "--redirect-url={{ full_url }}/oauth2/callback"
             - "--cookie-path={{ path }}"
             - "--proxy-prefix={{ path if path != '/' else '' }}/oauth2"
-            - "--authenticated-emails-file=/etc/oauth2-proxy/authorized-users.txt"
+            - "--authenticated-emails-file=/etc/config/authorized-users.txt"
             - "--skip-auth-route=^{{ path if path != '/' else '' }}/api/status$"
             - "--exclude-logging-path=/ping"
-            {% for group in oidc["authorizedGroups"] %}
-            - "--allowed-group={{ group }}"
-            {% endfor %}
           ports:
             - name: http
               containerPort: 4180
@@ -179,22 +178,15 @@ spec:
                 secretKeyRef:
                   name: {{ name }}
                   key: oauth2ProxyCookieSecret
-            - name: OAUTH2_PROXY_CLIENT_SECRET
-              valueFrom:
-              {% if "value" in auth["oidc"]["clientSecret"] %}
-                secretKeyRef:
-                  name: {{ name }}
-                  key: oidcClientSecret
-              {% endif %}
-              {% if "secretKeyRef" in auth["oidc"]["clientSecret"] %}
-                secretKeyRef:
-                  name: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["name"] }}
-                  key: {{ auth["oidc"]["clientSecret"]["secretKeyRef"]["key"] }}
-              {% endif %}
           volumeMounts:
-            - name: oauth2-proxy-config
-              mountPath: /etc/oauth2-proxy/authorized-users.txt
-              subPath: authorized-users.txt
+            - name: config
+              mountPath: /etc/config
+            {% if "secretKeyRef" in auth["oidc"]["clientSecret"] %}
+            - name: oidc-client-secret
+              mountPath: /etc/oauth2-proxy/oidc-client-secret
+            {% endif %}
+            - name: secret
+              mountPath: /etc/secret
           resources:
             requests:
               cpu: 20m
