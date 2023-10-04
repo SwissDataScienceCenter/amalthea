@@ -1,4 +1,4 @@
-{{- if .Values.scheduler.enable }}
+{{- if .Values.scheduler.packing.enabled }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -26,10 +26,13 @@ spec:
             - /usr/local/bin/kube-scheduler
             - --address=0.0.0.0
             - --config=/etc/user-scheduler/config.yaml
+            {{- if semverCompare "<1.23.0-0" .Capabilities.KubeVersion.GitVersion }}
             - --policy-configmap={{ include "amalthea.fullname" . }}-scheduler-policy
             - --policy-configmap-namespace={{ .Release.Namespace }}
+            {{- end }}
             - --scheduler-name={{ include "amalthea.fullname" . }}-scheduler
-          image: "{{ .Values.scheduler.image.repository }}:{{ .Values.scheduler.image.tag }}"
+          image: "{{ .Values.scheduler.packing.image.repository }}:{{ .Values.scheduler.packing.image.tag | default .Capabilities.KubeVersion }}"
+          imagePullPolicy: {{ .Values.scheduler.packing.image.pullPolicy }}
           livenessProbe:
             httpGet:
               path: /healthz

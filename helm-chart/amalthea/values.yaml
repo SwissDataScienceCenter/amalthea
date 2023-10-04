@@ -151,38 +151,22 @@ resourceUsageCheck:
 
 # Deploy an optional additional scheduler in the same namespace where the operator is deployed.
 # The additional scheduler allows for fine grained scheduling policies for the pods managed by this operator.
-# As an example the pods can be scheduled to prioritize the most requested nodes, thus "packing" the workload in
-# as few nodes as possible, instead of spreading them over all the available nodes.
-# NOTE: ensure that the tag of the scheduler image matches the version of the Kubernetes cluster where it is deployed.
 scheduler:
-  enable: false
-  image:
-    repository: k8s.gcr.io/kube-scheduler
-    pullPolicy: IfNotPresent
-    tag: you-MUST-set-a-tag-matching-the-k8s-version-in-your-cluster
-  priorities:
-    - name: MostRequestedPriority
-      weight: 100
-    - name: ServiceSpreadingPriority
-      weight: 1
-    - name: EqualPriority
-      weight: 1
-    - name: ImageLocalityPriority
-      weight: 1
-    - name: SelectorSpreadPriority
-      weight: 1
-    - name: InterPodAffinityPriority
-      weight: 1
-    - name: LeastRequestedPriority
-      weight: 1
-    - name: BalancedResourceAllocation
-      weight: 1
-    - name: NodePreferAvoidPodsPriority
-      weight: 1
-    - name: NodeAffinityPriority
-      weight: 1
-    - name: TaintTolerationPriority
-      weight: 1
+  packing:    
+    # The configuration that is very useful for efficient scheduling and that we provide will pack the workloads in
+    # as few nodes as possible, instead of spreading them over all the available nodes.
+    enabled: false
+    image:
+      repository: k8s.gcr.io/kube-scheduler
+      pullPolicy: IfNotPresent
+      # If you leave the tag empty we will set it based on the Kubernetes cluster version in Helm.
+      # If our guess and/or Helm is not reporting the right Kubernetes version then set the value here.
+      tag: 
+  custom:
+    # If you do not wish to use our bin packing scheduler then deploy your own in the same namespace
+    # as the operator and provide the scheduler name here. Amalthea will use this scheduler to schedule every session.
+    enabled: false
+    name: 
 
 metrics:
   enabled: false
