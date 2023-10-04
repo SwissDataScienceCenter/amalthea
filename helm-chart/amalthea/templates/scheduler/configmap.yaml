@@ -15,8 +15,11 @@ data:
     apiVersion: kubescheduler.config.k8s.io/v1beta3
     {{- end }}
     kind: KubeSchedulerConfiguration
+    leaderElection:
+      leaderElect: false
     profiles:
-      - pluginConfig:
+      - schedulerName: {{ include "amalthea.fullname" . }}-scheduler
+        pluginConfig:
           - args:
               scoringStrategy:
                 resources:
