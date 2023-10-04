@@ -1,4 +1,10 @@
-#  (2023-09-06)
+## [0.10.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.9.1...0.10.0) (2023-10-04)
+
+This release has a breaking change in the values file for the Amalthea Helm chart. This is only relevant
+if you are using the Amalthea scheduler. Please refer to the values file of this release for additional 
+information. All the values from the old version under the `scheduler` key have been removed and replaced
+with new values, so if you wish to retain similar scheduler functionality like before you have to change your
+values file when upgrading.
 
 ## [0.9.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.9.0...0.9.1) (2023-09-06)
 
@@ -8,8 +14,6 @@
 
 
 
-#  (2023-08-31)
-
 ## [0.9.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.8.0...0.9.0) (2023-08-31)
 
 ### Features
@@ -17,8 +21,6 @@
 * add two-step culling for sessions ([#366](https://github.com/SwissDataScienceCenter/amalthea/issues/366)) ([bfd88f3](https://github.com/SwissDataScienceCenter/amalthea/commit/bfd88f3a0c3f65dca929cadaafaf14f570443559))
 
 
-
-#  (2023-08-03)
 
 ## [0.8.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.7.1...0.8.0) (2023-08-03)
 

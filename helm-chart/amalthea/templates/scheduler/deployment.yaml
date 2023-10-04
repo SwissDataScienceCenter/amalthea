@@ -31,7 +31,7 @@ spec:
             - --policy-configmap-namespace={{ .Release.Namespace }}
             {{- end }}
             - --scheduler-name={{ include "amalthea.fullname" . }}-scheduler
-          image: "{{ .Values.scheduler.packing.image.repository }}:{{ .Values.scheduler.packing.image.tag | default .Capabilities.KubeVersion }}"
+          image: "{{ .Values.scheduler.packing.image.repository }}:{{ .Values.scheduler.packing.image.tag | default .Capabilities.KubeVersion.GitVersion }}"
           imagePullPolicy: {{ .Values.scheduler.packing.image.pullPolicy }}
           livenessProbe:
             httpGet:

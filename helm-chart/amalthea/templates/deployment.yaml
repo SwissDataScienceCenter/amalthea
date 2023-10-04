@@ -91,12 +91,12 @@ spec:
             - name: METRICS_EXTRA_LABELS
               value: {{ .Values.metrics.extraMetricsLabels | toJson | quote }}
             {{- include "certificates.env.python" . | nindent 12 }}
-            {{- if .Values.scheduler.packing.enabled }}
-            - name: SERVER_SCHEDULER_NAME
-              value: {{ include "amalthea.fullname" . }}-scheduler
-            {{- else if .Values.scheduler.custom.enabled -}}
+            {{- if .Values.scheduler.custom.enabled }}
             - name: SERVER_SCHEDULER_NAME
               value: {{ .Values.scheduler.custom.name | quote }}
+            {{- else if .Values.scheduler.packing.enabled }}
+            - name: SERVER_SCHEDULER_NAME
+              value: {{ include "amalthea.fullname" . }}-scheduler
             {{- end }}
             - name: AUDITLOG_ENABLED
               value: {{ .Values.auditLog.enabled | quote }}
