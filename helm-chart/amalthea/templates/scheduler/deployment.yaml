@@ -33,6 +33,10 @@ spec:
             {{- else }}
             - --bind-address=0.0.0.0
             - --secure-port=10251
+            - -v
+            - "2"
+            - --logging-format
+            - json
             {{- end }}
           image: "{{ .Values.scheduler.packing.image.repository }}:{{ .Values.scheduler.packing.image.tag | default .Capabilities.KubeVersion.GitVersion }}"
           imagePullPolicy: {{ .Values.scheduler.packing.image.pullPolicy }}
