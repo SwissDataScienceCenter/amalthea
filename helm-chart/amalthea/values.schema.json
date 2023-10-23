@@ -391,64 +391,6 @@
             ],
             "additionalProperties": false
         },
-        "scheduler": {
-            "type": "object",
-            "required": [
-                "enable",
-                "image",
-                "priorities"
-            ],
-            "properties": {
-                "enable": {
-                    "type": "boolean"
-                },
-                "image": {
-                    "type": "object",
-                    "required": [
-                        "repository",
-                        "pullPolicy",
-                        "tag"
-                    ],
-                    "properties": {
-                        "repository": {
-                            "type": "string"
-                        },
-                        "pullPolicy": {
-                            "type": "string"
-                        },
-                        "tag": {
-                            "type": "string"
-                        }
-                    },
-                    "additionalProperties": false
-                },
-                "priorities": {
-                    "type": "array",
-                    "additionalItems": true,
-                    "items": {
-                        "anyOf": [
-                            {
-                                "type": "object",
-                                "required": [
-                                    "name",
-                                    "weight"
-                                ],
-                                "properties": {
-                                    "name": {
-                                        "type": "string"
-                                    },
-                                    "weight": {
-                                        "type": "integer"
-                                    }
-                                },
-                                "additionalProperties": false
-                            }
-                        ]
-                    }
-                }
-            },
-            "additionalProperties": false
-        },
         "resourceUsageCheck": {
             "type": "object",
             "properties": {
