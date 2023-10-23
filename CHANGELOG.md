@@ -1,10 +1,16 @@
-## [0.10.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.9.1...0.10.0) (2023-10-04)
+#  (2023-10-23)
+
+## [0.10.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.9.1...0.10.0) (2023-10-23)
 
 This release has a breaking change in the values file for the Amalthea Helm chart. This is only relevant
 if you are using the Amalthea scheduler. Please refer to the values file of this release for additional 
 information. All the values from the old version under the `scheduler` key have been removed and replaced
 with new values, so if you wish to retain similar scheduler functionality like before you have to change your
 values file when upgrading.
+
+### Bug Fixes
+
+* **chart:** adapt scheduler for new k8s versions ([#419](https://github.com/SwissDataScienceCenter/amalthea/issues/419)) ([029486e](https://github.com/SwissDataScienceCenter/amalthea/commit/029486e071ba200c802f636379a0c7b29c79f67e))
 
 ## [0.9.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.9.0...0.9.1) (2023-09-06)
 
