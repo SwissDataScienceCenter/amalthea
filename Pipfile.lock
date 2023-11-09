@@ -135,19 +135,20 @@
         },
         "boto3": {
             "hashes": [
-                "sha256:63619ffa44bc7f799b525c86d73bdb7f7a70994942bbff78253585bf64084e6e",
-                "sha256:a15841c7d04f87c63c9f2587b2b48198bec04d307d7b9950cbe4a021f845a5ba"
+                "sha256:66e457b5f1580eb1f29855d867dec743eeec42b3935372eee5e6730e5e3124df",
+                "sha256:6ec7da884eed5c07e679d251bd5c66e4e2f64755ed98270a20323b241c54a743"
             ],
             "index": "pypi",
-            "version": "==1.28.26"
+            "markers": "python_version >= '3.7'",
+            "version": "==1.28.81"
         },
         "botocore": {
             "hashes": [
-                "sha256:74d1c26144915312004a9f0232cdbe08946dfec9fc7dcd854456d2b73be9bfd9",
-                "sha256:e68a50ba76425ede8693fdf1f95b8411e283bc7619c03d7eb666db9f1de48153"
+                "sha256:afb0886c5a5a542f763cc1644b1c1b4a783698d79980eb48052d1676d6b3d14e",
+                "sha256:eeb09a77c3e931667c9442565e8697e89e685089912a96d95f65b63e4b2c8c71"
             ],
             "markers": "python_version >= '3.7'",
-            "version": "==1.31.26"
+            "version": "==1.31.81"
         },
         "cachetools": {
             "hashes": [
@@ -694,11 +695,11 @@
         },
         "s3transfer": {
             "hashes": [
-                "sha256:3c0da2d074bf35d6870ef157158641178a4204a6e689e82546083e31e0311346",
-                "sha256:640bb492711f4c0c0905e1f62b6aaeb771881935ad27884852411f8e9cacbca9"
+                "sha256:10d6923c6359175f264811ef4bf6161a3156ce8e350e705396a7557d6293c33a",
+                "sha256:fd3889a66f5fe17299fe75b82eae6cf722554edca744ca5d5fe308b104883d2e"
             ],
             "markers": "python_version >= '3.7'",
-            "version": "==0.6.1"
+            "version": "==0.7.0"
         },
         "setuptools": {
             "hashes": [
@@ -726,11 +727,11 @@
         },
         "urllib3": {
             "hashes": [
-                "sha256:8d36afa7616d8ab714608411b4a3b13e58f463aee519024578e062e141dce20f",
-                "sha256:8f135f6502756bde6b2a9b28989df5fbe87c9970cecaa69041edcce7f0589b14"
+                "sha256:34b97092d7e0a3a8cf7cd10e386f401b3737364026c45e622aa02903dffe0f07",
+                "sha256:f8ecc1bba5667413457c529ab955bf8c67b45db799d159066261719e328580a0"
             ],
             "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3, 3.4, 3.5'",
-            "version": "==1.26.16"
+            "version": "==1.26.18"
         },
         "websocket-client": {
             "hashes": [
