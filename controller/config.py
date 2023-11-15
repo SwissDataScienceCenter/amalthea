@@ -27,6 +27,7 @@ CHILD_RESOURCES = [
     {"name": "configmaps", "group": ""},
     {"name": "services", "group": ""},
     {"name": "persistentvolumeclaims", "group": ""},
+    {"name": "persistentvolumes", "group": ""},
 ]
 
 CHILD_RESOURCES += json.loads(os.getenv("EXTRA_CHILD_RESOURCES", "[]"))

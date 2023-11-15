@@ -30,6 +30,7 @@
       - networking.k8s.io
     resources:
       - statefulsets
+      - persistentvolumes
       - persistentvolumeclaims
       - services
       - ingresses

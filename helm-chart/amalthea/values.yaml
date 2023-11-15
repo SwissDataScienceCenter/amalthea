@@ -70,7 +70,7 @@ kopf:
   #   backoff: 10
 
 # If the operator should be able to create and watch child resources other than
-# [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps]
+# [statefulset, persistentvolumeclaims, persistentvolumeclaims, services, ingresses, secrets, configmaps]
 # which are necessary for Amalthea to work, add the corresponding API groups and
 # resources here as an array of name/group objects, eg:
 extraChildResources: []
