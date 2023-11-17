@@ -33,7 +33,7 @@ scope:
   # 2. Do not define namespaces at all, in which case amalthea
   #    will only operate in the namespace where the helm chart is deployed.
   # namespaces: ["default"]
-  clusterRoleName: amalthea 
+  clusterRoleName: amalthea
   # name of the cluster role for PV creation
   # only needs to be set if not deployed clusterwide
   # the role needs permission to create,get,list,watch PVs

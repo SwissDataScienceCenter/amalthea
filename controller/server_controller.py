@@ -173,12 +173,20 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
 
 
 @kopf.on.delete(config.api_group, config.api_version, config.custom_resource_name)
-def delete_fn(labels, body, namespace, name, **_):
+def delete_fn(labels, logger, body, namespace, name, **_):
     """
     The jupyter server has been deleted.
     """
     api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     new_status = ServerStatusEnum.Stopping
+    # delete persistent volumes because their not in a namespace and ignored by k8s GC
+    pv_api = get_api("v1", "PersistentVolume")
+    pvs = pv_api.get(label_selector=f"amalthea.dev/parent-name={name}")
+    if pvs and pvs.items:
+        for pv in pvs.items:
+            if not pv:
+                continue
+            pv_api.delete(pv.metadata.name)
 
     api.patch(
         namespace=namespace,
