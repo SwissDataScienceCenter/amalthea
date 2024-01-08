@@ -31,22 +31,7 @@ metadata:
     {{- include "amalthea.labels" $fullTemplateScope | nindent 4 }}
 rules:
 {{- include "amalthea.rules" $fullTemplateScope }}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: {{ include "amalthea.fullname" $fullTemplateScope }}
-  namespace: {{ . }}
-  labels:
-    {{- include "amalthea.labels" $fullTemplateScope | nindent 4 }}
-subjects:
-  - kind: ServiceAccount
-    name: {{ include "amalthea.serviceAccountName" $fullTemplateScope}}
-    namespace: {{ $fullTemplateScope.Release.Namespace }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: {{ $fullTemplateScope.Values.scope.clusterRoleName }}
+
 {{- end }}
 {{- end }}
 {{- end }}

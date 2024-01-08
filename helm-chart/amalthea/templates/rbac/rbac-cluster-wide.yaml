@@ -32,9 +32,6 @@ rules:
   - apiGroups: [""]
     resources: [namespaces]
     verbs: [list, watch]
-  - apiGroups: [""]
-    resources: [persistentvolumes]
-    verbs: [create,get,list, watch]
 
   # Kopf: admission webhook configuration management.
   - apiGroups: [admissionregistration.k8s.io/v1, admissionregistration.k8s.io/v1beta1]

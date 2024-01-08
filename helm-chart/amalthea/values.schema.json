@@ -32,15 +32,11 @@
                                     }
                                 ],
                                 "uniqueItems": true
-                            },
-                            "clusterRoleName":{
-                                "type": "string"
                             }
                         },
                         "required": [
                             "clusterWide",
-                            "namespaces",
-                            "clusterRoleName"
+                            "namespaces"
                         ],
                         "additionalProperties": false
                     },
@@ -48,14 +44,10 @@
                         "properties": {
                             "clusterWide": {
                                 "const": false
-                            },
-                            "clusterRoleName":{
-                                "type": "string"
                             }
                         },
                         "required": [
-                            "clusterWide",
-                            "clusterRoleName"
+                            "clusterWide"
                         ],
                         "additionalProperties": false
                     }

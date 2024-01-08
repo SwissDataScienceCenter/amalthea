@@ -33,10 +33,6 @@ scope:
   # 2. Do not define namespaces at all, in which case amalthea
   #    will only operate in the namespace where the helm chart is deployed.
   # namespaces: ["default"]
-  # name of the cluster role for PV creation
-  # only needs to be set if not deployed clusterwide
-  # the role needs permission to create,get,list,watch PVs
-  clusterRoleName: amalthea
 
 deployCrd: true # whether to deploy the jupyterserver CRD
 
@@ -74,7 +70,7 @@ kopf:
   #   backoff: 10
 
 # If the operator should be able to create and watch child resources other than
-# [statefulset, persistentvolumeclaims, persistentvolumeclaims, services, ingresses, secrets, configmaps]
+# [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps]
 # which are necessary for Amalthea to work, add the corresponding API groups and
 # resources here as an array of name/group objects, eg:
 extraChildResources: []
