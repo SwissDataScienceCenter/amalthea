@@ -270,8 +270,8 @@ def update_server_state(body, namespace, name, logger, **_):
     kind=config.custom_resource_name,
     field="spec.jupyterServer.hibernated",
 )
-def hibernation_field_handler(body, logger, name, namespace, **_):
-    hibernated = body.get("spec", {}).get("jupyterServer", {}).get("hibernated")
+def hibernation_field_handler(body, old, new, logger, name, namespace, **_):
+    hibernated = new
 
     # NOTE: Don't do anything if ``hibernated`` field isn't set
     if hibernated is None:
@@ -322,6 +322,7 @@ def hibernation_field_handler(body, logger, name, namespace, **_):
                         "renku.io/hibernationDate": "",
                     },
                 },
+                "status": {"containerStates": None, "mainPod": None},
             },
         ):
             logger.warning(
