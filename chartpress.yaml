@@ -1,0 +1,14 @@
+charts:
+  - name: helm-chart/amalthea
+    resetTag: latest
+    imagePrefix: renku/
+    repo:
+      git: SwissDataScienceCenter/helm-charts
+      published: https://swissdatasciencecenter.github.io/helm-charts
+    paths:
+      - .
+    images:
+      amalthea:
+        contextPath: .
+        dockerfilePath: Dockerfile
+        valuesPath: image

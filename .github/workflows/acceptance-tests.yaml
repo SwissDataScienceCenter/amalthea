@@ -90,7 +90,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip pipenv
           pipenv install --dev
-          cd helm-chart
           pipenv run chartpress
           kind load docker-image $(pipenv run chartpress --list-images)
       - name: Install Amalthea and Ingress-Nginx
