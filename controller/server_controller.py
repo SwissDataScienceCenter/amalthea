@@ -368,25 +368,29 @@ def resources_field_handler(old, new, body, logger, name, namespace, **_):
             except NotFoundError:
                 pass
         # NOTE: The pod will be restarted when the statefulset is updated so switch the state
-        # immediately  to starting, this avoids a delay and the state being old for a few seconds
-        js_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
-        now = pytz.UTC.localize(datetime.utcnow()).isoformat(timespec="seconds")
-        js_api.patch(
-            namespace=namespace,
-            name=name,
-            body={
-                "metadata": {
-                    "annotations": {
-                        "renku.io/lastActivityDate": now,
+        # immediately to starting, this avoids a delay and the state being old for a few seconds.
+        # If the session is hibernated then the state should not be changed.
+        if body.get("status", {}).get("state") != ServerStatusEnum.Hibernated.value:
+            js_api = get_api(
+                config.api_version, config.custom_resource_name, config.api_group
+            )
+            now = pytz.UTC.localize(datetime.utcnow()).isoformat(timespec="seconds")
+            js_api.patch(
+                namespace=namespace,
+                name=name,
+                body={
+                    "metadata": {
+                        "annotations": {
+                            "renku.io/lastActivityDate": now,
+                        },
+                    },
+                    "status": {
+                        "state": ServerStatusEnum.Starting.value,
+                        "startingSince": now,
                     },
                 },
-                "status": {
-                    "state": ServerStatusEnum.Starting.value,
-                    "startingSince": now,
-                },
-            },
-            content_type=CONTENT_TYPES["merge-patch"],
-        )
+                content_type=CONTENT_TYPES["merge-patch"],
+            )
     except NotFoundError:
         logger.warning(
             f"Session resource patching for {name} failed because we cannot find it"
