@@ -60,6 +60,7 @@ jobs:
           pipenv install --deploy --system --dev
           cd helm-chart/
           helm dep update amalthea
+          cd ..
           pipenv run chartpress
           kind load docker-image $(pipenv run chartpress --list-images) 
 

@@ -19,8 +19,8 @@ jobs:
           pipenv install --dev
           cd helm-chart/
           helm dep update ./amalthea
-          pipenv run chartpress --reset
           cd ../
+          pipenv run chartpress --reset
           pipenv run python utils/render-chart-manifests.py
       - name: Generate CRD documentation
         uses: SwissDataScienceCenter/renku-actions/generate-crd-docs@3d6f5abf79b61d969b0d958e42dabb4e9f15392c
@@ -53,6 +53,5 @@ jobs:
           echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
           python -m pip install --upgrade pip pipenv
           pipenv install --dev
-          cd helm-chart/
           pipenv run chartpress --tag $(git rev-parse HEAD) --push
           pipenv run chartpress --tag latest --push

@@ -28,7 +28,8 @@ jobs:
           echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
           export TAG=$(echo ${GITHUB_REF} | cut -d/ -f3)
           helm dep update amalthea
-          chartpress --tag $TAG
           helm lint amalthea
+          cd ..
+          chartpress --tag $TAG
           chartpress --tag $TAG --push --publish-chart
           chartpress --tag latest --push
