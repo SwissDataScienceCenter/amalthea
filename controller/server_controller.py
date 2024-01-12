@@ -346,7 +346,7 @@ def resources_field_handler(old, new, body, logger, name, namespace, **_):
     # new values are the same for the requests. Even if different units are used.
     try:
         statefulset_api = kubernetes.client.AppsV1Api(kubernetes.client.ApiClient())
-        statefulset_api.patch_namespaced_stateful_set(
+        ss = statefulset_api.patch_namespaced_stateful_set(
             name=name,
             namespace=namespace,
             body=[
@@ -356,6 +356,36 @@ def resources_field_handler(old, new, body, logger, name, namespace, **_):
                     "value": new,
                 }
             ],
+        )
+        # NOTE: the statefulset will not make the pod restart itself if the pod is pending and the
+        # podManagementPolicy of the pod is set to OrderedReady (which is the default).
+        # NOTE: the podManagementPolicy field is immutable so it cannot be patched
+        # on an existing session
+        if ss.spec.pod_management_policy != "Parallel" and new != old:
+            core_api = kubernetes.client.CoreV1Api(kubernetes.client.ApiClient())
+            try:
+                core_api.delete_namespaced_pod(name + "-0", namespace)
+            except NotFoundError:
+                pass
+        # NOTE: The pod will be restarted when the statefulset is updated so switch the state
+        # immediately  to starting, this avoids a delay and the state being old for a few seconds
+        js_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
+        now = pytz.UTC.localize(datetime.utcnow()).isoformat(timespec="seconds")
+        js_api.patch(
+            namespace=namespace,
+            name=name,
+            body={
+                "metadata": {
+                    "annotations": {
+                        "renku.io/lastActivityDate": now,
+                    },
+                },
+                "status": {
+                    "state": ServerStatusEnum.Starting.value,
+                    "startingSince": now,
+                },
+            },
+            content_type=CONTENT_TYPES["merge-patch"],
         )
     except NotFoundError:
         logger.warning(

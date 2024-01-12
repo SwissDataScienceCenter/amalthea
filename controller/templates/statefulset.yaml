@@ -3,6 +3,10 @@ apiVersion: apps/v1
 metadata:
   name: {{ name }}
 spec:
+  # NOTE: With the default podManagementPolicy the pod does not always update when the statefulset is updated
+  # See: https://github.com/kubernetes/kubernetes/issues/67250 and
+  # https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#forced-rollback
+  podManagementPolicy: Parallel
   selector:
     matchLabels:
       app: {{ name }}
