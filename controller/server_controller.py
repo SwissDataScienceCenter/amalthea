@@ -270,7 +270,7 @@ def update_server_state(body, namespace, name, logger, **_):
     kind=config.custom_resource_name,
     field="spec.jupyterServer.hibernated",
 )
-def hibernation_field_handler(body, old, new, logger, name, namespace, **_):
+def hibernation_field_handler(body, new, logger, name, namespace, **_):
     hibernated = new
 
     # NOTE: Don't do anything if ``hibernated`` field isn't set
