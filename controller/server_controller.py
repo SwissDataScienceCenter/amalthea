@@ -208,13 +208,10 @@ def update_server_state(body, namespace, name, logger, **_):
     old_summary = body.get("status", {}).get("containerStates", {})
     # NOTE: Updating the status for deletions is handled in a specific delete handler
     if (
-        (old_status != new_status or new_summary != old_summary)
-        and new_status != ServerStatusEnum.Stopping
-    ):
+        old_status != new_status or new_summary != old_summary
+    ) and new_status != ServerStatusEnum.Stopping:
         now = pytz.UTC.localize(datetime.utcnow())
-        api = get_api(
-            config.api_version, config.custom_resource_name, config.api_group
-        )
+        api = get_api(config.api_version, config.custom_resource_name, config.api_group)
         try:
             api.patch(
                 namespace=namespace,
@@ -224,7 +221,9 @@ def update_server_state(body, namespace, name, logger, **_):
                         "state": new_status.value,
                         "containerStates": new_summary,
                         "failedSince": (
-                            now.isoformat() if new_status == ServerStatusEnum.Failed else None
+                            now.isoformat()
+                            if new_status == ServerStatusEnum.Failed
+                            else None
                         ),
                     },
                 },
@@ -234,8 +233,10 @@ def update_server_state(body, namespace, name, logger, **_):
             pass
 
         hibernated = body.get("spec", {}).get("jupyterServer", {}).get("hibernated")
-        hibernation_date = body.get("metadata", {}).get("annotations", {}).get(
-            "renku.io/hibernationDate"
+        hibernation_date = (
+            body.get("metadata", {})
+            .get("annotations", {})
+            .get("renku.io/hibernationDate")
         )
         # NOTE: We clear hibernation annotations here (and not in the notebooks service) to avoid
         # flickering in the UI (showing the repository as dirty when resuming a session for a short
@@ -269,8 +270,8 @@ def update_server_state(body, namespace, name, logger, **_):
     kind=config.custom_resource_name,
     field="spec.jupyterServer.hibernated",
 )
-def hibernation_field_handler(body, logger, name, namespace, **_):
-    hibernated = body.get("spec", {}).get("jupyterServer", {}).get("hibernated")
+def hibernation_field_handler(body, new, logger, name, namespace, **_):
+    hibernated = new
 
     # NOTE: Don't do anything if ``hibernated`` field isn't set
     if hibernated is None:
@@ -321,12 +322,83 @@ def hibernation_field_handler(body, logger, name, namespace, **_):
                         "renku.io/hibernationDate": "",
                     },
                 },
+                "status": {"containerStates": None, "mainPod": None},
             },
         ):
             logger.warning(
                 f"Trying to clear hibernation annotations for Jupyter server {name} in "
                 f"namespace {namespace} when handling hibernation, but we cannot find it."
             )
+
+
+@kopf.on.field(
+    group=config.api_group,
+    version=config.api_version,
+    kind=config.custom_resource_name,
+    field="spec.jupyterServer.resources",
+)
+def resources_field_handler(old, new, body, logger, name, namespace, **_):
+    """
+    Patches the session resources assuming that the session container is the first in the
+    list of containers.
+    """
+    # NOTE: K8s is smart enough to not restart or do anything to the statefulset if the old and
+    # new values are the same for the requests. Even if different units are used.
+    try:
+        statefulset_api = kubernetes.client.AppsV1Api(kubernetes.client.ApiClient())
+        ss = statefulset_api.patch_namespaced_stateful_set(
+            name=name,
+            namespace=namespace,
+            body=[
+                {
+                    "op": "replace",
+                    "path": "/spec/template/spec/containers/0/resources",
+                    "value": new,
+                }
+            ],
+        )
+        # NOTE: the statefulset will not make the pod restart itself if the pod is pending and the
+        # podManagementPolicy of the pod is set to OrderedReady (which is the default).
+        # NOTE: the podManagementPolicy field is immutable so it cannot be patched
+        # on an existing session
+        if ss.spec.pod_management_policy != "Parallel" and new != old:
+            core_api = kubernetes.client.CoreV1Api(kubernetes.client.ApiClient())
+            try:
+                core_api.delete_namespaced_pod(name + "-0", namespace)
+            except NotFoundError:
+                pass
+        # NOTE: The pod will be restarted when the statefulset is updated so switch the state
+        # immediately to starting, this avoids a delay and the state being old for a few seconds.
+        # If the session is hibernated then the state should not be changed.
+        if body.get("status", {}).get("state") != ServerStatusEnum.Hibernated.value:
+            js_api = get_api(
+                config.api_version, config.custom_resource_name, config.api_group
+            )
+            now = pytz.UTC.localize(datetime.utcnow()).isoformat(timespec="seconds")
+            js_api.patch(
+                namespace=namespace,
+                name=name,
+                body={
+                    "metadata": {
+                        "annotations": {
+                            "renku.io/lastActivityDate": now,
+                        },
+                    },
+                    "status": {
+                        "state": ServerStatusEnum.Starting.value,
+                        "startingSince": now,
+                    },
+                },
+                content_type=CONTENT_TYPES["merge-patch"],
+            )
+    except NotFoundError:
+        logger.warning(
+            f"Session resource patching for {name} failed because we cannot find it"
+        )
+    except kubernetes.client.ApiException as e:
+        logger.error(f"Session {name} resource patching failed with error {e}")
+    else:
+        logger.info(f"Patched session {name} with resource {old} -> {new}")
 
 
 @kopf.timer(
@@ -364,8 +436,10 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
 
     # NOTE: Do nothing if the server is hibernated
     if hibernated:
-        last_activity_date = body.get("metadata", {}).get("annotations", {}).get(
-            "renku.io/lastActivityDate"
+        last_activity_date = (
+            body.get("metadata", {})
+            .get("annotations", {})
+            .get("renku.io/lastActivityDate")
         )
         if last_activity_date:
             update_last_activity_date("")
@@ -413,7 +487,13 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
         # NOTE: We don't fill out repository status because we don't want to access session's
         # sidecar in Amalthea
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        hibernation = {"branch": "", "commit": "", "dirty": "", "synchronized": "", "date": now}
+        hibernation = {
+            "branch": "",
+            "commit": "",
+            "dirty": "",
+            "synchronized": "",
+            "date": now,
+        }
         if not patch_jupyter_servers(
             name=name,
             namespace=namespace,
@@ -468,7 +548,9 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
     if not hibernated:
         return
 
-    hibernated_seconds_threshold = body["spec"]["culling"].get("hibernatedSecondsThreshold", 0)
+    hibernated_seconds_threshold = body["spec"]["culling"].get(
+        "hibernatedSecondsThreshold", 0
+    )
     if hibernated_seconds_threshold == 0:
         return
 
@@ -479,9 +561,7 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
 
     now = datetime.now(timezone.utc)
     hibernation_date = (
-        datetime.fromisoformat(hibernation_date_str)
-        if hibernation_date_str
-        else now
+        datetime.fromisoformat(hibernation_date_str) if hibernation_date_str else now
     )
 
     hibernated_seconds = (now - hibernation_date).total_seconds()
@@ -548,7 +628,9 @@ def cull_pending_jupyter_servers(body, name, namespace, logger, **kwargs):
     failed_seconds = 0
 
     if starting_since is not None:
-        starting_seconds = (now - datetime.fromisoformat(starting_since)).total_seconds()
+        starting_seconds = (
+            now - datetime.fromisoformat(starting_since)
+        ).total_seconds()
     if failed_since is not None:
         failed_seconds = (now - datetime.fromisoformat(failed_since)).total_seconds()
 
@@ -708,21 +790,22 @@ def handle_statefulset_events(event, namespace, logger, **_):
     except NotFoundError:
         return
     new_message_timestamp = datetime.fromisoformat(body["lastTimestamp"].rstrip("Z"))
-    old_message = js.get("status", {}).get("events", {}).get("statefulset", {}).get("message")
+    old_message = (
+        js.get("status", {}).get("events", {}).get("statefulset", {}).get("message")
+    )
     old_message_timestamp_raw = (
         js.get("status", {}).get("events", {}).get("statefulset", {}).get("timestamp")
     )
     old_message_timestamp = None
     if old_message_timestamp_raw is not None:
-        old_message_timestamp = datetime.fromisoformat(old_message_timestamp_raw.rstrip("Z"))
-    is_event_newer = (
-        old_message_timestamp_raw is None
-        or (
-            new_message_timestamp is not None
-            and old_message_timestamp_raw is not None
-            and old_message_timestamp is not None
-            and new_message_timestamp > old_message_timestamp
+        old_message_timestamp = datetime.fromisoformat(
+            old_message_timestamp_raw.rstrip("Z")
         )
+    is_event_newer = old_message_timestamp_raw is None or (
+        new_message_timestamp is not None
+        and old_message_timestamp_raw is not None
+        and old_message_timestamp is not None
+        and new_message_timestamp > old_message_timestamp
     )
     if not is_event_newer:
         return
@@ -851,14 +934,14 @@ if config.METRICS.enabled or config.AUDITLOG.enabled:
         config.api_group,
         config.api_version,
         config.custom_resource_name,
-        field='status.state',
+        field="status.state",
     )(publish_metrics)
     # NOTE: The 'on.field' handler cannot catch the server deletion so this is needed.
     kopf.on.delete(
         config.api_group,
         config.api_version,
         config.custom_resource_name,
-        field='status.state',
+        field="status.state",
     )(publish_metrics)
 # INFO: Start the prometheus metrics server if enabled
 if config.METRICS.enabled:
