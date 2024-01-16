@@ -305,8 +305,6 @@ class ServerStatus:
                 num_failed_statuses += 1
             elif status.running_ready or status.completed_successfully:
                 num_ok_statuses += 1
-        if self.hibernated:
-            return ServerStatusEnum.Hibernated
         if (
             self.pod_phase == K8sPodPhaseEnum.running
             and num_ok_statuses == len(self.init_statuses) + len(self.statuses)
