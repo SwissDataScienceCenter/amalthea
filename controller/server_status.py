@@ -292,6 +292,8 @@ class ServerStatus:
     @property
     def overall_status(self) -> ServerStatusEnum:
         """Get the status of the jupyterserver."""
+        if self.hibernated:
+            return ServerStatusEnum.Hibernated
         if self.deletion_timestamp:
             return ServerStatusEnum.Stopping
         if self.is_unschedulable:
