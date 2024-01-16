@@ -1,4 +1,14 @@
-#  (2023-10-23)
+## [0.11.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.10.0...0.11.0) (2024-01-16)
+
+### Bug Fixes
+
+* **app:** failed status should not override hibernated status ([#494](https://github.com/SwissDataScienceCenter/amalthea/issues/494)) ([8c16330](https://github.com/SwissDataScienceCenter/amalthea/commit/8c16330fb7ea6ab940f77a95dc62eee22be034b6))
+
+
+### Features
+
+* **app:** enable patching of server resources ([#459](https://github.com/SwissDataScienceCenter/amalthea/issues/459)) ([764b199](https://github.com/SwissDataScienceCenter/amalthea/commit/764b19942bd37911edf649ae88c44ada96c54488))
+
 
 ## [0.10.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.9.1...0.10.0) (2023-10-23)
 
