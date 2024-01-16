@@ -292,6 +292,8 @@ class ServerStatus:
     @property
     def overall_status(self) -> ServerStatusEnum:
         """Get the status of the jupyterserver."""
+        if self.hibernated:
+            return ServerStatusEnum.Hibernated
         if self.deletion_timestamp:
             return ServerStatusEnum.Stopping
         if self.is_unschedulable:
@@ -303,8 +305,6 @@ class ServerStatus:
                 num_failed_statuses += 1
             elif status.running_ready or status.completed_successfully:
                 num_ok_statuses += 1
-        if self.hibernated:
-            return ServerStatusEnum.Hibernated
         if (
             self.pod_phase == K8sPodPhaseEnum.running
             and num_ok_statuses == len(self.init_statuses) + len(self.statuses)
