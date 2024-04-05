@@ -157,6 +157,19 @@ class PodConditionsEnum(Enum):
     has_network: str = "PodHasNetwork"  # Pod networking successfully configured
     containers_ready: str = "ContainersReady"  # All containers in the pod are ready
     ready: str = "Ready"  # Pod is able to serve requests and should reachable by services
+    ready_to_start: str = "PodReadyToStartContainers"  # Pod sandbox successfully created
+    unknown: str = "Unknown"
+
+    @classmethod
+    def from_string(cls, val: str):
+        """Generate a pod condition from a string.
+
+        If the condition is not known, return the unknown enum.
+        """
+        try:
+            return cls(val)
+        except ValueError:
+            return cls("Unknown")
 
 
 @dataclass
@@ -170,7 +183,7 @@ class PodCondition:
     @classmethod
     def from_dict(cls, condition_dict: Dict[str, str]):
         return cls(
-            type=PodConditionsEnum(condition_dict["type"]),
+            type=PodConditionsEnum.from_string(condition_dict["type"]),
             last_transition_time=datetime.fromisoformat(
                 condition_dict["lastTransitionTime"].rstrip("Z")
             ),
