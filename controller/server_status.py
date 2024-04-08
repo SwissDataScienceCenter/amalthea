@@ -161,15 +161,11 @@ class PodConditionsEnum(Enum):
     unknown: str = "Unknown"  # Not part of the known Pod conditions
 
     @classmethod
-    def from_string(cls, val: str):
-        """Generate a pod condition from a string.
-
-        If the condition is not known, return the unknown enum.
+    def _missing_(cls, value):
         """
-        try:
-            return cls(val)
-        except ValueError:
-            return cls.unknown
+        In case the condition is not known, use the unknown enum.
+        """
+        return cls.unknown
 
 
 @dataclass
