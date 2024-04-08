@@ -179,7 +179,7 @@ class PodCondition:
     @classmethod
     def from_dict(cls, condition_dict: Dict[str, str]):
         return cls(
-            type=PodConditionsEnum.from_string(condition_dict["type"]),
+            type=PodConditionsEnum(condition_dict["type"]),
             last_transition_time=datetime.fromisoformat(
                 condition_dict["lastTransitionTime"].rstrip("Z")
             ),
