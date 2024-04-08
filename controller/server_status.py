@@ -157,6 +157,15 @@ class PodConditionsEnum(Enum):
     has_network: str = "PodHasNetwork"  # Pod networking successfully configured
     containers_ready: str = "ContainersReady"  # All containers in the pod are ready
     ready: str = "Ready"  # Pod is able to serve requests and should reachable by services
+    ready_to_start: str = "PodReadyToStartContainers"  # Pod sandbox successfully created
+    unknown: str = "Unknown"  # Not part of the known Pod conditions
+
+    @classmethod
+    def _missing_(cls, value):
+        """
+        In case the condition is not known, use the unknown enum.
+        """
+        return cls.unknown
 
 
 @dataclass
