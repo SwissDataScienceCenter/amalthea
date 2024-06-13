@@ -1,21 +1,20 @@
 {{- if .Values.deployCrd -}}
+# This manifest is auto-generated from controller/crds/jupyter_server.yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: {{ .Values.crdNames.plural }}.{{ .Values.crdApiGroup }}
+  name: jupyterservers.amalthea.dev
 spec:
   scope: Namespaced
-  group: {{ .Values.crdApiGroup }}
+  group: amalthea.dev
   names:
-    kind: {{ .Values.crdNames.kind }}
-    plural: {{ .Values.crdNames.plural }}
-    singular: {{ .Values.crdNames.singular }}
+    kind: JupyterServer
+    plural: jupyterservers
+    singular: jupyterserver
     shortNames:
-    {{- range .Values.crdNames.shortNames }}
-      - {{ . }}
-    {{- end }}
+      - js
   versions:
-    - name: {{ .Values.crdApiVersion }}
+    - name: v1alpha1
       served: true
       storage: true
       additionalPrinterColumns:
@@ -36,7 +35,267 @@ spec:
         openAPIV3Schema:
           type: object
           properties:
-            {{- .Files.Get "crd-spec.yaml" | nindent 12 -}}
+            spec:
+              description: User defined specification for a JupyterServer custom resource.
+              properties:
+                auth:
+                  default: {}
+                  description: Settings defining access control to the jupyter server.
+                  properties:
+                    oidc:
+                      default: {}
+                      description: >-
+                        Configuration for an OpenID connect provider to be used for access
+                        control to the jupyter server. Useful information can be found in
+                        the oauth2 proxy docs:
+                        https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/
+                      properties:
+                        authorizedEmails:
+                          default: []
+                          description:
+                            List of users (identified by Email address read from the "email"
+                            OIDC claim) which are allowed to access this Jupyter session.
+                            This list is stored as a file and passed to the
+                            `--authenticated-emails-file` option (see
+                            https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview#command-line-options).
+                          items:
+                            type: string
+                          type: array
+                        authorizedGroups:
+                          default: []
+                          description:
+                            List of groups of users (read from the "groups" OIDC claim)
+                            which are allowed to access this Jupyter session. This list
+                            passed to the `--allowed-group` option (see
+                            https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview#command-line-options).
+                          items:
+                            type: string
+                          type: array
+                        clientId:
+                          description:
+                            "The client id of the application registered with the OIDC
+                            provider, see `--client-id` here:
+                            https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#command-line-options"
+                          type: string
+                        clientSecret:
+                          description: >-
+                            The client secret of the application registered with the OIDC
+                            provider. This secret can be given here explicitly as string or
+                            through a reference to an existing secret. Using the secret
+                            reference is the preferred option because it avoids storing the
+                            secret in clear text on the custom resource specification. See
+                            `--client-secret` here:
+                            https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#command-line-options
+                          oneOf:
+                            - required:
+                                - value
+                            - required:
+                                - secretKeyRef
+                          properties:
+                            secretKeyRef:
+                              description:
+                                A regular reference to the key/secret which holds the client
+                                secret of the application registered with the OIDC provider.
+                                Note that the secret has to be in the same namespace in
+                                which the custom resource object is going to be created.
+                              properties:
+                                key:
+                                  type: string
+                                name:
+                                  type: string
+                              type: object
+                            value:
+                              description: The secret provided as a string value.
+                              type: string
+                          type: object
+                        enabled:
+                          default: false
+                          type: boolean
+                        issuerUrl:
+                          description: >-
+                            Issuer URL of the OIDC provider, see `--oidc-issuer-url` here:
+                            https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#command-line-options
+                          type: string
+                      type: object
+                    token:
+                      description: >-
+                        A token that will be passed to the `--ServerApp.token` option when
+                        running the Jupyter server and needed when first accessing the
+                        Jupyter server. The options are:
+                          - By leaving this field empty, a token will be autogenerated and
+                        added under the key `ServerApp.token` to the secret which is created
+                        as a child of the custom resource object.
+                          - Setting the token to an empty string "" runs the Jupyter server
+                        container itself without any authentication. This is recommended
+                        when enabling OIDC as authentication and authorization are then
+                        handled by the dedicated plugins.
+                          - Set an actual value here. Note that this string will be stored
+                        in clear text as part of the custom resource object. This option is
+                        mostly useful for dev purposes.
+                      type: string
+                  type: object
+                culling:
+                  default: {}
+                  description: Options about culling idle servers
+                  properties:
+                    maxAgeSecondsThreshold:
+                      default: 0
+                      description:
+                        The maximum allowed age for a session, regardless of whether it
+                        is active or not. A value of zero indicates that the server cannot be
+                        culled due to its age.
+                      minimum: 0
+                      type: integer
+                    idleSecondsThreshold:
+                      default: 0
+                      description:
+                        How long should a server be idle for before it is culled. A value of
+                        zero indicates that the server should never be culled for inactivity.
+                      minimum: 0
+                      type: integer
+                    startingSecondsThreshold:
+                      default: 0
+                      description:
+                        How long can a server be in starting state before it gets culled. A
+                        value of zero indicates that the server cannot be culled due to
+                        starting too long.
+                      minimum: 0
+                      type: integer
+                    failedSecondsThreshold:
+                      default: 0
+                      description:
+                        How long can a server be in failed state before it gets culled. A
+                        value of zero indicates that the server cannot be culled due to
+                        failing.
+                      minimum: 0
+                      type: integer
+                    hibernatedSecondsThreshold:
+                      default: 0
+                      description:
+                        Number of seconds where a server can be in hibernated state before
+                        it gets culled. A value of zero indicates that hibernated servers
+                        cannot be culled.
+                      minimum: 0
+                      type: integer
+                  type: object
+                jupyterServer:
+                  default: {}
+                  description:
+                    Configuration options (such as image to run) for the Jupyter server. See
+                    also
+                    https://jupyter-server.readthedocs.io/en/latest/other/full-config.html
+                  properties:
+                    defaultUrl:
+                      default: /lab
+                      description:
+                        The default URL to redirect to from '/'. Frequently used values are
+                        '/lab' or '/rstudio'. Translates to `--ServerApp.default_url`.
+                      type: string
+                    hibernated:
+                      default: false
+                      description: Whether the server is hibernated or not.
+                      type: boolean
+                    image:
+                      default: jupyter/minimal-notebook:latest
+                      type: string
+                    resources:
+                      default: {}
+                      description:
+                        Regular K8s resource requests, will be set on the main notebook
+                        container.
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    rootDir:
+                      default: /home/jovyan/work
+                      description:
+                        The absolute path to the root/notebook directory for the jupyter
+                        server. Should lead to a subdirectory of or match the path at
+                        storage.pvc.mountPath. Translates to `--ServerApp.root_dir`.
+                      type: string
+                  type: object
+                patches:
+                  default: []
+                  description:
+                    Patches to be applied to the created child resources after template
+                    rendering. Currently json patches and json merge patches are supported.
+                  items:
+                    properties:
+                      patch:
+                        x-kubernetes-preserve-unknown-fields: true
+                      type:
+                        enum:
+                          - application/json-patch+json
+                          - application/merge-patch+json
+                        type: string
+                    type: object
+                  type: array
+                routing:
+                  default: {}
+                  description:
+                    Settings related to how the jupyter server will be exposed outside of
+                    the cluster.
+                  properties:
+                    host:
+                      description:
+                        Host under which the server will be available (eg
+                        myserver.example.com), should not include the schema.
+                      type: string
+                    ingressAnnotations:
+                      default: {}
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    path:
+                      default: /
+                      description: Optionally make the server available under some path.
+                      type: string
+                    tls:
+                      default: {}
+                      description: Settings for defining TLS termination by the ingress.
+                      properties:
+                        enabled:
+                          default: false
+                          type: boolean
+                        secretName:
+                          description:
+                            The name of the K8s TLS secret. Might be pre-existing in the
+                            cluster or created under that name by a tool like cert manager
+                            when needed.
+                          type: string
+                      type: object
+                  type: object
+                storage:
+                  default: {}
+                  description: Settings to define storage to back the jupyter server.
+                  properties:
+                    pvc:
+                      default: {}
+                      properties:
+                        enabled:
+                          default: false
+                          description:
+                            Whether a PVC should be used to back the session. Defaults to
+                            'false' in which case an emptyDir volume will be used.
+                          type: boolean
+                        mountPath:
+                          default: /home/jovyan/work
+                          description:
+                            The absolute path to the location where the PVC should be
+                            mounted in the user session pod.
+                          type: string
+                        storageClassName:
+                          description:
+                            Storage class to be used for the PVC. If left empty, the default
+                            storage class defined for the cluster will be used.
+                          type: string
+                      type: object
+                    size:
+                      default: 100Mi
+                      description:
+                        Size of the PVC or sizeLimit of the emptyDir volume which backs the
+                        session respectively.
+                      x-kubernetes-int-or-string: true
+                  type: object
+              type: object
             status:
               description: A field for Jupyter Server status information, do not modify.
               type: object

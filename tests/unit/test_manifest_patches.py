@@ -84,10 +84,7 @@ def test_add_container(patch, valid_spec):
     spec = valid_spec(patches=patches)
     name = "test"
     manifest = get_children_specs(name, spec, logging)
-    assert (
-        manifest["statefulset"]["spec"]["template"]["spec"]["containers"][-1]
-        == patch["patch"][0]["value"]
-    )
+    assert manifest["statefulset"]["spec"]["template"]["spec"]["containers"][-1] == patch["patch"][0]["value"]
 
 
 @pytest.mark.parametrize(
@@ -129,13 +126,7 @@ def test_add_container(patch, valid_spec):
                     "type": "kubernetes.io/dockerconfigjson",
                 },
                 "statefulset": {
-                    "spec": {
-                        "template": {
-                            "spec": {
-                                "imagePullSecrets": [{"name": "image_pull_secret_name"}]
-                            }
-                        }
-                    }
+                    "spec": {"template": {"spec": {"imagePullSecrets": [{"name": "image_pull_secret_name"}]}}}
                 },
             },
         },
@@ -148,17 +139,12 @@ def test_add_image_pull_secret(patch, valid_spec):
     manifest = get_children_specs(name, spec, logging)
     if patch["type"] == "application/json-patch+json":
         assert manifest["image_pull_secret"] == patch["patch"][0]["value"]
-        assert (
-            manifest["statefulset"]["spec"]["template"]["spec"]["imagePullSecrets"][0]
-            == patch["patch"][1]["value"]
-        )
+        assert manifest["statefulset"]["spec"]["template"]["spec"]["imagePullSecrets"][0] == patch["patch"][1]["value"]
         assert len(manifest.keys()) > 1
     else:
         assert manifest["image_pull_secret"] == patch["patch"]["image_pull_secret"]
         assert (
             manifest["statefulset"]["spec"]["template"]["spec"]["imagePullSecrets"][0]
-            == patch["patch"]["statefulset"]["spec"]["template"]["spec"][
-                "imagePullSecrets"
-            ][0]
+            == patch["patch"]["statefulset"]["spec"]["template"]["spec"]["imagePullSecrets"][0]
         )
         assert len(manifest.keys()) > 1

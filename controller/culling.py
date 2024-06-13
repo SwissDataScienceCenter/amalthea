@@ -51,15 +51,12 @@ def get_js_server_status(js_body):
     try:
         res = requests.get(f"{server_url.rstrip('/')}/api/status", params=payload)
     except RequestException as err:
-        logging.warning(
-            f"Could not get js server status for {server_url}, because: {err}"
-        )
+        logging.warning(f"Could not get js server status for {server_url}, because: {err}")
         return None
 
     if res.status_code != 200:
         logging.warning(
-            f"Could not get js server status for {server_url}, "
-            f"response status code is {res.status_code}"
+            f"Could not get js server status for {server_url}, " f"response status code is {res.status_code}"
         )
         return None
 
@@ -72,9 +69,7 @@ def get_js_server_status(js_body):
         # }
         res = res.json()
     except JSONDecodeError as err:
-        logging.warning(
-            f"Could not parse js server status for {server_url}, because: {err}"
-        )
+        logging.warning(f"Could not parse js server status for {server_url}, because: {err}")
         return None
 
     if isinstance(res, dict):

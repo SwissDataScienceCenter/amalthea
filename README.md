@@ -166,114 +166,42 @@ However, there are a few requirements for an image to work with Amalthea:
 You have found a bug or you are missing a feature? We would be happy to hear
 from you, and even happier to receive a pull request :)
 
-### Requirements
+There are 2 ways to setup a development environment:
 
-For Amalthea development you will need python 3,
-[pipenv](https://pipenv.pypa.io/en/latest/#install-pipenv-today),
-[kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation),
-[kubectl](https://Kubernetes.io/docs/tasks/tools/#kubectl) and
-[helm](https://helm.sh/docs/intro/install/).
+1. Using devcontainers
+2. Using kind
 
-After cloning the repo, you can install the necessary python dependencies by
-running
+Regardless of which option you chose you will need to have the following installed:
+- poetry
+- docker
+- make
 
-```bash
-pipenv install --dev
+### Using devcontainers
+
+If you are using VSCode, then you can simply open and start the devcontainer with VSCode.
+If not read on.
+
+1. Install the devcontainer CLI - https://github.com/devcontainers/cli
+2. `devcontainer build --workspace-folder ./"
+3. `devcontainer up --workspace-folder ./"
+4. `devcontainer exec --workspace-folder ./ bash"
+5. Run `make tests` inside the devcontainer 
+
+Useful aliases for the devcontainer CLI:
+
+```
+alias dce="devcontainer exec --workspace-folder ./"
+alias dcb="devcontainer build --workspace-folder ./"
+alias dcu="devcontainer up --workspace-folder ./"
 ```
 
-### Kind
+### Using kind
 
-The easiest way to set up a cluster that will let you develop and test a feature
-is to use [kind](https://kind.sigs.k8s.io/). Kind runs a whole K8s cluster in
-docker and it can easily be used to run and test amalthea. We use kind for our
-integration tests too.
-
-### Running Kopf/Amalthea locally
-
-During development, Kopf-based operators can be executed locally using your
-local kubectl context. See `kopf run --help` for more information. In oder to do
-this, you first need to install the `JupyterServer` custom resource definiton
-defined in the helm charts template directory. It is also convenient to develop
-Amalthea using a kubectl context which has the same (minimal) roles assigned
-that Amalthea will run with when deployed through the helm chart. For this
-purpose, we provide a small script `utils/configure_local_dev.py` which creates
-a service account together with a role and a role binding and configures a
-kubectl context that uses this service account.
-
-### Example for a development workflow based on kind
-
-After cloning the repository and installing the required dependencies, executing
-the following commands should get you up and running:
-
-```bash
-pipenv install --dev
-kind create cluster
-kubectl create ns amalthea-testing
-pipenv run utils/configure_local_dev.py -n amalthea-testing
-pipenv run kopf run --dev -n amalthea-testing kopf_entrypoint.py
-```
-
-Unfortunately, [kopf auto reloading](https://github.com/nolar/kopf/issues/237)
-is not yet implemented. Therefore, after editing the code, you have to terminate
-and restart kopf. Once you are done working and you want to remove any traces of
-Amalthea from your cluster and your kubectl context, run
-
-```bash
-pipenv run utils/cleanup_local_dev.py -n amalthea-testing --use-context kind-kind
-```
-
-Note that `kind-kind` should be replaced with the name of the context that you
-would like to set as default _after_ removing the context which has been created
-during the test execution. Finally, if you also want to remove your kind
-cluster, run
-
-```bash
-kind delete cluster
-```
-
-### Testing
-
-A combination of unit- and integration tests are executed through pytest. The
-integration tests run in the `default` namespace of the cluster defined in your
-current kubectl context. Furthermore, the tests will temporarily install the 
-`JupyterServer` custom resource definition (CRD), so if you already have that 
-CRD installed, please delete it before running the tests. By installing the CRD 
-in the tests we ensure that the correct, up-to-date CRD is being tested and not 
-an older version left over from past work or tests. Overall we thus recommend 
-that you create a new kind cluster to run the tests.
-
-In a fresh cluster you can run the test suite by executing
-
-```bash
-cat <<EOF | kind create cluster --config=-
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-- role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: InitConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        node-labels: "ingress-ready=true"
-  extraPortMappings:
-  - containerPort: 80
-    hostPort: 80
-    protocol: TCP
-  - containerPort: 443
-    hostPort: 443
-    protocol: TCP
-EOF
-helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
-helm repo update
-helm upgrade --install metrics-server metrics-server/metrics-server --set 'args[0]=--kubelet-insecure-tls' --wait --timeout 5m0s
-VERSION=controller-v1.0.3
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/$VERSION/deploy/static/provider/kind/deploy.yaml
-kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=5m0s
-pipenv run pytest
-```
-
-in the root directory of the repository.
+1. Install kind - https://kind.sigs.k8s.io/docs/user/quick-start#installation
+2. `make kind_cluster`
+3. Ensure that you switch your current k8s context to the kind cluster (this usually happens automatically)
+4. `poetry install`
+5. `make tests`
 
 ## Why is this project called Amalthea?
 

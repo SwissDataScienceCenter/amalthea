@@ -19,9 +19,7 @@ def test_storage(storage_class, size, pvc_enabled, valid_spec):
     name = "test"
     manifest = get_children_specs(name, spec, logging)
     volumes = manifest["statefulset"]["spec"]["template"]["spec"]["volumes"]
-    volume_mounts = manifest["statefulset"]["spec"]["template"]["spec"]["containers"][
-        0
-    ]["volumeMounts"]
+    volume_mounts = manifest["statefulset"]["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
     if pvc_enabled:
         assert {"name": "workspace", "emptyDir": {"sizeLimit": size}} not in volumes
         assert "pvc" in manifest.keys()

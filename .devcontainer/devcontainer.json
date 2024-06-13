@@ -1,0 +1,25 @@
+{
+	"name": "Amalthea",
+	"image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
+	"build": {
+		"args": {"DEV_BUILD": true}
+	},
+	"containerUser": "root",
+	"postCreateCommand": {
+		"cluster": "make kind_cluster",
+		"poetry": "poetry install",
+		"kubectl_alias": "echo alias k=kubectl >> ~/.bashrc"
+	},
+	"features": {
+		"ghcr.io/eitsupi/devcontainer-features/jq-likes:2": {},
+		"ghcr.io/devcontainers-contrib/features/curl-apt-get:1": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		"ghcr.io/mpriscella/features/kind:1": {},
+		"ghcr.io/devcontainers-contrib/features/apt-get-packages:1": {
+			"packages": "sudo"
+		},
+		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": { "minikube": "none" },
+		"ghcr.io/devcontainers-contrib/features/poetry:2": {},
+		"ghcr.io/dhoeric/features/k9s:1": {}
+	}
+}

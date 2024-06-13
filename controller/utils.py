@@ -24,10 +24,7 @@ def get_pod_metrics(pod_name, namespace):
             f"/apis/metrics.k8s.io/v1beta1/namespaces/{namespace}/pods/{pod_name}",
         )
     except ApiException as err:
-        logging.warning(
-            f"Could not get metrics for pod {pod_name} "
-            f"in namespace {namespace}, because: {type(err)}"
-        )
+        logging.warning(f"Could not get metrics for pod {pod_name} " f"in namespace {namespace}, because: {type(err)}")
         return None
 
     return res
@@ -46,9 +43,7 @@ def parse_pod_metrics(metrics):
     for container in containers:
         try:
             parsed_data = {"name": container.name}
-            parsed_data["cpu_millicores"] = convert_to_millicores(
-                container["usage"]["cpu"]
-            )
+            parsed_data["cpu_millicores"] = convert_to_millicores(container["usage"]["cpu"])
             parsed_data["memory_bytes"] = convert_to_bytes(container["usage"]["memory"])
             parsed_metrics.append(parsed_data)
         except (KeyError, ValueError, AttributeError) as err:
@@ -80,10 +75,7 @@ def get_volume_disk_capacity(pod_name, namespace, volume_name):
                 mount_path = volume_mount.get("mountPath")
                 volume = list(filter(lambda x: x.name == volume_name, pod.spec.volumes))
                 volume = volume[0] if len(volume) == 1 else {}
-                if (
-                    "emptyDir" in volume.keys()
-                    and volume["emptyDir"].get("sizeLimit") is not None
-                ):
+                if "emptyDir" in volume.keys() and volume["emptyDir"].get("sizeLimit") is not None:
                     # empty dir is used for the session
                     command = ["sh", "-c", f"du -sb {mount_path}"]
                     used_bytes = parse_du_command(
@@ -95,9 +87,7 @@ def get_volume_disk_capacity(pod_name, namespace, volume_name):
                         )
                     )
                     total_bytes = convert_to_bytes(volume["emptyDir"]["sizeLimit"])
-                    available_bytes = (
-                        0 if total_bytes - used_bytes < 0 else total_bytes - used_bytes
-                    )
+                    available_bytes = 0 if total_bytes - used_bytes < 0 else total_bytes - used_bytes
                     return {
                         "total_bytes": total_bytes,
                         "used_bytes": used_bytes,
@@ -159,11 +149,7 @@ def parse_df_command(capacity, bytes_multiplier=1024):
     """
     output = []
     lines = capacity.strip("\n").split("\n")
-    if (
-        not lines[0].startswith("Filesystem")
-        or "Used" not in lines[0]
-        or "Available" not in lines[0]
-    ):
+    if not lines[0].startswith("Filesystem") or "Used" not in lines[0] or "Available" not in lines[0]:
         return output
     else:
         lines[0] = lines[0].replace("Mounted on", "Mounted_on")
@@ -231,9 +217,7 @@ def convert_to_bytes(value):
         raise ValueError(f"Cannot convert value {value} to bytes.")
     value, unit = res.groups()
     if unit and unit not in factors.keys():
-        raise ValueError(
-            f"Cannot convert value {value} to bytes because unit {unit} is not known."
-        )
+        raise ValueError(f"Cannot convert value {value} to bytes because unit {unit} is not known.")
     return float(value) * (factors[unit] if unit else 1)
 
 
@@ -250,7 +234,5 @@ def convert_to_millicores(value):
         raise ValueError(f"Cannot convert value {value} to millicores.")
     value, unit = res.groups()
     if unit and unit not in factors.keys():
-        raise ValueError(
-            f"Cannot convert value {value} to millicores because unit {unit} is not known."
-        )
+        raise ValueError(f"Cannot convert value {value} to millicores because unit {unit} is not known.")
     return float(value) * (factors[unit] if unit else 1000)

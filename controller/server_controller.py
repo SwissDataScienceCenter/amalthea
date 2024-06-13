@@ -1,50 +1,30 @@
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Dict
 
 import kopf
-from datetime import datetime, timezone
-
 import kubernetes.client
+import pytz
 from kubernetes.client.models import V1DeleteOptions
 from kubernetes.dynamic.exceptions import NotFoundError
-from prometheus_client import start_http_server
-import pytz
 
 from controller import config
-from controller.k8s_resources import CONTENT_TYPES, get_children_specs, get_urls
 from controller.culling import get_cpu_usage_for_culling, get_js_server_status
-from controller.utils import (
-    get_pod_metrics,
-    get_volume_disk_capacity,
-    get_api,
-    parse_pod_metrics,
-)
-from controller.metrics.s3 import S3MetricHandler, S3RotatingLogHandler, S3Formatter
-from controller.metrics.prometheus import PrometheusMetricHandler
+from controller.k8s_resources import CONTENT_TYPES, get_children_specs, get_urls
 from controller.metrics.events import MetricEvent
 from controller.metrics.queue import MetricsQueue
-from controller.server_status_enum import ServerStatusEnum
 from controller.server_status import ServerStatus
+from controller.server_status_enum import ServerStatusEnum
+from controller.utils import (
+    get_api,
+    get_pod_metrics,
+    get_volume_disk_capacity,
+    parse_pod_metrics,
+)
 
 
-metric_handlers = []
-if config.METRICS.enabled:
-    metric_handlers.append(PrometheusMetricHandler(config.METRICS.extra_labels))
-if config.AUDITLOG.enabled:
-    s3_metric_logger = logging.getLogger("s3")
-    s3_logging_handler = S3RotatingLogHandler(
-        "/tmp/amalthea_audit_log.txt", "a", config.AUDITLOG.s3
-    )
-    s3_logging_handler.setFormatter(S3Formatter())
-    s3_metric_logger.addHandler(s3_logging_handler)
-    metric_handlers.append(S3MetricHandler(s3_metric_logger, config.AUDITLOG))
-metric_events_queue = MetricsQueue(metric_handlers)
-
-
-def patch_jupyter_servers(
-    *, name: str, namespace: str, body: Dict, custom_resource_api=None
-) -> bool:
+def patch_jupyter_servers(*, name: str, namespace: str, body: Dict, custom_resource_api=None) -> bool:
     """Patch a server with the given body."""
     custom_resource_api = custom_resource_api or get_api(
         config.api_version, config.custom_resource_name, config.api_group
@@ -63,9 +43,7 @@ def patch_jupyter_servers(
         return True
 
 
-def get_labels(
-    parent_name, parent_uid, parent_labels, child_key=None, is_main_pod=False
-):
+def get_labels(parent_name, parent_uid, parent_labels, child_key=None, is_main_pod=False):
     """Create the appropriate labels per resource"""
     # Add labels from lowest to highest priority
     labels = {}
@@ -93,7 +71,6 @@ def create_namespaced_resource(namespace, body):
     return api.create(namespace=namespace, body=body)
 
 
-@kopf.on.startup()
 def configure(logger, settings, **_):
     """
     Configure the operator - see https://kopf.readthedocs.io/en/stable/configuration/
@@ -109,14 +86,6 @@ def configure(logger, settings, **_):
             logger.error(f"Problem when configuring the Operator: {e}")
 
 
-@kopf.on.create(
-    config.api_group,
-    config.api_version,
-    config.custom_resource_name,
-    timeout=config.KOPF_CREATE_TIMEOUT,
-    retries=config.KOPF_CREATE_RETRIES,
-    backoff=config.KOPF_CREATE_BACKOFF,
-)
 def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
     """
     Watch the creation of jupyter server objects and create all
@@ -165,9 +134,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
         )
         kopf.adopt(child_spec)
 
-        children_uids[child_key] = create_namespaced_resource(
-            namespace=namespace, body=child_spec
-        ).metadata.uid
+        children_uids[child_key] = create_namespaced_resource(namespace=namespace, body=child_spec).metadata.uid
 
     return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 
@@ -192,9 +159,6 @@ def delete_fn(labels, body, namespace, name, **_):
     )
 
 
-@kopf.on.event(
-    version=config.api_version, kind=config.custom_resource_name, group=config.api_group
-)
 def update_server_state(body, namespace, name, logger, **_):
     server_status = ServerStatus.from_server_spec(
         body,
@@ -207,9 +171,7 @@ def update_server_state(body, namespace, name, logger, **_):
     new_summary = server_status.get_container_summary()
     old_summary = body.get("status", {}).get("containerStates", {})
     # NOTE: Updating the status for deletions is handled in a specific delete handler
-    if (
-        old_status != new_status or new_summary != old_summary
-    ) and new_status != ServerStatusEnum.Stopping:
+    if (old_status != new_status or new_summary != old_summary) and new_status != ServerStatusEnum.Stopping:
         now = pytz.UTC.localize(datetime.utcnow())
         api = get_api(config.api_version, config.custom_resource_name, config.api_group)
         try:
@@ -220,11 +182,7 @@ def update_server_state(body, namespace, name, logger, **_):
                     "status": {
                         "state": new_status.value,
                         "containerStates": new_summary,
-                        "failedSince": (
-                            now.isoformat()
-                            if new_status == ServerStatusEnum.Failed
-                            else None
-                        ),
+                        "failedSince": (now.isoformat() if new_status == ServerStatusEnum.Failed else None),
                     },
                 },
                 content_type=CONTENT_TYPES["merge-patch"],
@@ -233,11 +191,7 @@ def update_server_state(body, namespace, name, logger, **_):
             pass
 
         hibernated = body.get("spec", {}).get("jupyterServer", {}).get("hibernated")
-        hibernation_date = (
-            body.get("metadata", {})
-            .get("annotations", {})
-            .get("renku.io/hibernationDate")
-        )
+        hibernation_date = body.get("metadata", {}).get("annotations", {}).get("renku.io/hibernationDate")
         # NOTE: We clear hibernation annotations here (and not in the notebooks service) to avoid
         # flickering in the UI (showing the repository as dirty when resuming a session for a short
         # period of time).
@@ -264,12 +218,6 @@ def update_server_state(body, namespace, name, logger, **_):
                 )
 
 
-@kopf.on.field(
-    group=config.api_group,
-    version=config.api_version,
-    kind=config.custom_resource_name,
-    field="spec.jupyterServer.hibernated",
-)
 def hibernation_field_handler(body, new, logger, name, namespace, **_):
     hibernated = new
 
@@ -331,12 +279,6 @@ def hibernation_field_handler(body, new, logger, name, namespace, **_):
             )
 
 
-@kopf.on.field(
-    group=config.api_group,
-    version=config.api_version,
-    kind=config.custom_resource_name,
-    field="spec.jupyterServer.resources",
-)
 def resources_field_handler(old, new, body, logger, name, namespace, **_):
     """
     Patches the session resources assuming that the session container is the first in the
@@ -371,9 +313,7 @@ def resources_field_handler(old, new, body, logger, name, namespace, **_):
         # immediately to starting, this avoids a delay and the state being old for a few seconds.
         # If the session is hibernated then the state should not be changed.
         if body.get("status", {}).get("state") != ServerStatusEnum.Hibernated.value:
-            js_api = get_api(
-                config.api_version, config.custom_resource_name, config.api_group
-            )
+            js_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
             now = pytz.UTC.localize(datetime.utcnow()).isoformat(timespec="seconds")
             js_api.patch(
                 namespace=namespace,
@@ -392,21 +332,13 @@ def resources_field_handler(old, new, body, logger, name, namespace, **_):
                 content_type=CONTENT_TYPES["merge-patch"],
             )
     except NotFoundError:
-        logger.warning(
-            f"Session resource patching for {name} failed because we cannot find it"
-        )
+        logger.warning(f"Session resource patching for {name} failed because we cannot find it")
     except kubernetes.client.ApiException as e:
         logger.error(f"Session {name} resource patching failed with error {e}")
     else:
         logger.info(f"Patched session {name} with resource {old} -> {new}")
 
 
-@kopf.timer(
-    config.api_group,
-    config.api_version,
-    config.custom_resource_name,
-    interval=config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS,
-)
 def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
     """
     Check if a session is idle (has zero open connections in proxy and CPU is below
@@ -436,11 +368,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
 
     # NOTE: Do nothing if the server is hibernated
     if hibernated:
-        last_activity_date = (
-            body.get("metadata", {})
-            .get("annotations", {})
-            .get("renku.io/lastActivityDate")
-        )
+        last_activity_date = body.get("metadata", {}).get("annotations", {}).get("renku.io/lastActivityDate")
         if last_activity_date:
             update_last_activity_date("")
         return
@@ -475,9 +403,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
         and js_server_status.get("connections", 0) <= 0
         and idle_seconds > config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS
     )
-    hibernate_idle_server = (
-        jupyter_server_is_idle_now and idle_seconds >= idle_seconds_threshold > 0
-    )
+    hibernate_idle_server = jupyter_server_is_idle_now and idle_seconds >= idle_seconds_threshold > 0
     hibernate_old_server = jupyter_server_age_seconds >= max_age_seconds_threshold > 0
 
     if hibernate_idle_server or hibernate_old_server:
@@ -523,23 +449,13 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
         return
 
     if jupyter_server_is_idle_now:
-        logger.info(
-            f"Jupyter Server {name} in namespace {namespace} found to be idle for {idle_seconds}"
-        )
+        logger.info(f"Jupyter Server {name} in namespace {namespace} found to be idle for {idle_seconds}")
         update_last_activity_date(last_activity.isoformat(timespec="seconds"))
     elif idle_seconds > 0:
-        logger.info(
-            f"Resetting last activity date for Jupyter server {name} in namespace {namespace}."
-        )
+        logger.info(f"Resetting last activity date for Jupyter server {name} in namespace {namespace}.")
         update_last_activity_date("")
 
 
-@kopf.timer(
-    config.api_group,
-    config.api_version,
-    config.custom_resource_name,
-    interval=config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS,
-)
 def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
     """Check if a server is hibernated for long enough, then cull it."""
     hibernated = body.get("spec", {}).get("jupyterServer", {}).get("hibernated")
@@ -548,9 +464,7 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
     if not hibernated:
         return
 
-    hibernated_seconds_threshold = body["spec"]["culling"].get(
-        "hibernatedSecondsThreshold", 0
-    )
+    hibernated_seconds_threshold = body["spec"]["culling"].get("hibernatedSecondsThreshold", 0)
     if hibernated_seconds_threshold == 0:
         return
 
@@ -560,18 +474,14 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
     hibernation_date_str = annotations.get("renku.io/hibernationDate", "")
 
     now = datetime.now(timezone.utc)
-    hibernation_date = (
-        datetime.fromisoformat(hibernation_date_str) if hibernation_date_str else now
-    )
+    hibernation_date = datetime.fromisoformat(hibernation_date_str) if hibernation_date_str else now
 
     hibernated_seconds = (now - hibernation_date).total_seconds()
     can_be_deleted = hibernated_seconds >= hibernated_seconds_threshold
 
     if can_be_deleted:
         logger.info(f"Deleting hibernated Jupyter server {name} due to age")
-        custom_resource_api = get_api(
-            config.api_version, config.custom_resource_name, config.api_group
-        )
+        custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
         try:
             custom_resource_api.delete(
                 name=name,
@@ -585,8 +495,7 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
             )
     else:
         logger.info(
-            f"Jupyter Server {name} in namespace {namespace} found to be hibernated for "
-            f"{hibernated_seconds}"
+            f"Jupyter Server {name} in namespace {namespace} found to be hibernated for " f"{hibernated_seconds}"
         )
         if not hibernation_date_str:
             if not patch_jupyter_servers(
@@ -606,12 +515,6 @@ def cull_hibernated_jupyter_servers(body, name, namespace, logger, **_):
                 )
 
 
-@kopf.timer(
-    config.api_group,
-    config.api_version,
-    config.custom_resource_name,
-    interval=config.JUPYTER_SERVER_PENDING_CHECK_INTERVAL_SECONDS,
-)
 def cull_pending_jupyter_servers(body, name, namespace, logger, **kwargs):
     """
     Check if a session is pending (starting or failed). If the session is pending then
@@ -628,15 +531,11 @@ def cull_pending_jupyter_servers(body, name, namespace, logger, **kwargs):
     failed_seconds = 0
 
     if starting_since is not None:
-        starting_seconds = (
-            now - datetime.fromisoformat(starting_since)
-        ).total_seconds()
+        starting_seconds = (now - datetime.fromisoformat(starting_since)).total_seconds()
     if failed_since is not None:
         failed_seconds = (now - datetime.fromisoformat(failed_since)).total_seconds()
 
-    custom_resource_api = get_api(
-        config.api_version, config.custom_resource_name, config.api_group
-    )
+    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
 
     if starting_seconds_threshold > 0 and starting_seconds > starting_seconds_threshold:
         logger.info(f"Deleting Jupyter server {name} due to starting too long")
@@ -668,17 +567,6 @@ def cull_pending_jupyter_servers(body, name, namespace, logger, **kwargs):
             )
             pass
         return
-
-
-# create @kopf.on.event(...) type of decorators
-# Go to the bottom of the update_status function definition to see how
-# those decorators are applied.
-def get_update_decorator(child_resource_kind):
-    return kopf.on.event(
-        child_resource_kind["name"],
-        group=child_resource_kind["group"],
-        labels={config.PARENT_NAME_LABEL_KEY: kopf.PRESENT},
-    )
 
 
 def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
@@ -731,9 +619,7 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
 
     # We use the dynamic client for patching since we need
     # content_type="application/json-patch+json"
-    custom_resource_api = get_api(
-        config.api_version, config.custom_resource_name, config.api_group
-    )
+    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     try:
         custom_resource_api.patch(
             namespace=namespace,
@@ -750,18 +636,10 @@ def update_status(body, event, labels, logger, meta, name, namespace, uid, **_):
             raise e
 
 
-# Add the actual decorators
-for child_resource_kind in config.CHILD_RESOURCES:
-    get_update_decorator(child_resource_kind)(update_status)
-
-
-@kopf.on.event("events", field="involvedObject.kind", value="StatefulSet")
 def handle_statefulset_events(event, namespace, logger, **_):
     """Used to update the jupyterserver status when a resource quota is full
     and the pod cannot be scheduled."""
-    custom_resource_api = get_api(
-        config.api_version, config.custom_resource_name, config.api_group
-    )
+    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     ss_api = get_api("apps/v1", "StatefulSet")
     body = event.get("object", {})
     tp = body.get("type")
@@ -777,9 +655,7 @@ def handle_statefulset_events(event, namespace, logger, **_):
             return
         if ss is None:
             return
-        ss_belongs_to_amalthea = (
-            ss.metadata.get("labels", {}).get(config.PARENT_NAME_LABEL_KEY) is not None
-        )
+        ss_belongs_to_amalthea = ss.metadata.get("labels", {}).get(config.PARENT_NAME_LABEL_KEY) is not None
     if not ss_belongs_to_amalthea:
         return
 
@@ -790,17 +666,11 @@ def handle_statefulset_events(event, namespace, logger, **_):
     except NotFoundError:
         return
     new_message_timestamp = datetime.fromisoformat(body["lastTimestamp"].rstrip("Z"))
-    old_message = (
-        js.get("status", {}).get("events", {}).get("statefulset", {}).get("message")
-    )
-    old_message_timestamp_raw = (
-        js.get("status", {}).get("events", {}).get("statefulset", {}).get("timestamp")
-    )
+    old_message = js.get("status", {}).get("events", {}).get("statefulset", {}).get("message")
+    old_message_timestamp_raw = js.get("status", {}).get("events", {}).get("statefulset", {}).get("timestamp")
     old_message_timestamp = None
     if old_message_timestamp_raw is not None:
-        old_message_timestamp = datetime.fromisoformat(
-            old_message_timestamp_raw.rstrip("Z")
-        )
+        old_message_timestamp = datetime.fromisoformat(old_message_timestamp_raw.rstrip("Z"))
     is_event_newer = old_message_timestamp_raw is None or (
         new_message_timestamp is not None
         and old_message_timestamp_raw is not None
@@ -867,9 +737,7 @@ def update_resource_usage(body, name, namespace, **kwargs):
     disk_capacity = get_volume_disk_capacity(pod_name, namespace, "workspace")
     pod_metrics = get_pod_metrics(pod_name, namespace)
     parsed_pod_metrics = parse_pod_metrics(pod_metrics)
-    cpu_memory = list(
-        filter(lambda x: x.get("name") == "jupyter-server", parsed_pod_metrics)
-    )
+    cpu_memory = list(filter(lambda x: x.get("name") == "jupyter-server", parsed_pod_metrics))
     cpu_memory = cpu_memory[0] if len(cpu_memory) == 1 else {}
     patch = {
         "status": {
@@ -886,9 +754,7 @@ def update_resource_usage(body, name, namespace, **kwargs):
             }
         }
     }
-    custom_resource_api = get_api(
-        config.api_version, config.custom_resource_name, config.api_group
-    )
+    custom_resource_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     try:
         custom_resource_api.patch(
             namespace=namespace,
@@ -901,51 +767,20 @@ def update_resource_usage(body, name, namespace, **kwargs):
         pass
 
 
-def publish_metrics(old, new, body, name, **_):
-    """Handler to publish prometheus and auditlog metrics on server status change."""
-    if old == new:
-        # INFO: This is highly unlikely to occur, but if for some reason the status hasn't changed
-        # then we do not want to publish a metric. Metrics are published only on status changes.
-        return
-    metric_event = MetricEvent(
-        pytz.UTC.localize(datetime.utcnow()),
-        body,
-        old_status=old,
-        status=new,
-    )
-    logging.info(
-        f"Adding event {metric_event} for server {name} to metrics queue from delete handler."
-    )
-    metric_events_queue.add_to_queue(metric_event)
+def publish_metrics(metric_events_queue: MetricsQueue):
+    def _publish_metrics(old, new, body, name, **_):
+        """Handler to publish prometheus and auditlog metrics on server status change."""
+        if old == new:
+            # INFO: This is highly unlikely to occur, but if for some reason the status hasn't changed
+            # then we do not want to publish a metric. Metrics are published only on status changes.
+            return
+        metric_event = MetricEvent(
+            pytz.UTC.localize(datetime.utcnow()),
+            body,
+            old_status=old,
+            status=new,
+        )
+        logging.info(f"Adding event {metric_event} for server {name} to metrics queue from delete handler.")
+        metric_events_queue.add_to_queue(metric_event)
 
-
-if config.JUPYTER_SERVER_RESOURCE_CHECK_ENABLED:
-    kopf.timer(
-        config.api_group,
-        config.api_version,
-        config.custom_resource_name,
-        interval=config.JUPYTER_SERVER_RESOURCE_CHECK_INTERVAL_SECONDS,
-    )(update_resource_usage)
-
-
-# INFO: Register the functions that publish metric events into the metric events queue
-if config.METRICS.enabled or config.AUDITLOG.enabled:
-    kopf.on.field(
-        config.api_group,
-        config.api_version,
-        config.custom_resource_name,
-        field="status.state",
-    )(publish_metrics)
-    # NOTE: The 'on.field' handler cannot catch the server deletion so this is needed.
-    kopf.on.delete(
-        config.api_group,
-        config.api_version,
-        config.custom_resource_name,
-        field="status.state",
-    )(publish_metrics)
-# INFO: Start the prometheus metrics server if enabled
-if config.METRICS.enabled:
-    start_http_server(config.METRICS.port)
-# INFO: Start a thread to watch the metric events queue and process metrics if handlers are present
-if len(metric_handlers) > 0:
-    metric_events_queue.start_workers()
+    return _publish_metrics

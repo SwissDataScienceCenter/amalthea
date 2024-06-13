@@ -14,16 +14,14 @@ jobs:
         with:
           fetch-depth: 0
       - name: Render chart into manifests
-        run: |
-          python -m pip install --upgrade pip pipenv
-          pipenv install --dev
-          cd helm-chart/
-          helm dep update ./amalthea
-          cd ../
-          pipenv run chartpress --reset
-          pipenv run python utils/render-chart-manifests.py
+        uses: devcontainers/ci@v0.3
+        with:
+          runCmd: |
+            make crd
+          push: never
+          skipContainerUserIdUpdate: false
       - name: Generate CRD documentation
-        uses: SwissDataScienceCenter/renku-actions/generate-crd-docs@3d6f5abf79b61d969b0d958e42dabb4e9f15392c
+        uses: SwissDataScienceCenter/renku-actions/generate-crd-docs@v1.11.3
         env:
           RESOURCES: ./manifests/crd.yaml
           OUTPUT: ./docs/crd.md
@@ -39,19 +37,3 @@ jobs:
           committer: "Renku Bot <renku@datascience.ch>"
           branch: renkubot/update-manifests-docs-
           branch-suffix: timestamp
-  push-image:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Push the image for the current commit
-        env:
-          DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
-        run: |
-          echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
-          python -m pip install --upgrade pip pipenv
-          pipenv install --dev
-          pipenv run chartpress --tag $(git rev-parse HEAD) --push
-          pipenv run chartpress --tag latest --push

@@ -35,16 +35,11 @@ def test_auth_no_oidc(token, cookie_block_list, cookie_allow_list, valid_spec):
     elif token is None:
         assert secret["data"]["jupyterServerAppToken"] is not None
     else:
-        assert (
-            secret["data"]["jupyterServerAppToken"]
-            == b64encode(token.encode()).decode()
-        )
+        assert secret["data"]["jupyterServerAppToken"] == b64encode(token.encode()).decode()
     assert not any(
         [
             container["name"] in ["authentication-plugin", "authorization-plugin"]
-            for container in manifest["statefulset"]["spec"]["template"]["spec"][
-                "containers"
-            ]
+            for container in manifest["statefulset"]["spec"]["template"]["spec"]["containers"]
         ]
     )
 
@@ -72,32 +67,20 @@ def test_auth_oidc(oidc_secret, valid_spec):
     assert any(
         [
             container["name"] == "oauth2-proxy"
-            for container in manifest["statefulset"]["spec"]["template"]["spec"][
-                "containers"
-            ]
+            for container in manifest["statefulset"]["spec"]["template"]["spec"]["containers"]
         ]
     )
     assert "oauth2ProxyCookieSecret" in secret["data"].keys()
-    auth_container = manifest["statefulset"]["spec"]["template"]["spec"]["containers"][
-        1
+    auth_container = manifest["statefulset"]["spec"]["template"]["spec"]["containers"][1]
+    auth_container_oidc_secret = [env for env in auth_container["env"] if env["name"] == "OAUTH2_PROXY_CLIENT_SECRET"][
+        0
     ]
-    auth_container_oidc_secret = [
-        env
-        for env in auth_container["env"]
-        if env["name"] == "OAUTH2_PROXY_CLIENT_SECRET"
-    ][0]
     if "value" in oidc_secret.keys():
         assert "oidcClientSecret" in secret["data"].keys()
-        assert (
-            secret["data"]["oidcClientSecret"]
-            == b64encode(oidc_secret["value"].encode()).decode()
-        )
+        assert secret["data"]["oidcClientSecret"] == b64encode(oidc_secret["value"].encode()).decode()
         assert auth_container_oidc_secret["valueFrom"]["secretKeyRef"] == {
             "key": "oidcClientSecret",
             "name": name,
         }
     else:
-        assert (
-            auth_container_oidc_secret["valueFrom"]["secretKeyRef"]
-            == oidc_secret["secretKeyRef"]
-        )
+        assert auth_container_oidc_secret["valueFrom"]["secretKeyRef"] == oidc_secret["secretKeyRef"]

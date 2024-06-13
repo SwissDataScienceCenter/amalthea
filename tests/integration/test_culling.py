@@ -1,17 +1,17 @@
 import time
 
 import pytest
+from kubernetes.dynamic import Resource
 
 from tests.integration.utils import find_resource
 
 
 @pytest.mark.culling
 def test_idle_culling(
-    k8s_namespace,
-    launch_session,
+    k8s_namespace: str,
     is_session_ready,
-    k8s_amalthea_api,
-    k8s_pod_api,
+    operator: Resource,
+    k8s_pod_api: Resource,
     test_manifest,
     wait_for_pod_deletion,
     is_session_deleted,
@@ -21,11 +21,11 @@ def test_idle_culling(
     culling_threshold_seconds = 60
     test_manifest["spec"]["culling"]["idleSecondsThreshold"] = culling_threshold_seconds
     test_manifest["spec"]["culling"]["hibernatedSecondsThreshold"] = culling_threshold_seconds
-    launch_session(test_manifest)
+    operator.create(test_manifest, namespace=k8s_namespace)
 
     assert is_session_ready(name, timeout_mins=5)
 
-    session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+    session = find_resource(name, k8s_namespace, operator)
     assert session is not None
     assert session["metadata"]["name"] == name
     assert session["spec"]["culling"]["idleSecondsThreshold"] == culling_threshold_seconds
@@ -40,7 +40,7 @@ def test_idle_culling(
     # NOTE: Wait for some hibernated culling handler executions
     time.sleep(15)
 
-    session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+    session = find_resource(name, k8s_namespace, operator)
     pod = find_resource(f"{name}-0", k8s_namespace, k8s_pod_api)
     assert session is not None
     assert session["metadata"]["annotations"]["renku.io/hibernation"]
@@ -51,18 +51,17 @@ def test_idle_culling(
     # NOTE: Wait for the hibernated session to be deleted due to culling
     is_session_deleted(name, timeout=60)
 
-    session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+    session = find_resource(name, k8s_namespace, operator)
 
     assert session is None
 
 
 @pytest.mark.culling
 def test_starting_culling(
-    k8s_namespace,
-    launch_session,
+    k8s_namespace: str,
     is_session_ready,
-    k8s_amalthea_api,
-    k8s_pod_api,
+    operator: Resource,
+    k8s_pod_api: Resource,
     test_manifest,
     is_session_deleted,
     patch_sleep_init_container,
@@ -71,9 +70,9 @@ def test_starting_culling(
     culling_threshold_seconds = 60
     test_manifest["spec"]["culling"]["startingSecondsThreshold"] = culling_threshold_seconds
     test_manifest["spec"]["patches"] = [patch_sleep_init_container(300)]
-    launch_session(test_manifest)
+    operator.create(test_manifest, namespace=k8s_namespace)
     assert not is_session_ready(name, timeout_mins=1)
-    session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+    session = find_resource(name, k8s_namespace, operator)
     assert session["spec"]["culling"]["idleSecondsThreshold"] == 0
     assert session["spec"]["culling"]["startingSecondsThreshold"] == culling_threshold_seconds
     assert session["spec"]["culling"]["failedSecondsThreshold"] == 0
@@ -83,18 +82,17 @@ def test_starting_culling(
     # wait for session to be culled
     is_session_deleted(name, culling_threshold_seconds + 60)
     # confirm session got culled
-    session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+    session = find_resource(name, k8s_namespace, operator)
     pod = find_resource(name + "-0", k8s_namespace, k8s_pod_api)
     assert session is None or pod is None or pod["metadata"].get("deletionTimestamp") is not None
 
 
 @pytest.mark.culling
 def test_failed_culling(
-    k8s_namespace,
-    launch_session,
+    k8s_namespace: str,
     is_session_ready,
-    k8s_amalthea_api,
-    k8s_pod_api,
+    operator: Resource,
+    k8s_pod_api: Resource,
     test_manifest,
     is_session_deleted,
 ):
@@ -102,9 +100,9 @@ def test_failed_culling(
     culling_threshold_seconds = 60
     test_manifest["spec"]["jupyterServer"]["image"] = "nginx:latest"
     test_manifest["spec"]["culling"]["failedSecondsThreshold"] = culling_threshold_seconds
-    launch_session(test_manifest)
+    operator.create(test_manifest, namespace=k8s_namespace)
     assert not is_session_ready(name, timeout_mins=1)
-    session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+    session = find_resource(name, k8s_namespace, operator)
     assert session["spec"]["culling"]["idleSecondsThreshold"] == 0
     assert session["spec"]["culling"]["startingSecondsThreshold"] == 0
     assert session["spec"]["culling"]["failedSecondsThreshold"] == culling_threshold_seconds
@@ -114,6 +112,6 @@ def test_failed_culling(
     # wait for session to be culled
     is_session_deleted(name, culling_threshold_seconds + 60)
     # confirm session got culled
-    session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+    session = find_resource(name, k8s_namespace, operator)
     pod = find_resource(name + "-0", k8s_namespace, k8s_pod_api)
     assert session is None or pod is None or pod["metadata"].get("deletionTimestamp") is not None

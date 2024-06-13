@@ -29,9 +29,7 @@ def test_routing(tls, valid_spec):
     ingress = manifest["ingress"]
     if tls["enabled"]:
         assert "tls" in ingress["spec"].keys()
-        assert ingress["spec"]["tls"] == [
-            {"hosts": [routing["host"]], "secretName": routing["tls"]["secretName"]}
-        ]
+        assert ingress["spec"]["tls"] == [{"hosts": [routing["host"]], "secretName": routing["tls"]["secretName"]}]
     else:
         assert "tls" not in ingress["spec"].keys()
     assert "rules" in ingress["spec"].keys()
