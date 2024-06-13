@@ -84,14 +84,12 @@ jobs:
         id: install
       - uses: actions/setup-python@v4
         with:
-          python-version: 3.8
-          cache: pipenv
+          python-version: 3.12
       - name: Build Chart and Images
         run: |
-          python -m pip install --upgrade pip pipenv
-          pipenv install --dev
-          pipenv run chartpress
-          kind load docker-image $(pipenv run chartpress --list-images)
+          pip install chartpress
+          chartpress
+          kind load docker-image $(chartpress --list-images)
       - name: Install Amalthea and Ingress-Nginx
         run: |
           # Keep pinned version for controller because it does not work with all k8s versions,
