@@ -9,7 +9,7 @@ from controller.crds import jupyter_server_crd
 def _template_plain(output: Path):
     latest_crd = jupyter_server_crd()
     with open(output, "w") as f:
-        f.write("# This manifest is auto-generated from controller/crds/jupyter_server.yaml\n")
+        f.write("# This manifest is auto-generated from controller/crds/jupyter_server.yaml, do not modify.\n")
         f.write(latest_crd.strip())
         f.write("\n")
 
@@ -18,7 +18,7 @@ def _template_helm(output: Path):
     latest_crd = jupyter_server_crd()
     with open(output, "w") as f:
         f.write("{{- if .Values.deployCrd -}}\n")
-        f.write("# This manifest is auto-generated from controller/crds/jupyter_server.yaml\n")
+        f.write("# This manifest is auto-generated from controller/crds/jupyter_server.yaml, do not modify.\n")
         f.write(latest_crd.strip())
         f.write("\n{{- end }}")
         f.write("\n")

@@ -42,6 +42,7 @@ testpaths = [
     "utils",
 ]
 log_cli = false
+markers = ["culling: tests that check culling functionality and take a few minutes (per test) to complete."]
 
 [[tool.mypy.overrides]]
 module = [
