@@ -1,11 +1,10 @@
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from typing import Dict
 
 import kopf
 import kubernetes.client
-import pytz
 from kubernetes.client.models import V1DeleteOptions
 from kubernetes.dynamic.exceptions import NotFoundError
 
@@ -92,7 +91,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
     the necessary k8s child resources which make the actual jupyter server.
     """
     api = get_api(config.api_version, config.custom_resource_name, config.api_group)
-    now = pytz.UTC.localize(datetime.utcnow()).isoformat(timespec="seconds")
+    now = datetime.now(UTC).isoformat(timespec="seconds")
     try:
         api.patch(
             namespace=namespace,
@@ -172,7 +171,7 @@ def update_server_state(body, namespace, name, logger, **_):
     old_summary = body.get("status", {}).get("containerStates", {})
     # NOTE: Updating the status for deletions is handled in a specific delete handler
     if (old_status != new_status or new_summary != old_summary) and new_status != ServerStatusEnum.Stopping:
-        now = pytz.UTC.localize(datetime.utcnow())
+        now = datetime.now(UTC)
         api = get_api(config.api_version, config.custom_resource_name, config.api_group)
         try:
             api.patch(
@@ -314,7 +313,7 @@ def resources_field_handler(old, new, body, logger, name, namespace, **_):
         # If the session is hibernated then the state should not be changed.
         if body.get("status", {}).get("state") != ServerStatusEnum.Hibernated.value:
             js_api = get_api(config.api_version, config.custom_resource_name, config.api_group)
-            now = pytz.UTC.localize(datetime.utcnow()).isoformat(timespec="seconds")
+            now = datetime.now(UTC).isoformat(timespec="seconds")
             js_api.patch(
                 namespace=namespace,
                 name=name,
@@ -386,7 +385,7 @@ def cull_idle_jupyter_servers(body, name, namespace, logger, **_):
         return
     cpu_usage = get_cpu_usage_for_culling(pod=pod_name, namespace=namespace)
 
-    now = pytz.UTC.localize(datetime.utcnow())
+    now = datetime.now(UTC)
     last_activity = js_server_status.get("last_activity", now)
     jupyter_server_started = js_server_status.get("started", now)
     jupyter_server_age_seconds = (now - jupyter_server_started).total_seconds()
@@ -523,7 +522,7 @@ def cull_pending_jupyter_servers(body, name, namespace, logger, **kwargs):
     """
     starting_seconds_threshold = body["spec"]["culling"]["startingSecondsThreshold"]
     failed_seconds_threshold = body["spec"]["culling"]["failedSecondsThreshold"]
-    now = pytz.UTC.localize(datetime.utcnow())
+    now = datetime.now(UTC)
     starting_since = body["status"].get("startingSince")
     failed_since = body["status"].get("failedSince")
 
@@ -775,7 +774,7 @@ def publish_metrics(metric_events_queue: MetricsQueue):
             # then we do not want to publish a metric. Metrics are published only on status changes.
             return
         metric_event = MetricEvent(
-            pytz.UTC.localize(datetime.utcnow()),
+            datetime.now(UTC),
             body,
             old_status=old,
             status=new,

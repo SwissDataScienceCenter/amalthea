@@ -1,8 +1,7 @@
 from dataclasses import dataclass, asdict, field
 from typing import Optional, Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 import boto3
-import pytz
 from pathlib import Path
 import json
 from logging.handlers import BaseRotatingHandler
@@ -84,7 +83,7 @@ class S3RotatingLogHandler(BaseRotatingHandler):
     def __init__(self, filename, mode, config: S3Config, encoding=None):
         super().__init__(filename, mode, encoding, delay=False)
         self._period_timedelta = timedelta(seconds=config.rotation_period_seconds)
-        self._start_timestamp = pytz.UTC.localize(datetime.utcnow())
+        self._start_timestamp = datetime.now(UTC)
         self._session = boto3.Session(
             aws_secret_access_key=config.secret_access_key,
             aws_access_key_id=config.access_key_id,
@@ -130,11 +129,11 @@ class S3RotatingLogHandler(BaseRotatingHandler):
             os.remove(dfn)
         # NOTE: self.rotate calls self.rotator
         self.rotate(self.baseFilename, dfn)
-        self._start_timestamp = pytz.UTC.localize(datetime.utcnow())
+        self._start_timestamp = datetime.now(UTC)
         self.stream = self._open()
 
     def shouldRollover(self, _: str) -> bool:
-        now = pytz.UTC.localize(datetime.utcnow())
+        now = datetime.now(UTC)
         if now - self._start_timestamp > self._period_timedelta:
             return True
         return False
