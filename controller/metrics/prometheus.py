@@ -66,7 +66,7 @@ class PrometheusMetric:
             self._metric_type = metric_type
         else:
             raise ValueError(
-                "Invalid type provided for metric_type, needed str or " f"PrometheusMetricType, got {type(metric_type)}"
+                f"Invalid type provided for metric_type, needed str or PrometheusMetricType, got {type(metric_type)}"
             )
         if labelnames is None:
             labelnames = []
@@ -99,7 +99,7 @@ class PrometheusMetric:
             metric_action = action
         else:
             raise ValueError(
-                "Type of metric action needs to be either str or " f"PrometheusMetricAction, got {type(action)}"
+               f"Type of metric action needs to be either str or PrometheusMetricAction, got {type(action)}"
             )
         if metric_action not in self._metric_type.actions:
             raise ValueError(

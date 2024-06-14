@@ -24,7 +24,7 @@ def get_pod_metrics(pod_name, namespace):
             f"/apis/metrics.k8s.io/v1beta1/namespaces/{namespace}/pods/{pod_name}",
         )
     except ApiException as err:
-        logging.warning(f"Could not get metrics for pod {pod_name} " f"in namespace {namespace}, because: {type(err)}")
+        logging.warning(f"Could not get metrics for pod {pod_name} in namespace {namespace}, because: {type(err)}")
         return None
 
     return res

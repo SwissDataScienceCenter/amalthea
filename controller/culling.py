@@ -56,7 +56,7 @@ def get_js_server_status(js_body):
 
     if res.status_code != 200:
         logging.warning(
-            f"Could not get js server status for {server_url}, " f"response status code is {res.status_code}"
+            f"Could not get js server status for {server_url}, response status code is {res.status_code}"
         )
         return None
 
