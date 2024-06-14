@@ -106,13 +106,13 @@ securityContext:
   runAsNonRoot: true
   allowPrivilegeEscalation: false
 
-resources:
-  limits:
-    cpu: 100m
-    memory: 128Mi
-  requests:
-    cpu: 100m
-    memory: 128Mi
+resources: {}
+#   limits:
+#     cpu: 100m
+#     memory: 128Mi
+#   requests:
+#     cpu: 100m
+#     memory: 128Mi
 
 nodeSelector: {}
 
@@ -157,7 +157,7 @@ scheduler:
     # as few nodes as possible, instead of spreading them over all the available nodes.
     enabled: false
     image:
-      repository: k8s.gcr.io/kube-scheduler
+      repository: registry.k8s.io/kube-scheduler
       pullPolicy: IfNotPresent
       # If you leave the tag empty we will set it based on the Kubernetes cluster version in Helm.
       # If our guess and/or Helm is not reporting the right Kubernetes version then set the value here.
