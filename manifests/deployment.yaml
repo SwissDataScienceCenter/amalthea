@@ -60,12 +60,7 @@ spec:
             - "--log-format=json"
             - "--namespace=default"
           resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
+            {}
           env:
             - name: CRD_API_GROUP
               value: amalthea.dev
