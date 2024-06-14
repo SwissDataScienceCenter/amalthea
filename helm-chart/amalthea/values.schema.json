@@ -220,10 +220,7 @@
                             ]
                         }
                     },
-                    "required": [
-                        "memory",
-                        "cpu"
-                    ],
+                    "required": [],
                     "additionalProperties": false
                 },
                 "requests": {
@@ -242,18 +239,12 @@
                             ]
                         }
                     },
-                    "required": [
-                        "memory",
-                        "cpu"
-                    ],
+                    "required": [],
                     "additionalProperties": false
                 }
             },
             "additionalProperties": false,
-            "required": [
-                "limits",
-                "requests"
-            ]
+            "required": []
         },
         "nodeSelector": {
             "type": "object"
