@@ -1,0 +1,272 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: amaltheasessions.amalthea.dev
+spec:
+  scope: Namespaced
+  group: amalthea.dev
+  names:
+    plural: amaltheasessions
+    singular: amaltheasession
+    kind: AlmaltheaSession
+    shortNames:
+    - asn
+
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - jsonPath: .status.phase
+          description: The current session startup phase
+          name: Phase
+          type: string
+      subresources:
+          status: {}
+
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: AlmaltheaSession is the Schema for the session API
+          properties:
+            spec:
+              type: object
+              description: User defined specification for an Amalthea Session custom resource.
+              properties:
+                projects:
+                  type: array
+                  description: Projects to bring into the session
+                  items:
+                    type: object
+                    properties:
+                      clonePath:
+                        type: string
+                        description: Path relative to the root of the projects to where
+                          the project should be cloned into.
+                      git:
+                        type: object
+                        description: Project's git source
+                        properties:
+                          checkoutFrom:
+                            type: object
+                            description: Defines from what the project should be checked
+                              out from.
+                            properties:
+                              remote:
+                                type: string
+                                description: The remote name.
+                              revision:
+                                type: string
+                                description: The revision to be checkout from. This can
+                                  be a branch, tag or commit id.
+
+                container:
+                  type: object
+                  description: session container specification
+                  properties:
+                    args:
+                      type: array
+                      description: Arguments passed to the command of the image or the
+                        overridden command below.
+                      items:
+                        type: string
+                    command:
+                      type: array
+                      description: Command to run in place of the image provided
+                        command.
+                      items:
+                        type: string
+                    env:
+                      type: array
+                      description: Environment variables used in this container
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          value:
+                            type: string
+                        required:
+                        - name
+                        - value
+                    image:
+                      type: string
+                    memoryLimit:
+                      type: string
+                    cpuLimit:
+                      type: string
+                    name:
+                      type: string
+                  required:
+                  - name
+
+                extraContainers:
+                  type: array
+                  default: []
+                  description: Sidecar containers to run along the main cotnainer
+                  items:
+                    type: object
+                    properties:
+                      args:
+                        type: array
+                        description: Arguments passed to the command of the image or the
+                          overridden command below.
+                        items:
+                          type: string
+                      command:
+                        type: array
+                        description: Command to run in place of the image provided
+                          command.
+                        items:
+                          type: string
+                      env:
+                        type: array
+                        description: Environment variables used in this container
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            value:
+                              type: string
+                          required:
+                          - name
+                          - value
+                      image:
+                        type: string
+                      memoryLimit:
+                        type: string
+                      cpuLimit:
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - name
+                    - image
+
+                initContainers:
+                  type: array
+                  default: []
+                  description: Sidecar containers to run along the main cotnainer
+                  items:
+                    type: object
+                    properties:
+                      args:
+                        type: array
+                        description: Arguments passed to the command of the image or the
+                          overridden command below.
+                        items:
+                          type: string
+                      command:
+                        type: array
+                        description: Command to run in place of the image provided
+                          command.
+                        items:
+                          type: string
+                      env:
+                        type: array
+                        description: Environment variables used in this container
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            value:
+                              type: string
+                          required:
+                          - name
+                          - value
+                      image:
+                        type: string
+                      memoryLimit:
+                        type: string
+                      cpuLimit:
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - name
+                    - image
+
+                dataSources:
+                  type: array
+                  default: []
+                  description: List of data source to connect to and mount in the main
+                    container.
+                  items:
+                    type: object
+                    properties:
+                      remote:
+                        type: string
+                        description: URL of the data source to connect to
+                      mountPath:
+                        type: string
+                        description: Path to were the data source should be mounted
+                      secret:
+                        type: string
+                        description: Name of the secret containing the credentials for the
+                          data source.
+                    required:
+                      - remote
+                      - mountPath
+
+                culling:
+                  type: object
+                  default: {}
+                  description: Options about culling idle servers
+                  properties:
+                    maxAgeSecondsThreshold:
+                      type: integer
+                      default: 0
+                      minimum: 0
+                      description:
+                        The maximum allowed age for a session, regardless of whether it
+                        is active or not. A value of zero indicates that the server cannot be
+                        culled due to its age.
+                    idleSecondsThreshold:
+                      type: integer
+                      minimum: 0
+                      default: 0
+                      description:
+                        How long should a server be idle for before it is culled. A value of
+                        zero indicates that the server should never be culled for inactivity.
+                    startingSecondsThreshold:
+                      type: integer
+                      default: 0
+                      minimum: 0
+                      description:
+                        How long can a server be in starting state before it gets culled. A
+                        value of zero indicates that the server cannot be culled due to
+                        starting too long.
+                    failedSecondsThreshold:
+                      type: integer
+                      default: 0
+                      minimum: 0
+                      description:
+                        How long can a server be in failed state before it gets culled. A
+                        value of zero indicates that the server cannot be culled due to
+                        failing.
+                    hibernatedSecondsThreshold:
+                      type: integer
+                      default: 0
+                      minimum: 0
+                      description:
+                        Number of seconds where a server can be in hibernated state before
+                        it gets culled. A value of zero indicates that hibernated servers
+                        cannot be culled.
+                oidc:
+                  type: object
+                  default: {}
+                  description: OIDC configuration
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                      description: Whether OIDC is enabled for this environement
+                    configuration:
+                      type: object
+                      description: Configuration to be applied
+                      properties:
+                        secretRef:
+                          type: string
+                          description: Name of the secret containing the OIDC configuration
