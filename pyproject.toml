@@ -25,7 +25,7 @@ kopf = {extras = ["uvloop"], version = "^1.37.2"}
 black = "^24.4.2"
 flake8 = "^7.0.0"
 pytest = "^8.2.2"
-pylint = "^3.2.2"
+pylint = "^3.2.3"
 pytest-mock = "^3.14.0"
 flake8-pyproject = "^1.2.3"
 
