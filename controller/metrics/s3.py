@@ -1,8 +1,7 @@
 from dataclasses import dataclass, asdict, field
 from typing import Optional, Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 import boto3
-import pytz
 from pathlib import Path
 import json
 from logging.handlers import BaseRotatingHandler
@@ -24,6 +23,7 @@ from controller.metrics.utils import (
 @dataclass
 class SesionMetricData:
     """The data that is included for each metric event uploaded to S3."""
+
     name: str
     namespace: str
     uid: str
@@ -65,7 +65,8 @@ class SesionMetricData:
             metric_event.status,
             metric_event.old_status,
             additional_labels_from_manifest(
-                metric_event.session, additional_label_names,
+                metric_event.session,
+                additional_label_names,
             ),
         )
 
@@ -76,14 +77,13 @@ class S3RotatingLogHandler(BaseRotatingHandler):
     not kept locally. The maximum rotation period (in seconds) can be
     specified.
     """
+
     _datetime_format = "_%Y%m%d_%H%M%S%z"
 
-    def __init__(
-        self, filename, mode, config: S3Config, encoding=None
-    ):
+    def __init__(self, filename, mode, config: S3Config, encoding=None):
         super().__init__(filename, mode, encoding, delay=False)
         self._period_timedelta = timedelta(seconds=config.rotation_period_seconds)
-        self._start_timestamp = pytz.UTC.localize(datetime.utcnow())
+        self._start_timestamp = datetime.now(UTC)
         self._session = boto3.Session(
             aws_secret_access_key=config.secret_access_key,
             aws_access_key_id=config.access_key_id,
@@ -109,20 +109,14 @@ class S3RotatingLogHandler(BaseRotatingHandler):
         file_stats = os.stat(fname)
         resp = None
         if file_stats.st_size > 0:
-            resp = self._client.upload_file(
-                fname,
-                self._bucket,
-                self._s3_path_prefix + "/" + Path(fname).name
-            )
+            resp = self._client.upload_file(fname, self._bucket, self._s3_path_prefix + "/" + Path(fname).name)
         if remove_after_upload:
             os.remove(fname)
         return resp
 
     def _namer(self, default_name: str) -> str:
         path = Path(default_name)
-        new_file = path.parent / (
-            path.stem + self._start_timestamp.strftime(self._datetime_format) + path.suffix
-        )
+        new_file = path.parent / (path.stem + self._start_timestamp.strftime(self._datetime_format) + path.suffix)
         return os.fspath(new_file)
 
     def doRollover(self):
@@ -135,11 +129,11 @@ class S3RotatingLogHandler(BaseRotatingHandler):
             os.remove(dfn)
         # NOTE: self.rotate calls self.rotator
         self.rotate(self.baseFilename, dfn)
-        self._start_timestamp = pytz.UTC.localize(datetime.utcnow())
+        self._start_timestamp = datetime.now(UTC)
         self.stream = self._open()
 
     def shouldRollover(self, _: str) -> bool:
-        now = pytz.UTC.localize(datetime.utcnow())
+        now = datetime.now(UTC)
         if now - self._start_timestamp > self._period_timedelta:
             return True
         return False
@@ -147,10 +141,11 @@ class S3RotatingLogHandler(BaseRotatingHandler):
 
 class S3Formatter(Formatter):
     """Logging formatter that has ISO8601 timestamps and produces valid json logs."""
+
     def __init__(self, validate: bool = True) -> None:
         datefmt = "%Y-%m-%dT%H:%M:%S%z"
         style = "%"
-        fmt = "{\"time\":\"%(asctime)s\", \"message\":%(message)s}"
+        fmt = '{"time":"%(asctime)s", "message":%(message)s}'
         super().__init__(fmt, datefmt, style, validate)
 
     def formatTime(self, record: LogRecord, datefmt: Optional[str] = None) -> str:
@@ -167,6 +162,7 @@ class S3MetricHandler(MetricEventHandler):
     """A simple metric handler that persists the metrics
     that are published by Amalthea to a S3 bucket.
     """
+
     def __init__(
         self,
         logger: Logger,

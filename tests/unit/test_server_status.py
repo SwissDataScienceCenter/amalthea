@@ -227,12 +227,8 @@ status:
         ),
     ],
 )
-def test_container_status(
-    container_status_dict, container_type, property_name, expected_value
-):
-    status = ContainerStatus.from_k8s_container_status(
-        container_status_dict, container_type=container_type
-    )
+def test_container_status(container_status_dict, container_type, property_name, expected_value):
+    status = ContainerStatus.from_k8s_container_status(container_status_dict, container_type=container_type)
     assert getattr(status, property_name) == expected_value
 
 

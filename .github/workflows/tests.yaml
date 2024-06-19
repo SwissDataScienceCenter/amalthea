@@ -1,0 +1,24 @@
+name: Tests
+
+on:
+  pull_request:
+    types:
+    - opened
+    - edited
+    - synchronize
+    - reopened
+    - closed
+
+jobs:
+  run-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Style checks
+        uses: devcontainers/ci@v0.3
+        with:
+          runCmd: |
+            make style_checks
+            make tests
+          push: never
+          skipContainerUserIdUpdate: false

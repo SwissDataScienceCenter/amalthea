@@ -23,11 +23,7 @@ def test_get_urls(tls, valid_spec):
     else:
         assert host_url.startswith("http")
     re_match = re.match(
-        r"^http[s]*:\/\/"
-        + spec["routing"]["host"]
-        + r"\/"
-        + spec["routing"]["path"]
-        + r"$",
+        r"^http[s]*:\/\/" + spec["routing"]["host"] + r"\/" + spec["routing"]["path"] + r"$",
         full_url,
     )
     assert re_match is not None

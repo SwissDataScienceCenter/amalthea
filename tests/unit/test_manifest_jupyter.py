@@ -36,9 +36,7 @@ def test_jupyterserver(resources, valid_spec):
     assert (
         len(
             re.findall(
-                re.escape("c.ServerApp.default_url=")
-                + r"[\'\"]{1}"
-                + re.escape(server["defaultUrl"]),
+                re.escape("c.ServerApp.default_url=") + r"[\'\"]{1}" + re.escape(server["defaultUrl"]),
                 manifest["configmap"]["data"]["jupyter_server_config.py"],
             )
         )
@@ -47,9 +45,7 @@ def test_jupyterserver(resources, valid_spec):
     assert (
         len(
             re.findall(
-                re.escape("c.NotebookApp.default_url=")
-                + r"[\'\"]{1}"
-                + re.escape(server["defaultUrl"]),
+                re.escape("c.NotebookApp.default_url=") + r"[\'\"]{1}" + re.escape(server["defaultUrl"]),
                 manifest["configmap"]["data"]["jupyter_notebook_config.py"],
             )
         )

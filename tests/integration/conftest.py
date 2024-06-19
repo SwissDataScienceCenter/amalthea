@@ -1,138 +1,37 @@
-import base64
+import random
+import string
+import threading
+from collections.abc import Iterator
 from datetime import datetime, timedelta
-from os.path import expanduser
-import tempfile
 from time import sleep
+from typing import Any
 from uuid import uuid4
-import os
-from subprocess import Popen
 
 import pytest
-from kubernetes import config, client
-from kubernetes.dynamic import DynamicClient
-from kubernetes.dynamic.exceptions import NotFoundError
+import uvloop
 import yaml
+from kubernetes import config
+from kubernetes.client import (
+    ApiClient,
+    CoreV1Api,
+    V1DeleteOptions,
+    V1Namespace,
+    V1ObjectMeta,
+)
+from kubernetes.dynamic import DynamicClient
+from kubernetes.dynamic.exceptions import NotFoundError, ResourceNotFoundError
+from kubernetes.dynamic.resource import Resource
 
+from controller.crds import jupyter_server_crd_dict
 from controller.culling import get_js_server_status
+from controller.main import run as run_controller
 from tests.integration.utils import find_resource
-from utils.chart_rbac import cleanup_k8s_resources, create_k8s_resources
 
 
-@pytest.fixture(scope="session")
-def operator_env(operator_kubeconfig_fp):
-    """Use to override environment variables that set the kube config.
-    But also (and more importantly) this can be used to override important
-    application-level operator configuration like the interval at which
-    the idle checks run. Refer to the config.py in the controler folder for
-    available environment variables that can be overriden."""
-    yield {
-        "KUBECONFIG": operator_kubeconfig_fp.name,
-        "JUPYTER_SERVER_PENDING_CHECK_INTERVAL_SECONDS": "5",
-        "JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS": "5",
-    }
-
-
-@pytest.fixture(scope="session", autouse=True)
-def operator(k8s_namespace, operator_env, k8s_amalthea_api, kopf_log_files_fp):
-    stdout, stderr = kopf_log_files_fp
-    p = Popen(
-        args=f"kopf run -n {k8s_namespace} --verbose kopf_entrypoint.py",
-        stdout=stdout,
-        stderr=stderr,
-        shell=True,
-        env={
-            **os.environ,
-            **operator_env,
-        },
-        bufsize=0,
-        # NOTE: os.setpgrp makes it so that Ctrl-C is ignored.
-        # This is needed because Ctrl-C gets picked up if the tests are stopped manually
-        # But stopping the operator the instant the tests are stopped results in
-        # incomplete cleanup of fixtures and leftover k8s resources
-        preexec_fn=os.setpgrp,
-    )
-    # INFO: Give time for the operator to fully start up, call to Popen does not block
-    sleep(10)
-    yield p
-
-    # NOTE: Keep the kopf runner (i.e. operator) going until all sessions are cleaned up
-    sessions = k8s_amalthea_api.get(namespace=k8s_namespace)
-    print("Checking for the number of active sessions")
-    while len(sessions.items) > 0:
-        sessions = k8s_amalthea_api.get(namespace=k8s_namespace)
-        print(f"{len(sessions.items)} active sessions found")
-        sleep(10)
-    # NOTE: Ctrl-C is ignored - this is only way to stop operator
-    p.kill()
-    # INFO: Extract and post logs from controller - in most cases controller writes
-    # to standard error regardless of whether erors were present or not
-    stdout.seek(0)
-    stderr.seek(0)
-    stdout_content = stdout.read()
-    stderr_content = stderr.read()
-    if type(stdout_content) is bytes:
-        stdout = stdout_content.decode()
-    if type(stderr_content) is bytes:
-        stderr_content = stderr_content.decode()
-    try:
-        term_width = os.get_terminal_size().columns
-    except OSError:
-        term_width = 80
-    print(" KOPF STDOUT ".center(term_width, "*"))
-    print(stdout_content)
-    print(" KOPF STDERR ".center(term_width, "*"))
-    print(stderr_content)
-    print("*".center(term_width, "*"))
-
-
-@pytest.fixture(scope="session", autouse=True)
-def operator_kubeconfig_fp():
-    with tempfile.NamedTemporaryFile("w") as fout:
-        yield fout
-
-
-@pytest.fixture(scope="session", autouse=True)
-def kopf_log_files_fp():
-    with tempfile.NamedTemporaryFile("w+b") as stdout, tempfile.NamedTemporaryFile(
-        "w+b"
-    ) as stderr:
-        yield stdout, stderr
-
-
-@pytest.fixture(scope="session", autouse=True)
-def make_operator_kubeconfig(
-    create_amalthea_k8s_resources,
-    k8s_namespace,
-    operator_kubeconfig_fp,
-    release_name,
-):
-    k8s_client = client.ApiClient()
-    # Get the token for the amalthea service account
-    dc = DynamicClient(k8s_client)
-    sa_api = dc.resources.get(api_version="v1", kind="ServiceAccount")
-    sa = sa_api.get(f"{release_name}", k8s_namespace)
-    secret_api = dc.resources.get(api_version="v1", kind="Secret")
-    sa_token_secret = secret_api.get(sa["secrets"][0]["name"], k8s_namespace)
-    token = base64.b64decode(sa_token_secret["data"]["token"].encode()).decode()
-
-    # Read kube config, replace current context, save to file
-    kc_path = config.KUBE_CONFIG_DEFAULT_LOCATION
-    if kc_path.startswith("~"):
-        kc_path = expanduser("~") + kc_path[1:]
-    with open(kc_path, "r") as f:
-        kc = yaml.safe_load(f)
-    current_context = kc["current-context"]
-    for iuser, user in enumerate(kc["users"]):
-        if user["name"] == current_context:
-            kc["users"][iuser]["user"] = {"token": token}
-            kc["users"] = [user]
-    for _, cluster in enumerate(kc["clusters"]):
-        if cluster["name"] == current_context:
-            kc["clusters"] = [cluster]
-    for _, context in enumerate(kc["contexts"]):
-        if context["name"] == current_context:
-            kc["contexts"] = [context]
-    yaml.dump(kc, operator_kubeconfig_fp)
+@pytest.fixture
+def k8s_crd_api(k8s_dynamic: DynamicClient) -> Resource:
+    crd_api = k8s_dynamic.resources.get(api_version="apiextensions.k8s.io/v1", kind="CustomResourceDefinition")
+    return crd_api
 
 
 @pytest.fixture
@@ -145,86 +44,138 @@ def read_manifest():
     return _read_manifest
 
 
-@pytest.fixture(scope="session", autouse=True)
-def load_k8s_config():
+@pytest.fixture
+def k8s_core() -> CoreV1Api:
     config.load_kube_config()
+    k8s_client = CoreV1Api()
+    return k8s_client
 
 
-@pytest.fixture(scope="session")
-def get_k8s_api(load_k8s_config):
-    apis = {}
+@pytest.fixture
+def k8s_dynamic() -> DynamicClient:
+    config.load_kube_config()
+    api_client = ApiClient()
+    k8s_client = DynamicClient(api_client)
+    return k8s_client
 
-    def _get_k8s_api(api_version, kind):
-        if (api_version, kind) in apis.keys():
-            return apis[(api_version, kind)]
+
+@pytest.fixture
+def k8s_pod_api(k8s_dynamic: DynamicClient) -> Resource:
+    return k8s_dynamic.resources.get(api_version="v1", kind="Pod")
+
+
+@pytest.fixture
+def js_crd_manifest() -> Iterator[dict[str, Any]]:
+    manifest = jupyter_server_crd_dict()
+    random_prefix = "test" + "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
+    manifest["metadata"]["name"] = random_prefix + manifest["metadata"]["name"]
+    manifest["spec"]["names"]["kind"] = random_prefix + manifest["spec"]["names"]["kind"]
+    manifest["spec"]["names"]["plural"] = random_prefix + manifest["spec"]["names"]["plural"]
+    manifest["spec"]["names"]["singular"] = random_prefix + manifest["spec"]["names"]["singular"]
+    manifest["spec"]["names"]["shortNames"] = []
+    return manifest
+
+
+@pytest.fixture
+def k8s_namespace(k8s_core: CoreV1Api) -> Iterator[str]:
+    ns = "ns-" + str(uuid4())
+    k8s_core.create_namespace(V1Namespace(metadata=V1ObjectMeta(name=ns)))
+    yield ns
+    k8s_core.delete_namespace(name=ns, propagation_policy="Foreground")
+
+
+@pytest.fixture
+def operator(
+    k8s_namespace: str,
+    monkeypatch,
+    k8s_crd_api: Resource,
+    mocker,
+    js_crd_manifest: dict[str, Any],
+    k8s_dynamic: DynamicClient,
+) -> Iterator[Resource]:
+    # Create CRD in K8s
+    k8s_crd_api.create(js_crd_manifest)
+    while True:
+        try:
+            k8s_crd_api.get(name=js_crd_manifest["metadata"]["name"])
+        except NotFoundError:
+            sleep(1)
         else:
-            k8s_client = DynamicClient(client.ApiClient())
-            api = k8s_client.resources.get(api_version=api_version, kind=kind)
-            apis[(api_version, kind)] = api
-            return api
-
-    yield _get_k8s_api
-
-
-@pytest.fixture(scope="session")
-def k8s_amalthea_api(get_k8s_api, create_amalthea_k8s_resources):
-    yield get_k8s_api(
-        "v1alpha1",
-        "JupyterServer",
+            break
+    k8s_dynamic.resources.invalidate_cache()
+    k8s_dynamic.resources.discover()
+    # Get a client
+    retries = 0
+    while True:
+        retries += 1
+        if retries > 5:
+            assert False, "cannot initialize the operator"
+        try:
+            js_api = k8s_dynamic.resources.get(
+                group=js_crd_manifest["spec"]["group"],
+                api_version=js_crd_manifest["spec"]["versions"][0]["name"],
+                kind=js_crd_manifest["spec"]["names"]["kind"],
+            )
+        except ResourceNotFoundError:
+            sleep(1)
+        else:
+            break
+    # Setup oprerator environment / config
+    monkeypatch.setenv("CRD_API_GROUP", js_api.group)
+    monkeypatch.setenv("CRD_API_VERSION", js_api.api_version)
+    monkeypatch.setenv("CRD_NAME", js_api.kind)
+    monkeypatch.setenv("NAMESPACES", k8s_namespace)
+    mocker.patch("controller.config.api_group", js_api.group)
+    mocker.patch("controller.config.api_version", js_api.api_version)
+    mocker.patch("controller.config.custom_resource_name", js_api.kind)
+    mocker.patch("controller.config.NAMESPACES", [k8s_namespace])
+    mocker.patch("controller.config.JUPYTER_SERVER_PENDING_CHECK_INTERVAL_SECONDS", 2)
+    mocker.patch("controller.config.JUPYTER_SERVER_IDLE_CHECK_INTERVAL_SECONDS", 2)
+    stop_flag = threading.Event()
+    ready_flag = threading.Event()
+    thread = threading.Thread(
+        target=uvloop.run,
+        args=(run_controller(stop_flag=stop_flag, ready_flag=ready_flag),),
+    )
+    thread.start()
+    ready_flag.wait()
+    yield js_api
+    # Cleanup
+    resources = js_api.get()
+    for res in resources.items:
+        js_name = res["metadata"]["name"]
+        js_namespace = res["metadata"]["namespace"]
+        try:
+            js_api.delete(
+                name=js_name,
+                namespace=js_namespace,
+                body=V1DeleteOptions(propagation_policy="Foreground"),
+            )
+        except NotFoundError:
+            pass
+    # Wait for all jupyter servers to be deleted before quitting the operator
+    # If not jupyter servers get orphaned and the CRD and namespaces cannot be deleted
+    # For some reason the Foreground propagation policies that are supposed to prevent this
+    # do not seem to help at all and jupyter servers still get orphaned without this loop.
+    while js_api.get().items:
+        sleep(0.5)
+    stop_flag.set()
+    thread.join(timeout=10)
+    k8s_crd_api.delete(
+        name=js_crd_manifest["metadata"]["name"],
+        body=V1DeleteOptions(propagation_policy="Foreground"),
     )
 
 
 @pytest.fixture
-def k8s_pod_api(get_k8s_api):
-    yield get_k8s_api("v1", "Pod")
-
-
-@pytest.fixture(scope="session")
-def k8s_namespace():
-    yield "default"
-
-
-@pytest.fixture(scope="session")
-def release_name():
-    yield "amalthea-test"
-
-
-@pytest.fixture
-def launch_session(k8s_amalthea_api, k8s_namespace, is_session_deleted):
-    launched_sessions = []
-
-    def _launch_session(manifest):
-        k8s_amalthea_api.create(manifest, namespace=k8s_namespace)
-        launched_sessions.append(manifest)
-
-    yield _launch_session
-
-    # cleanup
-    for session in launched_sessions:
-        print(f"\nCleaning up session {session['metadata']['name']}")
-        try:
-            k8s_amalthea_api.delete(
-                session["metadata"]["name"],
-                namespace=k8s_namespace,
-                propagation_policy="Foreground",
-                async_req=False,
-            )
-            is_session_deleted(session["metadata"]["name"])
-        except NotFoundError:
-            pass
-        else:
-            print("Finished cleaning up sesssion.")
-
-
-@pytest.fixture
-def is_session_ready(k8s_namespace, k8s_amalthea_api):
+def is_session_ready(k8s_namespace: str, operator: Resource):
     def _is_session_ready(name, timeout_mins=5):
         """The session is considered ready only when it successfully responds
         to a status request."""
         tstart = datetime.now()
         timeout = timedelta(minutes=timeout_mins)
         while datetime.now() - tstart < timeout:
-            session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+            session = find_resource(name, k8s_namespace, operator)
             if session is not None:
                 try:
                     status = get_js_server_status(session)
@@ -239,14 +190,14 @@ def is_session_ready(k8s_namespace, k8s_amalthea_api):
 
 
 @pytest.fixture
-def is_session_deleted(k8s_namespace, k8s_pod_api, k8s_amalthea_api):
+def is_session_deleted(k8s_namespace, k8s_pod_api: Resource, operator: Resource):
     def _is_session_deleted(name, timeout=300):
         """Has the session been fully shut down"""
         tstart = datetime.now()
         timeout = timedelta(seconds=timeout)
         while datetime.now() - tstart < timeout:
             pod = find_resource(name + "-0", k8s_namespace, k8s_pod_api)
-            session = find_resource(name, k8s_namespace, k8s_amalthea_api)
+            session = find_resource(name, k8s_namespace, operator)
             if pod is not None or session is not None:
                 sleep(2)
             else:
@@ -270,30 +221,8 @@ def wait_for_pod_deletion(k8s_namespace, k8s_pod_api):
     yield is_pod_deleted
 
 
-@pytest.fixture(scope="session", autouse=True)
-def create_amalthea_k8s_resources(load_k8s_config, release_name, k8s_namespace):
-    """This fixture configures the tests to use a serviceaccount
-    with the same roles that the operator has when installed through
-    the helm chart."""
-    print("Creating custom resources for Amalthea.")
-    yield create_k8s_resources(
-        k8s_namespace,
-        [k8s_namespace],
-        resources=["ServiceAccount", "Role", "RoleBinding", "CustomResourceDefinition"],
-        release_name=release_name,
-    )
-    print("Removing custom resources for Amalthea.")
-    # Cleanup after testing
-    cleanup_k8s_resources(
-        k8s_namespace,
-        [k8s_namespace],
-        resources=["ServiceAccount", "Role", "RoleBinding", "CustomResourceDefinition"],
-        release_name=release_name,
-    )
-
-
 @pytest.fixture
-def custom_session_manifest(read_manifest, k8s_namespace):
+def custom_session_manifest(read_manifest, k8s_namespace: str, operator: Resource):
     def _custom_session_manifest(
         manifest_file="tests/examples/token.yaml",
         name=f"test-session-{uuid4()}",
@@ -316,6 +245,8 @@ def custom_session_manifest(read_manifest, k8s_namespace):
         manifest = read_manifest(manifest_file)
         return {
             **manifest,
+            "apiVersion": operator.group_version,
+            "kind": operator.kind,
             "metadata": {
                 "name": name,
                 "namespace": k8s_namespace,
@@ -384,4 +315,5 @@ def patch_sleep_init_container():
                 },
             ],
         }
+
     yield _patch_sleep_init_container
