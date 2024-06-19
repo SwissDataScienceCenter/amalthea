@@ -10,7 +10,7 @@ packages = [{include = "controller"}]
 [tool.poetry.dependencies]
 python = "^3.12"
 pyyaml = "^6.0.1"
-kubernetes = "^29.0.0"
+kubernetes = "^30.1.0"
 jsonpatch = "^1.33"
 json-merge-patch = "^0.2"
 expiringdict = "^1.2.2"
