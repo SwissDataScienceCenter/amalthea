@@ -4,15 +4,31 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    groups:
+      python:
+        patterns:
+          - "*"
   - package-ecosystem: "npm"
     directory: "/acceptance-tests"
     schedule:
       interval: "daily"
+    groups:
+      node:
+        patterns:
+          - "*"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      docker:
+        patterns:
+          - "*"
   - package-ecosystem: "devcontainers"
     directory: "/"
     schedule:
       interval: weekly
+    groups:
+      devcontainer:
+        patterns:
+          - "*"
