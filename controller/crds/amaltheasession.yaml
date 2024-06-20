@@ -249,7 +249,7 @@ spec:
                         Number of seconds where a server can be in hibernated state before
                         it gets completely deleted. A value of zero indicates that hibernated servers
                         will not be automatically be deleted by Amalthea after a period of time.
-                oidc:
+                authentication:
                   type: object
                   default: {}
                   description: OIDC configuration
@@ -260,8 +260,21 @@ spec:
                       description: Whether OIDC is enabled for this environement
                     configuration:
                       type: object
-                      description: Configuration to be applied
+                      description: Authentication configuration options
+                      oneOf:
+                        - required:
+                            - token
+                        - required:
+                            - oidc
                       properties:
-                        secretRef:
+                        token:
                           type: string
-                          description: Name of the secret containing the OIDC configuration
+                          description: A pre-generated token that can be used to authenticate a
+                            user.
+                        configuration:
+                          type: object
+                          description: Configuration to be applied
+                          properties:
+                            secretRef:
+                              type: string
+                              description: Name of the secret containing the OIDC configuration
