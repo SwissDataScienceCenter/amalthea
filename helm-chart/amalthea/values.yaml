@@ -14,7 +14,8 @@ global:
       tag: "0.0.2"
     customCAs: []
       # - secret:
-
+# Inject some extra env variables directly from a config map
+envFromConfigMaps: []
 # Indicate the scope which this operator watches for
 # JupyterServer resources.
 scope:
@@ -37,7 +38,7 @@ scope:
 deployCrd: true # whether to deploy the jupyterserver CRD
 
 networkPolicies:
-  # # Enable sensible, default network policies. Note that until cluster-wide 
+  # # Enable sensible, default network policies. Note that until cluster-wide
   # # network policies are available in Kubernetes (https://github.com/kubernetes/enhancements/issues/2091),
   # # enabling network policies for the servers won't do anything if the scope of the
   # # operator is set to clusterWide. These default policies disable all ingress
