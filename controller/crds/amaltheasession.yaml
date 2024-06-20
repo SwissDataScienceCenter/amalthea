@@ -85,10 +85,18 @@ spec:
                         - value
                     image:
                       type: string
-                    memoryLimit:
-                      type: string
-                    cpuLimit:
-                      type: string
+                    resources:
+                      type: object
+                      default: {}
+                      description: >-
+                        Pod resources request
+                        example:
+                          requests:
+                            memory: "64Mi"
+                            cpu: "250m"
+                          limits:
+                            memory: "128Mi"
+                            cpu: "500m"
                     name:
                       type: string
                   required:
@@ -128,10 +136,18 @@ spec:
                           - value
                       image:
                         type: string
-                      memoryLimit:
-                        type: string
-                      cpuLimit:
-                        type: string
+                      resources:
+                        type: object
+                        default: {}
+                        description: >-
+                          Pod resources request
+                          example:
+                            requests:
+                              memory: "64Mi"
+                              cpu: "250m"
+                            limits:
+                              memory: "128Mi"
+                              cpu: "500m"
                       name:
                         type: string
                     required:
@@ -172,12 +188,18 @@ spec:
                           - value
                       image:
                         type: string
-                      memoryLimit:
-                        type: string
-                      cpuLimit:
-                        type: string
-                      name:
-                        type: string
+                      resources:
+                        type: object
+                        default: {}
+                        description: >-
+                          Pod resources request
+                          example:
+                            requests:
+                              memory: "64Mi"
+                              cpu: "250m"
+                            limits:
+                              memory: "128Mi"
+                              cpu: "500m"
                     required:
                     - name
                     - image
