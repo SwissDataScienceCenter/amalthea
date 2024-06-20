@@ -33,33 +33,27 @@ spec:
               type: object
               description: User defined specification for an Amalthea Session custom resource.
               properties:
-                projects:
+                codeRepositories:
                   type: array
-                  description: Projects to bring into the session
+                  description: Code that will be pulled into the session
                   items:
                     type: object
                     properties:
                       clonePath:
                         type: string
-                        description: Path relative to the root of the projects to where
-                          the project should be cloned into.
+                        description: Path relative to the root of the work folder to where
+                          the repository should be cloned into.
                       git:
                         type: object
                         description: Project's git source
                         properties:
-                          checkoutFrom:
-                            type: object
-                            description: Defines from what the project should be checked
-                              out from.
-                            properties:
-                              remote:
-                                type: string
-                                description: The remote name.
-                              revision:
-                                type: string
-                                description: The revision to be checkout from. This can
-                                  be a branch, tag or commit id.
-
+                          remote:
+                            type: string
+                            description: The remote name.
+                          revision:
+                            type: string
+                            description: The revision to be checkout from. This can
+                              be a branch, tag or commit id.
                 container:
                   type: object
                   description: session container specification
