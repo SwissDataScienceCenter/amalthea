@@ -49,6 +49,12 @@ networkPolicies:
   # #             are blocked
   # #   - ingress: allowed only on port 4180 for TCP so that the oauth2proxy can be reached
   enabled: true
+  # # Do not allow deployment to communicate with private cluster IPs.
+  clusterIpBlock:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+
 
 kopf:
   # # Configure the kopf operator settings by providing
