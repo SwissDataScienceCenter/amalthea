@@ -27,7 +27,7 @@ spec:
       schema:
         openAPIV3Schema:
           type: object
-          description: AlmaltheaSession is the Schema for the session API
+          description: AmaltheaSession is the Schema for the session API
           properties:
             spec:
               type: object
@@ -103,7 +103,7 @@ spec:
                 extraContainers:
                   type: array
                   default: []
-                  description: Sidecar containers to run along the main cotnainer
+                  description: Extra containers to run alongside the main container
                   items:
                     type: object
                     properties:
@@ -147,7 +147,7 @@ spec:
                 initContainers:
                   type: array
                   default: []
-                  description: Sidecar containers to run along the main cotnainer
+                  description: Init containers that run before the rest
                   items:
                     type: object
                     properties:
@@ -221,39 +221,40 @@ spec:
                       minimum: 0
                       description:
                         The maximum allowed age for a session, regardless of whether it
-                        is active or not. A value of zero indicates that the server cannot be
-                        culled due to its age.
+                        is active or not. When the threshold is reached the session is hibernated.
+                        A value of zero indicates that Amalthea will not automatically hibernate
+                        the session based on its age.
                     idleSecondsThreshold:
                       type: integer
                       minimum: 0
                       default: 0
                       description:
-                        How long should a server be idle for before it is culled. A value of
-                        zero indicates that the server should never be culled for inactivity.
+                        How long should a server be idle for before it is hibernated. A value of
+                        zero indicates that Amalthea will not automatically hibernate inactive sessions.
                     startingSecondsThreshold:
                       type: integer
                       default: 0
                       minimum: 0
                       description:
-                        How long can a server be in starting state before it gets culled. A
-                        value of zero indicates that the server cannot be culled due to
-                        starting too long.
+                        How long can a server be in starting state before it gets hibernated. A
+                        value of zero indicates that the server will not be automatically hibernated
+                        by Amalthea because it took to long to start.
                     failedSecondsThreshold:
                       type: integer
                       default: 0
                       minimum: 0
                       description:
-                        How long can a server be in failed state before it gets culled. A
-                        value of zero indicates that the server cannot be culled due to
-                        failing.
+                        How long can a server be in failed state before it gets hibernated. A
+                        value of zero indicates that the server will not be automatically
+                        hibernated by Amalthea if it is failing.
                     hibernatedSecondsThreshold:
                       type: integer
                       default: 0
                       minimum: 0
                       description:
                         Number of seconds where a server can be in hibernated state before
-                        it gets culled. A value of zero indicates that hibernated servers
-                        cannot be culled.
+                        it gets completely deleted. A value of zero indicates that hibernated servers
+                        will not be automatically be deleted by Amalthea after a period of time.
                 oidc:
                   type: object
                   default: {}
