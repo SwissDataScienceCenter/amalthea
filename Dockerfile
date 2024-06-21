@@ -1,35 +1,33 @@
-FROM python:3.12-bookworm as builder
-ARG DEV_BUILD=false
-ARG USER_UID=1000
-ARG USER_GID=$USER_UID
+# Build the manager binary
+FROM golang:1.21 AS builder
+ARG TARGETOS
+ARG TARGETARCH
 
-RUN groupadd --gid $USER_GID renku && \
-    DEBIAN_FRONTEND=noninteractive adduser --gid $USER_GID --uid $USER_UID renku && \
-    apt-get update && apt-get install -y tini
-USER $USER_UID:$USER_GID
-WORKDIR /app
-RUN python3 -m pip install --user pipx && \
-    python3 -m pipx ensurepath && \
-    /home/renku/.local/bin/pipx install poetry && \
-    /home/renku/.local/bin/pipx install virtualenv && \
-    /home/renku/.local/bin/virtualenv env
-COPY --chown=$USER_UID:$USER_GID . .
-RUN if $DEV_BUILD ; then \
-    /home/renku/.local/bin/poetry export -o requirements.txt --with dev; \
-    env/bin/pip install -r requirements.txt; \
-  fi
-RUN /home/renku/.local/bin/poetry build -f wheel 
-RUN env/bin/pip --no-cache-dir install dist/*.whl
+WORKDIR /workspace
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
 
-FROM python:3.12-slim-bookworm
-ARG USER_UID=1000
-ARG USER_GID=$USER_UID
-ENV PROMETHEUS_MULTIPROC_DIR=/prometheus
-RUN mkdir /prometheus && \
-    groupadd --gid $USER_GID renku && \
-    adduser --gid $USER_GID --uid $USER_UID renku
-USER $USER_UID:$USER_GID
-WORKDIR /app
-COPY --from=builder /usr/bin/tini /usr/bin/tini
-COPY --from=builder /app/env ./env
-ENTRYPOINT ["tini", "-g", "--", "./env/bin/python", "-m", "controller.main"]
+# Copy the go source
+COPY cmd/main.go cmd/main.go
+COPY api/ api/
+COPY internal/controller/ internal/controller/
+
+# Build
+# the GOARCH has not a default value to allow the binary be built according to the host where the command
+# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
+# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
+# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
+
+# Use distroless as minimal base image to package the manager binary
+# Refer to https://github.com/GoogleContainerTools/distroless for more details
+FROM gcr.io/distroless/static:nonroot
+WORKDIR /
+COPY --from=builder /workspace/manager .
+USER 65532:65532
+
+ENTRYPOINT ["/manager"]
