@@ -1,0 +1,27 @@
+# permissions for end users to view amaltheasessions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: amaltheasession-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: amalthea
+    app.kubernetes.io/part-of: amalthea
+    app.kubernetes.io/managed-by: kustomize
+  name: amaltheasession-viewer-role
+rules:
+- apiGroups:
+  - amalthea.dev.amalthea.dev
+  resources:
+  - amaltheasessions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - amalthea.dev.amalthea.dev
+  resources:
+  - amaltheasessions/status
+  verbs:
+  - get
