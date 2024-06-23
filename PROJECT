@@ -15,7 +15,6 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: amalthea.dev
   group: amalthea.dev
   kind: AmaltheaSession
   path: github.com/SwissDataScienceCenter/amalthea/api/v1alpha1

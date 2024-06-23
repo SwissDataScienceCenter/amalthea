@@ -5,7 +5,7 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - amalthea.dev.amalthea.dev
+  - amalthea.dev
   resources:
   - amaltheasessions
   verbs:
@@ -17,13 +17,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - amalthea.dev.amalthea.dev
+  - amalthea.dev
   resources:
   - amaltheasessions/finalizers
   verbs:
   - update
 - apiGroups:
-  - amalthea.dev.amalthea.dev
+  - amalthea.dev
   resources:
   - amaltheasessions/status
   verbs:

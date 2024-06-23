@@ -1,12 +1,12 @@
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.13.0
-  name: amaltheasessions.amalthea.dev.amalthea.dev
+  creationTimestamp: null
+  name: amaltheasessions.amalthea.dev
 spec:
-  group: amalthea.dev.amalthea.dev
+  group: amalthea.dev
   names:
     kind: AmaltheaSession
     listKind: AmaltheaSessionList
@@ -47,3 +47,9 @@ spec:
     storage: true
     subresources:
       status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: null
+  storedVersions: null

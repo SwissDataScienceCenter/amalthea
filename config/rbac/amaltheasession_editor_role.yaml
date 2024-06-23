@@ -12,7 +12,7 @@ metadata:
   name: amaltheasession-editor-role
 rules:
 - apiGroups:
-  - amalthea.dev.amalthea.dev
+  - amalthea.dev
   resources:
   - amaltheasessions
   verbs:
@@ -24,7 +24,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - amalthea.dev.amalthea.dev
+  - amalthea.dev
   resources:
   - amaltheasessions/status
   verbs:

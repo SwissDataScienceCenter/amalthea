@@ -33,9 +33,9 @@ type AmaltheaSessionReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=amalthea.dev.amalthea.dev,resources=amaltheasessions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=amalthea.dev.amalthea.dev,resources=amaltheasessions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=amalthea.dev.amalthea.dev,resources=amaltheasessions/finalizers,verbs=update
+//+kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

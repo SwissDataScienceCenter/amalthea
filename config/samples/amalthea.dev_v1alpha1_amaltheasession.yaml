@@ -1,4 +1,4 @@
-apiVersion: amalthea.dev.amalthea.dev/v1alpha1
+apiVersion: amalthea.dev/v1alpha1
 kind: AmaltheaSession
 metadata:
   labels:
