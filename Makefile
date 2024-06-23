@@ -307,25 +307,31 @@ catalog-build: opm ## Build a catalog image.
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
-.PHONY: crd crd_check style_checks run tests kind_cluster
+##@ Kopf
 
-crd:
+.PHONY: crd
+crd: ## Create the kopf CRDs
 	poetry run python -m controller.crds template
 
-crd_check:
+.PHONY: crd_check
+crd_check: ## Check the kopf CRDs
 	poetry run python -m controller.crds check
 
-style_checks:
+.PHONY: style_checks
+style_checks: ## Run python style checks
 	poetry run flake8 ./
 	poetry run black --check ./
 
-run:
+.PHONY: run_kopf
+run_kopf: ## Run the kopf controller
 	poetry run python -m controller.main
 
-tests:
+.PHONY: tests
+tests: ## Run the kopf tests
 	poetry run pytest
 
-kind_cluster:
+.PHONY: kind_cluster
+kind_cluster: ## Start a kind cluster
 	kind delete cluster
 	kind create cluster --config kind_config.yaml
 	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
