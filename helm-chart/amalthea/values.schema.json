@@ -71,12 +71,16 @@
             "type": "boolean"
         },
         "networkPolicies": {
-            "description": "Enable default network policies for the controller and jupyter servers.",
+            "description": "Enable and configure network policies for the controller and jupyter servers.",
             "type": "object",
             "properties": {
                 "enabled": {
                     "type": "boolean",
                     "default": true
+                },
+                "clusterIpBlock": {
+                    "type": "array",
+                    "default": ["10.0.0.0/8","172.16.0.0/12","192.168.0.0/16"]
                 }
             },
             "additionalProperties": false,
