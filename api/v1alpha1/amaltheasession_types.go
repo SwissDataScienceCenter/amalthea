@@ -74,7 +74,7 @@ type Session struct {
 	// +kubebuilder:validation:ExclusiveMinimum:=true
 	// +kubebuilder:validation:Minimum:=0
 	// The TCP port where whatever is running in the session container will listen on for connections
-	Port    int     `json:"port"`
+	Port    int32   `json:"port"`
 	Storage Storage `json:"storage,omitempty"`
 	// The abolute path for the working directory of the session container, if omitted it will use the image
 	// working directory.
