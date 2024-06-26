@@ -90,11 +90,12 @@ spec:
                       example: repositories/project1
                       type: string
                     cloningGitConfigSecretRef:
-                      description: 'The Kubernetes secret that contains the git configuration
-                        to be used during cloning. This can be used to inject credentials
+                      description: 'The Kubernetes secret that contains the code repository
+                        configuration to be used during cloning. For ''git'' this
+                        is the git configuration which can be used to inject credentials
                         in addition to any other repo-specific Git configuration.
-                        NOTE: you have to specify the whole git config in a single
-                        key in the secret.'
+                        NOTE: you have to specify the whole config in a single key
+                        in the secret.'
                       properties:
                         key:
                           type: string
@@ -105,11 +106,12 @@ spec:
                       - name
                       type: object
                     gitConfigSecretRef:
-                      description: 'The Kubernetes secret that contains the git configuration
-                        to be used when the session is running. This can be used to
+                      description: 'The Kubernetes secret that contains the code repository
+                        configuration to be used when the session is running. For
+                        ''git'' this is the git configuration which can be used to
                         inject credentials in addition to any other repo-specific
-                        Git configuration. NOTE: you have to specify the whole git
-                        config in a single key in the secret.'
+                        Git configuration. NOTE: you have to specify the whole config
+                        in a single key in the secret.'
                       properties:
                         key:
                           type: string
@@ -120,13 +122,20 @@ spec:
                       - name
                       type: object
                     remote:
-                      description: The HTTP url to the git repository
+                      description: The HTTP url to the code repository
                       example: https://github.com/SwissDataScienceCenter/renku
                       type: string
                     revision:
                       description: The tag, branch or commit SHA to checkout, if ommitted
                         then will be the tip of the default branch of the repo
                       example: main
+                      type: string
+                    type:
+                      default: git
+                      description: The type of the code repository - currently the
+                        only supported kind is git.
+                      enum:
+                      - git
                       type: string
                   required:
                   - remote
@@ -135,51 +144,58 @@ spec:
               culling:
                 description: Culling configuration
                 properties:
-                  failedSeconds:
-                    default: 0
+                  failed:
                     description: How long can a server be in failed state before it
                       gets hibernated. A value of zero indicates that the server will
                       not be automatically hibernated by Amalthea if it is failing.
-                    minimum: 0
-                    type: integer
-                  hibernatedSeconds:
-                    default: 0
-                    description: Number of seconds where a server can be in hibernated
-                      state before it gets completely deleted. A value of zero indicates
-                      that hibernated servers will not be automatically be deleted
-                      by Amalthea after a period of time.
-                    minimum: 0
-                    type: integer
-                  idleSeconds:
-                    default: 0
+                      Golang's time.ParseDuration is used to parse this, so values
+                      like 2h5min will work, valid time units are "ns", "us" (or "µs"),
+                      "ms", "s", "m", "h".
+                    format: duration
+                    type: string
+                  hibernated:
+                    description: How long can a session be in hibernated state before
+                      it gets completely deleted. A value of zero indicates that hibernated
+                      servers will not be automatically be deleted by Amalthea after
+                      a period of time. Golang's time.ParseDuration is used to parse
+                      this, so values like 2h5min will work, valid time units are
+                      "ns", "us" (or "µs"), "ms", "s", "m", "h".
+                    format: duration
+                    type: string
+                  idle:
                     description: How long should a server be idle for before it is
                       hibernated. A value of zero indicates that Amalthea will not
-                      automatically hibernate inactive sessions.
-                    minimum: 0
-                    type: integer
-                  maxAgeSeconds:
-                    default: 0
+                      automatically hibernate inactive sessions. Golang's time.ParseDuration
+                      is used to parse this, so values like 2h5min will work, valid
+                      time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+                    format: duration
+                    type: string
+                  maxAge:
                     description: The maximum allowed age for a session, regardless
                       of whether it is active or not. When the threshold is reached
                       the session is hibernated. A value of zero indicates that Amalthea
                       will not automatically hibernate the session based on its age.
-                    minimum: 0
-                    type: integer
-                  startingSeconds:
-                    default: 0
+                      Golang's time.ParseDuration is used to parse this, so values
+                      like 2h5min will work, valid time units are "ns", "us" (or "µs"),
+                      "ms", "s", "m", "h".
+                    format: duration
+                    type: string
+                  starting:
                     description: How long can a server be in starting state before
                       it gets hibernated. A value of zero indicates that the server
                       will not be automatically hibernated by Amalthea because it
-                      took to long to start.
-                    minimum: 0
-                    type: integer
+                      took to long to start. Golang's time.ParseDuration is used to
+                      parse this, so values like 2h5min will work, valid time units
+                      are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+                    format: duration
+                    type: string
                 type: object
               dataSources:
                 description: A list of data sources that should be added to the session
                 items:
                   properties:
                     mountPath:
-                      default: .
+                      default: data
                       description: Path relative to the session working directory
                         where the data should be mounted
                       example: data/storages
@@ -191,7 +207,15 @@ spec:
                         all values in a single key of the Kubernetes secret. rclone:
                         any valid rclone configuration for a single remote, see the
                         output of `rclone config providers` for validation and format.'
-                      type: string
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                      required:
+                      - key
+                      - name
+                      type: object
                     type:
                       default: rclone
                       description: The data source type
@@ -3098,6 +3122,15 @@ spec:
                   - type
                   type: object
                 type: array
+              containerCounts:
+                description: Counts of the total and ready containers, can represent
+                  either regular or init contianers.
+                properties:
+                  ready:
+                    type: integer
+                  total:
+                    type: integer
+                type: object
               failingSince:
                 format: date-time
                 type: string
@@ -3109,14 +3142,9 @@ spec:
               idleSince:
                 format: date-time
                 type: string
-              initReadyCounts:
-                properties:
-                  ready:
-                    type: integer
-                  total:
-                    type: integer
-                type: object
-              readyCounts:
+              initContainerCounts:
+                description: Counts of the total and ready containers, can represent
+                  either regular or init contianers.
                 properties:
                   ready:
                     type: integer

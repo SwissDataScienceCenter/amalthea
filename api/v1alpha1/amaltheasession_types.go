@@ -107,25 +107,33 @@ type Storage struct {
 	MountPath string `json:"mountPath,omitempty"`
 }
 
+// +kubebuilder:validation:Enum={git}
+type CodeRepositoryType string
+
+const Git CodeRepositoryType = "git"
+
 type CodeRepository struct {
+	// +kubebuilder:default:=git
+	// The type of the code repository - currently the only supported kind is git.
+	Type CodeRepositoryType `json:"type,omitempty"`
 	// +kubebuilder:example:=repositories/project1
 	// +kubebuilder:default:="."
 	// Path relative to the session working directory where the repository should be cloned into.
 	ClonePath string `json:"clonePath,omitempty"`
 	// +kubebuilder:example:="https://github.com/SwissDataScienceCenter/renku"
-	// The HTTP url to the git repository
+	// The HTTP url to the code repository
 	Remote string `json:"remote"`
 	// +kubebuilder:example:=main
 	// The tag, branch or commit SHA to checkout, if ommitted then will be the tip of the default branch of the repo
 	Revision string `json:"revision,omitempty"`
-	// The Kubernetes secret that contains the git configuration to be used during cloning.
-	// This can be used to inject credentials in addition to any other repo-specific Git configuration.
-	// NOTE: you have to specify the whole git config in a single key in the secret.
-	CloningGitConfigSecretRef SecretRef `json:"cloningGitConfigSecretRef,omitempty"`
-	// The Kubernetes secret that contains the git configuration to be used when the session is running.
-	// This can be used to inject credentials in addition to any other repo-specific Git configuration.
-	// NOTE: you have to specify the whole git config in a single key in the secret.
-	GitConfigSecretRef SecretRef `json:"gitConfigSecretRef,omitempty"`
+	// The Kubernetes secret that contains the code repository configuration to be used during cloning.
+	// For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
+	// NOTE: you have to specify the whole config in a single key in the secret.
+	CloningConfigSecretRef *SessionSecretRef `json:"cloningGitConfigSecretRef,omitempty"`
+	// The Kubernetes secret that contains the code repository configuration to be used when the session is running.
+	// For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
+	// NOTE: you have to specify the whole config in a single key in the secret.
+	ConfigSecretRef *SessionSecretRef `json:"gitConfigSecretRef,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={rclone}
@@ -138,47 +146,52 @@ type DataSource struct {
 	// The data source type
 	Type StorageType `json:"type,omitempty"`
 	// +kubebuilder:example:=data/storages
-	// +kubebuilder:default:="."
+	// +kubebuilder:default:="data"
 	// Path relative to the session working directory where the data should be mounted
 	MountPath string `json:"mountPath,omitempty"`
 	// The secret containing the configuration or credentials needed for access to the data.
 	// The format of the configuration that is expected depends on the storage type.
 	// NOTE: define all values in a single key of the Kubernetes secret.
 	// rclone: any valid rclone configuration for a single remote, see the output of `rclone config providers` for validation and format.
-	SecretRef string `json:"secretRef,omitempty"`
+	SecretRef *SessionSecretRef `json:"secretRef,omitempty"`
 }
 
 type Culling struct {
-	// +kubebuilder:default:=0
-	// +kubebuilder:validation:Minimum:=0
+	// +kubebuilder:validation:Format:=duration
 	// The maximum allowed age for a session, regardless of whether it
 	// is active or not. When the threshold is reached the session is hibernated.
 	// A value of zero indicates that Amalthea will not automatically hibernate
 	// the session based on its age.
-	MaxAgeSeconds int `json:"maxAgeSeconds,omitempty"`
-	// +kubebuilder:default:=0
-	// +kubebuilder:validation:Minimum:=0
+	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
+	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+	MaxAge metav1.Duration `json:"maxAge,omitempty"`
+	// +kubebuilder:validation:Format:=duration
 	// How long should a server be idle for before it is hibernated. A value of
 	// zero indicates that Amalthea will not automatically hibernate inactive sessions.
-	IdleSeconds int `json:"idleSeconds,omitempty"`
-	// +kubebuilder:default:=0
-	// +kubebuilder:validation:Minimum:=0
+	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
+	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+	Idle metav1.Duration `json:"idle,omitempty"`
+	// +kubebuilder:validation:Format:=duration
 	// How long can a server be in starting state before it gets hibernated. A
 	// value of zero indicates that the server will not be automatically hibernated
 	// by Amalthea because it took to long to start.
-	StartingSeconds int `json:"startingSeconds,omitempty"`
-	// +kubebuilder:default:=0
-	// +kubebuilder:validation:Minimum:=0
+	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
+	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+	Starting metav1.Duration `json:"starting,omitempty"`
+	// +kubebuilder:validation:Format:=duration
 	// How long can a server be in failed state before it gets hibernated. A
 	// value of zero indicates that the server will not be automatically
 	// hibernated by Amalthea if it is failing.
-	FailedSeconds int `json:"failedSeconds,omitempty"`
-	// +kubebuilder:default:=0
-	// +kubebuilder:validation:Minimum:=0
-	// Number of seconds where a server can be in hibernated state before
+	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
+	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+	Failed metav1.Duration `json:"failed,omitempty"`
+	// +kubebuilder:validation:Format:=duration
+	// How long can a session be in hibernated state before
 	// it gets completely deleted. A value of zero indicates that hibernated servers
 	// will not be automatically be deleted by Amalthea after a period of time.
-	HibernatedSeconds int `json:"hibernatedSeconds,omitempty"`
+	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
+	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+	Hibernated metav1.Duration `json:"hibernated,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={token,oauth2proxy}
@@ -195,11 +208,11 @@ type Authentication struct {
 	// this value can be used as Authorization header or as a cookie with the name `amaltheaSessionToken` to
 	// access the session.
 	// For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
-	SecretRef SecretRef `json:"secretRef,omitempty"`
+	SecretRef *SessionSecretRef `json:"secretRef,omitempty"`
 }
 
 // A reference to a Kubernetes secret and a specific field in the secret to be used in a session
-type SecretRef struct {
+type SessionSecretRef struct {
 	Name string `json:"name"`
 	Key  string `json:"key"`
 }
@@ -213,6 +226,7 @@ const Hibernated State = "Hibernated"
 const NotReady State = "NotReady"
 const RunningDegraded State = "RunningDegraded"
 
+// Counts of the total and ready containers, can represent either regular or init contianers.
 type ContainerCounts struct {
 	Ready int `json:"ready,omitempty"`
 	Total int `json:"total,omitempty"`
@@ -227,12 +241,15 @@ type AmaltheaSessionStatus struct {
 	// +kubebuilder:default:=NotReady
 	State               State           `json:"state,omitempty"`
 	URL                 string          `json:"url,omitempty"`
-	ContainerCounts     ContainerCounts `json:"readyCounts,omitempty"`
-	InitContainerCounts ContainerCounts `json:"initReadyCounts,omitempty"`
+	ContainerCounts     ContainerCounts `json:"containerCounts,omitempty"`
+	InitContainerCounts ContainerCounts `json:"initContainerCounts,omitempty"`
 	Idle                bool            `json:"idle,omitempty"`
-	IdleSince           metav1.Time     `json:"idleSince,omitempty"`
-	FailingSince        metav1.Time     `json:"failingSince,omitempty"`
-	HibernatedSince     metav1.Time     `json:"hibernatedSince,omitempty"`
+	// +kubebuilder:validation:Format:=date-time
+	IdleSince metav1.Time `json:"idleSince,omitempty"`
+	// +kubebuilder:validation:Format:=date-time
+	FailingSince metav1.Time `json:"failingSince,omitempty"`
+	// +kubebuilder:validation:Format:=date-time
+	HibernatedSince metav1.Time `json:"hibernatedSince,omitempty"`
 }
 
 //+kubebuilder:object:root=true
