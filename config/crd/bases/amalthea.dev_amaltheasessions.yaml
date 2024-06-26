@@ -15,18 +15,28 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.state
+    - description: The overall status of the session.
+      jsonPath: .status.state
       name: Status
       type: string
-    - jsonPath: .status.url
-      name: URL
-      type: string
-    - jsonPath: '{.status.containerCounts.ready}/{.status.containerCounts.total}'
+    - description: The number of containers in a ready state for the session, disregarding
+        init containers.
+      jsonPath: .status.containerCounts.ready
       name: Ready
       type: string
-    - jsonPath: .status.idle
+    - description: The total numeber of containers in the session, disregarding init
+        containers.
+      jsonPath: .status.containerCounts.total
+      name: Total
+      type: string
+    - description: Whether the session is idle or not.
+      jsonPath: .status.idle
       name: Idle
       type: boolean
+    - description: The URL where the session can be accessed.
+      jsonPath: .status.url
+      name: URL
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:

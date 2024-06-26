@@ -255,10 +255,11 @@ type AmaltheaSessionStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=`.status.state`
-// +kubebuilder:printcolumn:name="URL",type="string",JSONPath=`.status.url`
-// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=`{.status.containerCounts.ready}/{.status.containerCounts.total}`
-// +kubebuilder:printcolumn:name="Idle",type="boolean",JSONPath=`.status.idle`
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=`.status.state`,description="The overall status of the session."
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=`.status.containerCounts.ready`,description="The number of containers in a ready state for the session, disregarding init containers."
+// +kubebuilder:printcolumn:name="Total",type="string",JSONPath=`.status.containerCounts.total`,description="The total numeber of containers in the session, disregarding init containers."
+// +kubebuilder:printcolumn:name="Idle",type="boolean",JSONPath=`.status.idle`,description="Whether the session is idle or not."
+// +kubebuilder:printcolumn:name="URL",type="string",JSONPath=`.status.url`,description="The URL where the session can be accessed."
 // AmaltheaSession is the Schema for the amaltheasessions API
 type AmaltheaSession struct {
 	metav1.TypeMeta   `json:",inline"`
