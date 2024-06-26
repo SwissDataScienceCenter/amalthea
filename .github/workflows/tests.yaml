@@ -14,11 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Style checks
+      - name: Tests
         uses: devcontainers/ci@v0.3
         with:
           runCmd: |
             make style_checks
+            make lint
             make tests
+            make test
+            make test-e2e
           push: never
           skipContainerUserIdUpdate: false
