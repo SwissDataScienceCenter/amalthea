@@ -10,5 +10,5 @@ charts:
     images:
       amalthea:
         contextPath: .
-        dockerfilePath: old.Dockerfile
+        dockerfilePath: kopf.Dockerfile
         valuesPath: image

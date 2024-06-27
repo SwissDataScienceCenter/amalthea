@@ -234,6 +234,7 @@ __pycache__
 *.so
 *.dylib
 bin/*
+bin_devcontainer/*
 Dockerfile.cross
 
 # Test binary, built with `go test -c`
