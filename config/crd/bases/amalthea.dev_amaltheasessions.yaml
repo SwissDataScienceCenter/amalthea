@@ -2965,6 +2965,7 @@ spec:
                     description: The TCP port where whatever is running in the session
                       container will listen on for connections
                     exclusiveMinimum: true
+                    format: int32
                     minimum: 0
                     type: integer
                   resources:
@@ -3019,10 +3020,12 @@ spec:
                     type: object
                   runAsGroup:
                     default: 1000
+                    format: int64
                     minimum: 0
                     type: integer
                   runAsUser:
                     default: 1000
+                    format: int64
                     minimum: 0
                     type: integer
                   storage:
