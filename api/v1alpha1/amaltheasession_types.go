@@ -81,10 +81,10 @@ type Session struct {
 	WorkingDir string `json:"workingDir,omitempty"`
 	// +kubebuilder:default:=1000
 	// +kubebuilder:validation:Minimum:=0
-	RunAsUser int `json:"runAsUser"`
+	RunAsUser int64 `json:"runAsUser"`
 	// +kubebuilder:default:=1000
 	// +kubebuilder:validation:Minimum:=0
-	RunAsGroup int `json:"runAsGroup"`
+	RunAsGroup int64 `json:"runAsGroup"`
 	// The path where the session can be accessed. If an ingress is specified, this value must
 	// be a subpath of or identical to the ingress `pathPrefix` field.
 	URLPath string `json:"urlPath,omitempty"`
