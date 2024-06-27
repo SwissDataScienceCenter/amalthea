@@ -23,6 +23,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -187,6 +188,46 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	// Handle Ingress
+
+	ingress_found := &networkingv1.Ingress{}
+	err = r.Get(ctx, types.NamespacedName{Name: amaltheasession.Name, Namespace: amaltheasession.Namespace}, ingress_found)
+	if err != nil && apierrors.IsNotFound(err) {
+		// Define a new ingress
+		ingress, err := r.ingressForAmaltheaSession(amaltheasession)
+		if err != nil {
+			log.Error(err, "Failed to define new Ingress resource for AmaltheaSession")
+
+			// The following implementation will update the status
+			meta.SetStatusCondition(&amaltheasession.Status.Conditions, metav1.Condition{Type: typeAvailableAmaltheaSession,
+				Status: metav1.ConditionFalse, Reason: "Reconciling",
+				Message: fmt.Sprintf("Failed to create Ingress for the custom resource (%s): (%s)", amaltheasession.Name, err)})
+
+			if err := r.Status().Update(ctx, amaltheasession); err != nil {
+				log.Error(err, "Failed to update AmaltheaSession status")
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{}, err
+		}
+
+		log.Info("Creating a new Ingress",
+			"Ingress.Namespace", ingress.Namespace, "Ingress.Name", ingress.Name)
+		if err = r.Create(ctx, ingress); err != nil {
+			log.Error(err, "Failed to create new Ingress",
+				"Ingress.Namespace", ingress.Namespace, "Ingress.Name", ingress.Name)
+			return ctrl.Result{}, err
+		}
+		// Ingress created successfully
+		// We will requeue the reconciliation so that we can ensure the state
+		// and move forward for the next operations
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
+	} else if err != nil {
+		log.Error(err, "Failed to get Ingress")
+		// Let's return the error for the reconciliation be re-trigged again
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -285,6 +326,62 @@ func (r *AmaltheaSessionReconciler) serviceForAmaltheaSession(
 	return svc, nil
 }
 
+// ingressForAmaltheaSession returns a AmaltheaSession Ingress object
+func (r *AmaltheaSessionReconciler) ingressForAmaltheaSession(
+	amaltheasession *amaltheadevv1alpha1.AmaltheaSession) (*networkingv1.Ingress, error) {
+	labels := labelsForAmaltheaSession(amaltheasession.Name)
+
+	ingress := amaltheasession.Spec.Ingress
+
+	path := "/"
+	if ingress.PathPrefix != "" {
+		path = ingress.PathPrefix
+	}
+
+	ing := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        amaltheasession.Name,
+			Namespace:   amaltheasession.Namespace,
+			Labels:      labels,
+			Annotations: ingress.Annotations,
+		},
+		Spec: networkingv1.IngressSpec{
+			IngressClassName: &ingress.IngressClassName,
+			Rules: []networkingv1.IngressRule{{
+				Host: ingress.Host,
+				IngressRuleValue: networkingv1.IngressRuleValue{
+					HTTP: &networkingv1.HTTPIngressRuleValue{
+						Paths: []networkingv1.HTTPIngressPath{{
+							Path: path,
+							PathType: func() *networkingv1.PathType {
+								pt := networkingv1.PathTypePrefix
+								return &pt
+							}(),
+							Backend: networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: amaltheasession.Name,
+									Port: networkingv1.ServiceBackendPort{
+										Name: "session-port",
+									},
+								},
+							},
+						}},
+					},
+				},
+			}},
+			TLS: []networkingv1.IngressTLS{{
+				Hosts:      []string{ingress.Host},
+				SecretName: ingress.TLSSecretName,
+			}},
+		},
+	}
+
+	if err := ctrl.SetControllerReference(amaltheasession, ing, r.Scheme); err != nil {
+		return nil, err
+	}
+	return ing, nil
+}
+
 // labelsForAmaltheaSessino returns the labels for selecting the resources
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
 func labelsForAmaltheaSession(name string) map[string]string {
@@ -301,5 +398,6 @@ func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&amaltheadevv1alpha1.AmaltheaSession{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.Service{}).
+		Owns(&networkingv1.Ingress{}).
 		Complete(r)
 }
