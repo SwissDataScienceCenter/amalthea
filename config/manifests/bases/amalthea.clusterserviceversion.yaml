@@ -1,0 +1,44 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: amalthea.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: AmaltheaSession is the Schema for the amaltheasessions API
+      displayName: Amalthea Session
+      kind: AmaltheaSession
+      name: amaltheasessions.amalthea.dev
+      version: v1alpha1
+  description: Operator for running amalthea sessions
+  displayName: amalthea
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - sessions
+  links:
+  - name: Amalthea
+    url: https://amalthea.domain
+  maturity: alpha
+  provider:
+    name: amalthea
+  version: 0.0.0

@@ -15,7 +15,8 @@ global:
     customCAs:
       []
       # - secret:
-
+# Inject some extra env variables directly from a config map
+envFromConfigMaps: []
 # Indicate the scope which this operator watches for
 # JupyterServer resources.
 scope:

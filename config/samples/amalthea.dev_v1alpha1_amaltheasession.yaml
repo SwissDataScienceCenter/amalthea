@@ -1,0 +1,12 @@
+apiVersion: amalthea.dev/v1alpha1
+kind: AmaltheaSession
+metadata:
+  labels:
+    app.kubernetes.io/name: amaltheasession
+    app.kubernetes.io/instance: amaltheasession-sample
+    app.kubernetes.io/part-of: amalthea
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: amalthea
+  name: amaltheasession-sample
+spec:
+  # TODO(user): Add fields here
