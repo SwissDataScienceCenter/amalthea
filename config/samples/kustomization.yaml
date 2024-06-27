@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- amalthea.dev_v1alpha1_amaltheasession.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

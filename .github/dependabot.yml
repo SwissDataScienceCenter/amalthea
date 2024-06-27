@@ -8,6 +8,14 @@ updates:
       python:
         patterns:
           - "*"
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    groups:
+      go:
+        patterns:
+          - "*"
   - package-ecosystem: "npm"
     directory: "/acceptance-tests"
     schedule:
