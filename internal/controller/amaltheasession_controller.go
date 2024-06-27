@@ -19,13 +19,17 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -143,6 +147,46 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	// Handle Service
+
+	svc_found := &corev1.Service{}
+	err = r.Get(ctx, types.NamespacedName{Name: amaltheasession.Name, Namespace: amaltheasession.Namespace}, svc_found)
+	if err != nil && apierrors.IsNotFound(err) {
+		// Define a new service
+		svc, err := r.serviceForAmaltheaSession(amaltheasession)
+		if err != nil {
+			log.Error(err, "Failed to define new Service resource for AmaltheaSession")
+
+			// The following implementation will update the status
+			meta.SetStatusCondition(&amaltheasession.Status.Conditions, metav1.Condition{Type: typeAvailableAmaltheaSession,
+				Status: metav1.ConditionFalse, Reason: "Reconciling",
+				Message: fmt.Sprintf("Failed to create Service for the custom resource (%s): (%s)", amaltheasession.Name, err)})
+
+			if err := r.Status().Update(ctx, amaltheasession); err != nil {
+				log.Error(err, "Failed to update AmaltheaSession status")
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{}, err
+		}
+
+		log.Info("Creating a new Service",
+			"Service.Namespace", svc.Namespace, "Service.Name", svc.Name)
+		if err = r.Create(ctx, svc); err != nil {
+			log.Error(err, "Failed to create new Service",
+				"Service.Namespace", svc.Namespace, "Service.Name", svc.Name)
+			return ctrl.Result{}, err
+		}
+		// Service created successfully
+		// We will requeue the reconciliation so that we can ensure the state
+		// and move forward for the next operations
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
+	} else if err != nil {
+		log.Error(err, "Failed to get Service")
+		// Let's return the error for the reconciliation be re-trigged again
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -215,6 +259,32 @@ func (r *AmaltheaSessionReconciler) statefulSetForAmaltheaSession(
 	return sts, nil
 }
 
+// serviceForAmaltheaSession returns a AmaltheaSession Service object
+func (r *AmaltheaSessionReconciler) serviceForAmaltheaSession(
+	amaltheasession *amaltheadevv1alpha1.AmaltheaSession) (*corev1.Service, error) {
+	labels := labelsForAmaltheaSession(amaltheasession.Name)
+
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      amaltheasession.Name,
+			Namespace: amaltheasession.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: labels,
+			Ports: []corev1.ServicePort{{
+				Name:       "session-port",
+				Port:       80,
+				TargetPort: intstr.FromInt32(amaltheasession.Spec.Session.Port),
+			}},
+		},
+	}
+
+	if err := ctrl.SetControllerReference(amaltheasession, svc, r.Scheme); err != nil {
+		return nil, err
+	}
+	return svc, nil
+}
+
 // labelsForAmaltheaSessino returns the labels for selecting the resources
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
 func labelsForAmaltheaSession(name string) map[string]string {
@@ -230,5 +300,6 @@ func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&amaltheadevv1alpha1.AmaltheaSession{}).
 		Owns(&appsv1.StatefulSet{}).
+		Owns(&corev1.Service{}).
 		Complete(r)
 }
