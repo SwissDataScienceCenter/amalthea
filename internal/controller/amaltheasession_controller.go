@@ -18,12 +18,14 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -101,12 +103,132 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
+	// Handle StatefulSet
+
+	found_sts := &appsv1.StatefulSet{}
+	err = r.Get(ctx, types.NamespacedName{Name: amaltheasession.Name, Namespace: amaltheasession.Namespace}, found_sts)
+	if err != nil && apierrors.IsNotFound(err) {
+		// Define a new StatefulSet
+		sts, err := r.statefulSetForAmaltheaSession(amaltheasession)
+		if err != nil {
+			log.Error(err, "Failed to define new StatefulSet resource for AmaltheaSession")
+
+			// The following implementation will update the status
+			meta.SetStatusCondition(&amaltheasession.Status.Conditions, metav1.Condition{Type: typeAvailableAmaltheaSession,
+				Status: metav1.ConditionFalse, Reason: "Reconciling",
+				Message: fmt.Sprintf("Failed to create StatefulSet for the custom resource (%s): (%s)", amaltheasession.Name, err)})
+
+			if err := r.Status().Update(ctx, amaltheasession); err != nil {
+				log.Error(err, "Failed to update AmaltheaSession status")
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{}, err
+		}
+
+		log.Info("Creating a new StatefulSet",
+			"StatefulSet.Namespace", sts.Namespace, "StatefulSet.Name", sts.Name)
+		if err = r.Create(ctx, sts); err != nil {
+			log.Error(err, "Failed to create new StatefulSet",
+				"StatefulSet.Namespace", sts.Namespace, "StatefulSet.Name", sts.Name)
+			return ctrl.Result{}, err
+		}
+		// StatefulSet created successfully
+		// We will requeue the reconciliation so that we can ensure the state
+		// and move forward for the next operations
+		// return ctrl.Result{RequeueAfter: time.Minute}, nil
+	} else if err != nil {
+		log.Error(err, "Failed to get StatefulSet")
+		// Let's return the error for the reconciliation be re-trigged again
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
+}
+
+// statefulSetForAmaltheaSession returns a AmaltheaSession StatefulSet object
+func (r *AmaltheaSessionReconciler) statefulSetForAmaltheaSession(
+	amaltheasession *amaltheadevv1alpha1.AmaltheaSession) (*appsv1.StatefulSet, error) {
+	labels := labelsForAmaltheaSession(amaltheasession.Name)
+	replicas := int32(1)
+
+	session := amaltheasession.Spec.Session
+
+	sessionContainer := corev1.Container{
+		Image:           session.Image,
+		Name:            "session",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+
+		Ports: []corev1.ContainerPort{{
+			ContainerPort: session.Port,
+			Name:          "session-port",
+		}},
+
+		Args:      session.Args,
+		Command:   session.Command,
+		Env:       session.Env,
+		Resources: session.Resources,
+	}
+
+	securityContext := &corev1.SecurityContext{
+		RunAsNonRoot: &[]bool{true}[0],
+		RunAsUser:    &[]int64{session.RunAsUser}[0],
+		RunAsGroup:   &[]int64{session.RunAsGroup}[0],
+	}
+
+	if session.RunAsUser == 0 {
+		securityContext.RunAsNonRoot = &[]bool{false}[0]
+	}
+
+	sessionContainer.SecurityContext = securityContext
+
+	containers := []corev1.Container{sessionContainer}
+	containers = append(containers, amaltheasession.Spec.ExtraContainers...)
+
+	sts := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      amaltheasession.Name,
+			Namespace: amaltheasession.Namespace,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: corev1.PodSpec{
+					Containers:     containers,
+					InitContainers: amaltheasession.Spec.ExtraInitContainers,
+				},
+			},
+		},
+	}
+
+	// Set the ownerRef for the StatefulSet
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/
+	if err := ctrl.SetControllerReference(amaltheasession, sts, r.Scheme); err != nil {
+		return nil, err
+	}
+	return sts, nil
+}
+
+// labelsForAmaltheaSessino returns the labels for selecting the resources
+// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
+func labelsForAmaltheaSession(name string) map[string]string {
+	return map[string]string{"app.kubernetes.io/name": "AmaltheaSession",
+		"app.kubernetes.io/instance":   name,
+		"app.kubernetes.io/part-of":    "amaltheasession-operator",
+		"app.kubernetes.io/created-by": "controller-manager",
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&amaltheadevv1alpha1.AmaltheaSession{}).
+		Owns(&appsv1.StatefulSet{}).
 		Complete(r)
 }
