@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -30,7 +29,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -108,29 +106,15 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
+	children := amaltheasession.Children()
+
 	// Handle StatefulSet
 
 	found_sts := &appsv1.StatefulSet{}
 	err = r.Get(ctx, types.NamespacedName{Name: amaltheasession.Name, Namespace: amaltheasession.Namespace}, found_sts)
 	if err != nil && apierrors.IsNotFound(err) {
 		// Define a new StatefulSet
-		sts, err := r.statefulSetForAmaltheaSession(amaltheasession)
-		if err != nil {
-			log.Error(err, "Failed to define new StatefulSet resource for AmaltheaSession")
-
-			// The following implementation will update the status
-			meta.SetStatusCondition(&amaltheasession.Status.Conditions, metav1.Condition{Type: typeAvailableAmaltheaSession,
-				Status: metav1.ConditionFalse, Reason: "Reconciling",
-				Message: fmt.Sprintf("Failed to create StatefulSet for the custom resource (%s): (%s)", amaltheasession.Name, err)})
-
-			if err := r.Status().Update(ctx, amaltheasession); err != nil {
-				log.Error(err, "Failed to update AmaltheaSession status")
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{}, err
-		}
-
+		sts := &children.StatefulSet
 		log.Info("Creating a new StatefulSet",
 			"StatefulSet.Namespace", sts.Namespace, "StatefulSet.Name", sts.Name)
 		if err = r.Create(ctx, sts); err != nil {
@@ -154,23 +138,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	err = r.Get(ctx, types.NamespacedName{Name: amaltheasession.Name, Namespace: amaltheasession.Namespace}, svc_found)
 	if err != nil && apierrors.IsNotFound(err) {
 		// Define a new service
-		svc, err := r.serviceForAmaltheaSession(amaltheasession)
-		if err != nil {
-			log.Error(err, "Failed to define new Service resource for AmaltheaSession")
-
-			// The following implementation will update the status
-			meta.SetStatusCondition(&amaltheasession.Status.Conditions, metav1.Condition{Type: typeAvailableAmaltheaSession,
-				Status: metav1.ConditionFalse, Reason: "Reconciling",
-				Message: fmt.Sprintf("Failed to create Service for the custom resource (%s): (%s)", amaltheasession.Name, err)})
-
-			if err := r.Status().Update(ctx, amaltheasession); err != nil {
-				log.Error(err, "Failed to update AmaltheaSession status")
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{}, err
-		}
-
+		svc := &children.Service
 		log.Info("Creating a new Service",
 			"Service.Namespace", svc.Namespace, "Service.Name", svc.Name)
 		if err = r.Create(ctx, svc); err != nil {
@@ -190,32 +158,20 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Handle Ingress
 
-	ingress_found := &networkingv1.Ingress{}
-	err = r.Get(ctx, types.NamespacedName{Name: amaltheasession.Name, Namespace: amaltheasession.Namespace}, ingress_found)
+	if children.Ingress == nil {
+		log.Info("No ingress specified")
+		return ctrl.Result{}, nil
+	}
+
+	ing_found := &networkingv1.Ingress{}
+	err = r.Get(ctx, types.NamespacedName{Name: amaltheasession.Name, Namespace: amaltheasession.Namespace}, ing_found)
 	if err != nil && apierrors.IsNotFound(err) {
-		// Define a new ingress
-		ingress, err := r.ingressForAmaltheaSession(amaltheasession)
-		if err != nil {
-			log.Error(err, "Failed to define new Ingress resource for AmaltheaSession")
-
-			// The following implementation will update the status
-			meta.SetStatusCondition(&amaltheasession.Status.Conditions, metav1.Condition{Type: typeAvailableAmaltheaSession,
-				Status: metav1.ConditionFalse, Reason: "Reconciling",
-				Message: fmt.Sprintf("Failed to create Ingress for the custom resource (%s): (%s)", amaltheasession.Name, err)})
-
-			if err := r.Status().Update(ctx, amaltheasession); err != nil {
-				log.Error(err, "Failed to update AmaltheaSession status")
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{}, err
-		}
-
+		ing := children.Ingress
 		log.Info("Creating a new Ingress",
-			"Ingress.Namespace", ingress.Namespace, "Ingress.Name", ingress.Name)
-		if err = r.Create(ctx, ingress); err != nil {
+			"Ingress.Namespace", ing.Namespace, "Ingress.Name", ing.Name)
+		if err = r.Create(ctx, ing); err != nil {
 			log.Error(err, "Failed to create new Ingress",
-				"Ingress.Namespace", ingress.Namespace, "Ingress.Name", ingress.Name)
+				"Ingress.Namespace", ing.Namespace, "Ingress.Name", ing.Name)
 			return ctrl.Result{}, err
 		}
 		// Ingress created successfully
@@ -229,167 +185,6 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	return ctrl.Result{}, nil
-}
-
-// statefulSetForAmaltheaSession returns a AmaltheaSession StatefulSet object
-func (r *AmaltheaSessionReconciler) statefulSetForAmaltheaSession(
-	amaltheasession *amaltheadevv1alpha1.AmaltheaSession) (*appsv1.StatefulSet, error) {
-	labels := labelsForAmaltheaSession(amaltheasession.Name)
-	replicas := int32(1)
-
-	session := amaltheasession.Spec.Session
-
-	sessionContainer := corev1.Container{
-		Image:           session.Image,
-		Name:            "session",
-		ImagePullPolicy: corev1.PullIfNotPresent,
-
-		Ports: []corev1.ContainerPort{{
-			ContainerPort: session.Port,
-			Name:          "session-port",
-		}},
-
-		Args:      session.Args,
-		Command:   session.Command,
-		Env:       session.Env,
-		Resources: session.Resources,
-	}
-
-	securityContext := &corev1.SecurityContext{
-		RunAsNonRoot: &[]bool{true}[0],
-		RunAsUser:    &[]int64{session.RunAsUser}[0],
-		RunAsGroup:   &[]int64{session.RunAsGroup}[0],
-	}
-
-	if session.RunAsUser == 0 {
-		securityContext.RunAsNonRoot = &[]bool{false}[0]
-	}
-
-	sessionContainer.SecurityContext = securityContext
-
-	containers := []corev1.Container{sessionContainer}
-	containers = append(containers, amaltheasession.Spec.ExtraContainers...)
-
-	sts := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      amaltheasession.Name,
-			Namespace: amaltheasession.Namespace,
-		},
-		Spec: appsv1.StatefulSetSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: corev1.PodSpec{
-					Containers:     containers,
-					InitContainers: amaltheasession.Spec.ExtraInitContainers,
-				},
-			},
-		},
-	}
-
-	// Set the ownerRef for the StatefulSet
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/
-	if err := ctrl.SetControllerReference(amaltheasession, sts, r.Scheme); err != nil {
-		return nil, err
-	}
-	return sts, nil
-}
-
-// serviceForAmaltheaSession returns a AmaltheaSession Service object
-func (r *AmaltheaSessionReconciler) serviceForAmaltheaSession(
-	amaltheasession *amaltheadevv1alpha1.AmaltheaSession) (*corev1.Service, error) {
-	labels := labelsForAmaltheaSession(amaltheasession.Name)
-
-	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      amaltheasession.Name,
-			Namespace: amaltheasession.Namespace,
-		},
-		Spec: corev1.ServiceSpec{
-			Selector: labels,
-			Ports: []corev1.ServicePort{{
-				Name:       "session-port",
-				Port:       80,
-				TargetPort: intstr.FromInt32(amaltheasession.Spec.Session.Port),
-			}},
-		},
-	}
-
-	if err := ctrl.SetControllerReference(amaltheasession, svc, r.Scheme); err != nil {
-		return nil, err
-	}
-	return svc, nil
-}
-
-// ingressForAmaltheaSession returns a AmaltheaSession Ingress object
-func (r *AmaltheaSessionReconciler) ingressForAmaltheaSession(
-	amaltheasession *amaltheadevv1alpha1.AmaltheaSession) (*networkingv1.Ingress, error) {
-	labels := labelsForAmaltheaSession(amaltheasession.Name)
-
-	ingress := amaltheasession.Spec.Ingress
-
-	path := "/"
-	if ingress.PathPrefix != "" {
-		path = ingress.PathPrefix
-	}
-
-	ing := &networkingv1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        amaltheasession.Name,
-			Namespace:   amaltheasession.Namespace,
-			Labels:      labels,
-			Annotations: ingress.Annotations,
-		},
-		Spec: networkingv1.IngressSpec{
-			IngressClassName: &ingress.IngressClassName,
-			Rules: []networkingv1.IngressRule{{
-				Host: ingress.Host,
-				IngressRuleValue: networkingv1.IngressRuleValue{
-					HTTP: &networkingv1.HTTPIngressRuleValue{
-						Paths: []networkingv1.HTTPIngressPath{{
-							Path: path,
-							PathType: func() *networkingv1.PathType {
-								pt := networkingv1.PathTypePrefix
-								return &pt
-							}(),
-							Backend: networkingv1.IngressBackend{
-								Service: &networkingv1.IngressServiceBackend{
-									Name: amaltheasession.Name,
-									Port: networkingv1.ServiceBackendPort{
-										Name: "session-port",
-									},
-								},
-							},
-						}},
-					},
-				},
-			}},
-			TLS: []networkingv1.IngressTLS{{
-				Hosts:      []string{ingress.Host},
-				SecretName: ingress.TLSSecretName,
-			}},
-		},
-	}
-
-	if err := ctrl.SetControllerReference(amaltheasession, ing, r.Scheme); err != nil {
-		return nil, err
-	}
-	return ing, nil
-}
-
-// labelsForAmaltheaSessino returns the labels for selecting the resources
-// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
-func labelsForAmaltheaSession(name string) map[string]string {
-	return map[string]string{"app.kubernetes.io/name": "AmaltheaSession",
-		"app.kubernetes.io/instance":   name,
-		"app.kubernetes.io/part-of":    "amaltheasession-operator",
-		"app.kubernetes.io/created-by": "controller-manager",
-	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
