@@ -12,7 +12,8 @@ global:
     image:
       repository: renku/certificates
       tag: "0.0.2"
-    customCAs: []
+    customCAs:
+      []
       # - secret:
 # Inject some extra env variables directly from a config map
 envFromConfigMaps: []
@@ -80,7 +81,8 @@ kopf:
 # [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps]
 # which are necessary for Amalthea to work, add the corresponding API groups and
 # resources here as an array of name/group objects, eg:
-extraChildResources: []
+extraChildResources:
+  []
   # - name: jupyterservers
   #   group: amalthea.dev
 
@@ -198,3 +200,17 @@ auditLog:
     pathPrefix: ""
     accessKeyId: ""
     secretAccessKey: ""
+
+csi-rclone:
+  install: false
+  # This section is only relevant if you are installing csi-rclone as part of Amalthea.
+  # When this chart is deployed as part of Renkulab the following value should match the name of the storage class
+  # configured for Notebooks cloudstorage.
+  ## Name of the csi storage class to use for RClone/Cloudstorage. Should be unique per cluster.
+  # storageClassName: csi-rclone
+  # csiNodepluginRclone:
+  #   nodeSelector: {}
+  # Set tolerations if you have taints on your user session nodes. The csi has to run on every node
+  # where it is used.
+  #   tolerations: []
+  #   affinity: {}

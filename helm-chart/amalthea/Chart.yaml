@@ -6,6 +6,10 @@ dependencies:
   - name: certificates
     version: "0.0.3"
     repository: "https://swissdatasciencecenter.github.io/helm-charts/"
+  - name: csi-rclone
+    repository: "https://swissdatasciencecenter.github.io/helm-charts/"
+    version: "0.1.8"
+    condition: csi-rclone.install
 
 # A chart can be either an 'application' or a 'library' chart.
 #
