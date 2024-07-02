@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"reflect"
-
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -64,7 +62,7 @@ type AmaltheaSessionSpec struct {
 	ExtraInitContainers []v1.Container `json:"initContainers,omitempty"`
 
 	// Configuration for an ingress to the session, if omitted a Kubernetes Ingress will not be created
-	Ingress Ingress `json:"ingress,omitempty"`
+	Ingress *Ingress `json:"ingress,omitempty"`
 }
 
 type Session struct {
@@ -99,8 +97,10 @@ type Session struct {
 type Ingress struct {
 	Annotations      map[string]string `json:"annotations,omitempty"`
 	IngressClassName string            `json:"ingressClassName,omitempty"`
-	Host             string            `json:"host,omitempty"`
-	PathPrefix       string            `json:"pathPrefix,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Host is immutable"
+	Host string `json:"host"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="PathPrefix is immutable"
+	PathPrefix string `json:"pathPrefix,omitempty"`
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
 	TLSSecretName string `json:"tlsSecretName,omitempty"`
 }
@@ -388,7 +388,7 @@ func (cr *AmaltheaSession) serviceForAmaltheaSession() v1.Service {
 
 // ingressForAmaltheaSession returns a AmaltheaSession Ingress object
 func (cr *AmaltheaSession) ingressForAmaltheaSession() *networkingv1.Ingress {
-	if reflect.DeepEqual(cr.Spec.Ingress, Ingress{}) {
+	if cr.Spec.Ingress == nil {
 		return nil
 	}
 

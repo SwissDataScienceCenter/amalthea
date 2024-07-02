@@ -1538,14 +1538,22 @@ spec:
                     type: object
                   host:
                     type: string
+                    x-kubernetes-validations:
+                    - message: Host is immutable
+                      rule: self == oldSelf
                   ingressClassName:
                     type: string
                   pathPrefix:
                     type: string
+                    x-kubernetes-validations:
+                    - message: PathPrefix is immutable
+                      rule: self == oldSelf
                   tlsSecretName:
                     description: The name of the TLS secret, same as what is specified
                       in a regular Kubernetes Ingress.
                     type: string
+                required:
+                - host
                 type: object
               initContainers:
                 description: 'Additional init containers to add to the session statefulset
