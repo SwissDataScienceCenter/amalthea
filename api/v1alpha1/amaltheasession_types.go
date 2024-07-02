@@ -39,7 +39,7 @@ type AmaltheaSessionSpec struct {
 	DataSources []DataSource `json:"dataSources,omitempty"`
 
 	// Authentication configuration for the session
-	Authentication Authentication `json:"authentication,omitempty"`
+	Authentication *Authentication `json:"authentication,omitempty"`
 
 	// Culling configuration
 	Culling Culling `json:"culling,omitempty"`
@@ -220,14 +220,15 @@ const Token AuthenticationType = "token"
 const Oidc AuthenticationType = "oauth2proxy"
 
 type Authentication struct {
+	// +kubebuilder:default:=true
 	Enabled bool               `json:"enabled,omitempty"`
-	Type    AuthenticationType `json:"type,omitempty"`
+	Type    AuthenticationType `json:"type"`
 	// Kubernetes secret that contains the authentication configuration
 	// For `token` generate a hard to guess string / password-like string.
 	// this value can be used as Authorization header or as a cookie with the name `amaltheaSessionToken` to
 	// access the session.
 	// For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
-	SecretRef *SessionSecretRef `json:"secretRef,omitempty"`
+	SecretRef SessionSecretRef `json:"secretRef"`
 }
 
 // A reference to a Kubernetes secret and a specific field in the secret to be used in a session

@@ -71,6 +71,7 @@ spec:
                 description: Authentication configuration for the session
                 properties:
                   enabled:
+                    default: true
                     type: boolean
                   secretRef:
                     description: |-
@@ -93,6 +94,9 @@ spec:
                     - token
                     - oauth2proxy
                     type: string
+                required:
+                - secretRef
+                - type
                 type: object
               codeRepositories:
                 description: A list of code repositories and associated configuration
