@@ -296,19 +296,18 @@ func (cr *AmaltheaSession) OwnerReference() metav1.OwnerReference {
 
 func (cr *AmaltheaSession) Children() AmaltheaChildren {
 	return AmaltheaChildren{
-		StatefulSet: statefulSetForAmaltheaSession(cr),
-		Service:     serviceForAmaltheaSession(cr),
-		Ingress:     ingressForAmaltheaSession(cr),
+		StatefulSet: cr.statefulSetForAmaltheaSession(),
+		Service:     cr.serviceForAmaltheaSession(),
+		Ingress:     cr.ingressForAmaltheaSession(),
 	}
 }
 
 // statefulSetForAmaltheaSession returns a AmaltheaSession StatefulSet object
-func statefulSetForAmaltheaSession(
-	amaltheasession *AmaltheaSession) appsv1.StatefulSet {
-	labels := labelsForAmaltheaSession(amaltheasession.Name)
+func (cr *AmaltheaSession) statefulSetForAmaltheaSession() appsv1.StatefulSet {
+	labels := labelsForAmaltheaSession(cr.Name)
 	replicas := int32(1)
 
-	session := amaltheasession.Spec.Session
+	session := cr.Spec.Session
 
 	sessionContainer := v1.Container{
 		Image:           session.Image,
@@ -339,13 +338,13 @@ func statefulSetForAmaltheaSession(
 	sessionContainer.SecurityContext = securityContext
 
 	containers := []v1.Container{sessionContainer}
-	containers = append(containers, amaltheasession.Spec.ExtraContainers...)
+	containers = append(containers, cr.Spec.ExtraContainers...)
 
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            amaltheasession.Name,
-			Namespace:       amaltheasession.Namespace,
-			OwnerReferences: []metav1.OwnerReference{amaltheasession.OwnerReference()},
+			Name:            cr.Name,
+			Namespace:       cr.Namespace,
+			OwnerReferences: []metav1.OwnerReference{cr.OwnerReference()},
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicas,
@@ -358,7 +357,7 @@ func statefulSetForAmaltheaSession(
 				},
 				Spec: v1.PodSpec{
 					Containers:     containers,
-					InitContainers: amaltheasession.Spec.ExtraInitContainers,
+					InitContainers: cr.Spec.ExtraInitContainers,
 				},
 			},
 		},
@@ -366,37 +365,35 @@ func statefulSetForAmaltheaSession(
 }
 
 // serviceForAmaltheaSession returns a AmaltheaSession Service object
-func serviceForAmaltheaSession(
-	amaltheasession *AmaltheaSession) v1.Service {
-	labels := labelsForAmaltheaSession(amaltheasession.Name)
+func (cr *AmaltheaSession) serviceForAmaltheaSession() v1.Service {
+	labels := labelsForAmaltheaSession(cr.Name)
 
 	return v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            amaltheasession.Name,
-			Namespace:       amaltheasession.Namespace,
-			OwnerReferences: []metav1.OwnerReference{amaltheasession.OwnerReference()},
+			Name:            cr.Name,
+			Namespace:       cr.Namespace,
+			OwnerReferences: []metav1.OwnerReference{cr.OwnerReference()},
 		},
 		Spec: v1.ServiceSpec{
 			Selector: labels,
 			Ports: []v1.ServicePort{{
 				Name:       "session-port",
 				Port:       80,
-				TargetPort: intstr.FromInt32(amaltheasession.Spec.Session.Port),
+				TargetPort: intstr.FromInt32(cr.Spec.Session.Port),
 			}},
 		},
 	}
 }
 
 // ingressForAmaltheaSession returns a AmaltheaSession Ingress object
-func ingressForAmaltheaSession(
-	amaltheasession *AmaltheaSession) *networkingv1.Ingress {
-	if reflect.DeepEqual(amaltheasession.Spec.Ingress, Ingress{}) {
+func (cr *AmaltheaSession) ingressForAmaltheaSession() *networkingv1.Ingress {
+	if reflect.DeepEqual(cr.Spec.Ingress, Ingress{}) {
 		return nil
 	}
 
-	labels := labelsForAmaltheaSession(amaltheasession.Name)
+	labels := labelsForAmaltheaSession(cr.Name)
 
-	ingress := amaltheasession.Spec.Ingress
+	ingress := cr.Spec.Ingress
 
 	path := "/"
 	if ingress.PathPrefix != "" {
@@ -405,11 +402,11 @@ func ingressForAmaltheaSession(
 
 	return &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            amaltheasession.Name,
-			Namespace:       amaltheasession.Namespace,
+			Name:            cr.Name,
+			Namespace:       cr.Namespace,
 			Labels:          labels,
 			Annotations:     ingress.Annotations,
-			OwnerReferences: []metav1.OwnerReference{amaltheasession.OwnerReference()},
+			OwnerReferences: []metav1.OwnerReference{cr.OwnerReference()},
 		},
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: &ingress.IngressClassName,
@@ -425,7 +422,7 @@ func ingressForAmaltheaSession(
 							}(),
 							Backend: networkingv1.IngressBackend{
 								Service: &networkingv1.IngressServiceBackend{
-									Name: amaltheasession.Name,
+									Name: cr.Name,
 									Port: networkingv1.ServiceBackendPort{
 										Name: "session-port",
 									},
