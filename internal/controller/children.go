@@ -12,7 +12,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -110,16 +109,6 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client) Chi
 	}
 }
 
-// func before_after_test(obj client.Object, objAfter client.Object) {
-// 	obj := input.DeepCopyObject()
-// 	objPatch := client.MergeFrom(obj.DeepCopyObject().(client.Object))
-// 	before, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj.DeepCopyObject())
-// 	after, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-// 	if err != nil {
-// 		return OperationResultNone, err
-// 	}
-// }
-
 type ChildResourceUpdate[T ChildResourceType] struct {
 	Manifest     *T
 	UpdateResult controllerutil.OperationResult
@@ -142,16 +131,16 @@ type ChildResourceUpdates struct {
 
 func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResources {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
-	desiredService := serviceForAmaltheaSession(cr)
-	desiredPVC := pvcForAmalthea(cr)
-	desiredStatefulSet := statefulSetForAmaltheaSession(cr)
+	desiredService := cr.Service()
+	desiredPVC := cr.PVC()
+	desiredStatefulSet := cr.StatefulSet()
 	output := ChildResources{
 		Service:     ChildResource[v1.Service]{&v1.Service{ObjectMeta: metadata}, &desiredService},
 		PVC:         ChildResource[v1.PersistentVolumeClaim]{&v1.PersistentVolumeClaim{ObjectMeta: metadata}, &desiredPVC},
 		StatefulSet: ChildResource[appsv1.StatefulSet]{&appsv1.StatefulSet{ObjectMeta: metadata}, &desiredStatefulSet},
 	}
 	if !reflect.DeepEqual(cr.Spec.Ingress, amaltheadevv1alpha1.Ingress{}) {
-		desiredIngress := ingressForAmaltheaSession(cr)
+		desiredIngress := cr.Ingress()
 		output.Ingress = ChildResource[networkingv1.Ingress]{&networkingv1.Ingress{ObjectMeta: metadata}, desiredIngress}
 	}
 	return output
@@ -240,190 +229,5 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 		IdleSince:       idleSince,
 		FailingSince:    failingSince,
 		HibernatedSince: hibernatedSince,
-	}
-}
-
-// statefulSetForAmaltheaSession returns a AmaltheaSession StatefulSet object
-func statefulSetForAmaltheaSession(amaltheasession *amaltheadevv1alpha1.AmaltheaSession) appsv1.StatefulSet {
-	labels := labelsForAmaltheaSession(amaltheasession.Name)
-	replicas := int32(1)
-	if amaltheasession.Spec.Hibernated {
-		replicas = 0
-	}
-
-	session := amaltheasession.Spec.Session
-	pvc := pvcForAmalthea(amaltheasession)
-
-	sessionContainer := v1.Container{
-		Image:           session.Image,
-		Name:            "session",
-		ImagePullPolicy: v1.PullIfNotPresent,
-
-		Ports: []v1.ContainerPort{{
-			ContainerPort: session.Port,
-			Name:          "session-port",
-			Protocol:      v1.ProtocolTCP,
-		}},
-
-		Args:                     session.Args,
-		Command:                  session.Command,
-		Env:                      session.Env,
-		Resources:                session.Resources,
-		VolumeMounts:             []v1.VolumeMount{{Name: "session", MountPath: session.Storage.MountPath}},
-		TerminationMessagePath:   "/dev/termination-log",
-		TerminationMessagePolicy: v1.TerminationMessageReadFile,
-	}
-
-	securityContext := &v1.SecurityContext{
-		RunAsNonRoot: &[]bool{true}[0],
-		RunAsUser:    &[]int64{session.RunAsUser}[0],
-		RunAsGroup:   &[]int64{session.RunAsGroup}[0],
-	}
-
-	if session.RunAsUser == 0 {
-		securityContext.RunAsNonRoot = &[]bool{false}[0]
-	}
-
-	sessionContainer.SecurityContext = securityContext
-
-	containers := []v1.Container{sessionContainer}
-	containers = append(containers, amaltheasession.Spec.ExtraContainers...)
-
-	sts := appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            amaltheasession.Name,
-			Namespace:       amaltheasession.Namespace,
-			OwnerReferences: []metav1.OwnerReference{amaltheasession.OwnerReference()},
-		},
-		Spec: appsv1.StatefulSetSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: v1.PodSpec{
-					Containers:     containers,
-					InitContainers: amaltheasession.Spec.ExtraInitContainers,
-					Volumes:        []v1.Volume{{Name: "session", VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}}}},
-				},
-			},
-		},
-	}
-	return sts
-}
-
-// pvcForAmalthea returns a AmaltheaSession PVC
-func pvcForAmalthea(amaltheasession *amaltheadevv1alpha1.AmaltheaSession) v1.PersistentVolumeClaim {
-	labels := labelsForAmaltheaSession(amaltheasession.Name)
-	pvc := v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            amaltheasession.Name,
-			Namespace:       amaltheasession.Namespace,
-			OwnerReferences: []metav1.OwnerReference{amaltheasession.OwnerReference()},
-			Labels:          labels,
-		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					"storage": amaltheasession.Spec.Session.Storage.Size,
-				},
-			},
-			StorageClassName: amaltheasession.Spec.Session.Storage.ClassName,
-		},
-	}
-	return pvc
-}
-
-// serviceForAmaltheaSession returns a AmaltheaSession Service object
-func serviceForAmaltheaSession(amaltheasession *amaltheadevv1alpha1.AmaltheaSession) v1.Service {
-	labels := labelsForAmaltheaSession(amaltheasession.Name)
-
-	svc := v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            amaltheasession.Name,
-			Namespace:       amaltheasession.Namespace,
-			OwnerReferences: []metav1.OwnerReference{amaltheasession.OwnerReference()},
-		},
-		Spec: v1.ServiceSpec{
-			Selector: labels,
-			Ports: []v1.ServicePort{{
-				Protocol:   v1.ProtocolTCP,
-				Name:       "session-port",
-				Port:       80,
-				TargetPort: intstr.FromInt32(amaltheasession.Spec.Session.Port),
-			}},
-		},
-	}
-
-	return svc
-}
-
-// ingressForAmaltheaSession returns a AmaltheaSession Ingress object
-func ingressForAmaltheaSession(amaltheasession *amaltheadevv1alpha1.AmaltheaSession) *networkingv1.Ingress {
-	labels := labelsForAmaltheaSession(amaltheasession.Name)
-
-	ingress := amaltheasession.Spec.Ingress
-	if reflect.DeepEqual(ingress, amaltheadevv1alpha1.Ingress{}) {
-		return nil
-	}
-
-	path := "/"
-	if ingress.PathPrefix != "" {
-		path = ingress.PathPrefix
-	}
-
-	ing := &networkingv1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            amaltheasession.Name,
-			Namespace:       amaltheasession.Namespace,
-			Labels:          labels,
-			Annotations:     ingress.Annotations,
-			OwnerReferences: []metav1.OwnerReference{amaltheasession.OwnerReference()},
-		},
-		Spec: networkingv1.IngressSpec{
-			IngressClassName: &ingress.IngressClassName,
-			Rules: []networkingv1.IngressRule{{
-				Host: ingress.Host,
-				IngressRuleValue: networkingv1.IngressRuleValue{
-					HTTP: &networkingv1.HTTPIngressRuleValue{
-						Paths: []networkingv1.HTTPIngressPath{{
-							Path: path,
-							PathType: func() *networkingv1.PathType {
-								pt := networkingv1.PathTypePrefix
-								return &pt
-							}(),
-							Backend: networkingv1.IngressBackend{
-								Service: &networkingv1.IngressServiceBackend{
-									Name: amaltheasession.Name,
-									Port: networkingv1.ServiceBackendPort{
-										Name: "session-port",
-									},
-								},
-							},
-						}},
-					},
-				},
-			}},
-			TLS: []networkingv1.IngressTLS{{
-				Hosts:      []string{ingress.Host},
-				SecretName: ingress.TLSSecretName,
-			}},
-		},
-	}
-
-	return ing
-}
-
-// labelsForAmaltheaSessino returns the labels for selecting the resources
-// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
-func labelsForAmaltheaSession(name string) map[string]string {
-	return map[string]string{"app.kubernetes.io/name": "AmaltheaSession",
-		"app.kubernetes.io/instance":   name,
-		"app.kubernetes.io/part-of":    "amaltheasession-operator",
-		"app.kubernetes.io/created-by": "controller-manager",
 	}
 }

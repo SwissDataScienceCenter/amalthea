@@ -3,7 +3,6 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-
 	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -11,34 +10,21 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
-
-
-type AmaltheaChildren struct {
-	Ingress     *networkingv1.Ingress
-	Service     v1.Service
-	StatefulSet appsv1.StatefulSet
-	PVC         v1.PersistentVolumeClaim
-}
-
-
-func (cr *AmaltheaSession) Children() AmaltheaChildren {
-	return AmaltheaChildren{
-		StatefulSet: cr.StatefulSet(),
-		Service:     cr.Service(),
-		Ingress:     cr.Ingress(),
-	}
-}
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	labels := labelsForAmaltheaSession(cr.Name)
 	replicas := int32(1)
+	if cr.Spec.Hibernated {
+		replicas = 0
+	}
 
 	session := cr.Spec.Session
+	pvc := cr.PVC()
 
 	sessionContainer := v1.Container{
 		Image:           session.Image,
@@ -48,12 +34,16 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 		Ports: []v1.ContainerPort{{
 			ContainerPort: session.Port,
 			Name:          "session-port",
+			Protocol:      v1.ProtocolTCP,
 		}},
 
-		Args:      session.Args,
-		Command:   session.Command,
-		Env:       session.Env,
-		Resources: session.Resources,
+		Args:                     session.Args,
+		Command:                  session.Command,
+		Env:                      session.Env,
+		Resources:                session.Resources,
+		VolumeMounts:             []v1.VolumeMount{{Name: "session", MountPath: session.Storage.MountPath}},
+		TerminationMessagePath:   "/dev/termination-log",
+		TerminationMessagePolicy: v1.TerminationMessageReadFile,
 	}
 
 	securityContext := &v1.SecurityContext{
@@ -71,7 +61,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	containers := []v1.Container{sessionContainer}
 	containers = append(containers, cr.Spec.ExtraContainers...)
 
-	return appsv1.StatefulSet{
+	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            cr.Name,
 			Namespace:       cr.Namespace,
@@ -89,17 +79,19 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 				Spec: v1.PodSpec{
 					Containers:     containers,
 					InitContainers: cr.Spec.ExtraInitContainers,
+					Volumes:        []v1.Volume{{Name: "session", VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}}}},
 				},
 			},
 		},
 	}
+	return sts
 }
 
 // Service returns a AmaltheaSession Service object
 func (cr *AmaltheaSession) Service() v1.Service {
 	labels := labelsForAmaltheaSession(cr.Name)
 
-	return v1.Service{
+	svc := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            cr.Name,
 			Namespace:       cr.Namespace,
@@ -108,30 +100,31 @@ func (cr *AmaltheaSession) Service() v1.Service {
 		Spec: v1.ServiceSpec{
 			Selector: labels,
 			Ports: []v1.ServicePort{{
+				Protocol:   v1.ProtocolTCP,
 				Name:       "session-port",
 				Port:       80,
 				TargetPort: intstr.FromInt32(cr.Spec.Session.Port),
 			}},
 		},
 	}
+	return svc
 }
 
 // Ingress returns a AmaltheaSession Ingress object
 func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
-	if reflect.DeepEqual(cr.Spec.Ingress, Ingress{}) {
-		return nil
-	}
-
 	labels := labelsForAmaltheaSession(cr.Name)
 
 	ingress := cr.Spec.Ingress
+	if reflect.DeepEqual(ingress, Ingress{}) {
+		return nil
+	}
 
 	path := "/"
 	if ingress.PathPrefix != "" {
 		path = ingress.PathPrefix
 	}
 
-	return &networkingv1.Ingress{
+	ing := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            cr.Name,
 			Namespace:       cr.Namespace,
@@ -169,6 +162,31 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 			}},
 		},
 	}
+
+	return ing
+}
+
+// PVC returned the desired specification for a persistent volume claim
+func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
+	labels := labelsForAmaltheaSession(cr.Name)
+	pvc := v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            cr.Name,
+			Namespace:       cr.Namespace,
+			OwnerReferences: []metav1.OwnerReference{cr.OwnerReference()},
+			Labels:          labels,
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					"storage": cr.Spec.Session.Storage.Size,
+				},
+			},
+			StorageClassName: cr.Spec.Session.Storage.ClassName,
+		},
+	}
+	return pvc
 }
 
 // labelsForAmaltheaSessino returns the labels for selecting the resources
