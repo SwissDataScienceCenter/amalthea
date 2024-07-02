@@ -63,7 +63,7 @@ type AmaltheaSessionSpec struct {
 	ExtraInitContainers []v1.Container `json:"initContainers,omitempty"`
 
 	// Configuration for an ingress to the session, if omitted a Kubernetes Ingress will not be created
-	Ingress Ingress `json:"ingress"`
+	Ingress *Ingress `json:"ingress,omitempty"`
 }
 
 type Session struct {
@@ -105,9 +105,11 @@ type Ingress struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 	// +optional
 	IngressClassName *string `json:"ingressClassName,omitempty"`
-	Host             string  `json:"host"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Host is immutable"
+	Host string `json:"host"`
 	// +optional
 	// +kubebuilder:default:="/"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="PathPrefix is immutable"
 	PathPrefix *string `json:"pathPrefix,omitempty"`
 	// +optional
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
