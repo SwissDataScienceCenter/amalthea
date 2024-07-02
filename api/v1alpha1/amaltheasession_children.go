@@ -68,7 +68,10 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 			OwnerReferences: []metav1.OwnerReference{cr.OwnerReference()},
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: &replicas,
+			// NOTE: Parallel pod management policy is important
+			// If set to default (i.e. not parallel) K8s waits for the pod to become ready before restarting on updates
+			PodManagementPolicy: appsv1.ParallelPodManagement,
+			Replicas:            &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -211,10 +214,10 @@ func (cr *AmaltheaSession) OwnerReference() metav1.OwnerReference {
 	}
 }
 
-func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (v1.Pod, error) {
+func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
 	pod := v1.Pod{}
 	podName := fmt.Sprintf("%s-0", cr.Name)
 	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
 	err := clnt.Get(ctx, key, &pod)
-	return pod, err
+	return &pod, err
 }

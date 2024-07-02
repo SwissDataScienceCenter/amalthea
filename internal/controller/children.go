@@ -11,6 +11,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -161,20 +162,24 @@ func (c ChildResourceUpdates) AllEqual(op controllerutil.OperationResult) bool {
 	return ingressOK && c.Service.UpdateResult == op && c.PVC.UpdateResult == op && c.StatefulSet.UpdateResult == op
 }
 
-func (c ChildResourceUpdates) IsRunning(cr *amaltheadevv1alpha1.AmaltheaSession) bool {
+func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	onlyStatusUpdates := c.AllEqual(controllerutil.OperationResultUpdatedStatusOnly)
 	noUpdates := c.AllEqual(controllerutil.OperationResultNone)
 	ssReady := c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
-	return ssReady && (onlyStatusUpdates || noUpdates)
+	podExists := pod != nil
+	podReady := podExists && podIsReady(pod)
+	return ssReady && podReady && (onlyStatusUpdates || noUpdates)
 }
 
-func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession) amaltheadevv1alpha1.State {
+func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) amaltheadevv1alpha1.State {
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
 		return amaltheadevv1alpha1.NotReady
 	case cr.Spec.Hibernated && c.StatefulSet.Manifest.Spec.Replicas != nil && *c.StatefulSet.Manifest.Spec.Replicas == 0:
 		return amaltheadevv1alpha1.Hibernated
-	case c.IsRunning(cr):
+	case podIsFailed(pod):
+		return amaltheadevv1alpha1.Failed
+	case c.IsRunning(pod):
 		return amaltheadevv1alpha1.Running
 	default:
 		return amaltheadevv1alpha1.NotReady
@@ -182,6 +187,7 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession) ama
 }
 
 func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) amaltheadevv1alpha1.AmaltheaSessionStatus {
+	log := log.FromContext(ctx)
 
 	idle := isIdle()
 	idleSince := cr.Status.IdleSince
@@ -201,7 +207,12 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 		hibernatedSince = metav1.Time{}
 	}
 
-	failing := isFailing()
+	pod, err := cr.Pod(ctx, clnt)
+	if err != nil && !apierrors.IsNotFound(err) {
+		log.Error(err, "Could not read the session pod when updating the status")
+	}
+
+	failing := pod != nil && podIsFailed(pod)
 	failingSince := cr.Status.FailingSince
 	if failing && failingSince.IsZero() {
 		failingSince = metav1.NewTime(time.Now())
@@ -220,14 +231,23 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 	}
 	sessionURL = *sessionURL.JoinPath(cr.Spec.Session.URLPath)
 
-	state := c.State(cr)
-
-	return amaltheadevv1alpha1.AmaltheaSessionStatus{
-		State:           state,
+	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
+		State:           c.State(cr, pod),
 		URL:             sessionURL.String(),
 		Idle:            idle,
 		IdleSince:       idleSince,
 		FailingSince:    failingSince,
 		HibernatedSince: hibernatedSince,
 	}
+
+	if pod != nil {
+		initCounts, counts := containerCounts(pod)
+		status.InitContainerCounts = initCounts
+		status.ContainerCounts = counts
+	}
+
+	// Used for debugging to ensure the reconcile loop does not needlessly reschdule or update child resources
+	// log.Info("Update summary", "Ingress", c.Ingress.UpdateResult, "StatefulSet", c.StatefulSet.UpdateResult, "PVC", c.StatefulSet.UpdateResult, "Service", c.Service.UpdateResult)
+
+	return status
 }
