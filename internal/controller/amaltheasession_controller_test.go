@@ -51,7 +51,12 @@ var _ = Describe("AmaltheaSession Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
+						Session: amaltheadevv1alpha1.Session{
+							Image: "debian:bookworm-slim",
+							Port:  8000,
+						},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

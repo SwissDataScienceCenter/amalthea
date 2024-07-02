@@ -17,9 +17,15 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
@@ -74,7 +80,8 @@ type Session struct {
 	// +kubebuilder:validation:ExclusiveMinimum:=true
 	// +kubebuilder:validation:Minimum:=0
 	// The TCP port where whatever is running in the session container will listen on for connections
-	Port    int32   `json:"port"`
+	Port int32 `json:"port"`
+	// +kubebuilder:default:={}
 	Storage Storage `json:"storage,omitempty"`
 	// The abolute path for the working directory of the session container, if omitted it will use the image
 	// working directory.
@@ -86,7 +93,7 @@ type Session struct {
 	// +kubebuilder:validation:Minimum:=0
 	RunAsGroup int64 `json:"runAsGroup"`
 	// The path where the session can be accessed. If an ingress is specified, this value must
-	// be a subpath of or identical to the ingress `pathPrefix` field.
+	// be a subpath of the ingress `pathPrefix` field.
 	URLPath string `json:"urlPath,omitempty"`
 }
 
@@ -100,8 +107,9 @@ type Ingress struct {
 }
 
 type Storage struct {
-	ClassName string            `json:"storageClassName,omitempty"`
-	Size      resource.Quantity `json:"storageSize,omitempty"`
+	ClassName *string `json:"storageClassName,omitempty"`
+	// +kubebuilder:default:="1Gi"
+	Size resource.Quantity `json:"storageSize,omitempty"`
 	// The absolute mount path for the session volume
 	// +kubebuilder:default:=/workspace
 	MountPath string `json:"mountPath,omitempty"`
@@ -232,6 +240,10 @@ type ContainerCounts struct {
 	Total int `json:"total,omitempty"`
 }
 
+func (c ContainerCounts) Ok() bool {
+	return c.Ready == c.Total
+}
+
 // AmaltheaSessionStatus defines the observed state of AmaltheaSession
 type AmaltheaSessionStatus struct {
 	// Conditions store the status conditions of the AmaltheaSessions. This is a standard thing that
@@ -280,4 +292,24 @@ type AmaltheaSessionList struct {
 
 func init() {
 	SchemeBuilder.Register(&AmaltheaSession{}, &AmaltheaSessionList{})
+}
+
+func (cr *AmaltheaSession) OwnerReference() metav1.OwnerReference {
+	gvk := cr.GroupVersionKind()
+	return metav1.OwnerReference{
+		APIVersion:         gvk.GroupVersion().String(),
+		Kind:               gvk.Kind,
+		Name:               cr.ObjectMeta.Name,
+		BlockOwnerDeletion: pointer.Bool(true),
+		Controller:         pointer.Bool(true),
+		UID:                cr.GetObjectMeta().GetUID(),
+	}
+}
+
+func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (v1.Pod, error) {
+	pod := v1.Pod{}
+	podName := fmt.Sprintf("%s-0", cr.Name)
+	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
+	err := clnt.Get(ctx, key, &pod)
+	return pod, err
 }
