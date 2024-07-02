@@ -107,7 +107,7 @@ type Ingress struct {
 
 type Storage struct {
 	ClassName string            `json:"storageClassName,omitempty"`
-	Size      resource.Quantity `json:"storageSize,omitempty"`
+	Size      resource.Quantity `json:"storageSize"`
 	// The absolute mount path for the session volume
 	// +kubebuilder:default:=/workspace
 	MountPath string `json:"mountPath,omitempty"`
