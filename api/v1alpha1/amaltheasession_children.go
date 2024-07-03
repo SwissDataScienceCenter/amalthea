@@ -202,7 +202,7 @@ func labelsForAmaltheaSession(name string) map[string]string {
 	}
 }
 
-func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (v1.Pod, error) {
+func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
 	pod := v1.Pod{}
 	podName := fmt.Sprintf("%s-0", cr.Name)
 	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
