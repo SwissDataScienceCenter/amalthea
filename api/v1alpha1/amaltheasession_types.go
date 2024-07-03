@@ -30,9 +30,11 @@ type AmaltheaSessionSpec struct {
 	// Specification for the main session container that the user will access and use
 	Session Session `json:"session"`
 
+	// +optional
 	// A list of code repositories and associated configuration that will be cloned in the session
 	CodeRepositories []CodeRepository `json:"codeRepositories,omitempty"`
 
+	// +optional
 	// A list of data sources that should be added to the session
 	DataSources []DataSource `json:"dataSources,omitempty"`
 
@@ -42,23 +44,26 @@ type AmaltheaSessionSpec struct {
 	// Culling configuration
 	Culling Culling `json:"culling,omitempty"`
 
+	// +kubebuilder:default:=false
 	// Will hibernate the session, scaling the session's statefulset to zero.
-	Hibernated bool `json:"hibernated,omitempty"`
+	Hibernated bool `json:"hibernated"`
 
 	// +kubebuilder:default:=false
 	// Whether to adopt all secrets referred to by name in this CR. Adopted secrets will be deleted when the CR is deleted.
-	AdoptSecrets bool `json:"adoptSecrets,omitempty"`
+	AdoptSecrets bool `json:"adoptSecrets"`
 
+	// +optional
 	// Additional containers to add to the session statefulset.
 	// NOTE: The container names provided will be partially overwritten and randomized to avoid collisions
 	ExtraContainers []v1.Container `json:"extraContainers,omitempty"`
 
+	// +optional
 	// Additional init containers to add to the session statefulset
 	// NOTE: The container names provided will be partially overwritten and randomized to avoid collisions
 	ExtraInitContainers []v1.Container `json:"initContainers,omitempty"`
 
 	// Configuration for an ingress to the session, if omitted a Kubernetes Ingress will not be created
-	Ingress Ingress `json:"ingress,omitempty"`
+	Ingress Ingress `json:"ingress"`
 }
 
 type Session struct {
@@ -75,37 +80,48 @@ type Session struct {
 	// +kubebuilder:validation:Minimum:=0
 	// The TCP port where whatever is running in the session container will listen on for connections
 	Port int32 `json:"port"`
+	// +optional
 	// +kubebuilder:default:={}
 	Storage Storage `json:"storage,omitempty"`
 	// The abolute path for the working directory of the session container, if omitted it will use the image
 	// working directory.
 	WorkingDir string `json:"workingDir,omitempty"`
+	// +optional
 	// +kubebuilder:default:=1000
 	// +kubebuilder:validation:Minimum:=0
-	RunAsUser int64 `json:"runAsUser"`
+	RunAsUser int64 `json:"runAsUser,omitempty"`
+	// +optional
 	// +kubebuilder:default:=1000
 	// +kubebuilder:validation:Minimum:=0
-	RunAsGroup int64 `json:"runAsGroup"`
+	RunAsGroup int64 `json:"runAsGroup,omitempty"`
+	// +optional
+	// +kubebuilder:default:="/"
 	// The path where the session can be accessed. If an ingress is specified, this value must
 	// be a subpath of the ingress `pathPrefix` field.
 	URLPath string `json:"urlPath,omitempty"`
 }
 
 type Ingress struct {
-	Annotations      map[string]string `json:"annotations,omitempty"`
-	IngressClassName string            `json:"ingressClassName,omitempty"`
-	Host             string            `json:"host,omitempty"`
-	PathPrefix       string            `json:"pathPrefix,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// +optional
+	IngressClassName *string `json:"ingressClassName,omitempty"`
+	Host             string  `json:"host"`
+	// +optional
+	// +kubebuilder:default:="/"
+	PathPrefix string `json:"pathPrefix,omitempty"`
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
 	TLSSecretName string `json:"tlsSecretName,omitempty"`
 }
 
 type Storage struct {
-	ClassName *string `json:"storageClassName,omitempty"`
+	// +optional
+	ClassName *string `json:"className,omitempty"`
+	// +optional
 	// +kubebuilder:default:="1Gi"
-	Size resource.Quantity `json:"storageSize,omitempty"`
+	Size *resource.Quantity `json:"size,omitempty"`
 	// The absolute mount path for the session volume
-	// +kubebuilder:default:=/workspace
+	// +optional
+	// +kubebuilder:default:="/workspace"
 	MountPath string `json:"mountPath,omitempty"`
 }
 

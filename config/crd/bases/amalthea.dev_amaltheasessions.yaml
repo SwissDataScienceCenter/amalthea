@@ -1549,6 +1549,7 @@ spec:
                   type: object
                 type: array
               hibernated:
+                default: false
                 description: Will hibernate the session, scaling the session's statefulset
                   to zero.
                 type: boolean
@@ -1565,11 +1566,14 @@ spec:
                   ingressClassName:
                     type: string
                   pathPrefix:
+                    default: /
                     type: string
                   tlsSecretName:
                     description: The name of the TLS secret, same as what is specified
                       in a regular Kubernetes Ingress.
                     type: string
+                required:
+                - host
                 type: object
               initContainers:
                 description: |-
@@ -3092,13 +3096,13 @@ spec:
                   storage:
                     default: {}
                     properties:
+                      className:
+                        type: string
                       mountPath:
                         default: /workspace
                         description: The absolute mount path for the session volume
                         type: string
-                      storageClassName:
-                        type: string
-                      storageSize:
+                      size:
                         anyOf:
                         - type: integer
                         - type: string
@@ -3107,6 +3111,7 @@ spec:
                         x-kubernetes-int-or-string: true
                     type: object
                   urlPath:
+                    default: /
                     description: |-
                       The path where the session can be accessed. If an ingress is specified, this value must
                       be a subpath of the ingress `pathPrefix` field.
@@ -3119,10 +3124,11 @@ spec:
                 required:
                 - image
                 - port
-                - runAsGroup
-                - runAsUser
                 type: object
             required:
+            - adoptSecrets
+            - hibernated
+            - ingress
             - session
             type: object
           status:
