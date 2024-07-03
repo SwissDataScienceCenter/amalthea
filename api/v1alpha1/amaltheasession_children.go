@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -11,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -20,6 +22,8 @@ const sessionPortName string = "session-port"
 const servicePortName string = "session-http"
 const sessionVolumeName string = "session-volume"
 const servicePort int32 = 80
+const gitCloneImage string = "bitnami/git:2.45.2"
+const gitCloneContainerName string = "git-clone"
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
@@ -50,22 +54,22 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 		VolumeMounts:             []v1.VolumeMount{{Name: sessionVolumeName, MountPath: session.Storage.MountPath}},
 		TerminationMessagePath:   "/dev/termination-log",
 		TerminationMessagePolicy: v1.TerminationMessageReadFile,
+		SecurityContext:          cr.securityContext(),
 	}
 
-	securityContext := &v1.SecurityContext{
-		RunAsNonRoot: &[]bool{true}[0],
-		RunAsUser:    &[]int64{session.RunAsUser}[0],
-		RunAsGroup:   &[]int64{session.RunAsGroup}[0],
+	containers := append([]v1.Container{sessionContainer}, cr.Spec.ExtraContainers...)
+	initContainers := append([]v1.Container{}, cr.Spec.ExtraInitContainers...)
+	volumes := []v1.Volume{
+		{
+			Name:         sessionVolumeName,
+			VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}},
+		},
 	}
-
-	if session.RunAsUser == 0 {
-		securityContext.RunAsNonRoot = &[]bool{false}[0]
+	if len(cr.Spec.CodeRepositories) > 0 {
+		gitCloneContainer, gitCloneVols := cr.initClone()
+		initContainers = append(initContainers, gitCloneContainer)
+		volumes = append(volumes, gitCloneVols...)
 	}
-
-	sessionContainer.SecurityContext = securityContext
-
-	containers := []v1.Container{sessionContainer}
-	containers = append(containers, cr.Spec.ExtraContainers...)
 
 	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -85,14 +89,10 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 					Labels: labels,
 				},
 				Spec: v1.PodSpec{
-					Containers:     containers,
-					InitContainers: cr.Spec.ExtraInitContainers,
-					Volumes: []v1.Volume{
-						{
-							Name:         sessionVolumeName,
-							VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}},
-						},
-					},
+					SecurityContext: cr.podSecurityContext(),
+					Containers:      containers,
+					InitContainers:  initContainers,
+					Volumes:         volumes,
 				},
 			},
 		},
@@ -208,4 +208,76 @@ func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (*v1.Pod
 	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
 	err := clnt.Get(ctx, key, &pod)
 	return &pod, err
+}
+
+// Generates the init container that clones the specified Git repositories
+func (cr *AmaltheaSession) initClone() (v1.Container, []v1.Volume) {
+	envVars := []v1.EnvVar{}
+	volMounts := []v1.VolumeMount{{Name: sessionVolumeName, MountPath: cr.Spec.Session.Storage.MountPath}}
+	vols := []v1.Volume{}
+	commandArgs := []string{}
+	gitConfigInd := 0
+
+	for irepo, repo := range cr.Spec.CodeRepositories {
+		if repo.CloningConfigSecretRef != nil {
+			secretVolName := fmt.Sprintf("git-clone-cred-volume-%d-%d", irepo, gitConfigInd)
+			secretMountPath := fmt.Sprintf("/git-clone-secrets/%d-%d", irepo, gitConfigInd)
+			secretFilePath := fmt.Sprintf("%s/%s", secretMountPath, repo.CloningConfigSecretRef.Key)
+			vols = append(
+				vols,
+				v1.Volume{
+					Name:         secretVolName,
+					VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: repo.CloningConfigSecretRef.Name}},
+				},
+			)
+			volMounts = append(volMounts, v1.VolumeMount{Name: secretVolName, MountPath: secretMountPath})
+			envVars = append(
+				envVars,
+				v1.EnvVar{Name: fmt.Sprintf("GIT_CONFIG_KEY_%d", gitConfigInd), Value: "include.path"},
+				v1.EnvVar{Name: fmt.Sprintf("GIT_CONFIG_VALUE_%d", gitConfigInd), Value: secretFilePath},
+			)
+			gitConfigInd += 1
+		}
+		exec := fmt.Sprintf("git clone %s --recurse-submodules", repo.Remote)
+		if repo.Revision != nil {
+			exec += fmt.Sprintf(" --branch %s", *repo.Revision)
+		}
+		if repo.ClonePath != nil {
+			exec += fmt.Sprintf(" %s", *repo.ClonePath)
+		}
+		commandArgs = append(commandArgs, exec)
+	}
+	if gitConfigInd > 0 {
+		envVars = append(envVars, v1.EnvVar{Name: "GIT_CONFIG_COUNT", Value: fmt.Sprintf("%d", gitConfigInd-1)})
+	}
+
+	container := v1.Container{
+		Name:            gitCloneContainerName,
+		Image:           gitCloneImage,
+		VolumeMounts:    volMounts,
+		WorkingDir:      cr.Spec.Session.Storage.MountPath,
+		Env:             envVars,
+		SecurityContext: &v1.SecurityContext{RunAsUser: &cr.Spec.Session.RunAsUser, RunAsGroup: &cr.Spec.Session.RunAsGroup},
+		Command:         []string{"sh", "-c"},
+		Args:            []string{strings.Join(commandArgs, " || ") + " || echo 'Some repositories could not be cloned'"},
+	}
+	return container, vols
+}
+
+func (cr *AmaltheaSession) securityContext() *v1.SecurityContext {
+	return &v1.SecurityContext{
+		RunAsUser:                &cr.Spec.Session.RunAsUser,
+		RunAsGroup:               &cr.Spec.Session.RunAsGroup,
+		RunAsNonRoot:             ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(false),
+	}
+}
+
+func (cr *AmaltheaSession) podSecurityContext() *v1.PodSecurityContext {
+	return &v1.PodSecurityContext{
+		RunAsUser:    &cr.Spec.Session.RunAsUser,
+		RunAsGroup:   &cr.Spec.Session.RunAsGroup,
+		RunAsNonRoot: ptr.To(true),
+		FSGroup:      &cr.Spec.Session.RunAsGroup,
+	}
 }

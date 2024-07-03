@@ -131,27 +131,31 @@ type CodeRepositoryType string
 const Git CodeRepositoryType = "git"
 
 type CodeRepository struct {
+	// +optional
 	// +kubebuilder:default:=git
 	// The type of the code repository - currently the only supported kind is git.
-	Type CodeRepositoryType `json:"type,omitempty"`
+	Type *CodeRepositoryType `json:"type,omitempty"`
+	// +optional
 	// +kubebuilder:example:=repositories/project1
-	// +kubebuilder:default:="."
-	// Path relative to the session working directory where the repository should be cloned into.
-	ClonePath string `json:"clonePath,omitempty"`
+	// Path relative to the session storage mount path where the repository should be cloned
+	ClonePath *string `json:"clonePath,omitempty"`
 	// +kubebuilder:example:="https://github.com/SwissDataScienceCenter/renku"
 	// The HTTP url to the code repository
 	Remote string `json:"remote"`
+	// +optional
 	// +kubebuilder:example:=main
-	// The tag, branch or commit SHA to checkout, if ommitted then will be the tip of the default branch of the repo
-	Revision string `json:"revision,omitempty"`
+	// The tag or branch to checkout, if ommitted then will be the HEAD of the default branch of the repo
+	Revision *string `json:"revision,omitempty"`
+	// +optional
 	// The Kubernetes secret that contains the code repository configuration to be used during cloning.
 	// For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
 	// NOTE: you have to specify the whole config in a single key in the secret.
-	CloningConfigSecretRef *SessionSecretRef `json:"cloningGitConfigSecretRef,omitempty"`
+	CloningConfigSecretRef *SessionSecretRef `json:"cloningConfigSecretRef,omitempty"`
+	// +optional
 	// The Kubernetes secret that contains the code repository configuration to be used when the session is running.
 	// For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
 	// NOTE: you have to specify the whole config in a single key in the secret.
-	ConfigSecretRef *SessionSecretRef `json:"gitConfigSecretRef,omitempty"`
+	ConfigSecretRef *SessionSecretRef `json:"configSecretRef,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={rclone}

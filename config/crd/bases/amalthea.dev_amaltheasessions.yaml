@@ -100,12 +100,11 @@ spec:
                 items:
                   properties:
                     clonePath:
-                      default: .
-                      description: Path relative to the session working directory
-                        where the repository should be cloned into.
+                      description: Path relative to the session storage mount path
+                        where the repository should be cloned
                       example: repositories/project1
                       type: string
-                    cloningGitConfigSecretRef:
+                    cloningConfigSecretRef:
                       description: |-
                         The Kubernetes secret that contains the code repository configuration to be used during cloning.
                         For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
@@ -119,7 +118,7 @@ spec:
                       - key
                       - name
                       type: object
-                    gitConfigSecretRef:
+                    configSecretRef:
                       description: |-
                         The Kubernetes secret that contains the code repository configuration to be used when the session is running.
                         For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
@@ -138,8 +137,8 @@ spec:
                       example: https://github.com/SwissDataScienceCenter/renku
                       type: string
                     revision:
-                      description: The tag, branch or commit SHA to checkout, if ommitted
-                        then will be the tip of the default branch of the repo
+                      description: The tag or branch to checkout, if ommitted then
+                        will be the HEAD of the default branch of the repo
                       example: main
                       type: string
                     type:
