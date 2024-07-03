@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"reflect"
+	"strings"
 	"time"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
@@ -13,6 +13,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -27,7 +28,7 @@ type ChildResource[T ChildResourceType] struct {
 	Desired *T
 }
 
-func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client) ChildResourceUpdate[T] {
+func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] {
 	log := log.FromContext(ctx)
 	if c.Current == nil {
 		return ChildResourceUpdate[T]{}
@@ -43,7 +44,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client) Chi
 				log.Info("Creating an ingress")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
-				return nil
+				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				return err
 			}
 			current.Spec = desired.Spec
 			return nil
@@ -59,7 +61,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client) Chi
 				log.Info("Creating a statefulset")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
-				return nil
+				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				return err
 			}
 			current.Spec.Replicas = desired.Spec.Replicas
 			current.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
@@ -78,7 +81,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client) Chi
 				log.Info("Creating a PVC")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
-				return nil
+				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				return err
 			}
 			current.Spec.Resources.Requests = desired.Spec.Resources.Requests
 			if desired.Spec.StorageClassName != nil {
@@ -98,7 +102,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client) Chi
 				log.Info("Creating a service")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
-				return nil
+				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				return err
 			}
 			current.Spec.Ports = desired.Spec.Ports
 			current.Spec.Selector = desired.Spec.Selector
@@ -135,26 +140,24 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResources {
 	desiredService := cr.Service()
 	desiredPVC := cr.PVC()
 	desiredStatefulSet := cr.StatefulSet()
+	desiredIngress := cr.Ingress()
 	output := ChildResources{
 		Service:     ChildResource[v1.Service]{&v1.Service{ObjectMeta: metadata}, &desiredService},
 		PVC:         ChildResource[v1.PersistentVolumeClaim]{&v1.PersistentVolumeClaim{ObjectMeta: metadata}, &desiredPVC},
 		StatefulSet: ChildResource[appsv1.StatefulSet]{&appsv1.StatefulSet{ObjectMeta: metadata}, &desiredStatefulSet},
-	}
-	if !reflect.DeepEqual(cr.Spec.Ingress, amaltheadevv1alpha1.Ingress{}) {
-		desiredIngress := cr.Ingress()
-		output.Ingress = ChildResource[networkingv1.Ingress]{&networkingv1.Ingress{ObjectMeta: metadata}, desiredIngress}
+		Ingress:     ChildResource[networkingv1.Ingress]{&networkingv1.Ingress{ObjectMeta: metadata}, desiredIngress},
 	}
 	return output
 }
 
-func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client) ChildResourceUpdates {
+func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResourceUpdates, error) {
 	output := ChildResourceUpdates{
-		StatefulSet: c.StatefulSet.Reconcile(ctx, clnt),
-		PVC:         c.PVC.Reconcile(ctx, clnt),
-		Service:     c.Service.Reconcile(ctx, clnt),
-		Ingress:     c.Ingress.Reconcile(ctx, clnt),
+		StatefulSet: c.StatefulSet.Reconcile(ctx, clnt, cr),
+		PVC:         c.PVC.Reconcile(ctx, clnt, cr),
+		Service:     c.Service.Reconcile(ctx, clnt, cr),
+		Ingress:     c.Ingress.Reconcile(ctx, clnt, cr),
 	}
-	return output
+	return output, output.combineErrors()
 }
 
 func (c ChildResourceUpdates) AllEqual(op controllerutil.OperationResult) bool {
@@ -228,12 +231,22 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 	sessionURL := url.URL{
 		Scheme: urlScheme,
 		Path:   cr.Spec.Ingress.PathPrefix,
+		Host:   cr.Spec.Ingress.Host,
 	}
 	sessionURL = *sessionURL.JoinPath(cr.Spec.Session.URLPath)
+	sessionURLStr := strings.TrimSuffix(sessionURL.String(), "/")
 
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
 		State:           c.State(cr, pod),
 		URL:             sessionURL.String(),
+	state := c.State(cr)
+
+	// Used for debugging to ensure the reconcile loop does not needlessly reschdule or update child resources
+	log.Info("Update summary", "Ingress", c.Ingress.UpdateResult, "StatefulSet", c.StatefulSet.UpdateResult, "PVC", c.StatefulSet.UpdateResult, "Service", c.Service.UpdateResult)
+
+	return amaltheadevv1alpha1.AmaltheaSessionStatus{
+		State:           state,
+		URL:             sessionURLStr,
 		Idle:            idle,
 		IdleSince:       idleSince,
 		FailingSince:    failingSince,
@@ -250,4 +263,24 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 	// log.Info("Update summary", "Ingress", c.Ingress.UpdateResult, "StatefulSet", c.StatefulSet.UpdateResult, "PVC", c.StatefulSet.UpdateResult, "Service", c.Service.UpdateResult)
 
 	return status
+}
+
+func (c ChildResourceUpdates) combineErrors() error {
+	errorMsgs := []string{}
+	errors := map[string]error{
+		"Ingress":     c.Ingress.Error,
+		"Service":     c.Service.Error,
+		"PVC":         c.PVC.Error,
+		"StatefulSet": c.StatefulSet.Error,
+	}
+	for name, err := range errors {
+		if err == nil {
+			continue
+		}
+		errorMsgs = append(errorMsgs, fmt.Sprintf("%s: %s", name, err.Error()))
+	}
+	if len(errorMsgs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("error in reconciling children %s", strings.Join(errorMsgs, ", "))
 }

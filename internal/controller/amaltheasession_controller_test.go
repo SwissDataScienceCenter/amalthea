@@ -56,6 +56,9 @@ var _ = Describe("AmaltheaSession Controller", func() {
 							Image: "debian:bookworm-slim",
 							Port:  8000,
 						},
+						Ingress: amaltheadevv1alpha1.Ingress{
+							Host: "test.com",
+						},
 					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())

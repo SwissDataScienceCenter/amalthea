@@ -95,8 +95,15 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	log.Info("spec", "cr", amaltheasession)
+
 	children := NewChildResources(amaltheasession)
-	updates := children.Reconcile(ctx, r.Client)
+	updates, err := children.Reconcile(ctx, r.Client, amaltheasession)
+	if err != nil {
+		log.Error(err, "Failed when reconciling children")
+		return ctrl.Result{}, err
+	}
+
 	newStatus := updates.Status(ctx, r.Client, amaltheasession)
 	amaltheasession.Status = newStatus
 	err = r.Status().Update(ctx, amaltheasession)
