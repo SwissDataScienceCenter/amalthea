@@ -62,6 +62,11 @@ type AmaltheaSessionSpec struct {
 	// NOTE: The container names provided will be partially overwritten and randomized to avoid collisions
 	ExtraInitContainers []v1.Container `json:"initContainers,omitempty"`
 
+	// +optional
+	// Additional volumes to include in the statefulset for a session
+	ExtraVolumes []v1.Volume `json:"extraVolumes,omitempty"`
+
+	// +optional
 	// Configuration for an ingress to the session, if omitted a Kubernetes Ingress will not be created
 	Ingress *Ingress `json:"ingress,omitempty"`
 }
@@ -78,7 +83,8 @@ type Session struct {
 	// +kubebuilder:default:=8000
 	// +kubebuilder:validation:ExclusiveMinimum:=true
 	// +kubebuilder:validation:Minimum:=0
-	// The TCP port where whatever is running in the session container will listen on for connections
+	// The TCP port on the session Pod where the session can be accessed. Can point to either the
+	// session container or any additional container that is added. K8s port names are not accepted.
 	Port int32 `json:"port"`
 	// +optional
 	// +kubebuilder:default:={}
@@ -99,6 +105,9 @@ type Session struct {
 	// The path where the session can be accessed. If an ingress is specified, this value must
 	// be a subpath of the ingress `pathPrefix` field.
 	URLPath string `json:"urlPath,omitempty"`
+	// +optional
+	// Additional volume mounts for the session container
+	ExtraVolumeMounts []v1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 }
 
 type Ingress struct {
