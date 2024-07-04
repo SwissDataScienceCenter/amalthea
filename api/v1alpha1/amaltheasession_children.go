@@ -124,6 +124,11 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 	labels := labelsForAmaltheaSession(cr.Name)
 
 	ingress := cr.Spec.Ingress
+
+	if ingress == nil {
+		return nil
+	}
+
 	pathPrefix := "/"
 	if ingress.PathPrefix != nil {
 		pathPrefix = *ingress.PathPrefix
