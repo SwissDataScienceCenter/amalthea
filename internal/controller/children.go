@@ -145,7 +145,10 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResources {
 		Service:     ChildResource[v1.Service]{&v1.Service{ObjectMeta: metadata}, &desiredService},
 		PVC:         ChildResource[v1.PersistentVolumeClaim]{&v1.PersistentVolumeClaim{ObjectMeta: metadata}, &desiredPVC},
 		StatefulSet: ChildResource[appsv1.StatefulSet]{&appsv1.StatefulSet{ObjectMeta: metadata}, &desiredStatefulSet},
-		Ingress:     ChildResource[networkingv1.Ingress]{&networkingv1.Ingress{ObjectMeta: metadata}, desiredIngress},
+	}
+
+	if desiredIngress != nil {
+		output.Ingress = ChildResource[networkingv1.Ingress]{&networkingv1.Ingress{ObjectMeta: metadata}, desiredIngress}
 	}
 	return output
 }
@@ -224,21 +227,24 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 		failingSince = metav1.Time{}
 	}
 
-	urlScheme := "http"
-	if cr.Spec.Ingress.TLSSecretName != nil {
-		urlScheme = "https"
+	sessionURLStr := "None"
+	if cr.Spec.Ingress != nil {
+		urlScheme := "http"
+		if cr.Spec.Ingress.TLSSecretName != nil {
+			urlScheme = "https"
+		}
+		pathPrefix := "/"
+		if cr.Spec.Ingress.PathPrefix != nil {
+			pathPrefix = *cr.Spec.Ingress.PathPrefix
+		}
+		sessionURL := url.URL{
+			Scheme: urlScheme,
+			Path:   pathPrefix,
+			Host:   cr.Spec.Ingress.Host,
+		}
+		sessionURL = *sessionURL.JoinPath(cr.Spec.Session.URLPath)
+		sessionURLStr = strings.TrimSuffix(sessionURL.String(), "/")
 	}
-	pathPrefix := "/"
-	if cr.Spec.Ingress.PathPrefix != nil {
-		pathPrefix = *cr.Spec.Ingress.PathPrefix
-	}
-	sessionURL := url.URL{
-		Scheme: urlScheme,
-		Path:   pathPrefix,
-		Host:   cr.Spec.Ingress.Host,
-	}
-	sessionURL = *sessionURL.JoinPath(cr.Spec.Session.URLPath)
-	sessionURLStr := strings.TrimSuffix(sessionURL.String(), "/")
 
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
 		State:           c.State(cr, pod),

@@ -39,7 +39,7 @@ type AmaltheaSessionSpec struct {
 	DataSources []DataSource `json:"dataSources,omitempty"`
 
 	// Authentication configuration for the session
-	Authentication Authentication `json:"authentication,omitempty"`
+	Authentication *Authentication `json:"authentication,omitempty"`
 
 	// Culling configuration
 	Culling Culling `json:"culling,omitempty"`
@@ -63,7 +63,7 @@ type AmaltheaSessionSpec struct {
 	ExtraInitContainers []v1.Container `json:"initContainers,omitempty"`
 
 	// Configuration for an ingress to the session, if omitted a Kubernetes Ingress will not be created
-	Ingress Ingress `json:"ingress"`
+	Ingress *Ingress `json:"ingress,omitempty"`
 }
 
 type Session struct {
@@ -105,9 +105,11 @@ type Ingress struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 	// +optional
 	IngressClassName *string `json:"ingressClassName,omitempty"`
-	Host             string  `json:"host"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Host is immutable"
+	Host string `json:"host"`
 	// +optional
 	// +kubebuilder:default:="/"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="PathPrefix is immutable"
 	PathPrefix *string `json:"pathPrefix,omitempty"`
 	// +optional
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
@@ -220,14 +222,15 @@ const Token AuthenticationType = "token"
 const Oidc AuthenticationType = "oauth2proxy"
 
 type Authentication struct {
+	// +kubebuilder:default:=true
 	Enabled bool               `json:"enabled,omitempty"`
-	Type    AuthenticationType `json:"type,omitempty"`
+	Type    AuthenticationType `json:"type"`
 	// Kubernetes secret that contains the authentication configuration
 	// For `token` generate a hard to guess string / password-like string.
 	// this value can be used as Authorization header or as a cookie with the name `amaltheaSessionToken` to
 	// access the session.
 	// For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
-	SecretRef *SessionSecretRef `json:"secretRef,omitempty"`
+	SecretRef SessionSecretRef `json:"secretRef"`
 }
 
 // A reference to a Kubernetes secret and a specific field in the secret to be used in a session
