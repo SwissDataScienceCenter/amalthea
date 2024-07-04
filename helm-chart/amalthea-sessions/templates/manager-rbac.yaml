@@ -6,7 +6,7 @@ kind: Role
 {{- end }}
 metadata:
   name: {{ include "amalthea-sessions.fullname" . }}-manager-role
-  {{- if not .Value.clusterScoped }}
+  {{- if not .Values.clusterScoped }}
   namespace: {{ .Release.Namespace }}
   {{- end }}
   labels:
@@ -40,28 +40,28 @@ rules:
   - update
 # Required for tracking pods for session status
 - apiGroups: [""]
-resources: [pods]
-verbs: [get, list, watch]
+  resources: [pods]
+  verbs: [get, list, watch]
 # Amalthea get pod metrics used to cull idle sessions
 - apiGroups: ["metrics.k8s.io"]
-resources: [pods]
-verbs: [get, list, watch]
+  resources: [pods]
+  verbs: [get, list, watch]
 # Amalthea: child resources we produce
 # Note that we do not patch/update/delete them ever.
 - apiGroups:
   - ""
   - apps
   - networking.k8s.io
-resources:
-  - statefulsets
-  - persistentvolumeclaims
-  - services
-  - ingresses
-verbs: [create, get, list, watch]
+  resources:
+    - statefulsets
+    - persistentvolumeclaims
+    - services
+    - ingresses
+  verbs: [create, get, list, watch]
 # Required for hibernating sessions
 - apiGroups: ["apps"]
-resources: ["statefulsets"]
-verbs: [patch]
+  resources: ["statefulsets"]
+  verbs: [patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 {{- if .Values.clusterScoped }}
@@ -71,7 +71,7 @@ kind: RoleBinding
 {{- end }}
 metadata:
   name: {{ include "amalthea-sessions.fullname" . }}-manager-rolebinding
-  {{- if not .Value.clusterScoped }}
+  {{- if not .Values.clusterScoped }}
   namespace: {{ .Release.Namespace }}
   {{- end }}
   labels:
