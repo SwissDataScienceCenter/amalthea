@@ -1,0 +1,93 @@
+apiVersion: rbac.authorization.k8s.io/v1
+{{- if .Values.clusterScoped }}
+kind: ClusterRole
+{{ else }}
+kind: Role
+{{- end }}
+metadata:
+  name: {{ include "amalthea-sessions.fullname" . }}-manager-role
+  {{- if not .Value.clusterScoped }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+  {{- include "amalthea-sessions.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - amalthea.dev
+  resources:
+  - amaltheasessions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - amalthea.dev
+  resources:
+  - amaltheasessions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - amalthea.dev
+  resources:
+  - amaltheasessions/status
+  verbs:
+  - get
+  - patch
+  - update
+# Required for tracking pods for session status
+- apiGroups: [""]
+resources: [pods]
+verbs: [get, list, watch]
+# Amalthea get pod metrics used to cull idle sessions
+- apiGroups: ["metrics.k8s.io"]
+resources: [pods]
+verbs: [get, list, watch]
+# Amalthea: child resources we produce
+# Note that we do not patch/update/delete them ever.
+- apiGroups:
+  - ""
+  - apps
+  - networking.k8s.io
+resources:
+  - statefulsets
+  - persistentvolumeclaims
+  - services
+  - ingresses
+verbs: [create, get, list, watch]
+# Required for hibernating sessions
+- apiGroups: ["apps"]
+resources: ["statefulsets"]
+verbs: [patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+{{- if .Values.clusterScoped }}
+kind: ClusterRoleBinding
+{{- else }}
+kind: RoleBinding
+{{- end }}
+metadata:
+  name: {{ include "amalthea-sessions.fullname" . }}-manager-rolebinding
+  {{- if not .Value.clusterScoped }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: amalthea
+    app.kubernetes.io/part-of: amalthea
+  {{- include "amalthea-sessions.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  {{- if .Values.clusterScoped }}
+  kind: ClusterRole
+  {{- else }}
+  kind: Role
+  {{- end }}
+  name: '{{ include "amalthea-sessions.fullname" . }}-manager-role'
+subjects:
+- kind: ServiceAccount
+  name: '{{ include "amalthea-sessions.fullname" . }}-controller-manager'
+  namespace: '{{ .Release.Namespace }}'
