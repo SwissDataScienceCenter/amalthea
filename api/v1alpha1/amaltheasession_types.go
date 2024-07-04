@@ -17,15 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"reflect"
-
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
 )
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
@@ -36,9 +30,11 @@ type AmaltheaSessionSpec struct {
 	// Specification for the main session container that the user will access and use
 	Session Session `json:"session"`
 
+	// +optional
 	// A list of code repositories and associated configuration that will be cloned in the session
 	CodeRepositories []CodeRepository `json:"codeRepositories,omitempty"`
 
+	// +optional
 	// A list of data sources that should be added to the session
 	DataSources []DataSource `json:"dataSources,omitempty"`
 
@@ -48,23 +44,26 @@ type AmaltheaSessionSpec struct {
 	// Culling configuration
 	Culling Culling `json:"culling,omitempty"`
 
+	// +kubebuilder:default:=false
 	// Will hibernate the session, scaling the session's statefulset to zero.
-	Hibernated bool `json:"hibernated,omitempty"`
+	Hibernated bool `json:"hibernated"`
 
 	// +kubebuilder:default:=false
 	// Whether to adopt all secrets referred to by name in this CR. Adopted secrets will be deleted when the CR is deleted.
-	AdoptSecrets bool `json:"adoptSecrets,omitempty"`
+	AdoptSecrets bool `json:"adoptSecrets"`
 
+	// +optional
 	// Additional containers to add to the session statefulset.
 	// NOTE: The container names provided will be partially overwritten and randomized to avoid collisions
 	ExtraContainers []v1.Container `json:"extraContainers,omitempty"`
 
+	// +optional
 	// Additional init containers to add to the session statefulset
 	// NOTE: The container names provided will be partially overwritten and randomized to avoid collisions
 	ExtraInitContainers []v1.Container `json:"initContainers,omitempty"`
 
 	// Configuration for an ingress to the session, if omitted a Kubernetes Ingress will not be created
-	Ingress Ingress `json:"ingress,omitempty"`
+	Ingress Ingress `json:"ingress"`
 }
 
 type Session struct {
@@ -80,36 +79,50 @@ type Session struct {
 	// +kubebuilder:validation:ExclusiveMinimum:=true
 	// +kubebuilder:validation:Minimum:=0
 	// The TCP port where whatever is running in the session container will listen on for connections
-	Port    int32   `json:"port"`
+	Port int32 `json:"port"`
+	// +optional
+	// +kubebuilder:default:={}
 	Storage Storage `json:"storage,omitempty"`
 	// The abolute path for the working directory of the session container, if omitted it will use the image
 	// working directory.
 	WorkingDir string `json:"workingDir,omitempty"`
+	// +optional
 	// +kubebuilder:default:=1000
 	// +kubebuilder:validation:Minimum:=0
-	RunAsUser int64 `json:"runAsUser"`
+	RunAsUser int64 `json:"runAsUser,omitempty"`
+	// +optional
 	// +kubebuilder:default:=1000
 	// +kubebuilder:validation:Minimum:=0
-	RunAsGroup int64 `json:"runAsGroup"`
+	RunAsGroup int64 `json:"runAsGroup,omitempty"`
+	// +optional
+	// +kubebuilder:default:="/"
 	// The path where the session can be accessed. If an ingress is specified, this value must
-	// be a subpath of or identical to the ingress `pathPrefix` field.
+	// be a subpath of the ingress `pathPrefix` field.
 	URLPath string `json:"urlPath,omitempty"`
 }
 
 type Ingress struct {
-	Annotations      map[string]string `json:"annotations,omitempty"`
-	IngressClassName string            `json:"ingressClassName,omitempty"`
-	Host             string            `json:"host,omitempty"`
-	PathPrefix       string            `json:"pathPrefix,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// +optional
+	IngressClassName *string `json:"ingressClassName,omitempty"`
+	Host             string  `json:"host"`
+	// +optional
+	// +kubebuilder:default:="/"
+	PathPrefix *string `json:"pathPrefix,omitempty"`
+	// +optional
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
-	TLSSecretName string `json:"tlsSecretName,omitempty"`
+	TLSSecretName *string `json:"tlsSecretName,omitempty"`
 }
 
 type Storage struct {
-	ClassName string            `json:"storageClassName,omitempty"`
-	Size      resource.Quantity `json:"storageSize,omitempty"`
+	// +optional
+	ClassName *string `json:"className,omitempty"`
+	// +optional
+	// +kubebuilder:default:="1Gi"
+	Size *resource.Quantity `json:"size,omitempty"`
 	// The absolute mount path for the session volume
-	// +kubebuilder:default:=/workspace
+	// +optional
+	// +kubebuilder:default:="/workspace"
 	MountPath string `json:"mountPath,omitempty"`
 }
 
@@ -238,6 +251,10 @@ type ContainerCounts struct {
 	Total int `json:"total,omitempty"`
 }
 
+func (c ContainerCounts) Ok() bool {
+	return c.Ready == c.Total
+}
+
 // AmaltheaSessionStatus defines the observed state of AmaltheaSession
 type AmaltheaSessionStatus struct {
 	// Conditions store the status conditions of the AmaltheaSessions. This is a standard thing that
@@ -273,181 +290,6 @@ type AmaltheaSession struct {
 
 	Spec   AmaltheaSessionSpec   `json:"spec,omitempty"`
 	Status AmaltheaSessionStatus `json:"status,omitempty"`
-}
-
-type AmaltheaChildren struct {
-	Ingress     *networkingv1.Ingress
-	Service     v1.Service
-	StatefulSet appsv1.StatefulSet
-	PVC         v1.PersistentVolumeClaim
-}
-
-func (cr *AmaltheaSession) OwnerReference() metav1.OwnerReference {
-	gvk := cr.GroupVersionKind()
-	return metav1.OwnerReference{
-		APIVersion:         gvk.GroupVersion().String(),
-		Kind:               gvk.Kind,
-		Name:               cr.ObjectMeta.Name,
-		BlockOwnerDeletion: pointer.Bool(true),
-		Controller:         pointer.Bool(true),
-		UID:                cr.GetObjectMeta().GetUID(),
-	}
-}
-
-func (cr *AmaltheaSession) Children() AmaltheaChildren {
-	return AmaltheaChildren{
-		StatefulSet: cr.statefulSetForAmaltheaSession(),
-		Service:     cr.serviceForAmaltheaSession(),
-		Ingress:     cr.ingressForAmaltheaSession(),
-	}
-}
-
-// statefulSetForAmaltheaSession returns a AmaltheaSession StatefulSet object
-func (cr *AmaltheaSession) statefulSetForAmaltheaSession() appsv1.StatefulSet {
-	labels := labelsForAmaltheaSession(cr.Name)
-	replicas := int32(1)
-
-	session := cr.Spec.Session
-
-	sessionContainer := v1.Container{
-		Image:           session.Image,
-		Name:            "session",
-		ImagePullPolicy: v1.PullIfNotPresent,
-
-		Ports: []v1.ContainerPort{{
-			ContainerPort: session.Port,
-			Name:          "session-port",
-		}},
-
-		Args:      session.Args,
-		Command:   session.Command,
-		Env:       session.Env,
-		Resources: session.Resources,
-	}
-
-	securityContext := &v1.SecurityContext{
-		RunAsNonRoot: &[]bool{true}[0],
-		RunAsUser:    &[]int64{session.RunAsUser}[0],
-		RunAsGroup:   &[]int64{session.RunAsGroup}[0],
-	}
-
-	if session.RunAsUser == 0 {
-		securityContext.RunAsNonRoot = &[]bool{false}[0]
-	}
-
-	sessionContainer.SecurityContext = securityContext
-
-	containers := []v1.Container{sessionContainer}
-	containers = append(containers, cr.Spec.ExtraContainers...)
-
-	return appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            cr.Name,
-			Namespace:       cr.Namespace,
-			OwnerReferences: []metav1.OwnerReference{cr.OwnerReference()},
-		},
-		Spec: appsv1.StatefulSetSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: v1.PodSpec{
-					Containers:     containers,
-					InitContainers: cr.Spec.ExtraInitContainers,
-				},
-			},
-		},
-	}
-}
-
-// serviceForAmaltheaSession returns a AmaltheaSession Service object
-func (cr *AmaltheaSession) serviceForAmaltheaSession() v1.Service {
-	labels := labelsForAmaltheaSession(cr.Name)
-
-	return v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            cr.Name,
-			Namespace:       cr.Namespace,
-			OwnerReferences: []metav1.OwnerReference{cr.OwnerReference()},
-		},
-		Spec: v1.ServiceSpec{
-			Selector: labels,
-			Ports: []v1.ServicePort{{
-				Name:       "session-port",
-				Port:       80,
-				TargetPort: intstr.FromInt32(cr.Spec.Session.Port),
-			}},
-		},
-	}
-}
-
-// ingressForAmaltheaSession returns a AmaltheaSession Ingress object
-func (cr *AmaltheaSession) ingressForAmaltheaSession() *networkingv1.Ingress {
-	if reflect.DeepEqual(cr.Spec.Ingress, Ingress{}) {
-		return nil
-	}
-
-	labels := labelsForAmaltheaSession(cr.Name)
-
-	ingress := cr.Spec.Ingress
-
-	path := "/"
-	if ingress.PathPrefix != "" {
-		path = ingress.PathPrefix
-	}
-
-	return &networkingv1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            cr.Name,
-			Namespace:       cr.Namespace,
-			Labels:          labels,
-			Annotations:     ingress.Annotations,
-			OwnerReferences: []metav1.OwnerReference{cr.OwnerReference()},
-		},
-		Spec: networkingv1.IngressSpec{
-			IngressClassName: &ingress.IngressClassName,
-			Rules: []networkingv1.IngressRule{{
-				Host: ingress.Host,
-				IngressRuleValue: networkingv1.IngressRuleValue{
-					HTTP: &networkingv1.HTTPIngressRuleValue{
-						Paths: []networkingv1.HTTPIngressPath{{
-							Path: path,
-							PathType: func() *networkingv1.PathType {
-								pt := networkingv1.PathTypePrefix
-								return &pt
-							}(),
-							Backend: networkingv1.IngressBackend{
-								Service: &networkingv1.IngressServiceBackend{
-									Name: cr.Name,
-									Port: networkingv1.ServiceBackendPort{
-										Name: "session-port",
-									},
-								},
-							},
-						}},
-					},
-				},
-			}},
-			TLS: []networkingv1.IngressTLS{{
-				Hosts:      []string{ingress.Host},
-				SecretName: ingress.TLSSecretName,
-			}},
-		},
-	}
-}
-
-// labelsForAmaltheaSessino returns the labels for selecting the resources
-// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
-func labelsForAmaltheaSession(name string) map[string]string {
-	return map[string]string{"app.kubernetes.io/name": "AmaltheaSession",
-		"app.kubernetes.io/instance":   name,
-		"app.kubernetes.io/part-of":    "amaltheasession-operator",
-		"app.kubernetes.io/created-by": "controller-manager",
-	}
 }
 
 //+kubebuilder:object:root=true
