@@ -108,9 +108,10 @@ type Ingress struct {
 	Host             string  `json:"host"`
 	// +optional
 	// +kubebuilder:default:="/"
-	PathPrefix string `json:"pathPrefix,omitempty"`
+	PathPrefix *string `json:"pathPrefix,omitempty"`
+	// +optional
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
-	TLSSecretName string `json:"tlsSecretName,omitempty"`
+	TLSSecretName *string `json:"tlsSecretName,omitempty"`
 }
 
 type Storage struct {
