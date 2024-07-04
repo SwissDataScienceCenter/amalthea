@@ -242,13 +242,6 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
 		State:           c.State(cr, pod),
-	state := c.State(cr)
-
-	// Used for debugging to ensure the reconcile loop does not needlessly reschdule or update child resources
-	log.Info("Update summary", "Ingress", c.Ingress.UpdateResult, "StatefulSet", c.StatefulSet.UpdateResult, "PVC", c.StatefulSet.UpdateResult, "Service", c.Service.UpdateResult)
-
-	return amaltheadevv1alpha1.AmaltheaSessionStatus{
-		State:           state,
 		URL:             sessionURLStr,
 		Idle:            idle,
 		IdleSince:       idleSince,
