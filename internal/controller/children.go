@@ -215,12 +215,16 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 	}
 
 	urlScheme := "http"
-	if cr.Spec.Ingress.TLSSecretName != "" {
+	if cr.Spec.Ingress.TLSSecretName != nil {
 		urlScheme = "https"
+	}
+	pathPrefix := "/"
+	if cr.Spec.Ingress.PathPrefix != nil {
+		pathPrefix = *cr.Spec.Ingress.PathPrefix
 	}
 	sessionURL := url.URL{
 		Scheme: urlScheme,
-		Path:   cr.Spec.Ingress.PathPrefix,
+		Path:   pathPrefix,
 		Host:   cr.Spec.Ingress.Host,
 	}
 	sessionURL = *sessionURL.JoinPath(cr.Spec.Session.URLPath)

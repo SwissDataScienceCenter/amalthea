@@ -124,6 +124,10 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 	labels := labelsForAmaltheaSession(cr.Name)
 
 	ingress := cr.Spec.Ingress
+	pathPrefix := "/"
+	if ingress.PathPrefix != nil {
+		pathPrefix = *ingress.PathPrefix
+	}
 
 	ing := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -139,7 +143,7 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 				IngressRuleValue: networkingv1.IngressRuleValue{
 					HTTP: &networkingv1.HTTPIngressRuleValue{
 						Paths: []networkingv1.HTTPIngressPath{{
-							Path: ingress.PathPrefix,
+							Path: pathPrefix,
 							PathType: func() *networkingv1.PathType {
 								pt := networkingv1.PathTypePrefix
 								return &pt
@@ -156,11 +160,14 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 					},
 				},
 			}},
-			TLS: []networkingv1.IngressTLS{{
-				Hosts:      []string{ingress.Host},
-				SecretName: ingress.TLSSecretName,
-			}},
 		},
+	}
+
+	if ingress.TLSSecretName != nil {
+		ing.Spec.TLS = []networkingv1.IngressTLS{{
+			Hosts:      []string{ingress.Host},
+			SecretName: *ingress.TLSSecretName,
+		}}
 	}
 
 	return ing
