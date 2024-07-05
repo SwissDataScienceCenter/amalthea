@@ -51,7 +51,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 		volumes = append(volumes, cr.Spec.ExtraVolumes...)
 	}
 
-	// NOTE: ports on a container are for information purposes only, so they are removed beacuse the port specified
+	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
 	// in the CR can point to either the session container or another container.
 	sessionContainer := v1.Container{
 		Image:                    session.Image,
@@ -87,7 +87,10 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 			Namespace: cr.Namespace,
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: &replicas,
+			// NOTE: Parallel pod management policy is important
+			// If set to default (i.e. not parallel) K8s waits for the pod to become ready before restarting on updates
+			PodManagementPolicy: appsv1.ParallelPodManagement,
+			Replicas:            &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -220,10 +223,10 @@ func labelsForAmaltheaSession(name string) map[string]string {
 	}
 }
 
-func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (v1.Pod, error) {
+func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
 	pod := v1.Pod{}
 	podName := fmt.Sprintf("%s-0", cr.Name)
 	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
 	err := clnt.Get(ctx, key, &pod)
-	return pod, err
+	return &pod, err
 }

@@ -142,7 +142,7 @@ spec:
                       example: https://github.com/SwissDataScienceCenter/renku
                       type: string
                     revision:
-                      description: The tag, branch or commit SHA to checkout, if ommitted
+                      description: The tag, branch or commit SHA to checkout, if omitted
                         then will be the tip of the default branch of the repo
                       example: main
                       type: string
@@ -4865,7 +4865,7 @@ spec:
                 type: array
               containerCounts:
                 description: Counts of the total and ready containers, can represent
-                  either regular or init contianers.
+                  either regular or init containers.
                 properties:
                   ready:
                     type: integer
@@ -4885,7 +4885,7 @@ spec:
                 type: string
               initContainerCounts:
                 description: Counts of the total and ready containers, can represent
-                  either regular or init contianers.
+                  either regular or init containers.
                 properties:
                   ready:
                     type: integer

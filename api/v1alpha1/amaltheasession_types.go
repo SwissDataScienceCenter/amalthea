@@ -154,7 +154,7 @@ type CodeRepository struct {
 	// The HTTP url to the code repository
 	Remote string `json:"remote"`
 	// +kubebuilder:example:=main
-	// The tag, branch or commit SHA to checkout, if ommitted then will be the tip of the default branch of the repo
+	// The tag, branch or commit SHA to checkout, if omitted then will be the tip of the default branch of the repo
 	Revision string `json:"revision,omitempty"`
 	// The Kubernetes secret that contains the code repository configuration to be used during cloning.
 	// For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
@@ -257,7 +257,7 @@ const Hibernated State = "Hibernated"
 const NotReady State = "NotReady"
 const RunningDegraded State = "RunningDegraded"
 
-// Counts of the total and ready containers, can represent either regular or init contianers.
+// Counts of the total and ready containers, can represent either regular or init containers.
 type ContainerCounts struct {
 	Ready int `json:"ready,omitempty"`
 	Total int `json:"total,omitempty"`
