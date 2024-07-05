@@ -12,3 +12,16 @@ charts:
         contextPath: .
         dockerfilePath: kopf.Dockerfile
         valuesPath: image
+  - name: helm-chart/amalthea-sessions
+    resetTag: latest
+    imagePrefix: renku/
+    repo:
+      git: SwissDataScienceCenter/helm-charts
+      published: https://swissdatasciencecenter.github.io/helm-charts
+    paths:
+      - .
+    images:
+      amalthea-sessions:
+        contextPath: .
+        dockerfilePath: Dockerfile
+        valuesPath: controllerManager.manager.image
