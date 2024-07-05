@@ -51,7 +51,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 		volumes = append(volumes, cr.Spec.ExtraVolumes...)
 	}
 
-	// NOTE: ports on a container are for information purposes only, so they are removed beacuse the port specified
+	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
 	// in the CR can point to either the session container or another container.
 	sessionContainer := v1.Container{
 		Image:                    session.Image,
