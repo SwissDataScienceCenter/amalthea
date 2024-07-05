@@ -30,35 +30,45 @@ type AmaltheaSessionSpec struct {
 	// Specification for the main session container that the user will access and use
 	Session Session `json:"session"`
 
+	// +optional
 	// A list of code repositories and associated configuration that will be cloned in the session
 	CodeRepositories []CodeRepository `json:"codeRepositories,omitempty"`
 
+	// +optional
 	// A list of data sources that should be added to the session
 	DataSources []DataSource `json:"dataSources,omitempty"`
 
 	// Authentication configuration for the session
-	Authentication Authentication `json:"authentication,omitempty"`
+	Authentication *Authentication `json:"authentication,omitempty"`
 
 	// Culling configuration
 	Culling Culling `json:"culling,omitempty"`
 
+	// +kubebuilder:default:=false
 	// Will hibernate the session, scaling the session's statefulset to zero.
-	Hibernated bool `json:"hibernated,omitempty"`
+	Hibernated bool `json:"hibernated"`
 
 	// +kubebuilder:default:=false
 	// Whether to adopt all secrets referred to by name in this CR. Adopted secrets will be deleted when the CR is deleted.
-	AdoptSecrets bool `json:"adoptSecrets,omitempty"`
+	AdoptSecrets bool `json:"adoptSecrets"`
 
+	// +optional
 	// Additional containers to add to the session statefulset.
 	// NOTE: The container names provided will be partially overwritten and randomized to avoid collisions
 	ExtraContainers []v1.Container `json:"extraContainers,omitempty"`
 
+	// +optional
 	// Additional init containers to add to the session statefulset
 	// NOTE: The container names provided will be partially overwritten and randomized to avoid collisions
 	ExtraInitContainers []v1.Container `json:"initContainers,omitempty"`
 
+	// +optional
+	// Additional volumes to include in the statefulset for a session
+	ExtraVolumes []v1.Volume `json:"extraVolumes,omitempty"`
+
+	// +optional
 	// Configuration for an ingress to the session, if omitted a Kubernetes Ingress will not be created
-	Ingress Ingress `json:"ingress,omitempty"`
+	Ingress *Ingress `json:"ingress,omitempty"`
 }
 
 type Session struct {
@@ -73,37 +83,57 @@ type Session struct {
 	// +kubebuilder:default:=8000
 	// +kubebuilder:validation:ExclusiveMinimum:=true
 	// +kubebuilder:validation:Minimum:=0
-	// The TCP port where whatever is running in the session container will listen on for connections
-	Port    int32   `json:"port"`
+	// The TCP port on the session Pod where the session can be accessed. Can point to either the
+	// session container or any additional container that is added. K8s port names are not accepted.
+	Port int32 `json:"port"`
+	// +optional
+	// +kubebuilder:default:={}
 	Storage Storage `json:"storage,omitempty"`
 	// The abolute path for the working directory of the session container, if omitted it will use the image
 	// working directory.
 	WorkingDir string `json:"workingDir,omitempty"`
+	// +optional
 	// +kubebuilder:default:=1000
 	// +kubebuilder:validation:Minimum:=0
-	RunAsUser int64 `json:"runAsUser"`
+	RunAsUser int64 `json:"runAsUser,omitempty"`
+	// +optional
 	// +kubebuilder:default:=1000
 	// +kubebuilder:validation:Minimum:=0
-	RunAsGroup int64 `json:"runAsGroup"`
+	RunAsGroup int64 `json:"runAsGroup,omitempty"`
+	// +optional
+	// +kubebuilder:default:="/"
 	// The path where the session can be accessed. If an ingress is specified, this value must
-	// be a subpath of or identical to the ingress `pathPrefix` field.
+	// be a subpath of the ingress `pathPrefix` field.
 	URLPath string `json:"urlPath,omitempty"`
+	// +optional
+	// Additional volume mounts for the session container
+	ExtraVolumeMounts []v1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 }
 
 type Ingress struct {
-	Annotations      map[string]string `json:"annotations,omitempty"`
-	IngressClassName string            `json:"ingressClassName,omitempty"`
-	Host             string            `json:"host,omitempty"`
-	PathPrefix       string            `json:"pathPrefix,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// +optional
+	IngressClassName *string `json:"ingressClassName,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Host is immutable"
+	Host string `json:"host"`
+	// +optional
+	// +kubebuilder:default:="/"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="PathPrefix is immutable"
+	PathPrefix *string `json:"pathPrefix,omitempty"`
+	// +optional
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
-	TLSSecretName string `json:"tlsSecretName,omitempty"`
+	TLSSecretName *string `json:"tlsSecretName,omitempty"`
 }
 
 type Storage struct {
-	ClassName string            `json:"storageClassName,omitempty"`
-	Size      resource.Quantity `json:"storageSize,omitempty"`
+	// +optional
+	ClassName *string `json:"className,omitempty"`
+	// +optional
+	// +kubebuilder:default:="1Gi"
+	Size *resource.Quantity `json:"size,omitempty"`
 	// The absolute mount path for the session volume
-	// +kubebuilder:default:=/workspace
+	// +optional
+	// +kubebuilder:default:="/workspace"
 	MountPath string `json:"mountPath,omitempty"`
 }
 
@@ -201,14 +231,15 @@ const Token AuthenticationType = "token"
 const Oidc AuthenticationType = "oauth2proxy"
 
 type Authentication struct {
+	// +kubebuilder:default:=true
 	Enabled bool               `json:"enabled,omitempty"`
-	Type    AuthenticationType `json:"type,omitempty"`
+	Type    AuthenticationType `json:"type"`
 	// Kubernetes secret that contains the authentication configuration
 	// For `token` generate a hard to guess string / password-like string.
 	// this value can be used as Authorization header or as a cookie with the name `amaltheaSessionToken` to
 	// access the session.
 	// For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
-	SecretRef *SessionSecretRef `json:"secretRef,omitempty"`
+	SecretRef SessionSecretRef `json:"secretRef"`
 }
 
 // A reference to a Kubernetes secret and a specific field in the secret to be used in a session
@@ -230,6 +261,10 @@ const RunningDegraded State = "RunningDegraded"
 type ContainerCounts struct {
 	Ready int `json:"ready,omitempty"`
 	Total int `json:"total,omitempty"`
+}
+
+func (c ContainerCounts) Ok() bool {
+	return c.Ready == c.Total
 }
 
 // AmaltheaSessionStatus defines the observed state of AmaltheaSession
