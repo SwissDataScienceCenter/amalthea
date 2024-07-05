@@ -97,8 +97,11 @@ func main() {
 
 	clusterScoped := os.Getenv("CLUSTER_SCOPED") == "true"
 	releaseNamespace := os.Getenv("RELEASE_NAMESPACE")
+	if releaseNamespace == "" {
+		releaseNamespace = "default"
+	}
 	cacheOptions := cache.Options{
-		DefaultNamespaces: map[string]cache.Config{releaseNamespace: cache.Config{}},
+		DefaultNamespaces: map[string]cache.Config{releaseNamespace: {}},
 	}
 	if clusterScoped {
 		cacheOptions = cache.Options{
