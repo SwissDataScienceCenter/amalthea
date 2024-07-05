@@ -4865,7 +4865,7 @@ spec:
                 type: array
               containerCounts:
                 description: Counts of the total and ready containers, can represent
-                  either regular or init contianers.
+                  either regular or init containers.
                 properties:
                   ready:
                     type: integer
@@ -4885,7 +4885,7 @@ spec:
                 type: string
               initContainerCounts:
                 description: Counts of the total and ready containers, can represent
-                  either regular or init contianers.
+                  either regular or init containers.
                 properties:
                   ready:
                     type: integer

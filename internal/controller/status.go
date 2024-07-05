@@ -5,6 +5,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+// How many times should a pod restart before we consider it Failed. This is required because if we take
+// a value that is too low it is possible that the pod will "heal itself" after a few restarts. If the
+// value is too high then the user will wait for a long time before they see their pod is failing.
+const restartThreshold int32 = 3
+
 // countainerCounts provides from the total and completed/fully running containers in a pod.
 // The output is a tuple with the init container counts followed by the regular container counts.
 func containerCounts(pod *v1.Pod) (amaltheadevv1alpha1.ContainerCounts, amaltheadevv1alpha1.ContainerCounts) {
@@ -43,7 +48,6 @@ func podIsFailed(pod *v1.Pod) bool {
 		// A missing pod or a pod being deleted is not considered failed
 		return false
 	}
-	restartThreshold := int32(3)
 	for _, container := range pod.Status.InitContainerStatuses {
 		containerFailed := container.State.Waiting != nil && container.RestartCount >= restartThreshold
 		if containerFailed {

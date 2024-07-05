@@ -171,7 +171,7 @@ func (c ChildResourceUpdates) AllEqual(op controllerutil.OperationResult) bool {
 func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	onlyStatusUpdates := c.AllEqual(controllerutil.OperationResultUpdatedStatusOnly)
 	noUpdates := c.AllEqual(controllerutil.OperationResultNone)
-	ssReady := c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
+	stsReady := c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
 	podExists := pod != nil
 	podReady := podExists && podIsReady(pod)
 	return stsReady && podReady && (onlyStatusUpdates || noUpdates)
