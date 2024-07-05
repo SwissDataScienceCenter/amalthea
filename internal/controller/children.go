@@ -174,7 +174,7 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	ssReady := c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
 	podExists := pod != nil
 	podReady := podExists && podIsReady(pod)
-	return ssReady && podReady && (onlyStatusUpdates || noUpdates)
+	return stsReady && podReady && (onlyStatusUpdates || noUpdates)
 }
 
 func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) amaltheadevv1alpha1.State {
