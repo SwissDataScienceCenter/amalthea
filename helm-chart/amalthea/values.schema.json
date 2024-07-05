@@ -403,11 +403,36 @@
             ],
             "additionalProperties": false
         },
-        "global": {
-            "type": "object",
-            "default": {},
-            "additionalProperties": true
-        }
+        "rclone-csi": {
+          "type": "object",
+          "properties": {
+              "install": {
+                  "type": "boolean",
+                  "default": "false"
+              },
+              "storageClassName": {
+                  "type": "string",
+                  "default": "rclone-csi"
+              },
+              "csiNodepluginRclone": {
+                "type": "object",
+                "default": {
+                  "nodeSelector": {},
+                  "tolerations": [],
+                  "affinity": {}
+                }
+              }
+          },
+          "required": [
+              "install"
+          ],
+          "additionalProperties": false
+      },
+      "global": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": true
+      }
     },
     "required": [
         "scope",
