@@ -15,11 +15,13 @@ import (
 )
 
 // NOTE: changing these constant values will result in breaking changes or restarts in existing sessions when a new operator is released
-const sessionContainerName string = "session"
-const sessionPortName string = "session-port"
-const servicePortName string = "session-http"
-const sessionVolumeName string = "session-volume"
+// We should prefix reserved names like below with `amalthea-` and then add checks in our spec to prevent people from naming things where they
+// start with the same `amalthea-` prefix.
+const prefix string = "amalthea-"
+const sessionContainerName string = prefix + "session"
+const servicePortName string = prefix + "http"
 const servicePort int32 = 80
+const sessionVolumeName string = prefix + "volume"
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
@@ -31,23 +33,35 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 
 	session := cr.Spec.Session
 	pvc := cr.PVC()
+	extraMounts := []v1.VolumeMount{}
+	if len(cr.Spec.Session.ExtraVolumeMounts) > 0 {
+		extraMounts = cr.Spec.Session.ExtraVolumeMounts
+	}
+	volumeMounts := append(
+		[]v1.VolumeMount{{Name: sessionVolumeName, MountPath: session.Storage.MountPath}},
+		extraMounts...,
+	)
+	volumes := []v1.Volume{
+		{
+			Name:         sessionVolumeName,
+			VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}},
+		},
+	}
+	if len(cr.Spec.ExtraVolumes) > 0 {
+		volumes = append(volumes, cr.Spec.ExtraVolumes...)
+	}
 
+	// NOTE: ports on a container are for information purposes only, so they are removed beacuse the port specified
+	// in the CR can point to either the session container or another container.
 	sessionContainer := v1.Container{
-		Image:           session.Image,
-		Name:            sessionContainerName,
-		ImagePullPolicy: v1.PullIfNotPresent,
-
-		Ports: []v1.ContainerPort{{
-			ContainerPort: session.Port,
-			Name:          sessionPortName,
-			Protocol:      v1.ProtocolTCP,
-		}},
-
+		Image:                    session.Image,
+		Name:                     sessionContainerName,
+		ImagePullPolicy:          v1.PullIfNotPresent,
 		Args:                     session.Args,
 		Command:                  session.Command,
 		Env:                      session.Env,
 		Resources:                session.Resources,
-		VolumeMounts:             []v1.VolumeMount{{Name: sessionVolumeName, MountPath: session.Storage.MountPath}},
+		VolumeMounts:             volumeMounts,
 		TerminationMessagePath:   "/dev/termination-log",
 		TerminationMessagePolicy: v1.TerminationMessageReadFile,
 	}
@@ -87,12 +101,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 				Spec: v1.PodSpec{
 					Containers:     containers,
 					InitContainers: cr.Spec.ExtraInitContainers,
-					Volumes: []v1.Volume{
-						{
-							Name:         sessionVolumeName,
-							VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}},
-						},
-					},
+					Volumes:        volumes,
 				},
 			},
 		},
