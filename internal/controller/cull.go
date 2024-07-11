@@ -26,15 +26,6 @@ import (
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 )
 
-func customResourceNeedsDeletion(amaltheasession *amaltheadevv1alpha1.AmaltheaSession) bool {
-	culling := amaltheasession.Spec.Culling
-	status := amaltheasession.Status
-	now := time.Now()
-	hibernatedDuration := now.Sub(status.HibernatedSince.Time)
-	return status.State == amaltheadevv1alpha1.Hibernated &&
-		hibernatedDuration > culling.MaxHibernatedDuration.Duration
-}
-
 func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, amaltheasession *amaltheadevv1alpha1.AmaltheaSession) error {
 	culling := amaltheasession.Spec.Culling
 	status := amaltheasession.Status
