@@ -120,6 +120,12 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
+	if customResourceNeedsDeletion(amaltheasession) {
+		err = r.Client.Delete(ctx, amaltheasession)
+		log.Info("custom resource deleted")
+		return ctrl.Result{}, err
+	}
+
 	err = updateStatefulSetReplicas(ctx, r, amaltheasession)
 	if err != nil {
 		return ctrl.Result{}, err
