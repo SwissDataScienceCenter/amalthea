@@ -329,6 +329,7 @@ func (in *Session) DeepCopyInto(out *Session) {
 	}
 	in.Resources.DeepCopyInto(&out.Resources)
 	in.Storage.DeepCopyInto(&out.Storage)
+	out.ShmSize = in.ShmSize.DeepCopy()
 	if in.ExtraVolumeMounts != nil {
 		in, out := &in.ExtraVolumeMounts, &out.ExtraVolumeMounts
 		*out = make([]v1.VolumeMount, len(*in))
