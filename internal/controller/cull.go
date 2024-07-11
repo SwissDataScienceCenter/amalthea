@@ -35,7 +35,7 @@ func customResourceNeedsDeletion(amaltheasession *amaltheadevv1alpha1.AmaltheaSe
 		hibernatedDuration > culling.MaxHibernatedDuration.Duration
 }
 
-func updateStatefulSetReplicas(ctx context.Context, r *AmaltheaSessionReconciler, amaltheasession *amaltheadevv1alpha1.AmaltheaSession) error {
+func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, amaltheasession *amaltheadevv1alpha1.AmaltheaSession) error {
 	culling := amaltheasession.Spec.Culling
 	status := amaltheasession.Status
 	log := log.FromContext(ctx)

@@ -126,7 +126,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	err = updateStatefulSetReplicas(ctx, r, amaltheasession)
+	err = updateHibernationState(ctx, r, amaltheasession)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
