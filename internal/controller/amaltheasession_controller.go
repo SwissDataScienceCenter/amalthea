@@ -120,6 +120,11 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
+	err = updateStatefulSetReplicas(ctx, r, amaltheasession)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Now requeue to make sure we can watch for idleness and other status changes
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
 }
