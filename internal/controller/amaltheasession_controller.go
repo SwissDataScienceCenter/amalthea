@@ -24,10 +24,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
@@ -46,6 +48,9 @@ const (
 	// typeDegradedAmaltheaSession represents the status used when the custom resource is deleted and the finalizer operations are must to occur.
 	typeDegradedAmaltheaSession = "Degraded"
 )
+
+// finalizers
+const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
 
 //+kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions/status,verbs=get;update;patch
@@ -77,7 +82,17 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	if amaltheasession.GetDeletionTimestamp() != nil {
+	if amaltheasession.GetDeletionTimestamp() == nil {
+		// The object is not being deleted, so if it does not have our finalizer,
+		// then lets add the finalizer and update the object. This is equivalent
+		// to registering our finalizer.
+		if amaltheasession.Spec.AdoptSecrets && !controllerutil.ContainsFinalizer(amaltheasession, secretCleanupFinalizerName) {
+			controllerutil.AddFinalizer(amaltheasession, secretCleanupFinalizerName)
+			if err := r.Update(ctx, amaltheasession); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
 		amaltheasession.Status.State = amaltheadevv1alpha1.NotReady
 		err := r.Status().Update(ctx, amaltheasession)
 		if err != nil {
@@ -92,6 +107,20 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				return ctrl.Result{}, err
 			}
 		}
+
+		// The object is being deleted
+		if controllerutil.ContainsFinalizer(amaltheasession, secretCleanupFinalizerName) {
+			if err := r.deleteSecrets(ctx, amaltheasession); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			// remove our finalizer from the list and update it.
+			controllerutil.RemoveFinalizer(amaltheasession, secretCleanupFinalizerName)
+			if err := r.Update(ctx, amaltheasession); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
 		return ctrl.Result{Requeue: true}, nil
 	}
 
@@ -133,6 +162,29 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Now requeue to make sure we can watch for idleness and other status changes
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
+}
+
+func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession) error {
+	if !cr.Spec.AdoptSecrets {
+		log := log.FromContext(ctx)
+		log.Info("Secret deletion finalizer called while not adopting secrets, doing nothing")
+		return nil
+	}
+
+	if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecretName != nil {
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cr.Namespace,
+				Name:      *cr.Spec.Ingress.TLSSecretName,
+			},
+		}
+		err := r.Client.Delete(ctx, &secret)
+		if err != nil && apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
