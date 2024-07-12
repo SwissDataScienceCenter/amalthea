@@ -18,13 +18,13 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -171,20 +171,17 @@ func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amalt
 		return nil
 	}
 
-	if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecretName != nil {
-		secret := corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: cr.Namespace,
-				Name:      *cr.Spec.Ingress.TLSSecretName,
-			},
+	// create an initial empty error list
+	error_list := errors.Join(nil, nil)
+	for _, item := range cr.AllSecrets().Items {
+		err := r.Delete(ctx, &item)
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				error_list = errors.Join(error_list, err)
+			}
 		}
-		err := r.Client.Delete(ctx, &secret)
-		if err != nil && apierrors.IsNotFound(err) {
-			return nil
-		}
-		return err
 	}
-	return nil
+	return error_list
 }
 
 // SetupWithManager sets up the controller with the Manager.
