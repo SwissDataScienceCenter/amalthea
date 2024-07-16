@@ -237,3 +237,19 @@ func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (*v1.Pod
 	err := clnt.Get(ctx, key, &pod)
 	return &pod, err
 }
+
+// Returns the list of all the secrets used in this CR
+func (cr *AmaltheaSession) AllSecrets() v1.SecretList {
+	secrets := v1.SecretList{}
+
+	if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecretName != nil {
+		secrets.Items = append(secrets.Items, v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cr.Namespace,
+				Name:      *cr.Spec.Ingress.TLSSecretName,
+			},
+		})
+	}
+
+	return secrets
+}
