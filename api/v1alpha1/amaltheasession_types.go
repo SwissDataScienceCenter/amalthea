@@ -90,7 +90,6 @@ type Session struct {
 	// +kubebuilder:default:={}
 	Storage Storage `json:"storage,omitempty"`
 	// +optional
-	// +kubebuilder:default:="500Mi"
 	// Size of /dev/shm
 	ShmSize *resource.Quantity `json:"shmSize,omitempty"`
 	// The abolute path for the working directory of the session container, if omitted it will use the image
