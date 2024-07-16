@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -221,6 +222,12 @@ func labelsForAmaltheaSession(name string) map[string]string {
 		"app.kubernetes.io/part-of":    "amaltheasession-operator",
 		"app.kubernetes.io/created-by": "controller-manager",
 	}
+}
+
+func (cr *AmaltheaSession) NeedsDeletion() bool {
+	hibernatedDuration := time.Now().Sub(cr.Status.HibernatedSince.Time)
+	return cr.Status.State == Hibernated &&
+		hibernatedDuration > cr.Spec.Culling.MaxHibernatedDuration.Duration
 }
 
 func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {

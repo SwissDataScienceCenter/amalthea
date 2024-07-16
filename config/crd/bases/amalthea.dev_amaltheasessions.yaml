@@ -160,32 +160,6 @@ spec:
               culling:
                 description: Culling configuration
                 properties:
-                  failed:
-                    description: |-
-                      How long can a server be in failed state before it gets hibernated. A
-                      value of zero indicates that the server will not be automatically
-                      hibernated by Amalthea if it is failing.
-                      Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
-                      valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-                    format: duration
-                    type: string
-                  hibernated:
-                    description: |-
-                      How long can a session be in hibernated state before
-                      it gets completely deleted. A value of zero indicates that hibernated servers
-                      will not be automatically be deleted by Amalthea after a period of time.
-                      Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
-                      valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-                    format: duration
-                    type: string
-                  idle:
-                    description: |-
-                      How long should a server be idle for before it is hibernated. A value of
-                      zero indicates that Amalthea will not automatically hibernate inactive sessions.
-                      Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
-                      valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-                    format: duration
-                    type: string
                   maxAge:
                     description: |-
                       The maximum allowed age for a session, regardless of whether it
@@ -196,7 +170,33 @@ spec:
                       valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
                     format: duration
                     type: string
-                  starting:
+                  maxFailedDuration:
+                    description: |-
+                      How long can a server be in failed state before it gets hibernated. A
+                      value of zero indicates that the server will not be automatically
+                      hibernated by Amalthea if it is failing.
+                      Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
+                      valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+                    format: duration
+                    type: string
+                  maxHibernatedDuration:
+                    description: |-
+                      How long can a session be in hibernated state before
+                      it gets completely deleted. A value of zero indicates that hibernated servers
+                      will not be automatically be deleted by Amalthea after a period of time.
+                      Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
+                      valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+                    format: duration
+                    type: string
+                  maxIdleDuration:
+                    description: |-
+                      How long should a server be idle for before it is hibernated. A value of
+                      zero indicates that Amalthea will not automatically hibernate inactive sessions.
+                      Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
+                      valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+                    format: duration
+                    type: string
+                  maxStartingDuration:
                     description: |-
                       How long can a server be in starting state before it gets hibernated. A
                       value of zero indicates that the server will not be automatically hibernated
