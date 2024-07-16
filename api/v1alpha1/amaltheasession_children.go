@@ -23,7 +23,7 @@ const sessionContainerName string = prefix + "session"
 const servicePortName string = prefix + "http"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
-const shmVolumeName string = "dev-shm"
+const shmVolumeName string = prefix + "dev-shm"
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
