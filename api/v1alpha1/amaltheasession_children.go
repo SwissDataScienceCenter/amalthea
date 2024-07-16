@@ -45,13 +45,10 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 				Name:      sessionVolumeName,
 				MountPath: session.Storage.MountPath,
 			},
-			{
-				Name:      shmVolumeName,
-				MountPath: "/dev/shm",
-			},
 		},
 		extraMounts...,
 	)
+
 	volumes := []v1.Volume{
 		{
 			Name: sessionVolumeName,
@@ -61,18 +58,31 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 				},
 			},
 		},
-		{
-			Name: shmVolumeName,
-			VolumeSource: v1.VolumeSource{
-				EmptyDir: &v1.EmptyDirVolumeSource{
-					Medium:    v1.StorageMediumMemory,
-					SizeLimit: &cr.Spec.Session.ShmSize,
-				},
-			},
-		},
 	}
+
 	if len(cr.Spec.ExtraVolumes) > 0 {
 		volumes = append(volumes, cr.Spec.ExtraVolumes...)
+	}
+
+	if cr.Spec.Session.ShmSize != nil {
+		volumes = append(volumes,
+			v1.Volume{
+				Name: shmVolumeName,
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						Medium:    v1.StorageMediumMemory,
+						SizeLimit: cr.Spec.Session.ShmSize,
+					},
+				},
+			},
+		)
+
+		volumeMounts = append(volumeMounts,
+			v1.VolumeMount{
+				Name:      shmVolumeName,
+				MountPath: "/dev/shm",
+			},
+		)
 	}
 
 	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
