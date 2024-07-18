@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -33,6 +34,9 @@ func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, a
 	if !amaltheasession.Spec.Hibernated {
 		pod, err := amaltheasession.Pod(ctx, r.Client)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
 			return err
 		}
 		// then check whether we want to scale down the StatefulSet and do it
