@@ -4751,6 +4751,13 @@ spec:
                     format: int64
                     minimum: 0
                     type: integer
+                  shmSize:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: Size of /dev/shm
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
                   storage:
                     default: {}
                     properties:

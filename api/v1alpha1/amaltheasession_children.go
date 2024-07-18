@@ -23,6 +23,7 @@ const sessionContainerName string = prefix + "session"
 const servicePortName string = prefix + "http"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
+const shmVolumeName string = prefix + "dev-shm"
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
@@ -39,17 +40,49 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 		extraMounts = cr.Spec.Session.ExtraVolumeMounts
 	}
 	volumeMounts := append(
-		[]v1.VolumeMount{{Name: sessionVolumeName, MountPath: session.Storage.MountPath}},
+		[]v1.VolumeMount{
+			{
+				Name:      sessionVolumeName,
+				MountPath: session.Storage.MountPath,
+			},
+		},
 		extraMounts...,
 	)
+
 	volumes := []v1.Volume{
 		{
-			Name:         sessionVolumeName,
-			VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}},
+			Name: sessionVolumeName,
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.Name,
+				},
+			},
 		},
 	}
+
 	if len(cr.Spec.ExtraVolumes) > 0 {
 		volumes = append(volumes, cr.Spec.ExtraVolumes...)
+	}
+
+	if cr.Spec.Session.ShmSize != nil {
+		volumes = append(volumes,
+			v1.Volume{
+				Name: shmVolumeName,
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						Medium:    v1.StorageMediumMemory,
+						SizeLimit: cr.Spec.Session.ShmSize,
+					},
+				},
+			},
+		)
+
+		volumeMounts = append(volumeMounts,
+			v1.VolumeMount{
+				Name:      shmVolumeName,
+				MountPath: "/dev/shm",
+			},
+		)
 	}
 
 	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
