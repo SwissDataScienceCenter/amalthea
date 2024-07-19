@@ -116,37 +116,34 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	containers := []v1.Container{sessionContainer}
 	containers = append(containers, cr.Spec.ExtraContainers...)
 
-	if cr.Spec.Authentication != nil && cr.Spec.Authentication.Enabled {
-		auth := cr.Spec.Authentication
+	if auth := cr.Spec.Authentication; auth != nil && auth.Enabled && auth.Type == Oidc {
 
-		if auth.Type == Oidc {
-			volumes = append(volumes, v1.Volume{
-				Name: "proxy-configuration-secret",
-				VolumeSource: v1.VolumeSource{
-					Secret: &v1.SecretVolumeSource{
-						SecretName: auth.SecretRef.Name,
-						Optional:   ptr.To(false),
-					},
+		volumes = append(volumes, v1.Volume{
+			Name: "proxy-configuration-secret",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: auth.SecretRef.Name,
+					Optional:   ptr.To(false),
 				},
-			})
+			},
+		})
 
-			authContainer := v1.Container{
-				Image: "bitnami/oauth2-proxy:7.4.0",
-				Name:  "oauth2-proxy",
-				SecurityContext: &v1.SecurityContext{
-					AllowPrivilegeEscalation: ptr.To(false),
-					RunAsNonRoot:             ptr.To(true),
+		authContainer := v1.Container{
+			Image: "bitnami/oauth2-proxy:7.4.0",
+			Name:  "oauth2-proxy",
+			SecurityContext: &v1.SecurityContext{
+				AllowPrivilegeEscalation: ptr.To(false),
+				RunAsNonRoot:             ptr.To(true),
+			},
+			Args: []string{"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "proxy-configuration-secret",
+					MountPath: "/etc/oauth2-proxy",
 				},
-				Args: []string{"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key},
-				VolumeMounts: []v1.VolumeMount{
-					{
-						Name:      "proxy-configuration-secret",
-						MountPath: "/etc/oauth2-proxy",
-					},
-				},
-			}
-			containers = append(containers, authContainer)
+			},
 		}
+		containers = append(containers, authContainer)
 	}
 
 	sts := appsv1.StatefulSet{
@@ -318,11 +315,11 @@ func (cr *AmaltheaSession) AllSecrets() v1.SecretList {
 		})
 	}
 
-	if cr.Spec.Authentication != nil && cr.Spec.Authentication.Enabled {
+	if auth := cr.Spec.Authentication; auth != nil && auth.Enabled {
 		secrets.Items = append(secrets.Items, v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cr.Namespace,
-				Name:      cr.Spec.Authentication.SecretRef.Name,
+				Name:      auth.SecretRef.Name,
 			},
 		})
 	}
