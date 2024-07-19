@@ -310,6 +310,26 @@ func labelsForAmaltheaSession(name string) map[string]string {
 	}
 }
 
+func NewConditions() []AmaltheaSessionCondition {
+	now := metav1.Now()
+	return []AmaltheaSessionCondition{
+		{
+			Type:               AmaltheaSessionReady,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: now,
+			Reason:             "SessionCreated",
+			Message:            "The custom resource was created just now",
+		},
+		{
+			Type:               AmaltheaSessionRoutingReady,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: now,
+			Reason:             "SessionCreated",
+			Message:            "The custom resource was created just now",
+		},
+	}
+}
+
 func (cr *AmaltheaSession) NeedsDeletion() bool {
 	hibernatedDuration := time.Now().Sub(cr.Status.HibernatedSince.Time)
 	return cr.Status.State == Hibernated &&
