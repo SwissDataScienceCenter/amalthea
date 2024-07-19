@@ -13,6 +13,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -246,8 +247,50 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 		sessionURLStr = strings.TrimSuffix(sessionURL.String(), "/")
 	}
 
+	state := c.State(cr, pod)
+	conditions := cr.Status.Conditions
+	if len(conditions) == 0 {
+		conditions = amaltheadevv1alpha1.NewConditions()
+	}
+
+	for i, condition := range conditions {
+		now := metav1.Now()
+		switch condition.Type {
+		case amaltheadevv1alpha1.AmaltheaSessionReady:
+			if (condition.Status != metav1.ConditionTrue) != (state != amaltheadevv1alpha1.Running) {
+				if state == amaltheadevv1alpha1.Running {
+					condition.Status = metav1.ConditionTrue
+				} else {
+					condition.Status = metav1.ConditionFalse
+				}
+				condition.LastTransitionTime = now
+				condition.Reason = string(state)
+				condition.Message = fmt.Sprint("The session is ", strings.ToLower(string(state)))
+			}
+		case amaltheadevv1alpha1.AmaltheaSessionRoutingReady:
+			if ingress := cr.Spec.Ingress; ingress == nil && condition.Status != metav1.ConditionFalse {
+				condition.Status = metav1.ConditionFalse
+				condition.LastTransitionTime = now
+				condition.Reason = "IngressDeleted"
+				condition.Message = fmt.Sprint("The ingress information was deleted from custom resource ",
+					cr.Name)
+			} else if ingress != nil {
+				namespacedName := types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}
+				if err := clnt.Get(ctx, namespacedName, &networkingv1.Ingress{}); err == nil &&
+					condition.Status == metav1.ConditionFalse {
+					condition.Status = metav1.ConditionTrue
+					condition.LastTransitionTime = now
+					condition.Reason = "IngressOperational"
+					condition.Message = fmt.Sprint("The ingress is setup and operational")
+				}
+			}
+		}
+		conditions[i] = condition
+	}
+
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
-		State:           c.State(cr, pod),
+		Conditions:      conditions,
+		State:           state,
 		URL:             sessionURLStr,
 		Idle:            idle,
 		IdleSince:       idleSince,
