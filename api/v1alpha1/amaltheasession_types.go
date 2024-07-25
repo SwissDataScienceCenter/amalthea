@@ -234,8 +234,10 @@ const Token AuthenticationType = "token"
 const Oidc AuthenticationType = "oauth2proxy"
 
 type Authentication struct {
+	// +optional
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=true
-	Enabled bool               `json:"enabled,omitempty"`
+	Enabled bool               `json:"enabled"`
 	Type    AuthenticationType `json:"type"`
 	// Kubernetes secret that contains the authentication configuration
 	// For `token` generate a hard to guess string / password-like string.
