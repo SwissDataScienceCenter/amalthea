@@ -116,8 +116,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	containers := []v1.Container{sessionContainer}
 	containers = append(containers, cr.Spec.ExtraContainers...)
 
-	if auth := cr.Spec.Authentication; auth != nil && auth.Enabled && auth.Type == Oidc {
-
+	if auth := cr.Spec.Authentication; auth != nil && auth.Enabled {
 		volumes = append(volumes, v1.Volume{
 			Name: "proxy-configuration-secret",
 			VolumeSource: v1.VolumeSource{
@@ -128,22 +127,45 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 			},
 		})
 
-		authContainer := v1.Container{
-			Image: "bitnami/oauth2-proxy:7.4.0",
-			Name:  "oauth2-proxy",
-			SecurityContext: &v1.SecurityContext{
-				AllowPrivilegeEscalation: ptr.To(false),
-				RunAsNonRoot:             ptr.To(true),
-			},
-			Args: []string{"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key},
-			VolumeMounts: []v1.VolumeMount{
-				{
-					Name:      "proxy-configuration-secret",
-					MountPath: "/etc/oauth2-proxy",
+		if auth.Type == Oidc {
+			authContainer := v1.Container{
+				Image: "bitnami/oauth2-proxy:7.4.0",
+				Name:  "oauth2-proxy",
+				SecurityContext: &v1.SecurityContext{
+					AllowPrivilegeEscalation: ptr.To(false),
+					RunAsNonRoot:             ptr.To(true),
 				},
-			},
+				Args: []string{"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key},
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "proxy-configuration-secret",
+						MountPath: "/etc/oauth2-proxy",
+					},
+				},
+			}
+
+			containers = append(containers, authContainer)
+		} else if auth.Type == Token {
+			authContainer := v1.Container{
+				Image: "renku/authproxy:0.0.1",
+				Name:  "authproxy",
+				SecurityContext: &v1.SecurityContext{
+					AllowPrivilegeEscalation: ptr.To(false),
+					RunAsNonRoot:             ptr.To(true),
+					RunAsUser:                ptr.To(int64(1000)),
+					RunAsGroup:               ptr.To(int64(1000)),
+				},
+				Args: []string{"serve", "--config", "/etc/authproxy/" + auth.SecretRef.Key},
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "proxy-configuration-secret",
+						MountPath: "/etc/authproxy",
+					},
+				},
+			}
+
+			containers = append(containers, authContainer)
 		}
-		containers = append(containers, authContainer)
 	}
 
 	sts := appsv1.StatefulSet{
