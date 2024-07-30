@@ -38,9 +38,7 @@ func runCommandWithContext(ctx context.Context, t *testing.T, cmd, args string, 
 	command.Stdout = &combinedOutput
 	command.Stderr = &combinedOutput
 
-	for _, v := range env {
-		command.Env = append(command.Env, v)
-	}
+	command.Env = append(command.Env, env...)
 
 	t.Logf("Running %q with env: %v\n", command.String(), command.Env)
 
