@@ -17,10 +17,8 @@ limitations under the License.
 package cmd
 
 import (
-	// "errors"
 	"fmt"
 	"os"
-	// "reflect"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
