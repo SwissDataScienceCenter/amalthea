@@ -157,6 +157,9 @@ spec:
                   - remote
                   type: object
                 type: array
+                x-kubernetes-validations:
+                - message: CodeRepositories is immutable
+                  rule: self == oldSelf
               culling:
                 description: Culling configuration
                 properties:

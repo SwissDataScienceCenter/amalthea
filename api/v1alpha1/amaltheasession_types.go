@@ -31,6 +31,7 @@ type AmaltheaSessionSpec struct {
 	Session Session `json:"session"`
 
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="CodeRepositories is immutable"
 	// A list of code repositories and associated configuration that will be cloned in the session
 	CodeRepositories []CodeRepository `json:"codeRepositories,omitempty"`
 
