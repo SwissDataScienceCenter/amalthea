@@ -163,11 +163,11 @@ type CodeRepository struct {
 	// The Kubernetes secret that contains the code repository configuration to be used during cloning.
 	// For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
 	// NOTE: you have to specify the whole config in a single key in the secret.
-	CloningConfigSecretRef *SessionSecretRef `json:"cloningGitConfigSecretRef,omitempty"`
+	CloningConfigSecretRef *SessionSecretRef `json:"cloningConfigSecretRef,omitempty"`
 	// The Kubernetes secret that contains the code repository configuration to be used when the session is running.
 	// For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
 	// NOTE: you have to specify the whole config in a single key in the secret.
-	ConfigSecretRef *SessionSecretRef `json:"gitConfigSecretRef,omitempty"`
+	ConfigSecretRef *SessionSecretRef `json:"configSecretRef,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={rclone}

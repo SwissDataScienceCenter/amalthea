@@ -109,7 +109,7 @@ spec:
                         where the repository should be cloned into.
                       example: repositories/project1
                       type: string
-                    cloningGitConfigSecretRef:
+                    cloningConfigSecretRef:
                       description: |-
                         The Kubernetes secret that contains the code repository configuration to be used during cloning.
                         For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
@@ -123,7 +123,7 @@ spec:
                       - key
                       - name
                       type: object
-                    gitConfigSecretRef:
+                    configSecretRef:
                       description: |-
                         The Kubernetes secret that contains the code repository configuration to be used when the session is running.
                         For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
