@@ -257,32 +257,35 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 		now := metav1.Now()
 		switch condition.Type {
 		case amaltheadevv1alpha1.AmaltheaSessionReady:
-			if (condition.Status != metav1.ConditionTrue) != (state != amaltheadevv1alpha1.Running) {
-				if state == amaltheadevv1alpha1.Running {
-					condition.Status = metav1.ConditionTrue
-				} else {
-					condition.Status = metav1.ConditionFalse
-				}
+                        stateIsRunning := state == amaltheadevv1alpha1.Running
+			if stateIsRunning && conditionStatus == metav1.ConditionFalse {
+				condition.Status = metav1.ConditionTrue
+				condition.LastTransitionTime = now
+				condition.Reason = string(state)
+				condition.Message = fmt.Sprint("The session is ", strings.ToLower(string(state)))
+			} else if !stateIsRunning && conditionStatus == metav1.ConditionTrue {
+				condition.Status = metav1.ConditionFalse
 				condition.LastTransitionTime = now
 				condition.Reason = string(state)
 				condition.Message = fmt.Sprint("The session is ", strings.ToLower(string(state)))
 			}
 		case amaltheadevv1alpha1.AmaltheaSessionRoutingReady:
-			if ingress := cr.Spec.Ingress; ingress == nil && condition.Status != metav1.ConditionFalse {
+			ingressExists := func() bool {
+			        namespacedName := types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}
+			        err := clnt.Get(ctx, namespacedName, &networkingv1.Ingress{} 
+				return err == nil
+			}
+			if cr.Spec.Ingress == nil && condition.Status == metav1.ConditionTrue {
 				condition.Status = metav1.ConditionFalse
 				condition.LastTransitionTime = now
 				condition.Reason = "IngressDeleted"
-				condition.Message = fmt.Sprint("The ingress information was deleted from custom resource ",
+				condition.Message = fmt.Sprint("The ingress information was not specified or was deleted from custom resource ",
 					cr.Name)
-			} else if ingress != nil {
-				namespacedName := types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}
-				if err := clnt.Get(ctx, namespacedName, &networkingv1.Ingress{}); err == nil &&
-					condition.Status == metav1.ConditionFalse {
-					condition.Status = metav1.ConditionTrue
-					condition.LastTransitionTime = now
-					condition.Reason = "IngressOperational"
-					condition.Message = fmt.Sprint("The ingress is setup and operational")
-				}
+			} else if cr.Spec.Ingress != nil && condition.Status == metav1.ConditionFalse && ingressExists() {
+				condition.Status = metav1.ConditionTrue
+				condition.LastTransitionTime = now
+				condition.Reason = "IngressOperational"
+				condition.Message = fmt.Sprint("The ingress is setup and operational")
 			}
 		}
 		conditions[i] = condition
