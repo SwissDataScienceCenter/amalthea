@@ -89,6 +89,9 @@ type Session struct {
 	// +optional
 	// +kubebuilder:default:={}
 	Storage Storage `json:"storage,omitempty"`
+	// +optional
+	// Size of /dev/shm
+	ShmSize *resource.Quantity `json:"shmSize,omitempty"`
 	// The abolute path for the working directory of the session container, if omitted it will use the image
 	// working directory.
 	WorkingDir string `json:"workingDir,omitempty"`
@@ -154,7 +157,7 @@ type CodeRepository struct {
 	// The HTTP url to the code repository
 	Remote string `json:"remote"`
 	// +kubebuilder:example:=main
-	// The tag, branch or commit SHA to checkout, if ommitted then will be the tip of the default branch of the repo
+	// The tag, branch or commit SHA to checkout, if omitted then will be the tip of the default branch of the repo
 	Revision string `json:"revision,omitempty"`
 	// The Kubernetes secret that contains the code repository configuration to be used during cloning.
 	// For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
@@ -200,28 +203,28 @@ type Culling struct {
 	// zero indicates that Amalthea will not automatically hibernate inactive sessions.
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	Idle metav1.Duration `json:"idle,omitempty"`
+	MaxIdleDuration metav1.Duration `json:"maxIdleDuration,omitempty"`
 	// +kubebuilder:validation:Format:=duration
 	// How long can a server be in starting state before it gets hibernated. A
 	// value of zero indicates that the server will not be automatically hibernated
 	// by Amalthea because it took to long to start.
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	Starting metav1.Duration `json:"starting,omitempty"`
+	MaxStartingDuration metav1.Duration `json:"maxStartingDuration,omitempty"`
 	// +kubebuilder:validation:Format:=duration
 	// How long can a server be in failed state before it gets hibernated. A
 	// value of zero indicates that the server will not be automatically
 	// hibernated by Amalthea if it is failing.
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	Failed metav1.Duration `json:"failed,omitempty"`
+	MaxFailedDuration metav1.Duration `json:"maxFailedDuration,omitempty"`
 	// +kubebuilder:validation:Format:=duration
 	// How long can a session be in hibernated state before
 	// it gets completely deleted. A value of zero indicates that hibernated servers
 	// will not be automatically be deleted by Amalthea after a period of time.
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	Hibernated metav1.Duration `json:"hibernated,omitempty"`
+	MaxHibernatedDuration metav1.Duration `json:"maxHibernatedDuration,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={token,oauth2proxy}
@@ -231,8 +234,10 @@ const Token AuthenticationType = "token"
 const Oidc AuthenticationType = "oauth2proxy"
 
 type Authentication struct {
+	// +optional
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=true
-	Enabled bool               `json:"enabled,omitempty"`
+	Enabled bool               `json:"enabled"`
 	Type    AuthenticationType `json:"type"`
 	// Kubernetes secret that contains the authentication configuration
 	// For `token` generate a hard to guess string / password-like string.
@@ -257,7 +262,7 @@ const Hibernated State = "Hibernated"
 const NotReady State = "NotReady"
 const RunningDegraded State = "RunningDegraded"
 
-// Counts of the total and ready containers, can represent either regular or init contianers.
+// Counts of the total and ready containers, can represent either regular or init containers.
 type ContainerCounts struct {
 	Ready int `json:"ready,omitempty"`
 	Total int `json:"total,omitempty"`

@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -11,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -22,6 +24,7 @@ const sessionContainerName string = prefix + "session"
 const servicePortName string = prefix + "http"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
+const shmVolumeName string = prefix + "dev-shm"
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
@@ -38,20 +41,52 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 		extraMounts = cr.Spec.Session.ExtraVolumeMounts
 	}
 	volumeMounts := append(
-		[]v1.VolumeMount{{Name: sessionVolumeName, MountPath: session.Storage.MountPath}},
+		[]v1.VolumeMount{
+			{
+				Name:      sessionVolumeName,
+				MountPath: session.Storage.MountPath,
+			},
+		},
 		extraMounts...,
 	)
+
 	volumes := []v1.Volume{
 		{
-			Name:         sessionVolumeName,
-			VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}},
+			Name: sessionVolumeName,
+			VolumeSource: v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvc.Name,
+				},
+			},
 		},
 	}
+
 	if len(cr.Spec.ExtraVolumes) > 0 {
 		volumes = append(volumes, cr.Spec.ExtraVolumes...)
 	}
 
-	// NOTE: ports on a container are for information purposes only, so they are removed beacuse the port specified
+	if cr.Spec.Session.ShmSize != nil {
+		volumes = append(volumes,
+			v1.Volume{
+				Name: shmVolumeName,
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						Medium:    v1.StorageMediumMemory,
+						SizeLimit: cr.Spec.Session.ShmSize,
+					},
+				},
+			},
+		)
+
+		volumeMounts = append(volumeMounts,
+			v1.VolumeMount{
+				Name:      shmVolumeName,
+				MountPath: "/dev/shm",
+			},
+		)
+	}
+
+	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
 	// in the CR can point to either the session container or another container.
 	sessionContainer := v1.Container{
 		Image:                    session.Image,
@@ -67,13 +102,13 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	}
 
 	securityContext := &v1.SecurityContext{
-		RunAsNonRoot: &[]bool{true}[0],
-		RunAsUser:    &[]int64{session.RunAsUser}[0],
-		RunAsGroup:   &[]int64{session.RunAsGroup}[0],
+		RunAsNonRoot: ptr.To(true),
+		RunAsUser:    ptr.To(session.RunAsUser),
+		RunAsGroup:   ptr.To(session.RunAsGroup),
 	}
 
 	if session.RunAsUser == 0 {
-		securityContext.RunAsNonRoot = &[]bool{false}[0]
+		securityContext.RunAsNonRoot = ptr.To(false)
 	}
 
 	sessionContainer.SecurityContext = securityContext
@@ -81,13 +116,68 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	containers := []v1.Container{sessionContainer}
 	containers = append(containers, cr.Spec.ExtraContainers...)
 
+	if auth := cr.Spec.Authentication; auth != nil && auth.Enabled {
+		volumes = append(volumes, v1.Volume{
+			Name: "proxy-configuration-secret",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: auth.SecretRef.Name,
+					Optional:   ptr.To(false),
+				},
+			},
+		})
+
+		if auth.Type == Oidc {
+			authContainer := v1.Container{
+				Image: "bitnami/oauth2-proxy:7.4.0",
+				Name:  "oauth2-proxy",
+				SecurityContext: &v1.SecurityContext{
+					AllowPrivilegeEscalation: ptr.To(false),
+					RunAsNonRoot:             ptr.To(true),
+				},
+				Args: []string{"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key},
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "proxy-configuration-secret",
+						MountPath: "/etc/oauth2-proxy",
+					},
+				},
+			}
+
+			containers = append(containers, authContainer)
+		} else if auth.Type == Token {
+			authContainer := v1.Container{
+				Image: "renku/authproxy:0.0.1",
+				Name:  "authproxy",
+				SecurityContext: &v1.SecurityContext{
+					AllowPrivilegeEscalation: ptr.To(false),
+					RunAsNonRoot:             ptr.To(true),
+					RunAsUser:                ptr.To(int64(1000)),
+					RunAsGroup:               ptr.To(int64(1000)),
+				},
+				Args: []string{"serve", "--config", "/etc/authproxy/" + auth.SecretRef.Key},
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "proxy-configuration-secret",
+						MountPath: "/etc/authproxy",
+					},
+				},
+			}
+
+			containers = append(containers, authContainer)
+		}
+	}
+
 	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Name,
 			Namespace: cr.Namespace,
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: &replicas,
+			// NOTE: Parallel pod management policy is important
+			// If set to default (i.e. not parallel) K8s waits for the pod to become ready before restarting on updates
+			PodManagementPolicy: appsv1.ParallelPodManagement,
+			Replicas:            &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -220,10 +310,41 @@ func labelsForAmaltheaSession(name string) map[string]string {
 	}
 }
 
-func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (v1.Pod, error) {
+func (cr *AmaltheaSession) NeedsDeletion() bool {
+	hibernatedDuration := time.Now().Sub(cr.Status.HibernatedSince.Time)
+	return cr.Status.State == Hibernated &&
+		hibernatedDuration > cr.Spec.Culling.MaxHibernatedDuration.Duration
+}
+
+func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
 	pod := v1.Pod{}
 	podName := fmt.Sprintf("%s-0", cr.Name)
 	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
 	err := clnt.Get(ctx, key, &pod)
-	return pod, err
+	return &pod, err
+}
+
+// Returns the list of all the secrets used in this CR
+func (cr *AmaltheaSession) AllSecrets() v1.SecretList {
+	secrets := v1.SecretList{}
+
+	if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecretName != nil {
+		secrets.Items = append(secrets.Items, v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cr.Namespace,
+				Name:      *cr.Spec.Ingress.TLSSecretName,
+			},
+		})
+	}
+
+	if auth := cr.Spec.Authentication; auth != nil && auth.Enabled {
+		secrets.Items = append(secrets.Items, v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cr.Namespace,
+				Name:      auth.SecretRef.Name,
+			},
+		})
+	}
+
+	return secrets
 }

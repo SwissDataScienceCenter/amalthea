@@ -1,10 +1,11 @@
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  name: amaltheasessions.amalthea.dev
   annotations:
     controller-gen.kubebuilder.io/version: v0.15.0
-  name: amaltheasessions.amalthea.dev
+  labels:
+  {{- include "amalthea-sessions.labels" . | nindent 4 }}
 spec:
   group: amalthea.dev
   names:
@@ -105,8 +106,8 @@ spec:
                   properties:
                     clonePath:
                       default: .
-                      description: Path relative to the session working directory
-                        where the repository should be cloned into.
+                      description: Path relative to the session working directory where
+                        the repository should be cloned into.
                       example: repositories/project1
                       type: string
                     cloningGitConfigSecretRef:
@@ -142,14 +143,14 @@ spec:
                       example: https://github.com/SwissDataScienceCenter/renku
                       type: string
                     revision:
-                      description: The tag, branch or commit SHA to checkout, if omitted
+                      description: The tag, branch or commit SHA to checkout, if ommitted
                         then will be the tip of the default branch of the repo
                       example: main
                       type: string
                     type:
                       default: git
-                      description: The type of the code repository - currently the
-                        only supported kind is git.
+                      description: The type of the code repository - currently the only
+                        supported kind is git.
                       enum:
                       - git
                       type: string
@@ -160,6 +161,32 @@ spec:
               culling:
                 description: Culling configuration
                 properties:
+                  failed:
+                    description: |-
+                      How long can a server be in failed state before it gets hibernated. A
+                      value of zero indicates that the server will not be automatically
+                      hibernated by Amalthea if it is failing.
+                      Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
+                      valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+                    format: duration
+                    type: string
+                  hibernated:
+                    description: |-
+                      How long can a session be in hibernated state before
+                      it gets completely deleted. A value of zero indicates that hibernated servers
+                      will not be automatically be deleted by Amalthea after a period of time.
+                      Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
+                      valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+                    format: duration
+                    type: string
+                  idle:
+                    description: |-
+                      How long should a server be idle for before it is hibernated. A value of
+                      zero indicates that Amalthea will not automatically hibernate inactive sessions.
+                      Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
+                      valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+                    format: duration
+                    type: string
                   maxAge:
                     description: |-
                       The maximum allowed age for a session, regardless of whether it
@@ -170,33 +197,7 @@ spec:
                       valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
                     format: duration
                     type: string
-                  maxFailedDuration:
-                    description: |-
-                      How long can a server be in failed state before it gets hibernated. A
-                      value of zero indicates that the server will not be automatically
-                      hibernated by Amalthea if it is failing.
-                      Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
-                      valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-                    format: duration
-                    type: string
-                  maxHibernatedDuration:
-                    description: |-
-                      How long can a session be in hibernated state before
-                      it gets completely deleted. A value of zero indicates that hibernated servers
-                      will not be automatically be deleted by Amalthea after a period of time.
-                      Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
-                      valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-                    format: duration
-                    type: string
-                  maxIdleDuration:
-                    description: |-
-                      How long should a server be idle for before it is hibernated. A value of
-                      zero indicates that Amalthea will not automatically hibernate inactive sessions.
-                      Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
-                      valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-                    format: duration
-                    type: string
-                  maxStartingDuration:
+                  starting:
                     description: |-
                       How long can a server be in starting state before it gets hibernated. A
                       value of zero indicates that the server will not be automatically hibernated
@@ -212,8 +213,8 @@ spec:
                   properties:
                     mountPath:
                       default: data
-                      description: Path relative to the session working directory
-                        where the data should be mounted
+                      description: Path relative to the session working directory where
+                        the data should be mounted
                       example: data/storages
                       type: string
                     secretRef:
@@ -244,8 +245,8 @@ spec:
                   Additional containers to add to the session statefulset.
                   NOTE: The container names provided will be partially overwritten and randomized to avoid collisions
                 items:
-                  description: A single application container that you want to run
-                    within a pod.
+                  description: A single application container that you want to run within
+                    a pod.
                   properties:
                     args:
                       description: |-
@@ -282,8 +283,8 @@ spec:
                           in a Container.
                         properties:
                           name:
-                            description: Name of the environment variable. Must be
-                              a C_IDENTIFIER.
+                            description: Name of the environment variable. Must be a
+                              C_IDENTIFIER.
                             type: string
                           value:
                             description: |-
@@ -314,8 +315,8 @@ spec:
                                       TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
-                                    description: Specify whether the ConfigMap or
-                                      its key must be defined
+                                    description: Specify whether the ConfigMap or its
+                                      key must be defined
                                     type: boolean
                                 required:
                                 - key
@@ -377,8 +378,8 @@ spec:
                                       TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
-                                    description: Specify whether the Secret or its
-                                      key must be defined
+                                    description: Specify whether the Secret or its key
+                                      must be defined
                                     type: boolean
                                 required:
                                 - key
@@ -398,8 +399,8 @@ spec:
                         Values defined by an Env with a duplicate key will take precedence.
                         Cannot be updated.
                       items:
-                        description: EnvFromSource represents the source of a set
-                          of ConfigMaps
+                        description: EnvFromSource represents the source of a set of
+                          ConfigMaps
                         properties:
                           configMapRef:
                             description: The ConfigMap to select from
@@ -411,14 +412,13 @@ spec:
                                   TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
-                                description: Specify whether the ConfigMap must be
-                                  defined
+                                description: Specify whether the ConfigMap must be defined
                                 type: boolean
                             type: object
                             x-kubernetes-map-type: atomic
                           prefix:
-                            description: An optional identifier to prepend to each
-                              key in the ConfigMap. Must be a C_IDENTIFIER.
+                            description: An optional identifier to prepend to each key
+                              in the ConfigMap. Must be a C_IDENTIFIER.
                             type: string
                           secretRef:
                             description: The Secret to select from
@@ -532,8 +532,8 @@ spec:
                                 lifecycle hooks will fail in runtime when tcp handler is specified.
                               properties:
                                 host:
-                                  description: 'Optional: Host name to connect to,
-                                    defaults to the pod IP.'
+                                  description: 'Optional: Host name to connect to, defaults
+                                    to the pod IP.'
                                   type: string
                                 port:
                                   anyOf:
@@ -629,8 +629,8 @@ spec:
                                 lifecycle hooks will fail in runtime when tcp handler is specified.
                               properties:
                                 host:
-                                  description: 'Optional: Host name to connect to,
-                                    defaults to the pod IP.'
+                                  description: 'Optional: Host name to connect to, defaults
+                                    to the pod IP.'
                                   type: string
                                 port:
                                   anyOf:
@@ -677,16 +677,16 @@ spec:
                           description: GRPC specifies an action involving a GRPC port.
                           properties:
                             port:
-                              description: Port number of the gRPC service. Number
-                                must be in the range 1 to 65535.
+                              description: Port number of the gRPC service. Number must
+                                be in the range 1 to 65535.
                               format: int32
                               type: integer
                             service:
                               description: |-
                                 Service is the name of the service to place in the gRPC HealthCheckRequest
                                 (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
-
+  
+  
                                 If this is not specified, the default behavior is defined by gRPC.
                               type: string
                           required:
@@ -704,8 +704,8 @@ spec:
                               description: Custom headers to set in the request. HTTP
                                 allows repeated headers.
                               items:
-                                description: HTTPHeader describes a custom header
-                                  to be used in HTTP probes
+                                description: HTTPHeader describes a custom header to
+                                  be used in HTTP probes
                                 properties:
                                   name:
                                     description: |-
@@ -816,8 +816,8 @@ spec:
                         For more information See https://github.com/kubernetes/kubernetes/issues/108255.
                         Cannot be updated.
                       items:
-                        description: ContainerPort represents a network port in a
-                          single container.
+                        description: ContainerPort represents a network port in a single
+                          container.
                         properties:
                           containerPort:
                             description: |-
@@ -887,16 +887,16 @@ spec:
                           description: GRPC specifies an action involving a GRPC port.
                           properties:
                             port:
-                              description: Port number of the gRPC service. Number
-                                must be in the range 1 to 65535.
+                              description: Port number of the gRPC service. Number must
+                                be in the range 1 to 65535.
                               format: int32
                               type: integer
                             service:
                               description: |-
                                 Service is the name of the service to place in the gRPC HealthCheckRequest
                                 (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
-
+  
+  
                                 If this is not specified, the default behavior is defined by gRPC.
                               type: string
                           required:
@@ -914,8 +914,8 @@ spec:
                               description: Custom headers to set in the request. HTTP
                                 allows repeated headers.
                               items:
-                                description: HTTPHeader describes a custom header
-                                  to be used in HTTP probes
+                                description: HTTPHeader describes a custom header to
+                                  be used in HTTP probes
                                 properties:
                                   name:
                                     description: |-
@@ -1042,12 +1042,12 @@ spec:
                           description: |-
                             Claims lists the names of resources, defined in spec.resourceClaims,
                             that are used by this container.
-
-
+  
+  
                             This is an alpha field and requires enabling the
                             DynamicResourceAllocation feature gate.
-
-
+  
+  
                             This field is immutable. It can only be set for containers.
                           items:
                             description: ResourceClaim references one entry in PodSpec.ResourceClaims.
@@ -1236,8 +1236,8 @@ spec:
                               description: |-
                                 type indicates which kind of seccomp profile will be applied.
                                 Valid options are:
-
-
+  
+  
                                 Localhost - a profile defined in a file on the node should be used.
                                 RuntimeDefault - the container runtime default profile should be used.
                                 Unconfined - no profile should be applied.
@@ -1312,16 +1312,16 @@ spec:
                           description: GRPC specifies an action involving a GRPC port.
                           properties:
                             port:
-                              description: Port number of the gRPC service. Number
-                                must be in the range 1 to 65535.
+                              description: Port number of the gRPC service. Number must
+                                be in the range 1 to 65535.
                               format: int32
                               type: integer
                             service:
                               description: |-
                                 Service is the name of the service to place in the gRPC HealthCheckRequest
                                 (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
-
+  
+  
                                 If this is not specified, the default behavior is defined by gRPC.
                               type: string
                           required:
@@ -1339,8 +1339,8 @@ spec:
                               description: Custom headers to set in the request. HTTP
                                 allows repeated headers.
                               items:
-                                description: HTTPHeader describes a custom header
-                                  to be used in HTTP probes
+                                description: HTTPHeader describes a custom header to
+                                  be used in HTTP probes
                                 properties:
                                   name:
                                     description: |-
@@ -1501,8 +1501,8 @@ spec:
                         Pod volumes to mount into the container's filesystem.
                         Cannot be updated.
                       items:
-                        description: VolumeMount describes a mounting of a Volume
-                          within a container.
+                        description: VolumeMount describes a mounting of a Volume within
+                          a container.
                         properties:
                           mountPath:
                             description: |-
@@ -1553,11 +1553,11 @@ spec:
                   type: object
                 type: array
               extraVolumes:
-                description: Additional volumes to include in the statefulset for
-                  a session
+                description: Additional volumes to include in the statefulset for a
+                  session
                 items:
-                  description: Volume represents a named volume in a pod that may
-                    be accessed by any container in the pod.
+                  description: Volume represents a named volume in a pod that may be
+                    accessed by any container in the pod.
                   properties:
                     awsElasticBlockStore:
                       description: |-
@@ -1607,8 +1607,7 @@ spec:
                             blob storage
                           type: string
                         diskURI:
-                          description: diskURI is the URI of data disk in the blob
-                            storage
+                          description: diskURI is the URI of data disk in the blob storage
                           type: string
                         fsType:
                           description: |-
@@ -1617,10 +1616,10 @@ spec:
                             Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                           type: string
                         kind:
-                          description: 'kind expected values are Shared: multiple
-                            blob disks per storage account  Dedicated: single blob
-                            disk per storage account  Managed: azure managed data
-                            disk (only in managed availability set). defaults to shared'
+                          description: 'kind expected values are Shared: multiple blob
+                            disks per storage account  Dedicated: single blob disk per
+                            storage account  Managed: azure managed data disk (only
+                            in managed availability set). defaults to shared'
                           type: string
                         readOnly:
                           description: |-
@@ -1872,8 +1871,7 @@ spec:
                             properties:
                               fieldRef:
                                 description: 'Required: Selects a field of the pod:
-                                  only annotations, labels, name and namespace are
-                                  supported.'
+                                  only annotations, labels, name and namespace are supported.'
                                 properties:
                                   apiVersion:
                                     description: Version of the schema the FieldPath
@@ -1898,11 +1896,11 @@ spec:
                                 format: int32
                                 type: integer
                               path:
-                                description: 'Required: Path is  the relative path
-                                  name of the file to be created. Must not be absolute
-                                  or contain the ''..'' path. Must be utf-8 encoded.
-                                  The first item of the relative path must not start
-                                  with ''..'''
+                                description: 'Required: Path is  the relative path name
+                                  of the file to be created. Must not be absolute or
+                                  contain the ''..'' path. Must be utf-8 encoded. The
+                                  first item of the relative path must not start with
+                                  ''..'''
                                 type: string
                               resourceFieldRef:
                                 description: |-
@@ -1964,8 +1962,8 @@ spec:
                         ephemeral represents a volume that is handled by a cluster storage driver.
                         The volume's lifecycle is tied to the pod that defines it - it will be created before the pod starts,
                         and deleted when the pod is removed.
-
-
+  
+  
                         Use this if:
                         a) the volume is only needed while the pod runs,
                         b) features of normal volumes like restoring from snapshot or capacity
@@ -1975,18 +1973,18 @@ spec:
                            a PersistentVolumeClaim (see EphemeralVolumeSource for more
                            information on the connection between this volume type
                            and PersistentVolumeClaim).
-
-
+  
+  
                         Use PersistentVolumeClaim or one of the vendor-specific
                         APIs for volumes that persist for longer than the lifecycle
                         of an individual pod.
-
-
+  
+  
                         Use CSI for light-weight local ephemeral volumes if the CSI driver is meant to
                         be used that way - see the documentation of the driver for
                         more information.
-
-
+  
+  
                         A pod can use both types of ephemeral volumes and
                         persistent volumes at the same time.
                       properties:
@@ -1999,8 +1997,8 @@ spec:
                             `<volume name>` is the name from the `PodSpec.Volumes` array
                             entry. Pod validation will reject the pod if the concatenated name
                             is not valid for a PVC (for example, too long).
-
-
+  
+  
                             An existing PVC with that name that is not owned by the pod
                             will *not* be used for the pod to avoid using an unrelated
                             volume by mistake. Starting the pod is then blocked until
@@ -2009,12 +2007,12 @@ spec:
                             owner reference to the pod once the pod exists. Normally
                             this should not be necessary, but it may be useful when
                             manually reconstructing a broken cluster.
-
-
+  
+  
                             This field is read-only and no changes will be made by Kubernetes
                             to the PVC after it has been created.
-
-
+  
+  
                             Required, must not be nil.
                           properties:
                             metadata:
@@ -2129,16 +2127,16 @@ spec:
                                       description: |-
                                         Claims lists the names of resources, defined in spec.resourceClaims,
                                         that are used by this container.
-
-
+  
+  
                                         This is an alpha field and requires enabling the
                                         DynamicResourceAllocation feature gate.
-
-
+  
+  
                                         This field is immutable. It can only be set for containers.
                                       items:
-                                        description: ResourceClaim references one
-                                          entry in PodSpec.ResourceClaims.
+                                        description: ResourceClaim references one entry
+                                          in PodSpec.ResourceClaims.
                                         properties:
                                           name:
                                             description: |-
@@ -2192,8 +2190,8 @@ spec:
                                           relates the key and values.
                                         properties:
                                           key:
-                                            description: key is the label key that
-                                              the selector applies to.
+                                            description: key is the label key that the
+                                              selector applies to.
                                             type: string
                                           operator:
                                             description: |-
@@ -2235,8 +2233,8 @@ spec:
                                     Value of Filesystem is implied when not included in claim spec.
                                   type: string
                                 volumeName:
-                                  description: volumeName is the binding reference
-                                    to the PersistentVolume backing this claim.
+                                  description: volumeName is the binding reference to
+                                    the PersistentVolume backing this claim.
                                   type: string
                               type: object
                           required:
@@ -2244,9 +2242,8 @@ spec:
                           type: object
                       type: object
                     fc:
-                      description: fc represents a Fibre Channel resource that is
-                        attached to a kubelet's host machine and then exposed to the
-                        pod.
+                      description: fc represents a Fibre Channel resource that is attached
+                        to a kubelet's host machine and then exposed to the pod.
                       properties:
                         fsType:
                           description: |-
@@ -2284,8 +2281,8 @@ spec:
                         provisioned/attached using an exec based plugin.
                       properties:
                         driver:
-                          description: driver is the name of the driver to use for
-                            this volume.
+                          description: driver is the name of the driver to use for this
+                            volume.
                           type: string
                         fsType:
                           description: |-
@@ -2324,8 +2321,8 @@ spec:
                       - driver
                       type: object
                     flocker:
-                      description: flocker represents a Flocker volume attached to
-                        a kubelet's host machine. This depends on the Flocker control
+                      description: flocker represents a Flocker volume attached to a
+                        kubelet's host machine. This depends on the Flocker control
                         service being running
                       properties:
                         datasetName:
@@ -2695,18 +2692,18 @@ spec:
                                       file
                                     items:
                                       description: DownwardAPIVolumeFile represents
-                                        information to create the file containing
-                                        the pod field
+                                        information to create the file containing the
+                                        pod field
                                       properties:
                                         fieldRef:
-                                          description: 'Required: Selects a field
-                                            of the pod: only annotations, labels,
-                                            name and namespace are supported.'
+                                          description: 'Required: Selects a field of
+                                            the pod: only annotations, labels, name
+                                            and namespace are supported.'
                                           properties:
                                             apiVersion:
                                               description: Version of the schema the
-                                                FieldPath is written in terms of,
-                                                defaults to "v1".
+                                                FieldPath is written in terms of, defaults
+                                                to "v1".
                                               type: string
                                             fieldPath:
                                               description: Path of the field to select
@@ -2729,10 +2726,9 @@ spec:
                                         path:
                                           description: 'Required: Path is  the relative
                                             path name of the file to be created. Must
-                                            not be absolute or contain the ''..''
-                                            path. Must be utf-8 encoded. The first
-                                            item of the relative path must not start
-                                            with ''..'''
+                                            not be absolute or contain the ''..'' path.
+                                            Must be utf-8 encoded. The first item of
+                                            the relative path must not start with ''..'''
                                           type: string
                                         resourceFieldRef:
                                           description: |-
@@ -2748,13 +2744,12 @@ spec:
                                               - type: integer
                                               - type: string
                                               description: Specifies the output format
-                                                of the exposed resources, defaults
-                                                to "1"
+                                                of the exposed resources, defaults to
+                                                "1"
                                               pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                               x-kubernetes-int-or-string: true
                                             resource:
-                                              description: 'Required: resource to
-                                                select'
+                                              description: 'Required: resource to select'
                                               type: string
                                           required:
                                           - resource
@@ -2852,8 +2847,8 @@ spec:
                           type: array
                       type: object
                     quobyte:
-                      description: quobyte represents a Quobyte mount on the host
-                        that shares a pod's lifetime
+                      description: quobyte represents a Quobyte mount on the host that
+                        shares a pod's lifetime
                       properties:
                         group:
                           description: |-
@@ -2958,8 +2953,8 @@ spec:
                       - monitors
                       type: object
                     scaleIO:
-                      description: scaleIO represents a ScaleIO persistent volume
-                        attached and mounted on Kubernetes nodes.
+                      description: scaleIO represents a ScaleIO persistent volume attached
+                        and mounted on Kubernetes nodes.
                       properties:
                         fsType:
                           description: |-
@@ -2969,12 +2964,12 @@ spec:
                             Default is "xfs".
                           type: string
                         gateway:
-                          description: gateway is the host address of the ScaleIO
-                            API Gateway.
+                          description: gateway is the host address of the ScaleIO API
+                            Gateway.
                           type: string
                         protectionDomain:
-                          description: protectionDomain is the name of the ScaleIO
-                            Protection Domain for the configured storage.
+                          description: protectionDomain is the name of the ScaleIO Protection
+                            Domain for the configured storage.
                           type: string
                         readOnly:
                           description: |-
@@ -3008,8 +3003,8 @@ spec:
                             with the protection domain.
                           type: string
                         system:
-                          description: system is the name of the storage system as
-                            configured in ScaleIO.
+                          description: system is the name of the storage system as configured
+                            in ScaleIO.
                           type: string
                         volumeName:
                           description: |-
@@ -3138,8 +3133,8 @@ spec:
                             Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                           type: string
                         storagePolicyID:
-                          description: storagePolicyID is the storage Policy Based
-                            Management (SPBM) profile ID associated with the StoragePolicyName.
+                          description: storagePolicyID is the storage Policy Based Management
+                            (SPBM) profile ID associated with the StoragePolicyName.
                           type: string
                         storagePolicyName:
                           description: storagePolicyName is the storage Policy Based
@@ -3194,8 +3189,8 @@ spec:
                   Additional init containers to add to the session statefulset
                   NOTE: The container names provided will be partially overwritten and randomized to avoid collisions
                 items:
-                  description: A single application container that you want to run
-                    within a pod.
+                  description: A single application container that you want to run within
+                    a pod.
                   properties:
                     args:
                       description: |-
@@ -3232,8 +3227,8 @@ spec:
                           in a Container.
                         properties:
                           name:
-                            description: Name of the environment variable. Must be
-                              a C_IDENTIFIER.
+                            description: Name of the environment variable. Must be a
+                              C_IDENTIFIER.
                             type: string
                           value:
                             description: |-
@@ -3264,8 +3259,8 @@ spec:
                                       TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
-                                    description: Specify whether the ConfigMap or
-                                      its key must be defined
+                                    description: Specify whether the ConfigMap or its
+                                      key must be defined
                                     type: boolean
                                 required:
                                 - key
@@ -3327,8 +3322,8 @@ spec:
                                       TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
-                                    description: Specify whether the Secret or its
-                                      key must be defined
+                                    description: Specify whether the Secret or its key
+                                      must be defined
                                     type: boolean
                                 required:
                                 - key
@@ -3348,8 +3343,8 @@ spec:
                         Values defined by an Env with a duplicate key will take precedence.
                         Cannot be updated.
                       items:
-                        description: EnvFromSource represents the source of a set
-                          of ConfigMaps
+                        description: EnvFromSource represents the source of a set of
+                          ConfigMaps
                         properties:
                           configMapRef:
                             description: The ConfigMap to select from
@@ -3361,14 +3356,13 @@ spec:
                                   TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
-                                description: Specify whether the ConfigMap must be
-                                  defined
+                                description: Specify whether the ConfigMap must be defined
                                 type: boolean
                             type: object
                             x-kubernetes-map-type: atomic
                           prefix:
-                            description: An optional identifier to prepend to each
-                              key in the ConfigMap. Must be a C_IDENTIFIER.
+                            description: An optional identifier to prepend to each key
+                              in the ConfigMap. Must be a C_IDENTIFIER.
                             type: string
                           secretRef:
                             description: The Secret to select from
@@ -3482,8 +3476,8 @@ spec:
                                 lifecycle hooks will fail in runtime when tcp handler is specified.
                               properties:
                                 host:
-                                  description: 'Optional: Host name to connect to,
-                                    defaults to the pod IP.'
+                                  description: 'Optional: Host name to connect to, defaults
+                                    to the pod IP.'
                                   type: string
                                 port:
                                   anyOf:
@@ -3579,8 +3573,8 @@ spec:
                                 lifecycle hooks will fail in runtime when tcp handler is specified.
                               properties:
                                 host:
-                                  description: 'Optional: Host name to connect to,
-                                    defaults to the pod IP.'
+                                  description: 'Optional: Host name to connect to, defaults
+                                    to the pod IP.'
                                   type: string
                                 port:
                                   anyOf:
@@ -3627,16 +3621,16 @@ spec:
                           description: GRPC specifies an action involving a GRPC port.
                           properties:
                             port:
-                              description: Port number of the gRPC service. Number
-                                must be in the range 1 to 65535.
+                              description: Port number of the gRPC service. Number must
+                                be in the range 1 to 65535.
                               format: int32
                               type: integer
                             service:
                               description: |-
                                 Service is the name of the service to place in the gRPC HealthCheckRequest
                                 (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
-
+  
+  
                                 If this is not specified, the default behavior is defined by gRPC.
                               type: string
                           required:
@@ -3654,8 +3648,8 @@ spec:
                               description: Custom headers to set in the request. HTTP
                                 allows repeated headers.
                               items:
-                                description: HTTPHeader describes a custom header
-                                  to be used in HTTP probes
+                                description: HTTPHeader describes a custom header to
+                                  be used in HTTP probes
                                 properties:
                                   name:
                                     description: |-
@@ -3766,8 +3760,8 @@ spec:
                         For more information See https://github.com/kubernetes/kubernetes/issues/108255.
                         Cannot be updated.
                       items:
-                        description: ContainerPort represents a network port in a
-                          single container.
+                        description: ContainerPort represents a network port in a single
+                          container.
                         properties:
                           containerPort:
                             description: |-
@@ -3837,16 +3831,16 @@ spec:
                           description: GRPC specifies an action involving a GRPC port.
                           properties:
                             port:
-                              description: Port number of the gRPC service. Number
-                                must be in the range 1 to 65535.
+                              description: Port number of the gRPC service. Number must
+                                be in the range 1 to 65535.
                               format: int32
                               type: integer
                             service:
                               description: |-
                                 Service is the name of the service to place in the gRPC HealthCheckRequest
                                 (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
-
+  
+  
                                 If this is not specified, the default behavior is defined by gRPC.
                               type: string
                           required:
@@ -3864,8 +3858,8 @@ spec:
                               description: Custom headers to set in the request. HTTP
                                 allows repeated headers.
                               items:
-                                description: HTTPHeader describes a custom header
-                                  to be used in HTTP probes
+                                description: HTTPHeader describes a custom header to
+                                  be used in HTTP probes
                                 properties:
                                   name:
                                     description: |-
@@ -3992,12 +3986,12 @@ spec:
                           description: |-
                             Claims lists the names of resources, defined in spec.resourceClaims,
                             that are used by this container.
-
-
+  
+  
                             This is an alpha field and requires enabling the
                             DynamicResourceAllocation feature gate.
-
-
+  
+  
                             This field is immutable. It can only be set for containers.
                           items:
                             description: ResourceClaim references one entry in PodSpec.ResourceClaims.
@@ -4186,8 +4180,8 @@ spec:
                               description: |-
                                 type indicates which kind of seccomp profile will be applied.
                                 Valid options are:
-
-
+  
+  
                                 Localhost - a profile defined in a file on the node should be used.
                                 RuntimeDefault - the container runtime default profile should be used.
                                 Unconfined - no profile should be applied.
@@ -4262,16 +4256,16 @@ spec:
                           description: GRPC specifies an action involving a GRPC port.
                           properties:
                             port:
-                              description: Port number of the gRPC service. Number
-                                must be in the range 1 to 65535.
+                              description: Port number of the gRPC service. Number must
+                                be in the range 1 to 65535.
                               format: int32
                               type: integer
                             service:
                               description: |-
                                 Service is the name of the service to place in the gRPC HealthCheckRequest
                                 (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
-
+  
+  
                                 If this is not specified, the default behavior is defined by gRPC.
                               type: string
                           required:
@@ -4289,8 +4283,8 @@ spec:
                               description: Custom headers to set in the request. HTTP
                                 allows repeated headers.
                               items:
-                                description: HTTPHeader describes a custom header
-                                  to be used in HTTP probes
+                                description: HTTPHeader describes a custom header to
+                                  be used in HTTP probes
                                 properties:
                                   name:
                                     description: |-
@@ -4451,8 +4445,8 @@ spec:
                         Pod volumes to mount into the container's filesystem.
                         Cannot be updated.
                       items:
-                        description: VolumeMount describes a mounting of a Volume
-                          within a container.
+                        description: VolumeMount describes a mounting of a Volume within
+                          a container.
                         properties:
                           mountPath:
                             description: |-
@@ -4503,12 +4497,12 @@ spec:
                   type: object
                 type: array
               session:
-                description: Specification for the main session container that the
-                  user will access and use
+                description: Specification for the main session container that the user
+                  will access and use
                 properties:
                   args:
-                    description: The arguments to run in the session container, if
-                      omitted it will use the Docker image CMD
+                    description: The arguments to run in the session container, if omitted
+                      it will use the Docker image CMD
                     items:
                       type: string
                     type: array
@@ -4524,8 +4518,7 @@ spec:
                         in a Container.
                       properties:
                         name:
-                          description: Name of the environment variable. Must be a
-                            C_IDENTIFIER.
+                          description: Name of the environment variable. Must be a C_IDENTIFIER.
                           type: string
                         value:
                           description: |-
@@ -4569,12 +4562,12 @@ spec:
                                 spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
                               properties:
                                 apiVersion:
-                                  description: Version of the schema the FieldPath
-                                    is written in terms of, defaults to "v1".
+                                  description: Version of the schema the FieldPath is
+                                    written in terms of, defaults to "v1".
                                   type: string
                                 fieldPath:
-                                  description: Path of the field to select in the
-                                    specified API version.
+                                  description: Path of the field to select in the specified
+                                    API version.
                                   type: string
                               required:
                               - fieldPath
@@ -4593,8 +4586,8 @@ spec:
                                   anyOf:
                                   - type: integer
                                   - type: string
-                                  description: Specifies the output format of the
-                                    exposed resources, defaults to "1"
+                                  description: Specifies the output format of the exposed
+                                    resources, defaults to "1"
                                   pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                   x-kubernetes-int-or-string: true
                                 resource:
@@ -4605,8 +4598,7 @@ spec:
                               type: object
                               x-kubernetes-map-type: atomic
                             secretKeyRef:
-                              description: Selects a key of a secret in the pod's
-                                namespace
+                              description: Selects a key of a secret in the pod's namespace
                               properties:
                                 key:
                                   description: The key of the secret to select from.  Must
@@ -4693,12 +4685,12 @@ spec:
                         description: |-
                           Claims lists the names of resources, defined in spec.resourceClaims,
                           that are used by this container.
-
-
+  
+  
                           This is an alpha field and requires enabling the
                           DynamicResourceAllocation feature gate.
-
-
+  
+  
                           This field is immutable. It can only be set for containers.
                         items:
                           description: ResourceClaim references one entry in PodSpec.ResourceClaims.
@@ -4751,13 +4743,6 @@ spec:
                     format: int64
                     minimum: 0
                     type: integer
-                  shmSize:
-                    anyOf:
-                    - type: integer
-                    - type: string
-                    description: Size of /dev/shm
-                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                    x-kubernetes-int-or-string: true
                   storage:
                     default: {}
                     properties:
@@ -4804,13 +4789,13 @@ spec:
                   many operators implement see https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
                 items:
                   description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
+                    state of this API Resource.\n---\nThis struct is intended for direct
+                    use as an array at the field path .status.conditions.  For example,\n\n\n\ttype
+                    FooStatus struct{\n\t    // Represents the observations of a foo's
+                    current state.\n\t    // Known .status.conditions.type are: \"Available\",
+                    \"Progressing\", and \"Degraded\"\n\t    // +patchMergeKey=type\n\t
+                    \   // +patchStrategy=merge\n\t    // +listType=map\n\t    // +listMapKey=type\n\t
+                    \   Conditions []metav1.Condition `json:\"conditions,omitempty\"
                     patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
                     \   // other fields\n\t}"
                   properties:
@@ -4872,7 +4857,7 @@ spec:
                 type: array
               containerCounts:
                 description: Counts of the total and ready containers, can represent
-                  either regular or init containers.
+                  either regular or init contianers.
                 properties:
                   ready:
                     type: integer
@@ -4892,7 +4877,7 @@ spec:
                 type: string
               initContainerCounts:
                 description: Counts of the total and ready containers, can represent
-                  either regular or init containers.
+                  either regular or init contianers.
                 properties:
                   ready:
                     type: integer
@@ -4916,3 +4901,9 @@ spec:
     storage: true
     subresources:
       status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
