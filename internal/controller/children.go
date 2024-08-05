@@ -257,13 +257,13 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 		now := metav1.Now()
 		switch condition.Type {
 		case amaltheadevv1alpha1.AmaltheaSessionReady:
-                        stateIsRunning := state == amaltheadevv1alpha1.Running
-			if stateIsRunning && conditionStatus == metav1.ConditionFalse {
+			stateIsRunning := state == amaltheadevv1alpha1.Running
+			if stateIsRunning && condition.Status == metav1.ConditionFalse {
 				condition.Status = metav1.ConditionTrue
 				condition.LastTransitionTime = now
 				condition.Reason = string(state)
 				condition.Message = fmt.Sprint("The session is ", strings.ToLower(string(state)))
-			} else if !stateIsRunning && conditionStatus == metav1.ConditionTrue {
+			} else if !stateIsRunning && condition.Status == metav1.ConditionTrue {
 				condition.Status = metav1.ConditionFalse
 				condition.LastTransitionTime = now
 				condition.Reason = string(state)
@@ -271,8 +271,8 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 			}
 		case amaltheadevv1alpha1.AmaltheaSessionRoutingReady:
 			ingressExists := func() bool {
-			        namespacedName := types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}
-			        err := clnt.Get(ctx, namespacedName, &networkingv1.Ingress{} 
+				namespacedName := types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}
+				err := clnt.Get(ctx, namespacedName, &networkingv1.Ingress{})
 				return err == nil
 			}
 			if cr.Spec.Ingress == nil && condition.Status == metav1.ConditionTrue {
