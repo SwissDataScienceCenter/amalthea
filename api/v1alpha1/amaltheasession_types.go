@@ -329,7 +329,7 @@ type AmaltheaSessionCondition struct {
 	Type   AmaltheaSessionConditionType `json:"type"`
 	Status metav1.ConditionStatus       `json:"status"`
 	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,opmitempty"`
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
 	// +optional
 	Reason string `json:"reason,omitempty"`
 	// +optional
