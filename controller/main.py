@@ -153,7 +153,7 @@ def register_jupyter_server_handlers(
 
 
 async def run(ready_flag: threading.Event | None = None, stop_flag: threading.Event | None = None):
-    loggers.configure(debug=True, verbose=True)
+    loggers.configure(debug=config.DEBUG, verbose=config.VERBOSE, log_format=loggers.LogFormat.JSON)
 
     metric_handlers = []
     if config.METRICS.enabled:

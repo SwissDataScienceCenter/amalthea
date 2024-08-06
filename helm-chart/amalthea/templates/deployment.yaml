@@ -44,16 +44,6 @@ spec:
               path: /healthz
               port: 8080
             initialDelaySeconds: 300
-          args:
-            - "--verbose"
-            - "--log-format=json"
-            {{- if .Values.scope.clusterWide }}
-            - "--all-namespaces"
-            {{- else }}
-            {{- range (.Values.scope.namespaces | default (list .Release.Namespace)) }}
-            - "--namespace={{ . }}"
-            {{- end }}
-            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- if .Values.envFromConfigMaps }}
@@ -124,6 +114,15 @@ spec:
               value: {{ .Values.auditLog.s3.accessKeyId | quote }}
             - name: AUDITLOG_S3__SECRET_ACCESS_KEY
               value: {{ .Values.auditLog.s3.secretAccessKey | quote }}
+            {{- end }}
+            {{- if .Values.scope.clusterWide }}
+            - name: CLUSTER_WIDE
+              value: "true"
+            {{- else }}
+            - name: CLUSTER_WIDE
+              value: "false"
+            - name: NAMESPACES
+              value: {{ join "," .Values.scope.namespaces | quote }}
             {{- end }}
           volumeMounts:
             - name: config

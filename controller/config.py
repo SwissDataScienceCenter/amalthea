@@ -65,3 +65,5 @@ QUOTA_EXCEEDED_MESSAGE = "The resource quota has been exceeded."
 
 CLUSTER_WIDE: bool = os.getenv("CLUSTER_WIDE", "false").lower() == "true"
 NAMESPACES: list[str] = os.getenv("NAMESPACES", "default").split(",")
+VERBOSE = os.environ.get("VERBOSE", "false").lower() == "true"
+DEBUG = os.environ.get("DEBUG", "false").lower() == "true"
