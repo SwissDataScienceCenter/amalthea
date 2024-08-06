@@ -1,3 +1,12 @@
+## [0.12.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.12.0...0.12.1) (2024-08-06)
+
+
+### Bug Fixes
+
+* properly pass down namespace configuration ([#668](https://github.com/SwissDataScienceCenter/amalthea/issues/668)) ([aee87e0](https://github.com/SwissDataScienceCenter/amalthea/commit/aee87e0b0a8965735fa081c8299b20575731f1d0))
+
+
+
 ## [0.12.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.11.0...0.12.0) (2024-08-05)
 
 
