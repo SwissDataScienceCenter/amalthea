@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "amalthea"
-version = "0.12.1"
+version = "0.12.2"
 description = "A Kubernetes operator for interactive user sessions for Renku"
 authors = ["SDSC <info@datascience.ch>"]
 readme = "README.md"
