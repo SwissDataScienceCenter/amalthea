@@ -1,3 +1,12 @@
+## [0.12.2](https://github.com/SwissDataScienceCenter/amalthea/compare/0.12.1...0.12.2) (2024-08-07)
+
+
+### Bug Fixes
+
+* add kopf liveness check ([3c4daa1](https://github.com/SwissDataScienceCenter/amalthea/commit/3c4daa1420f6faab031d87be95198e8647771a0f))
+
+
+
 ## [0.12.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.12.0...0.12.1) (2024-08-06)
 
 
