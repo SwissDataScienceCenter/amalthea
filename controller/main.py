@@ -187,13 +187,13 @@ async def run(ready_flag: threading.Event | None = None, stop_flag: threading.Ev
     logging.info(f"The changing handlers we start with is {len(registry._changing._handlers)}")
     logging.info(f"The webhooks handlers we start with is {len(registry._webhooks._handlers)}")
 
-    kopf.spawn_tasks
     await kopf.operator(
         registry=registry,
         clusterwide=config.CLUSTER_WIDE,
         namespaces=config.NAMESPACES,
         ready_flag=ready_flag,
         stop_flag=stop_flag,
+        liveness_endpoint="http://0.0.0.0:8080/healthz",
     )
 
 
