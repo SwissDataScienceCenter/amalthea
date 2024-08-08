@@ -117,6 +117,10 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	containers = append(containers, cr.Spec.ExtraContainers...)
 
 	if auth := cr.Spec.Authentication; auth != nil && auth.Enabled {
+		extraAuthMounts := []v1.VolumeMount{}
+		if len(cr.Spec.Authentication.ExtraVolumeMounts) > 0 {
+			extraAuthMounts = cr.Spec.Authentication.ExtraVolumeMounts
+		}
 		volumes = append(volumes, v1.Volume{
 			Name: "proxy-configuration-secret",
 			VolumeSource: v1.VolumeSource{
@@ -136,12 +140,15 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 					RunAsNonRoot:             ptr.To(true),
 				},
 				Args: []string{"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key},
-				VolumeMounts: []v1.VolumeMount{
-					{
-						Name:      "proxy-configuration-secret",
-						MountPath: "/etc/oauth2-proxy",
+				VolumeMounts: append(
+					[]v1.VolumeMount{
+						{
+							Name:      "proxy-configuration-secret",
+							MountPath: "/etc/oauth2-proxy",
+						},
 					},
-				},
+					extraAuthMounts...,
+				),
 			}
 
 			containers = append(containers, authContainer)
@@ -156,12 +163,15 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 					RunAsGroup:               ptr.To(int64(1000)),
 				},
 				Args: []string{"serve", "--config", "/etc/authproxy/" + auth.SecretRef.Key},
-				VolumeMounts: []v1.VolumeMount{
-					{
-						Name:      "proxy-configuration-secret",
-						MountPath: "/etc/authproxy",
+				VolumeMounts: append(
+					[]v1.VolumeMount{
+						{
+							Name:      "proxy-configuration-secret",
+							MountPath: "/etc/authproxy",
+						},
 					},
-				},
+					extraAuthMounts...,
+				),
 			}
 
 			containers = append(containers, authContainer)
