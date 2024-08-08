@@ -245,6 +245,9 @@ type Authentication struct {
 	// access the session.
 	// For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
 	SecretRef SessionSecretRef `json:"secretRef"`
+	// +optional
+	// Additional volume mounts for the authentication container.
+	ExtraVolumeMounts []v1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 }
 
 // A reference to a Kubernetes secret and a specific field in the secret to be used in a session
