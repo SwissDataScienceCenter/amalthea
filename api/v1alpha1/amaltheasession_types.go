@@ -39,6 +39,7 @@ type AmaltheaSessionSpec struct {
 	DataSources []DataSource `json:"dataSources,omitempty"`
 
 	// Authentication configuration for the session
+	// +optional
 	Authentication *Authentication `json:"authentication,omitempty"`
 
 	// Culling configuration
@@ -82,9 +83,13 @@ type Session struct {
 	Resources v1.ResourceRequirements `json:"resources,omitempty"`
 	// +kubebuilder:default:=8000
 	// +kubebuilder:validation:ExclusiveMinimum:=true
+	// +kubebuilder:validation:ExclusiveMaximum:=true
 	// +kubebuilder:validation:Minimum:=0
-	// The TCP port on the session Pod where the session can be accessed. Can point to either the
-	// session container or any additional container that is added. K8s port names are not accepted.
+	// +kubebuilder:validation:Maximum:=65535
+	// The TCP port on the pod where the session can be accessed.
+	// If the session has authentication enabled then the ingress and service will point to the authentication container
+	// and the authentication proxy container will proxy to this port. If authentication is disabled then the ingress and service
+	// route directly to this port. Note that renku reserves the highest TCP value 65535 to run the authentication proxy.
 	Port int32 `json:"port"`
 	// +optional
 	// +kubebuilder:default:={}
@@ -105,8 +110,8 @@ type Session struct {
 	RunAsGroup int64 `json:"runAsGroup,omitempty"`
 	// +optional
 	// +kubebuilder:default:="/"
-	// The path where the session can be accessed. If an ingress is specified, this value must
-	// be a subpath of the ingress `pathPrefix` field.
+	// The path where the session can be accessed. If an ingress is enabled then this will be
+	// the path prefix for the ingress.
 	URLPath string `json:"urlPath,omitempty"`
 	// +optional
 	// Additional volume mounts for the session container
@@ -119,10 +124,6 @@ type Ingress struct {
 	IngressClassName *string `json:"ingressClassName,omitempty"`
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Host is immutable"
 	Host string `json:"host"`
-	// +optional
-	// +kubebuilder:default:="/"
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="PathPrefix is immutable"
-	PathPrefix *string `json:"pathPrefix,omitempty"`
 	// +optional
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
 	TLSSecretName *string `json:"tlsSecretName,omitempty"`
@@ -240,10 +241,12 @@ type Authentication struct {
 	Enabled bool               `json:"enabled"`
 	Type    AuthenticationType `json:"type"`
 	// Kubernetes secret that contains the authentication configuration
-	// For `token` generate a hard to guess string / password-like string.
-	// this value can be used as Authorization header or as a cookie with the name `amaltheaSessionToken` to
-	// access the session.
+	// For `token` a yaml file with the following keys is required:
+	//   - token: the token value used to authenticate the user
+	//   - cookie_key: the name of the cookie where the token will be saved and searched for
 	// For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
+	// Note that the `upstream` and `http_address` configuration options cannot be set from the secret because
+	// the operator knows how to set these options to the proper values.
 	SecretRef SessionSecretRef `json:"secretRef"`
 	// +optional
 	// Additional volume mounts for the authentication container.

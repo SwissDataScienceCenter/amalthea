@@ -18,6 +18,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 
 	"net/url"
 
@@ -29,23 +31,21 @@ import (
 	"github.com/labstack/gommon/log"
 )
 
-const RemoteFlag = "remote"
-const PortFlag = "port"
+// The configuration options for the authentication proxy used for anonymous users.
+// The fields below can be passed as arguments i.e. --token=some-very-complicated-random-value
+// or as a yaml config file.
 const TokenFlag = "token"
 const CookieKeyFlag = "cookie_key"
 const VerboseFlag = "verbose"
 
+// The port on which the proxy will listen to.
+const authProxyPortEnvKey = "PROXY_PORT"
+
+// The URL where the proxy will proxy traffic to - i.e. the upstream URL.
+const remoteURLEnvKey = "REMOTE_URL"
+
 func init() {
 	rootCmd.AddCommand(serveCmd)
-
-	serveCmd.PersistentFlags().String(RemoteFlag, "", "remote URL to proxy to")
-	serveCmd.MarkPersistentFlagRequired(RemoteFlag)
-	viper.BindPFlag(RemoteFlag, serveCmd.PersistentFlags().Lookup(RemoteFlag))
-	viper.BindEnv(RemoteFlag)
-
-	serveCmd.PersistentFlags().Int(PortFlag, 4180, "port on which the proxy will listen")
-	viper.BindPFlag(PortFlag, serveCmd.PersistentFlags().Lookup(PortFlag))
-	viper.BindEnv(PortFlag)
 
 	serveCmd.PersistentFlags().String(CookieKeyFlag, "renku-auth", "cookie key where to find the token")
 	viper.BindPFlag(CookieKeyFlag, serveCmd.PersistentFlags().Lookup(CookieKeyFlag))
@@ -79,16 +79,6 @@ func serve(cmd *cobra.Command, args []string) {
 		e.Logger.SetLevel(log.INFO)
 	}
 
-	remote := viper.GetString(RemoteFlag)
-	if remote == "" {
-		e.Logger.Fatal("Invalid remote URL")
-	}
-
-	port := viper.GetInt(PortFlag)
-	if port == 0 {
-		e.Logger.Warn("Using random port")
-	}
-
 	cookieKey := viper.GetString(CookieKeyFlag)
 	if cookieKey == "" {
 		e.Logger.Fatal("Invalid cookie key")
@@ -107,9 +97,21 @@ func serve(cmd *cobra.Command, args []string) {
 		},
 	}))
 
-	remoteURL, err := url.Parse(remote)
+	remoteURLStr := os.Getenv(remoteURLEnvKey)
+	if remoteURLStr == "" {
+		e.Logger.Fatalf("The '%s' environment variable is needed to start the authentication proxy", remoteURLEnvKey)
+	}
+	remoteURL, err := url.Parse(remoteURLStr)
 	if err != nil {
 		e.Logger.Fatal(err)
+	}
+	proxyPortStr := os.Getenv(authProxyPortEnvKey)
+	if proxyPortStr == "" {
+		proxyPortStr = "65535"
+	}
+	authProxyPort, err := strconv.Atoi(proxyPortStr)
+	if err != nil {
+		e.Logger.Fatalf("Cannot convert the proxy port environment variable to integer: %v", err)
 	}
 	targets := []*middleware.ProxyTarget{
 		{
@@ -119,5 +121,5 @@ func serve(cmd *cobra.Command, args []string) {
 	e.Use(middleware.Proxy(middleware.NewRoundRobinBalancer(targets)))
 
 	e.Logger.Info(fmt.Sprintf("Starting proxy for %v", remoteURL))
-	e.Logger.Fatal(e.Start(fmt.Sprintf(":%d", port)))
+	e.Logger.Fatal(e.Start(fmt.Sprintf(":%d", authProxyPort)))
 }

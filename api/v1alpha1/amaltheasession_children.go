@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -25,6 +26,7 @@ const servicePortName string = prefix + "http"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
+const authProxyPort int32 = 65535
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
@@ -118,8 +120,8 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 
 	if auth := cr.Spec.Authentication; auth != nil && auth.Enabled {
 		extraAuthMounts := []v1.VolumeMount{}
-		if len(cr.Spec.Authentication.ExtraVolumeMounts) > 0 {
-			extraAuthMounts = cr.Spec.Authentication.ExtraVolumeMounts
+		if len(auth.ExtraVolumeMounts) > 0 {
+			extraAuthMounts = auth.ExtraVolumeMounts
 		}
 		volumes = append(volumes, v1.Volume{
 			Name: "proxy-configuration-secret",
@@ -133,13 +135,18 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 
 		if auth.Type == Oidc {
 			authContainer := v1.Container{
-				Image: "bitnami/oauth2-proxy:7.4.0",
+				Image: "bitnami/oauth2-proxy:7.6.0",
 				Name:  "oauth2-proxy",
 				SecurityContext: &v1.SecurityContext{
 					AllowPrivilegeEscalation: ptr.To(false),
 					RunAsNonRoot:             ptr.To(true),
 				},
-				Args: []string{"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key},
+				Args: []string{
+					fmt.Sprintf("--upstream=%s", cr.sessionLocalhostURL().String()),
+					fmt.Sprintf("--http-address=:%d", authProxyPort),
+					"--silence-ping-logging",
+					"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key,
+				},
 				VolumeMounts: append(
 					[]v1.VolumeMount{
 						{
@@ -163,6 +170,10 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 					RunAsGroup:               ptr.To(int64(1000)),
 				},
 				Args: []string{"serve", "--config", "/etc/authproxy/" + auth.SecretRef.Key},
+				Env: []v1.EnvVar{
+					{Name: "PROXY_PORT", Value: fmt.Sprintf("%d", authProxyPort)},
+					{Name: "REMOTE_URL", Value: cr.sessionLocalhostURL().String()},
+				},
 				VolumeMounts: append(
 					[]v1.VolumeMount{
 						{
@@ -209,6 +220,10 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 // Service returns a AmaltheaSession Service object
 func (cr *AmaltheaSession) Service() v1.Service {
 	labels := labelsForAmaltheaSession(cr.Name)
+	targetPort := cr.Spec.Session.Port
+	if cr.Spec.Authentication != nil && cr.Spec.Authentication.Enabled {
+		targetPort = authProxyPort
+	}
 
 	svc := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -221,11 +236,19 @@ func (cr *AmaltheaSession) Service() v1.Service {
 				Protocol:   v1.ProtocolTCP,
 				Name:       servicePortName,
 				Port:       servicePort,
-				TargetPort: intstr.FromInt32(cr.Spec.Session.Port),
+				TargetPort: intstr.FromInt32(targetPort),
 			}},
 		},
 	}
 	return svc
+}
+
+// The URL where the session can be accessed. It excludes the auth proxy and the ingress and
+// the host is always 127.0.0.1.
+func (cr *AmaltheaSession) sessionLocalhostURL() *url.URL {
+	host := fmt.Sprintf("127.0.0.1:%d", cr.Spec.Session.Port)
+	output := url.URL{Host: host, Scheme: "http", Path: cr.Spec.Session.URLPath}
+	return &output
 }
 
 // Ingress returns a AmaltheaSession Ingress object
@@ -236,11 +259,6 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 
 	if ingress == nil {
 		return nil
-	}
-
-	pathPrefix := "/"
-	if ingress.PathPrefix != nil {
-		pathPrefix = *ingress.PathPrefix
 	}
 
 	ing := &networkingv1.Ingress{
@@ -257,7 +275,7 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 				IngressRuleValue: networkingv1.IngressRuleValue{
 					HTTP: &networkingv1.HTTPIngressRuleValue{
 						Paths: []networkingv1.HTTPIngressPath{{
-							Path: pathPrefix,
+							Path: cr.sessionLocalhostURL().Path,
 							PathType: func() *networkingv1.PathType {
 								pt := networkingv1.PathTypePrefix
 								return &pt

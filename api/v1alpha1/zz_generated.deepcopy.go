@@ -307,11 +307,6 @@ func (in *Ingress) DeepCopyInto(out *Ingress) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.PathPrefix != nil {
-		in, out := &in.PathPrefix, &out.PathPrefix
-		*out = new(string)
-		**out = **in
-	}
 	if in.TLSSecretName != nil {
 		in, out := &in.TLSSecretName, &out.TLSSecretName
 		*out = new(string)

@@ -119,10 +119,12 @@ spec:
                   secretRef:
                     description: |-
                       Kubernetes secret that contains the authentication configuration
-                      For `token` generate a hard to guess string / password-like string.
-                      this value can be used as Authorization header or as a cookie with the name `amaltheaSessionToken` to
-                      access the session.
+                      For `token` a yaml file with the following keys is required:
+                        - token: the token value used to authenticate the user
+                        - cookie_key: the name of the cookie where the token will be saved and searched for
                       For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
+                      Note that the `upstream` and `http_address` configuration options cannot be set from the secret because
+                      the operator knows how to set these options to the proper values.
                     properties:
                       key:
                         type: string
@@ -3219,12 +3221,6 @@ spec:
                       rule: self == oldSelf
                   ingressClassName:
                     type: string
-                  pathPrefix:
-                    default: /
-                    type: string
-                    x-kubernetes-validations:
-                    - message: PathPrefix is immutable
-                      rule: self == oldSelf
                   tlsSecretName:
                     description: The name of the TLS secret, same as what is specified
                       in a regular Kubernetes Ingress.
@@ -4722,10 +4718,14 @@ spec:
                   port:
                     default: 8000
                     description: |-
-                      The TCP port on the session Pod where the session can be accessed. Can point to either the
-                      session container or any additional container that is added. K8s port names are not accepted.
+                      The TCP port on the pod where the session can be accessed.
+                      If the session has authentication enabled then the ingress and service will point to the authentication container
+                      and the authentication proxy container will proxy to this port. If authentication is disabled then the ingress and service
+                      route directly to this port. Note that renku reserves the highest TCP value 65535 to run the authentication proxy.
+                    exclusiveMaximum: true
                     exclusiveMinimum: true
                     format: int32
+                    maximum: 65535
                     minimum: 0
                     type: integer
                   resources:
@@ -4821,8 +4821,8 @@ spec:
                   urlPath:
                     default: /
                     description: |-
-                      The path where the session can be accessed. If an ingress is specified, this value must
-                      be a subpath of the ingress `pathPrefix` field.
+                      The path where the session can be accessed. If an ingress is enabled then this will be
+                      the path prefix for the ingress.
                     type: string
                   workingDir:
                     description: |-
