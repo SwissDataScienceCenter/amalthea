@@ -27,6 +27,8 @@ const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
 const authProxyPort int32 = 65535
+const oauth2ProxyImage = "bitnami/oauth2-proxy:7.6.0"
+const authProxyImage = "renku/authproxy:0.0.1-test-1"
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
@@ -135,7 +137,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 
 		if auth.Type == Oidc {
 			authContainer := v1.Container{
-				Image: "bitnami/oauth2-proxy:7.6.0",
+				Image: oauth2ProxyImage,
 				Name:  "oauth2-proxy",
 				SecurityContext: &v1.SecurityContext{
 					AllowPrivilegeEscalation: ptr.To(false),
@@ -161,7 +163,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 			containers = append(containers, authContainer)
 		} else if auth.Type == Token {
 			authContainer := v1.Container{
-				Image: "renku/authproxy:0.0.1",
+				Image: authProxyImage,
 				Name:  "authproxy",
 				SecurityContext: &v1.SecurityContext{
 					AllowPrivilegeEscalation: ptr.To(false),
