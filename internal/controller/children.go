@@ -239,7 +239,6 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 			Path:   cr.Spec.Session.URLPath,
 			Host:   cr.Spec.Ingress.Host,
 		}
-		sessionURL = *sessionURL.JoinPath(cr.Spec.Session.URLPath)
 		sessionURLStr = strings.TrimSuffix(sessionURL.String(), "/")
 	}
 
