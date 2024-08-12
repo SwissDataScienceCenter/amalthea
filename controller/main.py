@@ -167,7 +167,7 @@ async def run(ready_flag: threading.Event | None = None, stop_flag: threading.Ev
     metric_events_queue = MetricsQueue(metric_handlers)
 
     registry = kopf.OperatorRegistry()
-    registry = register_jupyter_server_handlers(registry)
+    registry = register_jupyter_server_handlers(registry, metric_events_queue)
 
     # INFO: Start the prometheus metrics server if enabled
     if config.METRICS.enabled:
