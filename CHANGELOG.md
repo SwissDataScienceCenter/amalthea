@@ -1,3 +1,13 @@
+## [0.12.3](https://github.com/SwissDataScienceCenter/amalthea/compare/0.12.2...0.12.3) (2024-08-10)
+
+
+### Bug Fixes
+
+
+* metrics and auditlog config ([2cf0758](https://github.com/SwissDataScienceCenter/amalthea/commit/2cf075887522681367e53c479c7384a6c59a0f62))
+
+
+
 ## [0.12.2](https://github.com/SwissDataScienceCenter/amalthea/compare/0.12.1...0.12.2) (2024-08-07)
 
 
