@@ -81,7 +81,7 @@ func clone(cmd *cobra.Command, args []string) {
 		log.Fatal("failed to parse remote", err)
 	}
 
-	splittedRepo := strings.FieldsFunc(parsedURL.Path, func(c rune) bool { return c == '/' }) // trim empty fields from returned slice
+	splittedRepo := strings.FieldsFunc(parsedURL.Path, func(c rune) bool { return c == '/' }) // FieldsFunc handles repeated and beginning/ending separator characters more sanely than Split
 	if len(splittedRepo) < 2 {
 		log.Fatal("expecting <user>/<repo> in url path, received: ", parsedURL.Path)
 	}
