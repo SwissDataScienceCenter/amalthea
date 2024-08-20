@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: 3.8
-          cache: pipenv
+      - uses: azure/setup-helm@v4.2.0
       - name: Publish chart and push images
         env:
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
@@ -21,8 +21,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
         run: |
           cd helm-chart/
-          python -m pip install --upgrade pip pipenv
-          pipenv install --deploy --system --dev
+          python -m pip install --upgrade pip
+          pip install chartpress
           git config --global user.email "renku@datascience.ch"
           git config --global user.name "Renku Bot"
           echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin

@@ -1,3 +1,59 @@
+## [0.12.3](https://github.com/SwissDataScienceCenter/amalthea/compare/0.12.2...0.12.3) (2024-08-10)
+
+
+### Bug Fixes
+
+
+* metrics and auditlog config ([2cf0758](https://github.com/SwissDataScienceCenter/amalthea/commit/2cf075887522681367e53c479c7384a6c59a0f62))
+
+
+
+## [0.12.2](https://github.com/SwissDataScienceCenter/amalthea/compare/0.12.1...0.12.2) (2024-08-07)
+
+
+### Bug Fixes
+
+* add kopf liveness check ([3c4daa1](https://github.com/SwissDataScienceCenter/amalthea/commit/3c4daa1420f6faab031d87be95198e8647771a0f))
+
+
+
+## [0.12.1](https://github.com/SwissDataScienceCenter/amalthea/compare/0.12.0...0.12.1) (2024-08-06)
+
+
+### Bug Fixes
+
+* properly pass down namespace configuration ([#668](https://github.com/SwissDataScienceCenter/amalthea/issues/668)) ([aee87e0](https://github.com/SwissDataScienceCenter/amalthea/commit/aee87e0b0a8965735fa081c8299b20575731f1d0))
+
+
+
+## [0.12.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.11.0...0.12.0) (2024-08-05)
+
+
+### Bug Fixes
+
+* Change the default registry to pull kube-scheduler from. ([#557](https://github.com/SwissDataScienceCenter/amalthea/issues/557)) ([e21e99f](https://github.com/SwissDataScienceCenter/amalthea/commit/e21e99f28e65f4cc1c426949d6965817aa1978de))
+* parse unknown or new k8s pod conditions ([#553](https://github.com/SwissDataScienceCenter/amalthea/issues/553)) ([45780c6](https://github.com/SwissDataScienceCenter/amalthea/commit/45780c6a6e32391b1bf740f423a748b39d85d970))
+
+
+### Features
+
+* add csi-rclone as dependency ([#588](https://github.com/SwissDataScienceCenter/amalthea/issues/588)) ([6c08a05](https://github.com/SwissDataScienceCenter/amalthea/commit/6c08a05254da556a518dcd03f536e2251b0656d6))
+* **addEnvFrom:** possibility to inject env variables ([#579](https://github.com/SwissDataScienceCenter/amalthea/issues/579)) ([97b2d87](https://github.com/SwissDataScienceCenter/amalthea/commit/97b2d87ea5f2933a80d37a15f26428752f8f59da))
+* **networkpolicies:** customize cluster IPs ([#580](https://github.com/SwissDataScienceCenter/amalthea/issues/580)) ([6b374b3](https://github.com/SwissDataScienceCenter/amalthea/commit/6b374b356297181629e70d3b71a7b6ccb5c59272))
+
+
+### Features for brand new operator and CRDs (AmaltheaSession)
+
+Note this code is not operational and it is not deployed or publised anywhere yet.
+
+* AmaltheaSession CRD spec in golang ([#585](https://github.com/SwissDataScienceCenter/amalthea/issues/585)) ([e8f765d](https://github.com/SwissDataScienceCenter/amalthea/commit/e8f765d44b92eda787837e091e7d17264f5696e3))
+* basic status and reconcile implementation ([#605](https://github.com/SwissDataScienceCenter/amalthea/issues/605)) ([dd1f6ab](https://github.com/SwissDataScienceCenter/amalthea/commit/dd1f6ab1386384c93aad66688aac030696a6d53a))
+* **crd:** AmaltheaSession definition ([#560](https://github.com/SwissDataScienceCenter/amalthea/issues/560)) ([a89bad7](https://github.com/SwissDataScienceCenter/amalthea/commit/a89bad7aeef8a3205d063dcf5771b85440ac0115))
+* expand the CR spec with additional vols ([#618](https://github.com/SwissDataScienceCenter/amalthea/issues/618)) ([430dc53](https://github.com/SwissDataScienceCenter/amalthea/commit/430dc53d06081e157e7d050df20f871511039a52))
+* implement core AmaltheaSession crd elements creation ([#596](https://github.com/SwissDataScienceCenter/amalthea/issues/596)) ([d710bcf](https://github.com/SwissDataScienceCenter/amalthea/commit/d710bcf8cea9788137a268ae42e7a816123c963c))
+* Scaffold go operator framework ([#582](https://github.com/SwissDataScienceCenter/amalthea/issues/582)) ([a4e299f](https://github.com/SwissDataScienceCenter/amalthea/commit/a4e299fda93055c499e2ade2b4c5529780b0adb6))
+
+
 ## [0.11.0](https://github.com/SwissDataScienceCenter/amalthea/compare/0.10.0...0.11.0) (2024-01-16)
 
 ### Bug Fixes

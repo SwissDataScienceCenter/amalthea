@@ -249,6 +249,9 @@ type Authentication struct {
 	// access the session.
 	// For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
 	SecretRef SessionSecretRef `json:"secretRef"`
+	// +optional
+	// Additional volume mounts for the authentication container.
+	ExtraVolumeMounts []v1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 }
 
 // A reference to a Kubernetes secret and a specific field in the secret to be used in a session
@@ -281,7 +284,7 @@ type AmaltheaSessionStatus struct {
 	// Conditions store the status conditions of the AmaltheaSessions. This is a standard thing that
 	// many operators implement see https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
 	// +operator-sdk:csv:customresourcedefinitions:type=status
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+	Conditions []AmaltheaSessionCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 	// +kubebuilder:default:=NotReady
 	State               State           `json:"state,omitempty"`
 	URL                 string          `json:"url,omitempty"`
@@ -320,6 +323,24 @@ type AmaltheaSessionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []AmaltheaSession `json:"items"`
+}
+
+type AmaltheaSessionConditionType string
+
+const (
+	AmaltheaSessionReady        AmaltheaSessionConditionType = "Ready"
+	AmaltheaSessionRoutingReady AmaltheaSessionConditionType = "RoutingReady"
+)
+
+type AmaltheaSessionCondition struct {
+	Type   AmaltheaSessionConditionType `json:"type"`
+	Status metav1.ConditionStatus       `json:"status"`
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// +optional
+	Reason string `json:"reason,omitempty"`
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 func init() {
