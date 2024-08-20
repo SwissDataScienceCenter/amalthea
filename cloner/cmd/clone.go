@@ -46,7 +46,7 @@ var (
 	verbose    bool
 )
 
-type AuthConfig struct {
+type CloneFonfig struct {
 	Username   *string `yaml:"username,omitempty"`
 	PrivateKey *string `yaml:"privateKey,omitempty"`
 	Password   string  `yaml:"password"`
@@ -109,26 +109,26 @@ func clone(cmd *cobra.Command, args []string) {
 			log.Fatal("failed to read configuration file", err)
 		}
 
-		authConfig := &AuthConfig{}
-		err = yaml.Unmarshal(buf, authConfig)
+		cloneFonfig := &CloneFonfig{}
+		err = yaml.Unmarshal(buf, cloneFonfig)
 		if err != nil {
 			log.Fatal("failed to parse configuration:", err)
 		}
 
-		if authConfig.PrivateKey == nil && authConfig.Username == nil {
+		if cloneFonfig.PrivateKey == nil && cloneFonfig.Username == nil {
 			log.Fatal("Invalid authentication configuration one username or privateKey must be set")
 		}
 
-		if authConfig.PrivateKey != nil {
-			publicKeys, err := ssh.NewPublicKeys("git", []byte(*authConfig.PrivateKey), authConfig.Password)
+		if cloneFonfig.PrivateKey != nil {
+			publicKeys, err := ssh.NewPublicKeys("git", []byte(*cloneFonfig.PrivateKey), cloneFonfig.Password)
 			if err != nil {
 				log.Fatal("generate publickeys failed:", err)
 			}
 			cloneOptions.Auth = publicKeys
-		} else if authConfig.Username != nil {
+		} else if cloneFonfig.Username != nil {
 			cloneOptions.Auth = &http.BasicAuth{
-				Username: *authConfig.Username,
-				Password: authConfig.Password,
+				Username: *cloneFonfig.Username,
+				Password: cloneFonfig.Password,
 			}
 		}
 
