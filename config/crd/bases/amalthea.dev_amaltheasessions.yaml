@@ -152,10 +152,13 @@ spec:
                         where the repository should be cloned into.
                       example: repositories/project1
                       type: string
-                    cloningGitConfigSecretRef:
+                    cloningConfigSecretRef:
                       description: |-
                         The Kubernetes secret that contains the code repository configuration to be used during cloning.
-                        For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
+                        For 'git' this should contain either:
+                        The username and password
+                        The private key and its corresponding password
+                        An empty value can be used when cloning from public repositories using the http protocol
                         NOTE: you have to specify the whole config in a single key in the secret.
                       properties:
                         key:
@@ -166,7 +169,7 @@ spec:
                       - key
                       - name
                       type: object
-                    gitConfigSecretRef:
+                    configSecretRef:
                       description: |-
                         The Kubernetes secret that contains the code repository configuration to be used when the session is running.
                         For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
@@ -200,6 +203,9 @@ spec:
                   - remote
                   type: object
                 type: array
+                x-kubernetes-validations:
+                - message: CodeRepositories is immutable
+                  rule: self == oldSelf
               culling:
                 description: Culling configuration
                 properties:
