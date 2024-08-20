@@ -25,10 +25,10 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 
-	giturl "github.com/chainguard-dev/git-urls"
 	"gopkg.in/yaml.v3"
 )
 
@@ -76,14 +76,14 @@ var cloneCmd = &cobra.Command{
 
 func clone(cmd *cobra.Command, args []string) {
 
-	parsedURL, err := giturl.Parse(remote)
+	endpoint, err := transport.NewEndpoint(remote)
 	if err != nil {
 		log.Fatal("failed to parse remote", err)
 	}
 
-	splittedRepo := strings.FieldsFunc(parsedURL.Path, func(c rune) bool { return c == '/' }) // FieldsFunc handles repeated and beginning/ending separator characters more sanely than Split
+	splittedRepo := strings.FieldsFunc(endpoint.Path, func(c rune) bool { return c == '/' }) // FieldsFunc handles repeated and beginning/ending separator characters more sanely than Split
 	if len(splittedRepo) < 2 {
-		log.Fatal("expecting <user>/<repo> in url path, received: ", parsedURL.Path)
+		log.Fatal("expecting <user>/<repo> in url path, received: ", endpoint.Path)
 	}
 	projectName := splittedRepo[len(splittedRepo)-1]
 
