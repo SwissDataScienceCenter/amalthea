@@ -173,10 +173,10 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 				},
 				Args: []string{"serve", "--config", "/etc/authproxy/" + auth.SecretRef.Key},
 				Env: []v1.EnvVar{
-					{Name: "PROXY_PORT", Value: fmt.Sprintf("%d", authProxyPort)},
+					{Name: "AUTHPROXY_PORT", Value: fmt.Sprintf("%d", authProxyPort)},
 					// NOTE: The url for the remote has to not have a path at all, if it does, then the path
 					// in the url is appended to any path that is already there when the request comes in.
-					{Name: "REMOTE_URL", Value: fmt.Sprintf("http://127.0.0.1:%d", cr.Spec.Session.Port)},
+					{Name: "AUTHPROXY_REMOTE", Value: fmt.Sprintf("http://127.0.0.1:%d", cr.Spec.Session.Port)},
 				},
 				VolumeMounts: append(
 					[]v1.VolumeMount{
