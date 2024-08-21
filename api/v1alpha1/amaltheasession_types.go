@@ -31,6 +31,7 @@ type AmaltheaSessionSpec struct {
 	Session Session `json:"session"`
 
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="CodeRepositories is immutable"
 	// A list of code repositories and associated configuration that will be cloned in the session
 	CodeRepositories []CodeRepository `json:"codeRepositories,omitempty"`
 
@@ -161,13 +162,16 @@ type CodeRepository struct {
 	// The tag, branch or commit SHA to checkout, if omitted then will be the tip of the default branch of the repo
 	Revision string `json:"revision,omitempty"`
 	// The Kubernetes secret that contains the code repository configuration to be used during cloning.
-	// For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
+	// For 'git' this should contain either:
+	// The username and password
+	// The private key and its corresponding password
+	// An empty value can be used when cloning from public repositories using the http protocol
 	// NOTE: you have to specify the whole config in a single key in the secret.
-	CloningConfigSecretRef *SessionSecretRef `json:"cloningGitConfigSecretRef,omitempty"`
+	CloningConfigSecretRef *SessionSecretRef `json:"cloningConfigSecretRef,omitempty"`
 	// The Kubernetes secret that contains the code repository configuration to be used when the session is running.
 	// For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
 	// NOTE: you have to specify the whole config in a single key in the secret.
-	ConfigSecretRef *SessionSecretRef `json:"gitConfigSecretRef,omitempty"`
+	ConfigSecretRef *SessionSecretRef `json:"configSecretRef,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={rclone}
