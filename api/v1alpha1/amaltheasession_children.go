@@ -25,6 +25,7 @@ const servicePortName string = prefix + "http"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
+const sshKnownHostsName string = "ssh-known-hosts"
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
@@ -370,6 +371,32 @@ func (cr *AmaltheaSession) initClones() ([]v1.Container, []v1.Volume) {
 	volMounts := []v1.VolumeMount{{Name: sessionVolumeName, MountPath: cr.Spec.Session.Storage.MountPath}}
 	vols := []v1.Volume{}
 	containers := []v1.Container{}
+
+	vols = append(
+		vols,
+		v1.Volume{
+			Name: sshKnownHostsName,
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: sshKnownHostsName,
+					},
+					Items: []v1.KeyToPath{
+						{
+							Key:  "known_hosts",
+							Path: "ssh_known_hosts",
+						},
+					},
+					Optional: ptr.To(true),
+				},
+			},
+		},
+	)
+	volMounts = append(volMounts, v1.VolumeMount{
+		Name:      sshKnownHostsName,
+		MountPath: "/etc/ssh",
+	},
+	)
 
 	for irepo, repo := range cr.Spec.CodeRepositories {
 		args := []string{"clone", "--remote", repo.Remote, "--path", cr.Spec.Session.Storage.MountPath + "/" + repo.ClonePath}
