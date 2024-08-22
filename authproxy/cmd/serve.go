@@ -29,6 +29,10 @@ import (
 	"github.com/labstack/gommon/log"
 )
 
+
+// The configuration options for the authentication proxy used for anonymous users.
+// The fields below can be passed as arguments i.e. --token=some-very-complicated-random-value
+// or as a yaml config file.
 const RemoteFlag = "remote"
 const PortFlag = "port"
 const TokenFlag = "token"
@@ -43,7 +47,7 @@ func init() {
 	viper.BindPFlag(RemoteFlag, serveCmd.PersistentFlags().Lookup(RemoteFlag))
 	viper.BindEnv(RemoteFlag)
 
-	serveCmd.PersistentFlags().Int(PortFlag, 4180, "port on which the proxy will listen")
+	serveCmd.PersistentFlags().Int(PortFlag, 65535, "port on which the proxy will listen")
 	viper.BindPFlag(PortFlag, serveCmd.PersistentFlags().Lookup(PortFlag))
 	viper.BindEnv(PortFlag)
 
@@ -79,8 +83,8 @@ func serve(cmd *cobra.Command, args []string) {
 		e.Logger.SetLevel(log.INFO)
 	}
 
-	remote := viper.GetString(RemoteFlag)
-	if remote == "" {
+	remoteURLStr := viper.GetString(RemoteFlag)
+	if remoteURLStr == "" {
 		e.Logger.Fatal("Invalid remote URL")
 	}
 
@@ -106,8 +110,8 @@ func serve(cmd *cobra.Command, args []string) {
 			return key == token, nil
 		},
 	}))
-
-	remoteURL, err := url.Parse(remote)
+	
+	remoteURL, err := url.Parse(remoteURLStr)
 	if err != nil {
 		e.Logger.Fatal(err)
 	}
