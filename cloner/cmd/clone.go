@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"log"
 	"os"
 	"strings"
@@ -32,18 +33,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const ConfigFlag = "config"
-const RemoteFlag = "remote"
-const RevisionFlag = "revision"
-const PathFlag = "path"
-const VerboseFlag = "verbose"
+const ConfigFlag string = "config"
+const RemoteFlag string = "remote"
+const RevisionFlag string = "revision"
+const PathFlag string = "path"
+const VerboseFlag string = "verbose"
+const StrategyFlag string = "strategy"
 
 var (
-	configPath string
-	remote     string
-	revision   string
-	path       string
-	verbose    bool
+	configPath       string
+	remote           string
+	revision         string
+	path             string
+	verbose          bool
+	CloningStratgies []string = []string{"notifexist", "overwrite", "default"}
+	strategy                  = newEnum(CloningStratgies, "default")
 )
 
 type CloneFonfig struct {
@@ -66,6 +70,8 @@ func init() {
 	cloneCmd.MarkFlagRequired(PathFlag)
 
 	cloneCmd.Flags().BoolVar(&verbose, VerboseFlag, false, "make the command verbose")
+
+	cloneCmd.Flags().VarP(strategy, StrategyFlag, "", "the cloning strategy")
 }
 
 var cloneCmd = &cobra.Command{
@@ -90,6 +96,29 @@ func clone(cmd *cobra.Command, args []string) {
 	clonePath := projectName
 	if path != "" {
 		clonePath = path + "/" + projectName
+	}
+
+	if !strategy.Equal("default") {
+		_, err := os.Stat(clonePath)
+
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Fatal("unexpected error", err)
+		}
+
+		if err == nil {
+			if strategy.Equal("notifexist") {
+				log.Print(clonePath, " already exist, doing nothing")
+				os.Exit(0)
+			}
+
+			if strategy.Equal("overwrite") {
+				log.Print("deleting clone")
+				err = os.RemoveAll(clonePath + "/")
+				if err != nil {
+					log.Fatal("failed to remove existing clone", err)
+				}
+			}
+		}
 	}
 
 	// Clone the given repository to the given directory
