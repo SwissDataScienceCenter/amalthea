@@ -84,7 +84,7 @@ func clone(cmd *cobra.Command, args []string) {
 
 	endpoint, err := transport.NewEndpoint(remote)
 	if err != nil {
-		log.Fatal("failed to parse remote", err)
+		log.Fatal("failed to parse remote: ", err)
 	}
 
 	splittedRepo := strings.FieldsFunc(endpoint.Path, func(c rune) bool { return c == '/' }) // FieldsFunc handles repeated and beginning/ending separator characters more sanely than Split
@@ -103,7 +103,7 @@ func clone(cmd *cobra.Command, args []string) {
 		_, err := os.Stat(clonePath)
 
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			log.Fatal("unexpected error", err)
+			log.Fatal("unexpected error: ", err)
 		}
 
 		if err == nil {
@@ -116,7 +116,7 @@ func clone(cmd *cobra.Command, args []string) {
 				log.Print("deleting clone")
 				err = os.RemoveAll(clonePath + "/")
 				if err != nil {
-					log.Fatal("failed to remove existing clone", err)
+					log.Fatal("failed to remove existing clone: ", err)
 				}
 			}
 		}
@@ -136,13 +136,13 @@ func clone(cmd *cobra.Command, args []string) {
 	if configPath != "" {
 		buf, err := os.ReadFile(configPath)
 		if err != nil {
-			log.Fatal("failed to read configuration file", err)
+			log.Fatal("failed to read configuration file: ", err)
 		}
 
 		cloneFonfig := &CloneFonfig{}
 		err = yaml.Unmarshal(buf, cloneFonfig)
 		if err != nil {
-			log.Fatal("failed to parse configuration:", err)
+			log.Fatal("failed to parse configuration: ", err)
 		}
 
 		if cloneFonfig.PrivateKey == nil && cloneFonfig.Username == nil {
@@ -152,7 +152,7 @@ func clone(cmd *cobra.Command, args []string) {
 		if cloneFonfig.PrivateKey != nil {
 			publicKeys, err := ssh.NewPublicKeys("git", []byte(*cloneFonfig.PrivateKey), cloneFonfig.Password)
 			if err != nil {
-				log.Fatal("generate publickeys failed:", err)
+				log.Fatal("generate publickeys failed: ", err)
 			}
 			cloneOptions.Auth = publicKeys
 		} else if cloneFonfig.Username != nil {
@@ -167,6 +167,6 @@ func clone(cmd *cobra.Command, args []string) {
 	_, err = git.PlainClone(clonePath, false, &cloneOptions)
 
 	if err != nil {
-		log.Fatal("clone failed:", err)
+		log.Fatal("clone failed: ", err)
 	}
 }
