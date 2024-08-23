@@ -92,6 +92,7 @@ func clone(cmd *cobra.Command, args []string) {
 		log.Fatal("expecting <user>/<repo> in url path, received: ", endpoint.Path)
 	}
 	projectName := splittedRepo[len(splittedRepo)-1]
+	projectName = strings.TrimSuffix(projectName, ".git")
 
 	clonePath := projectName
 	if path != "" {
