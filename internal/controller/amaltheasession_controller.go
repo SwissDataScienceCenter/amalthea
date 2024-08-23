@@ -85,6 +85,21 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	if amaltheasession.GetDeletionTimestamp() == nil {
+		if reflect.DeepEqual(amaltheasession.Status, amaltheadevv1alpha1.AmaltheaSessionStatus{State: amaltheadevv1alpha1.NotReady, Idle: false}) {
+			// First status update/render
+			amaltheasession.Status.URL = amaltheasession.GetURLString()
+			err := r.Status().Update(ctx, amaltheasession)
+			if err != nil {
+				err = r.Get(ctx, req.NamespacedName, amaltheasession)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+				err = r.Status().Update(ctx, amaltheasession)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+		}
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// to registering our finalizer.

@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -228,20 +227,6 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 		failingSince = metav1.Time{}
 	}
 
-	sessionURLStr := "None"
-	if cr.Spec.Ingress != nil {
-		urlScheme := "http"
-		if cr.Spec.Ingress.TLSSecretName != nil {
-			urlScheme = "https"
-		}
-		sessionURL := url.URL{
-			Scheme: urlScheme,
-			Path:   cr.Spec.Session.URLPath,
-			Host:   cr.Spec.Ingress.Host,
-		}
-		sessionURLStr = strings.TrimSuffix(sessionURL.String(), "/")
-	}
-
 	state := c.State(cr, pod)
 	conditions := cr.Status.Conditions
 	if len(conditions) == 0 {
@@ -289,7 +274,7 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
 		Conditions:      conditions,
 		State:           state,
-		URL:             sessionURLStr,
+		URL:             cr.GetURLString(),
 		Idle:            idle,
 		IdleSince:       idleSince,
 		FailingSince:    failingSince,
