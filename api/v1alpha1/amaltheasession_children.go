@@ -394,7 +394,7 @@ func (cr *AmaltheaSession) initClones() ([]v1.Container, []v1.Volume) {
 	containers := []v1.Container{}
 
 	for irepo, repo := range cr.Spec.CodeRepositories {
-		args := []string{"clone", "--remote", repo.Remote, "--path", cr.Spec.Session.Storage.MountPath + "/" + repo.ClonePath}
+		args := []string{"clone", "--strategy", "notifexist", "--remote", repo.Remote, "--path", cr.Spec.Session.Storage.MountPath + "/" + repo.ClonePath}
 
 		if repo.CloningConfigSecretRef != nil {
 			secretVolName := fmt.Sprintf("git-clone-cred-volume-%d", irepo)
