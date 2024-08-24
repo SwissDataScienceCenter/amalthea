@@ -435,14 +435,16 @@ func (cr *AmaltheaSession) initClones() ([]v1.Container, []v1.Volume) {
 func (cr *AmaltheaSession) AllSecrets() v1.SecretList {
 	secrets := v1.SecretList{}
 
-	if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecretName != nil {
-		secrets.Items = append(secrets.Items, v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: cr.Namespace,
-				Name:      *cr.Spec.Ingress.TLSSecretName,
-			},
-		})
-	}
+	// Removing the TLS secret will cause certificates to be re-issued
+	// we should treat this differently.
+	// if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecretName != nil {
+	// 	secrets.Items = append(secrets.Items, v1.Secret{
+	// 		ObjectMeta: metav1.ObjectMeta{
+	// 			Namespace: cr.Namespace,
+	// 			Name:      *cr.Spec.Ingress.TLSSecretName,
+	// 		},
+	// 	})
+	// }
 
 	if auth := cr.Spec.Authentication; auth != nil && auth.Enabled {
 		secrets.Items = append(secrets.Items, v1.Secret{
