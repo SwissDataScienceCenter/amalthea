@@ -221,6 +221,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 					Labels: labels,
 				},
 				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{FSGroup: &cr.Spec.Session.RunAsGroup},
 					Containers:     containers,
 					InitContainers: initContainers,
 					Volumes:        volumes,

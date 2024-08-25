@@ -111,6 +111,8 @@ type Session struct {
 	// +optional
 	// +kubebuilder:default:=1000
 	// +kubebuilder:validation:Minimum:=0
+	// The group is set on the session and this value is also set as the fsgroup for the whole pod and all session
+	// contianers.
 	RunAsGroup int64 `json:"runAsGroup,omitempty"`
 	// +optional
 	// +kubebuilder:default:="/"

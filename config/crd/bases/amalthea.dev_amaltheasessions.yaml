@@ -4792,6 +4792,9 @@ spec:
                     type: object
                   runAsGroup:
                     default: 1000
+                    description: |-
+                      The group is set on the session and this value is also set as the fsgroup for the whole pod and all session
+                      contianers.
                     format: int64
                     minimum: 0
                     type: integer
