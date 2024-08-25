@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -146,6 +147,12 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 		})
 
 		if auth.Type == Oidc {
+			sessionURL := cr.sessionLocalhostURL().String()
+			if !strings.HasSuffix(sessionURL, "/") {
+				// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
+				// and does not proxy subpaths
+				sessionURL += "/"
+			}
 			authContainer := v1.Container{
 				Image: oauth2ProxyImage,
 				Name:  "oauth2-proxy",
@@ -154,7 +161,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 					RunAsNonRoot:             ptr.To(true),
 				},
 				Args: []string{
-					fmt.Sprintf("--upstream=%s", cr.sessionLocalhostURL().String()),
+					fmt.Sprintf("--upstream=%s", sessionURL),
 					fmt.Sprintf("--http-address=:%d", authProxyPort),
 					"--silence-ping-logging",
 					"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key,
