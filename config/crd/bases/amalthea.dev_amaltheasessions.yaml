@@ -4792,6 +4792,9 @@ spec:
                     type: object
                   runAsGroup:
                     default: 1000
+                    description: |-
+                      The group is set on the session and this value is also set as the fsgroup for the whole pod and all session
+                      contianers.
                     format: int64
                     minimum: 0
                     type: integer
@@ -4845,6 +4848,7 @@ spec:
             - session
             type: object
           status:
+            default: {}
             description: AmaltheaSessionStatus defines the observed state of AmaltheaSession
             properties:
               conditions:
@@ -4885,6 +4889,7 @@ spec:
                 format: date-time
                 type: string
               idle:
+                default: false
                 type: boolean
               idleSince:
                 format: date-time
