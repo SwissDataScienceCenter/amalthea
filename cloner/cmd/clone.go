@@ -40,14 +40,22 @@ const PathFlag string = "path"
 const VerboseFlag string = "verbose"
 const StrategyFlag string = "strategy"
 
+// Pre cloning strategies
+
+const NotIfExist string = "notifexist" // Do not clone if target already exists
+const Overwrite string = "overwrite"   // Remove target first if it exists
+const NoStrategy string = "nostrategy" // Let git handle the situation
+
 var (
-	configPath       string
-	remote           string
-	revision         string
-	path             string
-	verbose          bool
-	CloningStratgies []string = []string{"notifexist", "overwrite", "default"}
-	strategy                  = newEnum(CloningStratgies, "default")
+	configPath           string
+	remote               string
+	revision             string
+	path                 string
+	verbose              bool
+	PreCloningStrategies []string = []string{
+		NotIfExist, Overwrite, NoStrategy,
+	}
+	preCloningStrategy = newEnum(PreCloningStrategies, NoStrategy)
 )
 
 type CloneFonfig struct {
@@ -71,7 +79,7 @@ func init() {
 
 	cloneCmd.Flags().BoolVar(&verbose, VerboseFlag, false, "make the command verbose")
 
-	cloneCmd.Flags().VarP(strategy, StrategyFlag, "", "the cloning strategy")
+	cloneCmd.Flags().VarP(preCloningStrategy, StrategyFlag, "", "the pre cloning strategy")
 }
 
 var cloneCmd = &cobra.Command{
@@ -99,7 +107,7 @@ func clone(cmd *cobra.Command, args []string) {
 		clonePath = path + "/" + projectName
 	}
 
-	if !strategy.Equal("default") {
+	if !preCloningStrategy.Equal(NoStrategy) {
 		// check if target exists
 		_, err := os.Stat(clonePath)
 
@@ -109,12 +117,12 @@ func clone(cmd *cobra.Command, args []string) {
 
 		// if target folder exists, apply strategy
 		if err == nil {
-			if strategy.Equal("notifexist") {
+			if preCloningStrategy.Equal(NotIfExist) {
 				log.Print(clonePath, " already exist, doing nothing")
 				os.Exit(0)
 			}
 
-			if strategy.Equal("overwrite") {
+			if preCloningStrategy.Equal(Overwrite) {
 				log.Print("deleting clone")
 				err = os.RemoveAll(clonePath + "/")
 				if err != nil {
