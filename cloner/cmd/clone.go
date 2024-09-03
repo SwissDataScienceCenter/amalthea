@@ -100,12 +100,14 @@ func clone(cmd *cobra.Command, args []string) {
 	}
 
 	if !strategy.Equal("default") {
+		// check if target exists
 		_, err := os.Stat(clonePath)
 
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			log.Fatal("unexpected error: ", err)
 		}
 
+		// if target folder exists, apply strategy
 		if err == nil {
 			if strategy.Equal("notifexist") {
 				log.Print(clonePath, " already exist, doing nothing")
