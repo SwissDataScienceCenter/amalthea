@@ -88,6 +88,38 @@ var cloneCmd = &cobra.Command{
 	Run:   clone,
 }
 
+func applyPreCloningStrategy(clonePath string) {
+	if preCloningStrategy.Equal(NoStrategy) {
+		log.Print("no strategy selected, let git handle the this.")
+		return
+	}
+
+	// check if target exists
+	_, err := os.Stat(clonePath)
+
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			log.Print(clonePath, " does not exist, nothing to be done.")
+			return
+		}
+
+		log.Fatal("unexpected error: ", err)
+	}
+
+	if preCloningStrategy.Equal(NotIfExist) {
+		log.Print(clonePath, " already exist, doing nothing.")
+		os.Exit(0)
+	}
+
+	if preCloningStrategy.Equal(Overwrite) {
+		log.Print(clonePath, " exists, deleting it.")
+		err = os.RemoveAll(clonePath + "/")
+		if err != nil {
+			log.Fatal("failed to remove existing clone: ", err)
+		}
+	}
+}
+
 func clone(cmd *cobra.Command, args []string) {
 
 	endpoint, err := transport.NewEndpoint(remote)
@@ -107,30 +139,7 @@ func clone(cmd *cobra.Command, args []string) {
 		clonePath = path + "/" + projectName
 	}
 
-	if !preCloningStrategy.Equal(NoStrategy) {
-		// check if target exists
-		_, err := os.Stat(clonePath)
-
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			log.Fatal("unexpected error: ", err)
-		}
-
-		// if target folder exists, apply strategy
-		if err == nil {
-			if preCloningStrategy.Equal(NotIfExist) {
-				log.Print(clonePath, " already exist, doing nothing")
-				os.Exit(0)
-			}
-
-			if preCloningStrategy.Equal(Overwrite) {
-				log.Print("deleting clone")
-				err = os.RemoveAll(clonePath + "/")
-				if err != nil {
-					log.Fatal("failed to remove existing clone: ", err)
-				}
-			}
-		}
-	}
+	applyPreCloningStrategy(clonePath)
 
 	// Clone the given repository to the given directory
 	log.Print("git clone ", remote, " to ", clonePath)
