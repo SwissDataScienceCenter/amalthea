@@ -31,6 +31,11 @@ const shmVolumeName string = prefix + "dev-shm"
 const authProxyPort int32 = 65535
 const oauth2ProxyImage = "bitnami/oauth2-proxy:7.6.0"
 const authProxyImage = "renku/authproxy:0.0.1-test-1"
+const rcloneStorageClass = "csi-rclone"
+
+var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
+
+const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
 var rcloneStorageClass string = getStorageClass()
 var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
