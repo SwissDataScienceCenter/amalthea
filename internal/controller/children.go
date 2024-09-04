@@ -122,17 +122,19 @@ type ChildResourceUpdate[T ChildResourceType] struct {
 }
 
 type ChildResources struct {
-	Ingress     ChildResource[networkingv1.Ingress]
-	Service     ChildResource[v1.Service]
-	StatefulSet ChildResource[appsv1.StatefulSet]
-	PVC         ChildResource[v1.PersistentVolumeClaim]
+	Ingress         ChildResource[networkingv1.Ingress]
+	Service         ChildResource[v1.Service]
+	StatefulSet     ChildResource[appsv1.StatefulSet]
+	PVC             ChildResource[v1.PersistentVolumeClaim]
+	DataSourcesPVCs []ChildResource[v1.PersistentVolumeClaim]
 }
 
 type ChildResourceUpdates struct {
-	Ingress     ChildResourceUpdate[networkingv1.Ingress]
-	Service     ChildResourceUpdate[v1.Service]
-	StatefulSet ChildResourceUpdate[appsv1.StatefulSet]
-	PVC         ChildResourceUpdate[v1.PersistentVolumeClaim]
+	Ingress         ChildResourceUpdate[networkingv1.Ingress]
+	Service         ChildResourceUpdate[v1.Service]
+	StatefulSet     ChildResourceUpdate[appsv1.StatefulSet]
+	PVC             ChildResourceUpdate[v1.PersistentVolumeClaim]
+	DataSourcesPVCs []ChildResourceUpdate[v1.PersistentVolumeClaim]
 }
 
 func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResources {
@@ -150,6 +152,17 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResources {
 	if desiredIngress != nil {
 		output.Ingress = ChildResource[networkingv1.Ingress]{&networkingv1.Ingress{ObjectMeta: metadata}, desiredIngress}
 	}
+
+	desiredDataSourcesPVCs := []ChildResource[v1.PersistentVolumeClaim]{}
+	for _, desiredPVC := range cr.DataSourcesPVCs() {
+		childRes := ChildResource[v1.PersistentVolumeClaim]{
+			Current: &v1.PersistentVolumeClaim{ObjectMeta: desiredPVC.ObjectMeta},
+			Desired: &desiredPVC,
+		}
+		desiredDataSourcesPVCs = append(desiredDataSourcesPVCs, childRes)
+	}
+	output.DataSourcesPVCs = desiredDataSourcesPVCs
+
 	return output
 }
 
@@ -160,12 +173,21 @@ func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *a
 		Service:     c.Service.Reconcile(ctx, clnt, cr),
 		Ingress:     c.Ingress.Reconcile(ctx, clnt, cr),
 	}
+	dataSrouceUpdates := []ChildResourceUpdate[v1.PersistentVolumeClaim]{}
+	for _, pvc := range c.DataSourcesPVCs {
+		dataSrouceUpdates = append(dataSrouceUpdates, pvc.Reconcile(ctx, clnt, cr))
+	}
+	output.DataSourcesPVCs = dataSrouceUpdates
 	return output, output.combineErrors()
 }
 
 func (c ChildResourceUpdates) AllEqual(op controllerutil.OperationResult) bool {
 	ingressOK := c.Ingress.Manifest == nil || (c.Ingress.Manifest != nil && c.Ingress.UpdateResult == op)
-	return ingressOK && c.Service.UpdateResult == op && c.PVC.UpdateResult == op && c.StatefulSet.UpdateResult == op
+	dataSourcesOK := true
+	for _, ds := range c.DataSourcesPVCs {
+		dataSourcesOK = dataSourcesOK && (ds.UpdateResult == op)
+	}
+	return ingressOK && c.Service.UpdateResult == op && c.PVC.UpdateResult == op && c.StatefulSet.UpdateResult == op && dataSourcesOK
 }
 
 func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {

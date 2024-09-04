@@ -7,13 +7,7 @@
 		}
 	},
 	"containerUser": "root",
-	"postCreateCommand": {
-		"cluster": "make kind_cluster",
-		"poetry": "poetry install",
-		"kubectl_alias": "echo alias k=kubectl >> ~/.bashrc",
-		"go_mod_download": "go mod download",
-		"install_tools": "make kustomize controller-gen operator-sdk envtest"
-	},
+	"postCreateCommand": "make kind_cluster && poetry install && echo alias k=kubectl >> ~/.bashrc && go mod download && make kustomize controller-gen operator-sdk envtest",
 	"features": {
 		"ghcr.io/eitsupi/devcontainer-features/jq-likes:2": {},
 		"ghcr.io/devcontainers-contrib/features/curl-apt-get:1": {},
