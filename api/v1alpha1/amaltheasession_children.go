@@ -10,7 +10,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	resource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -30,6 +30,11 @@ const shmVolumeName string = prefix + "dev-shm"
 const authProxyPort int32 = 65535
 const oauth2ProxyImage = "bitnami/oauth2-proxy:7.6.0"
 const authProxyImage = "renku/authproxy:0.0.1-test-1"
+const rcloneStorageClass = "csi-rclone"
+
+var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
+
+const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
@@ -493,4 +498,40 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 	}
 
 	return secrets
+}
+
+// Assuming that the csi-rclone driver from https://github.com/SwissDataScienceCenter/csi-rclone
+// is installed, this will generate PVCs for the data sources that have the rclone type.
+func (cr *AmaltheaSession) DataSourcesPVCs() []v1.PersistentVolumeClaim {
+	output := []v1.PersistentVolumeClaim{}
+	for ids, ds := range cr.Spec.DataSources {
+		switch ds.Type {
+		case Rclone:
+			storageClass := rcloneStorageClass
+			output = append(
+				output,
+				v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fmt.Sprintf("%s-ds-%d", cr.Name, ids),
+						Namespace: cr.Namespace,
+						Annotations: map[string]string{
+							rcloneStorageSecretNameAnnotation: ds.SecretRef.Name,
+						},
+					},
+					Spec: v1.PersistentVolumeClaimSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{ds.AccessMode},
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceStorage: rcloneDefaultStorage,
+							},
+						},
+						StorageClassName: &storageClass,
+					},
+				},
+			)
+		default:
+			continue
+		}
+	}
+	return output
 }

@@ -128,7 +128,7 @@ type Ingress struct {
 	Host string `json:"host"`
 	// +optional
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
-	TLSSecret *SessionSecretRef `json:"tlsSecretName,omitempty"`
+	TLSSecret *SessionSecretRef `json:"tlsSecret,omitempty"`
 }
 
 type Storage struct {
