@@ -34,6 +34,7 @@ const authProxyImage = "renku/authproxy:0.0.1-test-1"
 
 var rcloneStorageClass string = getStorageClass()
 var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
+
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
@@ -50,6 +51,8 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	if len(cr.Spec.Session.ExtraVolumeMounts) > 0 {
 		extraMounts = cr.Spec.Session.ExtraVolumeMounts
 	}
+	_, dsVols, dsVolMounts := cr.DataSources()
+
 	volumeMounts := append(
 		[]v1.VolumeMount{
 			{
@@ -59,6 +62,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 		},
 		extraMounts...,
 	)
+	volumeMounts = append(volumeMounts, dsVolMounts...)
 
 	volumes := []v1.Volume{
 		{
@@ -70,6 +74,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 			},
 		},
 	}
+	volumes = append(volumes, dsVols...)
 
 	if len(cr.Spec.ExtraVolumes) > 0 {
 		volumes = append(volumes, cr.Spec.ExtraVolumes...)
@@ -502,17 +507,21 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 
 // Assuming that the csi-rclone driver from https://github.com/SwissDataScienceCenter/csi-rclone
 // is installed, this will generate PVCs for the data sources that have the rclone type.
-func (cr *AmaltheaSession) DataSourcesPVCs() []v1.PersistentVolumeClaim {
-	output := []v1.PersistentVolumeClaim{}
+func (cr *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
+	pvcs := []v1.PersistentVolumeClaim{}
+	vols := []v1.Volume{}
+	volMounts := []v1.VolumeMount{}
 	for ids, ds := range cr.Spec.DataSources {
+		pvcName := fmt.Sprintf("%s-ds-%d", cr.Name, ids)
 		switch ds.Type {
 		case Rclone:
 			storageClass := rcloneStorageClass
-			output = append(
-				output,
+			readOnly := ds.AccessMode == v1.ReadOnlyMany
+			pvcs = append(
+				pvcs,
 				v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fmt.Sprintf("%s-ds-%d", cr.Name, ids),
+						Name:      pvcName,
 						Namespace: cr.Namespace,
 						Annotations: map[string]string{
 							rcloneStorageSecretNameAnnotation: ds.SecretRef.Name,
@@ -529,11 +538,22 @@ func (cr *AmaltheaSession) DataSourcesPVCs() []v1.PersistentVolumeClaim {
 					},
 				},
 			)
+			vols = append(
+				vols,
+				v1.Volume{
+					Name:         pvcName,
+					VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName, ReadOnly: readOnly}},
+				},
+			)
+			volMounts = append(
+				volMounts,
+				v1.VolumeMount{Name: pvcName, ReadOnly: readOnly, MountPath: ds.MountPath},
+			)
 		default:
 			continue
 		}
 	}
-	return output
+	return pvcs, vols, volMounts
 }
 
 func getStorageClass() string {
