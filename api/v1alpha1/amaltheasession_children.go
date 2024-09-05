@@ -31,10 +31,9 @@ const shmVolumeName string = prefix + "dev-shm"
 const authProxyPort int32 = 65535
 const oauth2ProxyImage = "bitnami/oauth2-proxy:7.6.0"
 const authProxyImage = "renku/authproxy:0.0.1-test-1"
-const rcloneStorageClass = "csi-rclone"
 
+var rcloneStorageClass string = getStorageClass()
 var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
-
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
 var rcloneStorageClass string = getStorageClass()
@@ -569,6 +568,14 @@ func (cr *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 		}
 	}
 	return pvcs, vols, volMounts
+}
+
+func getStorageClass() string {
+	sc := os.Getenv("RCLONE_STORAGE_CLASS")
+	if sc == "" {
+		sc = "csi-rclone-secret-annotation"
+	}
+	return sc
 }
 
 func getStorageClass() string {
