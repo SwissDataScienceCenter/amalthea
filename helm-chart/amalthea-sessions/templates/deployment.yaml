@@ -33,6 +33,8 @@ spec:
           value: {{ .Release.Namespace | quote }}
         - name: CLUSTER_SCOPED
           value: {{ .Values.clusterScoped | quote }}
+        - name: RCLONE_STORAGE_CLASS
+          value: {{ .Values.rcloneStorageClass | quote }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
         livenessProbe:

@@ -27,3 +27,7 @@ kubernetesClusterDomain: cluster.local
 clusterScoped: false
 # Whether to install the CRD
 deployCrd: true
+# This is the default class name from the csi-rclone Helm chart, if you use the defaults there
+# you can use the default here as well. The csi-rclone Helm chart https://github.com/SwissDataScienceCenter/csi-rclone
+# is needed in order to mount Rclone data sources in amalthea sessions.
+rcloneStorageClass: csi-rclone-secret-annotation
