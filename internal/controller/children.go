@@ -192,12 +192,12 @@ func (c ChildResourceUpdates) AllEqual(op controllerutil.OperationResult) bool {
 }
 
 func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
-	onlyStatusUpdates := c.AllEqual(controllerutil.OperationResultUpdatedStatusOnly)
-	noUpdates := c.AllEqual(controllerutil.OperationResultNone)
+	// onlyStatusUpdates := c.AllEqual(controllerutil.OperationResultUpdatedStatusOnly)
+	// noUpdates := c.AllEqual(controllerutil.OperationResultNone)
 	stsReady := c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
 	podExists := pod != nil
 	podReady := podExists && podIsReady(pod)
-	return stsReady && podReady && (onlyStatusUpdates || noUpdates)
+	return stsReady && podReady
 }
 
 func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) amaltheadevv1alpha1.State {
@@ -309,6 +309,10 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 		status.InitContainerCounts = initCounts
 		status.ContainerCounts = counts
 	}
+	if state == amaltheadevv1alpha1.Hibernated || cr.DeletionTimestamp != nil {
+		status.ContainerCounts.Ready = 0
+		status.InitContainerCounts.Ready = 0
+	}
 
 	// Used for debugging to ensure the reconcile loop does not needlessly reschdule or update child resources
 	// log.Info("Update summary", "Ingress", c.Ingress.UpdateResult, "StatefulSet", c.StatefulSet.UpdateResult, "PVC", c.StatefulSet.UpdateResult, "Service", c.Service.UpdateResult)
@@ -323,6 +327,12 @@ func (c ChildResourceUpdates) combineErrors() error {
 		"Service":     c.Service.Error,
 		"PVC":         c.PVC.Error,
 		"StatefulSet": c.StatefulSet.Error,
+	}
+	for _, pvc := range c.DataSourcesPVCs {
+		if pvc.Error == nil {
+			continue
+		}
+		errors["DataSourcesPVCs/"+pvc.Manifest.Name] = pvc.Error
 	}
 	for name, err := range errors {
 		if err == nil {
