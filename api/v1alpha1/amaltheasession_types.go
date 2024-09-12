@@ -17,6 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"net/url"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,6 +111,8 @@ type Session struct {
 	// +optional
 	// +kubebuilder:default:=1000
 	// +kubebuilder:validation:Minimum:=0
+	// The group is set on the session and this value is also set as the fsgroup for the whole pod and all session
+	// contianers.
 	RunAsGroup int64 `json:"runAsGroup,omitempty"`
 	// +optional
 	// +kubebuilder:default:="/"
@@ -293,6 +298,7 @@ type AmaltheaSessionStatus struct {
 	URL                 string          `json:"url,omitempty"`
 	ContainerCounts     ContainerCounts `json:"containerCounts,omitempty"`
 	InitContainerCounts ContainerCounts `json:"initContainerCounts,omitempty"`
+	// +kubebuilder:default:=false
 	Idle                bool            `json:"idle,omitempty"`
 	// +kubebuilder:validation:Format:=date-time
 	IdleSince metav1.Time `json:"idleSince,omitempty"`
@@ -316,6 +322,7 @@ type AmaltheaSession struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   AmaltheaSessionSpec   `json:"spec,omitempty"`
+	// +kubebuilder:default:={}
 	Status AmaltheaSessionStatus `json:"status,omitempty"`
 }
 
@@ -348,4 +355,28 @@ type AmaltheaSessionCondition struct {
 
 func init() {
 	SchemeBuilder.Register(&AmaltheaSession{}, &AmaltheaSessionList{})
+}
+
+func (a *AmaltheaSession) GetURLString() string {
+	sessionURL := a.GetURL()
+	if sessionURL == nil {
+		return "None"
+	}
+	return strings.TrimSuffix(sessionURL.String(), "/")
+}
+
+func (a *AmaltheaSession) GetURL() *url.URL {
+	if a.Spec.Ingress == nil || a.Spec.Ingress.Host == "" {
+		return nil
+	}
+	urlScheme := "http"
+	if a.Spec.Ingress.TLSSecretName != nil {
+		urlScheme = "https"
+	}
+	sessionURL := url.URL{
+		Scheme: urlScheme,
+		Path:   a.Spec.Session.URLPath,
+		Host:   a.Spec.Ingress.Host,
+	}
+	return &sessionURL
 }

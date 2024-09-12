@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"reflect"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -84,6 +85,21 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	if amaltheasession.GetDeletionTimestamp() == nil {
+		if reflect.DeepEqual(amaltheasession.Status, amaltheadevv1alpha1.AmaltheaSessionStatus{State: amaltheadevv1alpha1.NotReady, Idle: false}) {
+			// First status update/render
+			amaltheasession.Status.URL = amaltheasession.GetURLString()
+			err := r.Status().Update(ctx, amaltheasession)
+			if err != nil {
+				err = r.Get(ctx, req.NamespacedName, amaltheasession)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+				err = r.Status().Update(ctx, amaltheasession)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+			}
+		}
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// to registering our finalizer.
@@ -135,6 +151,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	newStatus := updates.Status(ctx, r.Client, amaltheasession)
+	statusChanged := reflect.DeepEqual(amaltheasession.Status, newStatus)
 	amaltheasession.Status = newStatus
 	err = r.Status().Update(ctx, amaltheasession)
 	if err != nil {
@@ -162,7 +179,12 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Now requeue to make sure we can watch for idleness and other status changes
-	return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
+	requeueAfter := time.Second * 10
+	if statusChanged {
+		// If the status is evolving we should requeue faster
+		requeueAfter = 0
+	}
+	return ctrl.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
 }
 
 func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession) error {
