@@ -37,11 +37,6 @@ var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
 
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
-var rcloneStorageClass string = getStorageClass()
-var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
-
-const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
-
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	labels := labelsForAmaltheaSession(cr.Name)
@@ -247,6 +242,9 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 					Containers:      containers,
 					InitContainers:  initContainers,
 					Volumes:         volumes,
+					Tolerations:     cr.Spec.Tolerations,
+					NodeSelector:    cr.Spec.NodeSelector,
+					Affinity:        cr.Spec.Affinity,
 				},
 			},
 		},
