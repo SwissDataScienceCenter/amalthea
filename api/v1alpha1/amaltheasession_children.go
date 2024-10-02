@@ -541,13 +541,23 @@ func (cr *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 			vols = append(
 				vols,
 				v1.Volume{
-					Name:         pvcName,
-					VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName, ReadOnly: readOnly}},
+					Name: pvcName,
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvcName,
+							ReadOnly:  readOnly,
+						},
+					},
+
 				},
 			)
 			volMounts = append(
 				volMounts,
-				v1.VolumeMount{Name: pvcName, ReadOnly: readOnly, MountPath: ds.MountPath},
+				v1.VolumeMount{
+					Name:      pvcName,
+					ReadOnly:  readOnly,
+					MountPath: ds.MountPath,
+				},
 			)
 		default:
 			continue
