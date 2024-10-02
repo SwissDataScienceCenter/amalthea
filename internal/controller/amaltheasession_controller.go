@@ -103,7 +103,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// to registering our finalizer.
-		if amaltheasession.Spec.AdoptSecrets && !controllerutil.ContainsFinalizer(amaltheasession, secretCleanupFinalizerName) {
+		if len(amaltheasession.AdoptedSecrets().Items) > 0 && !controllerutil.ContainsFinalizer(amaltheasession, secretCleanupFinalizerName) {
 			controllerutil.AddFinalizer(amaltheasession, secretCleanupFinalizerName)
 			if err := r.Update(ctx, amaltheasession); err != nil {
 				return ctrl.Result{}, err
@@ -188,15 +188,16 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession) error {
-	if !cr.Spec.AdoptSecrets {
+	adoptedSecrets := cr.AdoptedSecrets()
+	if len(adoptedSecrets.Items) == 0 {
 		log := log.FromContext(ctx)
-		log.Info("Secret deletion finalizer called while not adopting secrets, doing nothing")
+		log.Info("Secret deletion finalizer called without any secret adopted, doing nothing")
 		return nil
 	}
 
 	// create an initial empty error list
 	error_list := errors.Join(nil, nil)
-	for _, item := range cr.AllSecrets().Items {
+	for _, item := range adoptedSecrets.Items {
 		err := r.Delete(ctx, &item)
 		if err != nil {
 			if !apierrors.IsNotFound(err) {

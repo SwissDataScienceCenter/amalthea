@@ -229,9 +229,9 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 				},
 				Spec: v1.PodSpec{
 					SecurityContext: &v1.PodSecurityContext{FSGroup: &cr.Spec.Session.RunAsGroup},
-					Containers:     containers,
-					InitContainers: initContainers,
-					Volumes:        volumes,
+					Containers:      containers,
+					InitContainers:  initContainers,
+					Volumes:         volumes,
 				},
 			},
 		},
@@ -317,10 +317,10 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 		},
 	}
 
-	if ingress.TLSSecretName != nil {
+	if ingress.TLSSecret != nil && ingress.TLSSecret.Name != "" {
 		ing.Spec.TLS = []networkingv1.IngressTLS{{
 			Hosts:      []string{ingress.Host},
-			SecretName: *ingress.TLSSecretName,
+			SecretName: ingress.TLSSecret.Name,
 		}}
 	}
 
@@ -440,27 +440,56 @@ func (cr *AmaltheaSession) initClones() ([]v1.Container, []v1.Volume) {
 }
 
 // Returns the list of all the secrets used in this CR
-func (cr *AmaltheaSession) AllSecrets() v1.SecretList {
+func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 	secrets := v1.SecretList{}
 
-	// Removing the TLS secret will cause certificates to be re-issued
-	// we should treat this differently.
-	// if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecretName != nil {
-	// 	secrets.Items = append(secrets.Items, v1.Secret{
-	// 		ObjectMeta: metav1.ObjectMeta{
-	// 			Namespace: cr.Namespace,
-	// 			Name:      *cr.Spec.Ingress.TLSSecretName,
-	// 		},
-	// 	})
-	// }
+	if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecret.isAdopted() {
+		secrets.Items = append(secrets.Items, v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cr.Namespace,
+				Name:      cr.Spec.Ingress.TLSSecret.Name,
+			},
+		})
+	}
 
-	if auth := cr.Spec.Authentication; auth != nil && auth.Enabled {
+	auth := cr.Spec.Authentication
+	if auth != nil && auth.Enabled && auth.SecretRef.isAdopted() {
 		secrets.Items = append(secrets.Items, v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cr.Namespace,
 				Name:      auth.SecretRef.Name,
 			},
 		})
+	}
+
+	for _, pv := range cr.Spec.DataSources {
+		if pv.SecretRef.isAdopted() {
+			secrets.Items = append(secrets.Items, v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pv.SecretRef.Name,
+					Namespace: cr.Namespace,
+				},
+			})
+		}
+	}
+
+	for _, codeRepo := range cr.Spec.CodeRepositories {
+		if codeRepo.CloningConfigSecretRef.isAdopted() {
+			secrets.Items = append(secrets.Items, v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      codeRepo.CloningConfigSecretRef.Name,
+					Namespace: cr.Namespace,
+				},
+			})
+		}
+		if codeRepo.ConfigSecretRef.isAdopted() {
+			secrets.Items = append(secrets.Items, v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      codeRepo.ConfigSecretRef.Name,
+					Namespace: cr.Namespace,
+				},
+			})
+		}
 	}
 
 	return secrets
