@@ -192,6 +192,10 @@ func (c ChildResourceUpdates) AllEqual(op controllerutil.OperationResult) bool {
 }
 
 func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
+	// TODO: Try to re-enable the two checks below and potentially use them to determine readiness.
+	// Currently the resources created by the operator have slight changes that k8s itself applies in a few places outside
+	// of the status field. So these are picked up by the functions below. For example a PVC or a statefulset gets automatic
+	// updates from k8s (I think from a mutating or defaulting webhook) to fields other than the status.
 	// onlyStatusUpdates := c.AllEqual(controllerutil.OperationResultUpdatedStatusOnly)
 	// noUpdates := c.AllEqual(controllerutil.OperationResultNone)
 	stsReady := c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
