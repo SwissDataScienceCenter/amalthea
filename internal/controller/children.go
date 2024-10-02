@@ -155,10 +155,11 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResources {
 
 	desiredDataSourcesPVCs := []ChildResource[v1.PersistentVolumeClaim]{}
 	specPVCs, _, _ := cr.DataSources()
-	for _, desiredPVC := range specPVCs {
+	for i := range specPVCs {
+		desiredPVC := &specPVCs[i]
 		childRes := ChildResource[v1.PersistentVolumeClaim]{
 			Current: &v1.PersistentVolumeClaim{ObjectMeta: desiredPVC.ObjectMeta},
-			Desired: &desiredPVC,
+			Desired: desiredPVC,
 		}
 		desiredDataSourcesPVCs = append(desiredDataSourcesPVCs, childRes)
 	}
