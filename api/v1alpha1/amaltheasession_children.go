@@ -443,7 +443,7 @@ func (cr *AmaltheaSession) initClones() ([]v1.Container, []v1.Volume) {
 func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 	secrets := v1.SecretList{}
 
-	if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecret != nil && cr.Spec.Ingress.TLSSecret.Name != "" && cr.Spec.Ingress.TLSSecret.Adopt {
+	if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecret.isAdopted() {
 		secrets.Items = append(secrets.Items, v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cr.Namespace,
@@ -453,7 +453,7 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 	}
 
 	auth := cr.Spec.Authentication
-	if auth != nil && auth.Enabled && auth.SecretRef.Name != "" && auth.SecretRef.Adopt {
+	if auth != nil && auth.Enabled && auth.SecretRef.isAdopted() {
 		secrets.Items = append(secrets.Items, v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cr.Namespace,
@@ -463,7 +463,7 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 	}
 
 	for _, pv := range cr.Spec.DataSources {
-		if pv.SecretRef != nil && pv.SecretRef.Name != "" && pv.SecretRef.Adopt {
+		if pv.SecretRef.isAdopted() {
 			secrets.Items = append(secrets.Items, v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      pv.SecretRef.Name,
@@ -474,7 +474,7 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 	}
 
 	for _, codeRepo := range cr.Spec.CodeRepositories {
-		if codeRepo.CloningConfigSecretRef != nil && codeRepo.CloningConfigSecretRef.Name != "" && codeRepo.CloningConfigSecretRef.Adopt {
+		if codeRepo.CloningConfigSecretRef.isAdopted() {
 			secrets.Items = append(secrets.Items, v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      codeRepo.CloningConfigSecretRef.Name,
@@ -482,7 +482,7 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 				},
 			})
 		}
-		if codeRepo.ConfigSecretRef != nil && codeRepo.ConfigSecretRef.Name != "" && codeRepo.ConfigSecretRef.Adopt {
+		if codeRepo.ConfigSecretRef.isAdopted() {
 			secrets.Items = append(secrets.Items, v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      codeRepo.ConfigSecretRef.Name,

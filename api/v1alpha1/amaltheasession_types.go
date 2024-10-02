@@ -271,6 +271,10 @@ type SessionSecretKeyRef struct {
 	Adopt bool `json:"adopt"`
 }
 
+func (s *SessionSecretKeyRef) isAdopted() bool {
+	return s != nil && s.Name != "" && s.Adopt
+}
+
 // A reference to a whole Kubernetes secret where the key is not important
 type SessionSecretRef struct {
 	Name string `json:"name"`
@@ -278,6 +282,10 @@ type SessionSecretRef struct {
 	// +kubebuilder:validation:Optional
 	// If the secret is adopted then the operator will delete the secret when the custom resource that uses it is deleted.
 	Adopt bool `json:"adopt"`
+}
+
+func (s *SessionSecretRef) isAdopted() bool {
+	return s != nil && s.Name != "" && s.Adopt
 }
 
 // +kubebuilder:validation:Enum={Running,Failed,Hibernated,NotReady,RunningDegraded}

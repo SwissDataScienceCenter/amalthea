@@ -191,7 +191,7 @@ func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amalt
 	adoptedSecrets := cr.AdoptedSecrets()
 	if len(adoptedSecrets.Items) == 0 {
 		log := log.FromContext(ctx)
-		log.Info("Secret deletion finalizer called while not adopting secrets, doing nothing")
+		log.Info("Secret deletion finalizer called without any secret adopted, doing nothing")
 		return nil
 	}
 
