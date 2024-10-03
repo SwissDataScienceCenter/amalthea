@@ -299,7 +299,7 @@ type AmaltheaSessionStatus struct {
 	ContainerCounts     ContainerCounts `json:"containerCounts,omitempty"`
 	InitContainerCounts ContainerCounts `json:"initContainerCounts,omitempty"`
 	// +kubebuilder:default:=false
-	Idle                bool            `json:"idle,omitempty"`
+	Idle bool `json:"idle,omitempty"`
 	// +kubebuilder:validation:Format:=date-time
 	IdleSince metav1.Time `json:"idleSince,omitempty"`
 	// +kubebuilder:validation:Format:=date-time
@@ -321,7 +321,7 @@ type AmaltheaSession struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   AmaltheaSessionSpec   `json:"spec,omitempty"`
+	Spec AmaltheaSessionSpec `json:"spec,omitempty"`
 	// +kubebuilder:default:={}
 	Status AmaltheaSessionStatus `json:"status,omitempty"`
 }

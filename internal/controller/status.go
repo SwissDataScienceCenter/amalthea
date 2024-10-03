@@ -1,8 +1,20 @@
 package controller
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+
 	v1 "k8s.io/api/core/v1"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	resource "k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // How many times should a pod restart before we consider it Failed. This is required because if we take
@@ -63,6 +75,83 @@ func podIsFailed(pod *v1.Pod) bool {
 	return false
 }
 
-func isIdle() bool {
+type MetricsSummary struct {
+	CPUMilicores int64
+	MemoryBytes  int64
+}
+
+type PodMetrics struct {
+	Kind       string            `json:"kind"`
+	APIVersion string            `json:"apiVersion"`
+	Metadata   metav1.ObjectMeta `json:"metadata"`
+
+	// The following fields define time interval from which metrics were
+	// collected in the following format [Timestamp-Window, Timestamp].
+	Timestamp metav1.Time     `json:"timestamp"`
+	Window    metav1.Duration `json:"window"`
+
+	// Metrics for all containers are collected within the same time window.
+	Containers []ContainerMetrics `json:"containers"`
+}
+
+type ContainerMetrics struct {
+	// Container name corresponding to the one from v1.Pod.Spec.Containers.
+	Name string `json:"name"`
+	// The memory usage is the memory working set.
+	Usage v1.ResourceList `json:"usage"`
+}
+
+func metrics(ctx context.Context, clnt *kubernetes.Clientset, cr *amaltheadevv1alpha1.AmaltheaSession) (MetricsSummary, error) {
+	podName := fmt.Sprintf("%s-0", cr.Name)
+	url := "apis/metrics.k8s.io/v1beta1/namespaces/" + cr.Namespace + "/pods/" + podName
+
+	if clnt == nil {
+		panic("WHAT ???")
+	}
+
+	data, err := clnt.RESTClient().Get().AbsPath(url).DoRaw(ctx)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// The pod might not yet be available or was deleted
+			return MetricsSummary{-1, -1}, nil
+		}
+		return MetricsSummary{}, err
+	}
+	podMetrics := PodMetrics{}
+	err = json.Unmarshal(data, &podMetrics)
+	if err != nil {
+		return MetricsSummary{}, err
+	}
+
+	totalCpu := resource.NewMilliQuantity(0, resource.DecimalSI)
+	totalMemory := resource.NewMilliQuantity(0, resource.BinarySI)
+
+	for _, container := range podMetrics.Containers {
+		totalCpu.Add(*container.Usage.Cpu())
+		totalMemory.Add(*container.Usage.Memory())
+	}
+
+	return MetricsSummary{totalCpu.MilliValue(), totalMemory.MilliValue()}, nil
+}
+
+func isIdle(ctx context.Context, clnt *kubernetes.Clientset, cr *amaltheadevv1alpha1.AmaltheaSession) bool {
+	log := log.FromContext(ctx)
+	if cr == nil {
+		log.Info("CR is nil")
+		return false
+	}
+
+	metrics, err := metrics(ctx, clnt, cr)
+	if err != nil {
+		log.Info("Metrics returned error", "error", err)
+		return false
+	}
+
+	if metrics.CPUMilicores == 0 {
+		log.Info("Is doing nothing")
+		return true
+	}
+
+	log.Info("Is returning false")
 	return false
 }

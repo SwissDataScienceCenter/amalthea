@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -31,7 +32,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	// "runtime/debug"
 )
+
+func newReconciler() *AmaltheaSessionReconciler {
+	return &AmaltheaSessionReconciler{
+		Client:    k8sClient,
+		Scheme:    k8sClient.Scheme(),
+		Clientset: k8sClientset,
+	}
+}
 
 var _ = Describe("AmaltheaSession Controller", func() {
 	Context("When reconciling a resource", func() {
@@ -80,11 +90,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &AmaltheaSessionReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
-
+			controllerReconciler := newReconciler()
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
 			})
@@ -137,11 +143,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &AmaltheaSessionReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
-
+			controllerReconciler := newReconciler()
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
 			})
@@ -283,10 +285,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 
 				Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
 
-				controllerReconciler := &AmaltheaSessionReconciler{
-					Client: k8sClient,
-					Scheme: k8sClient.Scheme(),
-				}
+				controllerReconciler := newReconciler()
 				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: typeNamespacedName,
 				})
@@ -307,5 +306,102 @@ var _ = Describe("AmaltheaSession Controller", func() {
 			Entry("When SHM is configured", true),
 			Entry("When SHM is not configured", false),
 		)
+	})
+
+	Context("When testing hibernation", func() {
+		const resourceName = "test-resource"
+
+		ctx := context.Background()
+
+		typeNamespacedName := types.NamespacedName{
+			Name:      resourceName,
+			Namespace: "default", // TODO(user):Modify as needed
+		}
+		amaltheasession := &amaltheadevv1alpha1.AmaltheaSession{}
+
+		BeforeEach(func() {
+			By("creating the custom resource for the Kind AmaltheaSession")
+			err := k8sClient.Get(ctx, typeNamespacedName, amaltheasession)
+			if err != nil && errors.IsNotFound(err) {
+				resource := &amaltheadevv1alpha1.AmaltheaSession{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      resourceName,
+						Namespace: "default",
+					},
+					Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
+						Session: amaltheadevv1alpha1.Session{
+							Image:   "debian:bookworm-slim",
+							Command: []string{"sleep"},
+							Args:    []string{"3600"},
+							Port:    8000,
+						},
+						Culling: amaltheadevv1alpha1.Culling{
+							MaxAge: metav1.Duration{
+								Duration: 10 * time.Minute,
+							},
+							MaxIdleDuration: metav1.Duration{
+								Duration: 10 * time.Second,
+							},
+							MaxStartingDuration: metav1.Duration{
+								Duration: 2 * time.Minute,
+							},
+							MaxFailedDuration: metav1.Duration{
+								Duration: 5 * time.Minute,
+							},
+							MaxHibernatedDuration: metav1.Duration{
+								Duration: 15 * time.Second,
+							},
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			}
+		})
+
+		AfterEach(func() {
+			// TODO(user): Cleanup logic after each test, like removing the resource instance.
+			resource := &amaltheadevv1alpha1.AmaltheaSession{}
+			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+
+		It("should successfully delete hibernated resources", func() {
+			By("Checking if the custom resource was successfully created")
+			Eventually(func() error {
+				found := &amaltheadevv1alpha1.AmaltheaSession{}
+				return k8sClient.Get(ctx, typeNamespacedName, found)
+			}, time.Minute, time.Second).Should(Succeed())
+
+			controllerReconciler := newReconciler()
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Checking if StatefulSet was successfully created in the reconciliation")
+			Eventually(func() error {
+				found := &appsv1.StatefulSet{}
+				return k8sClient.Get(ctx, typeNamespacedName, found)
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Marking the session as hibernated")
+			actual := amaltheadevv1alpha1.AmaltheaSession{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, &actual)).To(Succeed())
+
+			actual.Spec.Hibernated = true
+			Expect(controllerReconciler.Update(ctx, &actual)).To(Succeed())
+
+			By("Checking if the custom resource was successfully automatically deleted")
+			Eventually(func() bool {
+				_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				found := &amaltheadevv1alpha1.AmaltheaSession{}
+				err := k8sClient.Get(ctx, typeNamespacedName, found)
+				return errors.IsNotFound(err)
+			}, time.Minute, time.Second).Should(BeTrue())
+		})
 	})
 })
