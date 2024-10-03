@@ -21,6 +21,7 @@ import (
 // a value that is too low it is possible that the pod will "heal itself" after a few restarts. If the
 // value is too high then the user will wait for a long time before they see their pod is failing.
 const restartThreshold int32 = 3
+const idlenessThreshold int64 = 300
 
 // countainerCounts provides from the total and completed/fully running containers in a pod.
 // The output is a tuple with the init container counts followed by the regular container counts.
@@ -142,8 +143,8 @@ func isIdle(ctx context.Context, clnt *kubernetes.Clientset, cr *amaltheadevv1al
 		return false
 	}
 
-	if metrics.CPUMilicores == 0 {
-		log.Info("Is doing nothing")
+	if metrics.CPUMilicores < idlenessThreshold {
+		log.Info("the session was found to be idle", "cpu", metrics.CPUMilicores)
 		return true
 	}
 
