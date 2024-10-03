@@ -3243,7 +3243,7 @@ spec:
                       rule: self == oldSelf
                   ingressClassName:
                     type: string
-                  tlsSecretName:
+                  tlsSecret:
                     description: The name of the TLS secret, same as what is specified
                       in a regular Kubernetes Ingress.
                     properties:

@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	resource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -31,6 +32,11 @@ const authProxyPort int32 = 65535
 const oauth2ProxyImage = "bitnami/oauth2-proxy:7.6.0"
 const authProxyImage = "renku/authproxy:0.0.1-test-1"
 
+var rcloneStorageClass string = getStorageClass()
+var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
+
+const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
+
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	labels := labelsForAmaltheaSession(cr.Name)
@@ -45,6 +51,8 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	if len(cr.Spec.Session.ExtraVolumeMounts) > 0 {
 		extraMounts = cr.Spec.Session.ExtraVolumeMounts
 	}
+	_, dsVols, dsVolMounts := cr.DataSources()
+
 	volumeMounts := append(
 		[]v1.VolumeMount{
 			{
@@ -54,6 +62,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 		},
 		extraMounts...,
 	)
+	volumeMounts = append(volumeMounts, dsVolMounts...)
 
 	volumes := []v1.Volume{
 		{
@@ -65,6 +74,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 			},
 		},
 	}
+	volumes = append(volumes, dsVols...)
 
 	if len(cr.Spec.ExtraVolumes) > 0 {
 		volumes = append(volumes, cr.Spec.ExtraVolumes...)
@@ -493,4 +503,73 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 	}
 
 	return secrets
+}
+
+// Assuming that the csi-rclone driver from https://github.com/SwissDataScienceCenter/csi-rclone
+// is installed, this will generate PVCs for the data sources that have the rclone type.
+func (cr *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
+	pvcs := []v1.PersistentVolumeClaim{}
+	vols := []v1.Volume{}
+	volMounts := []v1.VolumeMount{}
+	for ids, ds := range cr.Spec.DataSources {
+		pvcName := fmt.Sprintf("%s-ds-%d", cr.Name, ids)
+		switch ds.Type {
+		case Rclone:
+			storageClass := rcloneStorageClass
+			readOnly := ds.AccessMode == v1.ReadOnlyMany
+			pvcs = append(
+				pvcs,
+				v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      pvcName,
+						Namespace: cr.Namespace,
+						Annotations: map[string]string{
+							rcloneStorageSecretNameAnnotation: ds.SecretRef.Name,
+						},
+					},
+					Spec: v1.PersistentVolumeClaimSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{ds.AccessMode},
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceStorage: rcloneDefaultStorage,
+							},
+						},
+						StorageClassName: &storageClass,
+					},
+				},
+			)
+			vols = append(
+				vols,
+				v1.Volume{
+					Name: pvcName,
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvcName,
+							ReadOnly:  readOnly,
+						},
+					},
+
+				},
+			)
+			volMounts = append(
+				volMounts,
+				v1.VolumeMount{
+					Name:      pvcName,
+					ReadOnly:  readOnly,
+					MountPath: ds.MountPath,
+				},
+			)
+		default:
+			continue
+		}
+	}
+	return pvcs, vols, volMounts
+}
+
+func getStorageClass() string {
+	sc := os.Getenv("RCLONE_STORAGE_CLASS")
+	if sc == "" {
+		sc = "csi-rclone-secret-annotation"
+	}
+	return sc
 }
