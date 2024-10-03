@@ -175,11 +175,12 @@ func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *a
 		Service:     c.Service.Reconcile(ctx, clnt, cr),
 		Ingress:     c.Ingress.Reconcile(ctx, clnt, cr),
 	}
-	dataSrouceUpdates := []ChildResourceUpdate[v1.PersistentVolumeClaim]{}
+
+	dataSourceUpdates := []ChildResourceUpdate[v1.PersistentVolumeClaim]{}
 	for _, pvc := range c.DataSourcesPVCs {
-		dataSrouceUpdates = append(dataSrouceUpdates, pvc.Reconcile(ctx, clnt, cr))
+		dataSourceUpdates = append(dataSourceUpdates, pvc.Reconcile(ctx, clnt, cr))
 	}
-	output.DataSourcesPVCs = dataSrouceUpdates
+	output.DataSourcesPVCs = dataSourceUpdates
 	return output, output.combineErrors()
 }
 
