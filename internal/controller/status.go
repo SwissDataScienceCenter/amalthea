@@ -105,10 +105,6 @@ func metrics(ctx context.Context, clnt *kubernetes.Clientset, cr *amaltheadevv1a
 	podName := fmt.Sprintf("%s-0", cr.Name)
 	url := "apis/metrics.k8s.io/v1beta1/namespaces/" + cr.Namespace + "/pods/" + podName
 
-	if clnt == nil {
-		panic("WHAT ???")
-	}
-
 	data, err := clnt.RESTClient().Get().AbsPath(url).DoRaw(ctx)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -137,7 +133,6 @@ func metrics(ctx context.Context, clnt *kubernetes.Clientset, cr *amaltheadevv1a
 func isIdle(ctx context.Context, clnt *kubernetes.Clientset, cr *amaltheadevv1alpha1.AmaltheaSession) bool {
 	log := log.FromContext(ctx)
 	if cr == nil {
-		log.Info("CR is nil")
 		return false
 	}
 
@@ -152,6 +147,5 @@ func isIdle(ctx context.Context, clnt *kubernetes.Clientset, cr *amaltheadevv1al
 		return true
 	}
 
-	log.Info("Is returning false")
 	return false
 }
