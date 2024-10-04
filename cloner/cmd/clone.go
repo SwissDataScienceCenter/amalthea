@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"log"
 	"os"
 	"strings"
@@ -32,18 +33,29 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const ConfigFlag = "config"
-const RemoteFlag = "remote"
-const RevisionFlag = "revision"
-const PathFlag = "path"
-const VerboseFlag = "verbose"
+const ConfigFlag string = "config"
+const RemoteFlag string = "remote"
+const RevisionFlag string = "revision"
+const PathFlag string = "path"
+const VerboseFlag string = "verbose"
+const StrategyFlag string = "strategy"
+
+// Pre cloning strategies
+
+const NotIfExist string = "notifexist" // Do not clone if target already exists
+const Overwrite string = "overwrite"   // Remove target first if it exists
+const NoStrategy string = "nostrategy" // Let git handle the situation
 
 var (
-	configPath string
-	remote     string
-	revision   string
-	path       string
-	verbose    bool
+	configPath           string
+	remote               string
+	revision             string
+	path                 string
+	verbose              bool
+	PreCloningStrategies []string = []string{
+		NotIfExist, Overwrite, NoStrategy,
+	}
+	preCloningStrategy = newEnum(PreCloningStrategies, NoStrategy)
 )
 
 type CloneFonfig struct {
@@ -66,6 +78,8 @@ func init() {
 	cloneCmd.MarkFlagRequired(PathFlag)
 
 	cloneCmd.Flags().BoolVar(&verbose, VerboseFlag, false, "make the command verbose")
+
+	cloneCmd.Flags().VarP(preCloningStrategy, StrategyFlag, "", "the pre cloning strategy")
 }
 
 var cloneCmd = &cobra.Command{
@@ -74,23 +88,58 @@ var cloneCmd = &cobra.Command{
 	Run:   clone,
 }
 
+func applyPreCloningStrategy(clonePath string) {
+	if preCloningStrategy.Equal(NoStrategy) {
+		log.Print("no strategy selected, let git handle the this.")
+		return
+	}
+
+	// check if target exists
+	_, err := os.Stat(clonePath)
+
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			log.Print(clonePath, " does not exist, nothing to be done.")
+			return
+		}
+
+		log.Fatal("unexpected error: ", err)
+	}
+
+	if preCloningStrategy.Equal(NotIfExist) {
+		log.Print(clonePath, " already exist, doing nothing.")
+		os.Exit(0)
+	}
+
+	if preCloningStrategy.Equal(Overwrite) {
+		log.Print(clonePath, " exists, deleting it.")
+		err = os.RemoveAll(clonePath + "/")
+		if err != nil {
+			log.Fatal("failed to remove existing clone: ", err)
+		}
+	}
+}
+
 func clone(cmd *cobra.Command, args []string) {
 
 	endpoint, err := transport.NewEndpoint(remote)
 	if err != nil {
-		log.Fatal("failed to parse remote", err)
+		log.Fatal("failed to parse remote: ", err)
 	}
 
 	splittedRepo := strings.FieldsFunc(endpoint.Path, func(c rune) bool { return c == '/' }) // FieldsFunc handles repeated and beginning/ending separator characters more sanely than Split
-	if len(splittedRepo) < 2 {
-		log.Fatal("expecting <user>/<repo> in url path, received: ", endpoint.Path)
+	if !(len(splittedRepo) > 0) {
+		log.Fatal("expecting repo in url path, received: ", endpoint.Path)
 	}
 	projectName := splittedRepo[len(splittedRepo)-1]
+	projectName = strings.TrimSuffix(projectName, ".git")
 
 	clonePath := projectName
 	if path != "" {
 		clonePath = path + "/" + projectName
 	}
+
+	applyPreCloningStrategy(clonePath)
 
 	// Clone the given repository to the given directory
 	log.Print("git clone ", remote, " to ", clonePath)
@@ -106,13 +155,13 @@ func clone(cmd *cobra.Command, args []string) {
 	if configPath != "" {
 		buf, err := os.ReadFile(configPath)
 		if err != nil {
-			log.Fatal("failed to read configuration file", err)
+			log.Fatal("failed to read configuration file: ", err)
 		}
 
 		cloneFonfig := &CloneFonfig{}
 		err = yaml.Unmarshal(buf, cloneFonfig)
 		if err != nil {
-			log.Fatal("failed to parse configuration:", err)
+			log.Fatal("failed to parse configuration: ", err)
 		}
 
 		if cloneFonfig.PrivateKey == nil && cloneFonfig.Username == nil {
@@ -122,7 +171,7 @@ func clone(cmd *cobra.Command, args []string) {
 		if cloneFonfig.PrivateKey != nil {
 			publicKeys, err := ssh.NewPublicKeys("git", []byte(*cloneFonfig.PrivateKey), cloneFonfig.Password)
 			if err != nil {
-				log.Fatal("generate publickeys failed:", err)
+				log.Fatal("generate publickeys failed: ", err)
 			}
 			cloneOptions.Auth = publicKeys
 		} else if cloneFonfig.Username != nil {
@@ -137,6 +186,6 @@ func clone(cmd *cobra.Command, args []string) {
 	_, err = git.PlainClone(clonePath, false, &cloneOptions)
 
 	if err != nil {
-		log.Fatal("clone failed:", err)
+		log.Fatal("clone failed: ", err)
 	}
 }
