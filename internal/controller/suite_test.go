@@ -32,7 +32,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"k8s.io/client-go/kubernetes"
+	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -43,7 +43,7 @@ import (
 
 var cfg *rest.Config
 var k8sClient client.Client
-var k8sClientset *kubernetes.Clientset
+var k8sMetricsClient *metricsv.Clientset
 var testEnv *envtest.Environment
 
 func TestControllers(t *testing.T) {
@@ -84,9 +84,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	k8sClientset, err = kubernetes.NewForConfig(cfg)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClientset).NotTo(BeNil())
+	k8sMetricsClient = metricsv.NewForConfigOrDie(cfg)
 })
 
 var _ = AfterSuite(func() {

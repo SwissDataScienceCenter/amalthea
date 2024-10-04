@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -38,6 +37,7 @@ import (
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller"
+	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -141,17 +141,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		setupLog.Error(err, "unable to create clientset")
-		os.Exit(1)
-	}
+	metricsClient := metricsv.NewForConfigOrDie(config)
 
 	if err = (&controller.AmaltheaSessionReconciler{
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		Clientset: clientset,
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		MetricsClient: metricsClient,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AmaltheaSession")
 		os.Exit(1)

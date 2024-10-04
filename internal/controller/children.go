@@ -195,7 +195,7 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReconciler, cr *amaltheadevv1alpha1.AmaltheaSession) amaltheadevv1alpha1.AmaltheaSessionStatus {
 	log := log.FromContext(ctx)
 
-	idle := isIdle(ctx, r.Clientset, cr)
+	idle := isIdle(ctx, r.MetricsClient, cr)
 	idleSince := cr.Status.IdleSince
 	if idle && idleSince.IsZero() {
 		idleSince = metav1.NewTime(time.Now())

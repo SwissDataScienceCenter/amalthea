@@ -28,7 +28,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
+	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -40,8 +41,8 @@ import (
 // AmaltheaSessionReconciler reconciles a AmaltheaSession object
 type AmaltheaSessionReconciler struct {
 	client.Client
-	Scheme    *runtime.Scheme
-	Clientset *kubernetes.Clientset
+	Scheme        *runtime.Scheme
+	MetricsClient *metricsv.Clientset
 }
 
 // Definitions to manage status conditions

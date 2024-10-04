@@ -37,9 +37,9 @@ import (
 
 func newReconciler() *AmaltheaSessionReconciler {
 	return &AmaltheaSessionReconciler{
-		Client:    k8sClient,
-		Scheme:    k8sClient.Scheme(),
-		Clientset: k8sClientset,
+		Client:        k8sClient,
+		Scheme:        k8sClient.Scheme(),
+		MetricsClient: k8sMetricsClient,
 	}
 }
 
