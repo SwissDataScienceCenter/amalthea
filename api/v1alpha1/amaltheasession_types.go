@@ -70,6 +70,22 @@ type AmaltheaSessionSpec struct {
 	// +optional
 	// Configuration for an ingress to the session, if omitted a Kubernetes Ingress will not be created
 	Ingress *Ingress `json:"ingress,omitempty"`
+
+	// Selector which must match a node's labels for the pod to be scheduled on that node.
+	// Passed right through to the Statefulset used for the session.
+	// +optional
+	// +mapType=atomic
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// If specified, the pod's scheduling constraints
+	// Passed right through to the Statefulset used for the session.
+	// +optional
+	Affinity *v1.Affinity `json:"affinity,omitempty"`
+
+	// If specified, the pod's tolerations.
+	// Passed right through to the Statefulset used for the session.
+	// +optional
+	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 }
 
 type Session struct {
