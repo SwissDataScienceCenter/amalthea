@@ -28,7 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,7 +42,7 @@ import (
 type AmaltheaSessionReconciler struct {
 	client.Client
 	Scheme        *runtime.Scheme
-	MetricsClient *metricsv.Clientset
+	MetricsClient metricsv1beta1.PodMetricsesGetter
 }
 
 // Definitions to manage status conditions
