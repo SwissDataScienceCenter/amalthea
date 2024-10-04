@@ -143,11 +143,13 @@ func main() {
 
 	metricsClient := metricsv.NewForConfigOrDie(config)
 
-	if err = (&controller.AmaltheaSessionReconciler{
+	err = (&controller.AmaltheaSessionReconciler{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
 		MetricsClient: metricsClient,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr)
+
+	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AmaltheaSession")
 		os.Exit(1)
 	}
