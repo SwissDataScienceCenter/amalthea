@@ -28,6 +28,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -39,7 +41,8 @@ import (
 // AmaltheaSessionReconciler reconciles a AmaltheaSession object
 type AmaltheaSessionReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme        *runtime.Scheme
+	MetricsClient metricsv1beta1.PodMetricsesGetter
 }
 
 // Definitions to manage status conditions
@@ -150,7 +153,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	newStatus := updates.Status(ctx, r.Client, amaltheasession)
+	newStatus := updates.Status(ctx, r, amaltheasession)
 	statusChanged := reflect.DeepEqual(amaltheasession.Status, newStatus)
 	amaltheasession.Status = newStatus
 	err = r.Status().Update(ctx, amaltheasession)

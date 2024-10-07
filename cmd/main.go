@@ -37,6 +37,7 @@ import (
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller"
+	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -109,7 +110,9 @@ func main() {
 		}
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	config := ctrl.GetConfigOrDie()
+
+	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
 			BindAddress:   metricsAddr,
@@ -138,10 +141,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.AmaltheaSessionReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	metricsClient := metricsv.NewForConfigOrDie(config).MetricsV1beta1()
+
+	err = (&controller.AmaltheaSessionReconciler{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		MetricsClient: metricsClient,
+	}).SetupWithManager(mgr)
+
+	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AmaltheaSession")
 		os.Exit(1)
 	}

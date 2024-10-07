@@ -221,10 +221,10 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	}
 }
 
-func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) amaltheadevv1alpha1.AmaltheaSessionStatus {
+func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReconciler, cr *amaltheadevv1alpha1.AmaltheaSession) amaltheadevv1alpha1.AmaltheaSessionStatus {
 	log := log.FromContext(ctx)
 
-	idle := isIdle()
+	idle := isIdle(ctx, r.MetricsClient, cr)
 	idleSince := cr.Status.IdleSince
 	if idle && idleSince.IsZero() {
 		idleSince = metav1.NewTime(time.Now())
@@ -242,7 +242,7 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 		hibernatedSince = metav1.Time{}
 	}
 
-	pod, err := cr.Pod(ctx, clnt)
+	pod, err := cr.Pod(ctx, r.Client)
 	if err != nil && !apierrors.IsNotFound(err) {
 		log.Error(err, "Could not read the session pod when updating the status")
 	}
@@ -281,7 +281,7 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 		case amaltheadevv1alpha1.AmaltheaSessionRoutingReady:
 			ingressExists := func() bool {
 				namespacedName := types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}
-				err := clnt.Get(ctx, namespacedName, &networkingv1.Ingress{})
+				err := r.Client.Get(ctx, namespacedName, &networkingv1.Ingress{})
 				return err == nil
 			}
 			if cr.Spec.Ingress == nil && condition.Status == metav1.ConditionTrue {
