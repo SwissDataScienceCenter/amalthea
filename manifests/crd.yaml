@@ -29,10 +29,6 @@ spec:
         type: string
         description: Status of the main pod
         jsonPath: .status.mainPod.status.phase
-      - name: Age
-        type: date
-        description: Creation timestamp of the JupyterServer
-        jsonPath: .metadata.creationTimestamp
 
       schema:
         openAPIV3Schema:
