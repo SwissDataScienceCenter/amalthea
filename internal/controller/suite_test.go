@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -43,7 +44,7 @@ import (
 
 var cfg *rest.Config
 var k8sClient client.Client
-var k8sMetricsClient *metricsv.Clientset
+var k8sMetricsClient metricsv1beta1.PodMetricsesGetter
 var testEnv *envtest.Environment
 
 func TestControllers(t *testing.T) {
@@ -84,7 +85,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	k8sMetricsClient = metricsv.NewForConfigOrDie(cfg)
+	k8sMetricsClient = metricsv.NewForConfigOrDie(cfg).MetricsV1beta1()
 })
 
 var _ = AfterSuite(func() {

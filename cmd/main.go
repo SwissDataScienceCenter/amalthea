@@ -141,7 +141,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	metricsClient := metricsv.NewForConfigOrDie(config)
+	metricsClient := metricsv.NewForConfigOrDie(config).MetricsV1beta1()
 
 	err = (&controller.AmaltheaSessionReconciler{
 		Client:        mgr.GetClient(),

@@ -22,7 +22,7 @@ import (
 // We should prefix reserved names like below with `amalthea-` and then add checks in our spec to prevent people from naming things where they
 // start with the same `amalthea-` prefix.
 const prefix string = "amalthea-"
-const sessionContainerName string = prefix + "session"
+const SessionContainerName string = prefix + "session"
 const servicePortName string = prefix + "http"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
@@ -105,7 +105,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	// in the CR can point to either the session container or another container.
 	sessionContainer := v1.Container{
 		Image:                    session.Image,
-		Name:                     sessionContainerName,
+		Name:                     SessionContainerName,
 		ImagePullPolicy:          v1.PullIfNotPresent,
 		Args:                     session.Args,
 		Command:                  session.Command,

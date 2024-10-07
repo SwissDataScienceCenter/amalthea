@@ -11,7 +11,7 @@ import (
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -20,7 +20,8 @@ import (
 // a value that is too low it is possible that the pod will "heal itself" after a few restarts. If the
 // value is too high then the user will wait for a long time before they see their pod is failing.
 const restartThreshold int32 = 3
-const idlenessThreshold int64 = 300
+
+var cpuUsageIdlenessThreshold resource.Quantity = *resource.NewMilliQuantity(300, resource.DecimalSI)
 
 // countainerCounts provides from the total and completed/fully running containers in a pod.
 // The output is a tuple with the init container counts followed by the regular container counts.
@@ -75,14 +76,9 @@ func podIsFailed(pod *v1.Pod) bool {
 	return false
 }
 
-type MetricsSummary struct {
-	CPUMilicores int64
-	MemoryBytes  int64
-}
-
-func metrics(ctx context.Context, clnt *metricsv.Clientset, cr *amaltheadevv1alpha1.AmaltheaSession) (MetricsSummary, error) {
+func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *amaltheadevv1alpha1.AmaltheaSession) (v1.ResourceList, error) {
 	podName := fmt.Sprintf("%s-0", cr.Name)
-	podMetricses, err := clnt.MetricsV1beta1().PodMetricses(cr.Namespace).List(
+	podMetricses, err := clnt.PodMetricses(cr.Namespace).List(
 		ctx,
 		metav1.SingleObject(
 			metav1.ObjectMeta{Name: podName},
@@ -90,27 +86,25 @@ func metrics(ctx context.Context, clnt *metricsv.Clientset, cr *amaltheadevv1alp
 	)
 
 	if err != nil {
-		return MetricsSummary{-1, -1}, err
+		return nil, err
 	}
 
 	if len(podMetricses.Items) == 0 {
-		return MetricsSummary{-1, -1}, fmt.Errorf("pod %s not found", podName)
+		return nil, fmt.Errorf("pod %s not found", podName)
 	}
 
 	podMetrics := podMetricses.Items[0]
 
-	totalCpu := resource.NewMilliQuantity(0, resource.DecimalSI)
-	totalMemory := resource.NewMilliQuantity(0, resource.BinarySI)
-
 	for _, container := range podMetrics.Containers {
-		totalCpu.Add(*container.Usage.Cpu())
-		totalMemory.Add(*container.Usage.Memory())
+		if container.Name == amaltheadevv1alpha1.SessionContainerName {
+			return container.Usage, nil
+		}
 	}
 
-	return MetricsSummary{totalCpu.MilliValue(), totalMemory.MilliValue()}, nil
+	return nil, fmt.Errorf("could not find the metrics for the session container %s", amaltheadevv1alpha1.SessionContainerName)
 }
 
-func isIdle(ctx context.Context, clnt *metricsv.Clientset, cr *amaltheadevv1alpha1.AmaltheaSession) bool {
+func isIdle(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *amaltheadevv1alpha1.AmaltheaSession) bool {
 	log := log.FromContext(ctx)
 	if cr == nil {
 		return false
@@ -122,8 +116,15 @@ func isIdle(ctx context.Context, clnt *metricsv.Clientset, cr *amaltheadevv1alph
 		return false
 	}
 
-	if metrics.CPUMilicores < idlenessThreshold {
-		log.Info("the session was found to be idle", "cpu", metrics.CPUMilicores)
+	cpuUsage := metrics.Cpu()
+	if cpuUsage != nil && cpuUsage.Cmp(cpuUsageIdlenessThreshold) == -1 {
+		log.Info(
+			"the session was found to be idle",
+			"cpu usage milicores",
+			cpuUsage.MilliValue(),
+			"idle threshold milicores",
+			cpuUsageIdlenessThreshold.MilliValue(),
+		)
 		return true
 	}
 
