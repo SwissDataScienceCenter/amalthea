@@ -53,10 +53,6 @@ type AmaltheaSessionSpec struct {
 	// Will hibernate the session, scaling the session's statefulset to zero.
 	Hibernated bool `json:"hibernated"`
 
-	// +kubebuilder:default:=false
-	// Whether to adopt all secrets referred to by name in this CR. Adopted secrets will be deleted when the CR is deleted.
-	AdoptSecrets bool `json:"adoptSecrets"`
-
 	// +optional
 	// Additional containers to add to the session statefulset.
 	// NOTE: The container names provided will be partially overwritten and randomized to avoid collisions
@@ -74,6 +70,22 @@ type AmaltheaSessionSpec struct {
 	// +optional
 	// Configuration for an ingress to the session, if omitted a Kubernetes Ingress will not be created
 	Ingress *Ingress `json:"ingress,omitempty"`
+
+	// Selector which must match a node's labels for the pod to be scheduled on that node.
+	// Passed right through to the Statefulset used for the session.
+	// +optional
+	// +mapType=atomic
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// If specified, the pod's scheduling constraints
+	// Passed right through to the Statefulset used for the session.
+	// +optional
+	Affinity *v1.Affinity `json:"affinity,omitempty"`
+
+	// If specified, the pod's tolerations.
+	// Passed right through to the Statefulset used for the session.
+	// +optional
+	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 }
 
 type Session struct {
@@ -132,7 +144,7 @@ type Ingress struct {
 	Host string `json:"host"`
 	// +optional
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
-	TLSSecretName *string `json:"tlsSecretName,omitempty"`
+	TLSSecret *SessionSecretRef `json:"tlsSecret,omitempty"`
 }
 
 type Storage struct {
@@ -172,11 +184,11 @@ type CodeRepository struct {
 	// The private key and its corresponding password
 	// An empty value can be used when cloning from public repositories using the http protocol
 	// NOTE: you have to specify the whole config in a single key in the secret.
-	CloningConfigSecretRef *SessionSecretRef `json:"cloningConfigSecretRef,omitempty"`
+	CloningConfigSecretRef *SessionSecretKeyRef `json:"cloningConfigSecretRef,omitempty"`
 	// The Kubernetes secret that contains the code repository configuration to be used when the session is running.
 	// For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
 	// NOTE: you have to specify the whole config in a single key in the secret.
-	ConfigSecretRef *SessionSecretRef `json:"configSecretRef,omitempty"`
+	ConfigSecretRef *SessionSecretKeyRef `json:"configSecretRef,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={rclone}
@@ -192,6 +204,9 @@ type DataSource struct {
 	// +kubebuilder:default:="data"
 	// Path relative to the session working directory where the data should be mounted
 	MountPath string `json:"mountPath,omitempty"`
+	// +kubebuilder:default:=ReadOnlyMany
+	// The access mode for the data source
+	AccessMode v1.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
 	// The secret containing the configuration or credentials needed for access to the data.
 	// The format of the configuration that is expected depends on the storage type.
 	// NOTE: define all values in a single key of the Kubernetes secret.
@@ -256,16 +271,37 @@ type Authentication struct {
 	// For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
 	// Note that the `upstream` and `http_address` configuration options cannot be set from the secret because
 	// the operator knows how to set these options to the proper values.
-	SecretRef SessionSecretRef `json:"secretRef"`
+	SecretRef SessionSecretKeyRef `json:"secretRef"`
 	// +optional
 	// Additional volume mounts for the authentication container.
 	ExtraVolumeMounts []v1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 }
 
 // A reference to a Kubernetes secret and a specific field in the secret to be used in a session
-type SessionSecretRef struct {
+type SessionSecretKeyRef struct {
 	Name string `json:"name"`
 	Key  string `json:"key"`
+	// +optional
+	// +kubebuilder:validation:Optional
+	// If the secret is adopted then the operator will delete the secret when the custom resource that uses it is deleted.
+	Adopt bool `json:"adopt"`
+}
+
+func (s *SessionSecretKeyRef) isAdopted() bool {
+	return s != nil && s.Name != "" && s.Adopt
+}
+
+// A reference to a whole Kubernetes secret where the key is not important
+type SessionSecretRef struct {
+	Name string `json:"name"`
+	// +optional
+	// +kubebuilder:validation:Optional
+	// If the secret is adopted then the operator will delete the secret when the custom resource that uses it is deleted.
+	Adopt bool `json:"adopt"`
+}
+
+func (s *SessionSecretRef) isAdopted() bool {
+	return s != nil && s.Name != "" && s.Adopt
 }
 
 // +kubebuilder:validation:Enum={Running,Failed,Hibernated,NotReady,RunningDegraded}
@@ -370,7 +406,7 @@ func (a *AmaltheaSession) GetURL() *url.URL {
 		return nil
 	}
 	urlScheme := "http"
-	if a.Spec.Ingress.TLSSecretName != nil {
+	if a.Spec.Ingress.TLSSecret != nil && a.Spec.Ingress.TLSSecret.Name != "" {
 		urlScheme = "https"
 	}
 	sessionURL := url.URL{

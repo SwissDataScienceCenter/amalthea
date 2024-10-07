@@ -64,11 +64,6 @@ spec:
           spec:
             description: AmaltheaSessionSpec defines the desired state of AmaltheaSession
             properties:
-              adoptSecrets:
-                default: false
-                description: Whether to adopt all secrets referred to by name in this
-                  CR. Adopted secrets will be deleted when the CR is deleted.
-                type: boolean
               authentication:
                 description: Authentication configuration for the session
                 properties:
@@ -121,11 +116,18 @@ spec:
                   secretRef:
                     description: |-
                       Kubernetes secret that contains the authentication configuration
-                      For `token` generate a hard to guess string / password-like string.
-                      this value can be used as Authorization header or as a cookie with the name `amaltheaSessionToken` to
-                      access the session.
+                      For `token` a yaml file with the following keys is required:
+                        - token: the token value used to authenticate the user
+                        - cookie_key: the name of the cookie where the token will be saved and searched for
                       For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
+                      Note that the `upstream` and `http_address` configuration options cannot be set from the secret because
+                      the operator knows how to set these options to the proper values.
                     properties:
+                      adopt:
+                        description: If the secret is adopted then the operator will
+                          delete the secret when the custom resource that uses it is
+                          deleted.
+                        type: boolean
                       key:
                         type: string
                       name:
@@ -154,12 +156,20 @@ spec:
                         the repository should be cloned into.
                       example: repositories/project1
                       type: string
-                    cloningGitConfigSecretRef:
+                    cloningConfigSecretRef:
                       description: |-
                         The Kubernetes secret that contains the code repository configuration to be used during cloning.
-                        For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
+                        For 'git' this should contain either:
+                        The username and password
+                        The private key and its corresponding password
+                        An empty value can be used when cloning from public repositories using the http protocol
                         NOTE: you have to specify the whole config in a single key in the secret.
                       properties:
+                        adopt:
+                          description: If the secret is adopted then the operator will
+                            delete the secret when the custom resource that uses it
+                            is deleted.
+                          type: boolean
                         key:
                           type: string
                         name:
@@ -168,12 +178,17 @@ spec:
                       - key
                       - name
                       type: object
-                    gitConfigSecretRef:
+                    configSecretRef:
                       description: |-
                         The Kubernetes secret that contains the code repository configuration to be used when the session is running.
                         For 'git' this is the git configuration which can be used to inject credentials in addition to any other repo-specific Git configuration.
                         NOTE: you have to specify the whole config in a single key in the secret.
                       properties:
+                        adopt:
+                          description: If the secret is adopted then the operator will
+                            delete the secret when the custom resource that uses it
+                            is deleted.
+                          type: boolean
                         key:
                           type: string
                         name:
@@ -202,6 +217,9 @@ spec:
                   - remote
                   type: object
                 type: array
+                x-kubernetes-validations:
+                - message: CodeRepositories is immutable
+                  rule: self == oldSelf
               culling:
                 description: Culling configuration
                 properties:
@@ -255,6 +273,10 @@ spec:
                 description: A list of data sources that should be added to the session
                 items:
                   properties:
+                    accessMode:
+                      default: ReadOnlyMany
+                      description: The access mode for the data source
+                      type: string
                     mountPath:
                       default: data
                       description: Path relative to the session working directory where
@@ -268,12 +290,14 @@ spec:
                         NOTE: define all values in a single key of the Kubernetes secret.
                         rclone: any valid rclone configuration for a single remote, see the output of `rclone config providers` for validation and format.
                       properties:
-                        key:
-                          type: string
+                        adopt:
+                          description: If the secret is adopted then the operator will
+                            delete the secret when the custom resource that uses it
+                            is deleted.
+                          type: boolean
                         name:
                           type: string
                       required:
-                      - key
                       - name
                       type: object
                     type:
@@ -3215,16 +3239,20 @@ spec:
                       rule: self == oldSelf
                   ingressClassName:
                     type: string
-                  pathPrefix:
-                    default: /
-                    type: string
-                    x-kubernetes-validations:
-                    - message: PathPrefix is immutable
-                      rule: self == oldSelf
-                  tlsSecretName:
+                  tlsSecret:
                     description: The name of the TLS secret, same as what is specified
                       in a regular Kubernetes Ingress.
-                    type: string
+                    properties:
+                      adopt:
+                        description: If the secret is adopted then the operator will
+                          delete the secret when the custom resource that uses it is
+                          deleted.
+                        type: boolean
+                      name:
+                        type: string
+                    required:
+                    - name
+                    type: object
                 required:
                 - host
                 type: object
@@ -4715,10 +4743,14 @@ spec:
                   port:
                     default: 8000
                     description: |-
-                      The TCP port on the session Pod where the session can be accessed. Can point to either the
-                      session container or any additional container that is added. K8s port names are not accepted.
+                      The TCP port on the pod where the session can be accessed.
+                      If the session has authentication enabled then the ingress and service will point to the authentication container
+                      and the authentication proxy container will proxy to this port. If authentication is disabled then the ingress and service
+                      route directly to this port. Note that renku reserves the highest TCP value 65535 to run the authentication proxy.
+                    exclusiveMaximum: true
                     exclusiveMinimum: true
                     format: int32
+                    maximum: 65535
                     minimum: 0
                     type: integer
                   resources:
@@ -4779,6 +4811,9 @@ spec:
                     type: object
                   runAsGroup:
                     default: 1000
+                    description: |-
+                      The group is set on the session and this value is also set as the fsgroup for the whole pod and all session
+                      contianers.
                     format: int64
                     minimum: 0
                     type: integer
@@ -4814,8 +4849,8 @@ spec:
                   urlPath:
                     default: /
                     description: |-
-                      The path where the session can be accessed. If an ingress is specified, this value must
-                      be a subpath of the ingress `pathPrefix` field.
+                      The path where the session can be accessed. If an ingress is enabled then this will be
+                      the path prefix for the ingress.
                     type: string
                   workingDir:
                     description: |-
@@ -4827,11 +4862,11 @@ spec:
                 - port
                 type: object
             required:
-            - adoptSecrets
             - hibernated
             - session
             type: object
           status:
+            default: {}
             description: AmaltheaSessionStatus defines the observed state of AmaltheaSession
             properties:
               conditions:
@@ -4872,6 +4907,7 @@ spec:
                 format: date-time
                 type: string
               idle:
+                default: false
                 type: boolean
               idleSince:
                 format: date-time

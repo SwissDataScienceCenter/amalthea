@@ -185,10 +185,9 @@ var _ = Describe("AmaltheaSession Controller", func() {
 						Port:  8000,
 					},
 					Ingress: &amaltheadevv1alpha1.Ingress{
-						Host:          "test.com",
-						TLSSecretName: &tlsSecretName,
+						Host:      "test.com",
+						TLSSecret: &amaltheadevv1alpha1.SessionSecretRef{Name: tlsSecretName},
 					},
-					AdoptSecrets: false,
 				},
 			}
 
@@ -211,7 +210,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 		DescribeTable("Manage secrets",
 			func(adoptSecrets bool) {
 				By("Ensuring the session has the correct configuration")
-				amaltheasession.Spec.AdoptSecrets = adoptSecrets
+				amaltheasession.Spec.Ingress.TLSSecret.Adopt = adoptSecrets
 				err := k8sClient.Get(ctx, typeNamespacedName, amaltheasession)
 				if err != nil && errors.IsNotFound(err) {
 					Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
@@ -219,7 +218,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 
 				actual := amaltheadevv1alpha1.AmaltheaSession{}
 				Expect(k8sClient.Get(ctx, typeNamespacedName, &actual)).To(Succeed())
-				Expect(actual.Spec.AdoptSecrets).To(Equal(adoptSecrets))
+				Expect(actual.Spec.Ingress.TLSSecret.Adopt).To(Equal(adoptSecrets))
 
 				By("Deleting the session")
 				Expect(k8sClient.Delete(ctx, &actual)).To(Succeed())
