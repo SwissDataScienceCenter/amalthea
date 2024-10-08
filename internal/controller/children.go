@@ -294,7 +294,7 @@ func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReco
 				condition.Status = metav1.ConditionTrue
 				condition.LastTransitionTime = now
 				condition.Reason = "IngressOperational"
-				condition.Message = fmt.Sprint("The ingress is setup and operational")
+				condition.Message = "The ingress is setup and operational"
 			}
 		}
 		conditions[i] = condition

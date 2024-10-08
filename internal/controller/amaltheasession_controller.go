@@ -45,14 +45,6 @@ type AmaltheaSessionReconciler struct {
 	MetricsClient metricsv1beta1.PodMetricsesGetter
 }
 
-// Definitions to manage status conditions
-const (
-	// typeAvailableAmaltheaSession represents the status of the StatefulSet reconciliation
-	typeAvailableAmaltheaSession = "Available"
-	// typeDegradedAmaltheaSession represents the status used when the custom resource is deleted and the finalizer operations are must to occur.
-	typeDegradedAmaltheaSession = "Degraded"
-)
-
 // finalizers
 const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
 
