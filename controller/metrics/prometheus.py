@@ -99,7 +99,7 @@ class PrometheusMetric:
             metric_action = action
         else:
             raise ValueError(
-               f"Type of metric action needs to be either str or PrometheusMetricAction, got {type(action)}"
+                f"Type of metric action needs to be either str or PrometheusMetricAction, got {type(action)}"
             )
         if metric_action not in self._metric_type.actions:
             raise ValueError(

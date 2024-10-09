@@ -221,42 +221,7 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	}
 }
 
-func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReconciler, cr *amaltheadevv1alpha1.AmaltheaSession) amaltheadevv1alpha1.AmaltheaSessionStatus {
-	log := log.FromContext(ctx)
-
-	idle := isIdle(ctx, r.MetricsClient, cr)
-	idleSince := cr.Status.IdleSince
-	if idle && idleSince.IsZero() {
-		idleSince = metav1.NewTime(time.Now())
-	}
-	if !idle && !idleSince.IsZero() {
-		idleSince = metav1.Time{}
-	}
-
-	hibernated := cr.Spec.Hibernated
-	hibernatedSince := cr.Status.HibernatedSince
-	if hibernated && hibernatedSince.IsZero() {
-		hibernatedSince = metav1.NewTime(time.Now())
-	}
-	if !hibernated && !hibernatedSince.IsZero() {
-		hibernatedSince = metav1.Time{}
-	}
-
-	pod, err := cr.Pod(ctx, r.Client)
-	if err != nil && !apierrors.IsNotFound(err) {
-		log.Error(err, "Could not read the session pod when updating the status")
-	}
-
-	failing := pod != nil && podIsFailed(pod)
-	failingSince := cr.Status.FailingSince
-	if failing && failingSince.IsZero() {
-		failingSince = metav1.NewTime(time.Now())
-	}
-	if !hibernated && !failingSince.IsZero() {
-		failingSince = metav1.Time{}
-	}
-
-	state := c.State(cr, pod)
+func (c ChildResourceUpdates) Conditions(state amaltheadevv1alpha1.State, ctx context.Context, r *AmaltheaSessionReconciler, cr *amaltheadevv1alpha1.AmaltheaSession) []amaltheadevv1alpha1.AmaltheaSessionCondition {
 	conditions := cr.Status.Conditions
 	if len(conditions) == 0 {
 		conditions = amaltheadevv1alpha1.NewConditions()
@@ -294,14 +259,54 @@ func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReco
 				condition.Status = metav1.ConditionTrue
 				condition.LastTransitionTime = now
 				condition.Reason = "IngressOperational"
-				condition.Message = fmt.Sprint("The ingress is setup and operational")
+				condition.Message = "The ingress is setup and operational"
 			}
 		}
 		conditions[i] = condition
 	}
 
+	return conditions
+}
+
+func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReconciler, cr *amaltheadevv1alpha1.AmaltheaSession) amaltheadevv1alpha1.AmaltheaSessionStatus {
+	log := log.FromContext(ctx)
+
+	idle := isIdle(ctx, r.MetricsClient, cr)
+	idleSince := cr.Status.IdleSince
+	if idle && idleSince.IsZero() {
+		idleSince = metav1.NewTime(time.Now())
+	}
+	if !idle && !idleSince.IsZero() {
+		idleSince = metav1.Time{}
+	}
+
+	hibernated := cr.Spec.Hibernated
+	hibernatedSince := cr.Status.HibernatedSince
+	if hibernated && hibernatedSince.IsZero() {
+		hibernatedSince = metav1.NewTime(time.Now())
+	}
+	if !hibernated && !hibernatedSince.IsZero() {
+		hibernatedSince = metav1.Time{}
+	}
+
+	pod, err := cr.Pod(ctx, r.Client)
+	if err != nil && !apierrors.IsNotFound(err) {
+		log.Error(err, "Could not read the session pod when updating the status")
+	}
+
+	failing := pod != nil && podIsFailed(pod)
+	failingSince := cr.Status.FailingSince
+	if failing && failingSince.IsZero() {
+		failingSince = metav1.NewTime(time.Now())
+	}
+	if !hibernated && !failingSince.IsZero() {
+		failingSince = metav1.Time{}
+	}
+
+	state := c.State(cr, pod)
+
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
-		Conditions:      conditions,
+		Conditions:      c.Conditions(state, ctx, r, cr),
 		State:           state,
 		URL:             cr.GetURLString(),
 		Idle:            idle,
