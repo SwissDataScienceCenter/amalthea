@@ -104,6 +104,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	echo "{{- if .Values.deployCrd -}}" > $(HELM_CRD_TEMPLATE)
 	echo "# This manifest is auto-generated from the makefile do not edit manually." >> $(HELM_CRD_TEMPLATE)
 	cat config/crd/bases/*yaml >> $(HELM_CRD_TEMPLATE)
+	echo "{{- end }}" >> $(HELM_CRD_TEMPLATE)
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -279,6 +280,17 @@ bundle-build: ## Build the bundle image.
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+
+.PHONY: list-chartpress-images
+list-chartpress-images:
+	@# Chartpress has a bug where it only lists the images from the first helm chart in the yaml file
+	@# We have 2 charts so we have to do this to compensate
+	@chartpress --list-images
+	@cp chartpress.yaml chartpress.backup.yaml
+	@yq "del(.charts[0])" -i chartpress.yaml
+	@chartpress --list-images
+	@rm chartpress.yaml
+	@mv chartpress.backup.yaml chartpress.yaml
 
 .PHONY: opm
 OPM = $(LOCALBIN)/opm

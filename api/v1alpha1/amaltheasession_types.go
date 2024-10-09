@@ -65,6 +65,8 @@ type AmaltheaSessionSpec struct {
 
 	// +optional
 	// Additional volumes to include in the statefulset for a session
+	// Volumes used internally by amalthea are all prefixed with 'amalthea-' so as long as you
+	// avoid that naming you will avoid conflicts with the volumes that amalthea generates.
 	ExtraVolumes []v1.Volume `json:"extraVolumes,omitempty"`
 
 	// +optional
@@ -87,8 +89,19 @@ type AmaltheaSessionSpec struct {
 	// +optional
 	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 
-	//Control over the sidecars and init containers Amalthea adds to each session
-	Sidecars Sidecars `json:"sidecars,omitempty"`
+	// +kubebuilder:default:="always"
+	// Indicates how Amalthea should reconcile the child resources for a session. This can be problematic because
+	// newer versions of Amalthea may include new versions of the sidecars or other changes not reflected
+	// in the AmaltheaSession CRD, so simply updating Amalthea could cause existing sessions to restart
+	// because the sidecars will have a newer image or for other reasons because the code changed.
+	// Hibernating the session and deleting it will always work as expected regardless of the strategy.
+	// The status of the session and all hibernation or auto-cleanup functionality will always work as expected.
+	// A few values are possible:
+	// - never: Amalthea will never update any of the child resources and will ignore any changes to the CR
+	// - always: This is the expected method of operation for an operator, changes to the spec are always reconciled
+	// - whenHibernatedOrFailed: To avoid interrupting a running session, reconciliation of the child components
+	//   are only done when the session has a Failed or Hibernated status
+	ReconcileStrategy ReconcileStrategy `json:"reconcileSrategy,omitempty"`
 }
 
 type Session struct {
@@ -109,7 +122,7 @@ type Session struct {
 	// If the session has authentication enabled then the ingress and service will point to the authentication container
 	// and the authentication proxy container will proxy to this port. If authentication is disabled then the ingress and service
 	// route directly to this port. Note that renku reserves the highest TCP value 65535 to run the authentication proxy.
-	Port int32 `json:"port"`
+	Port int32 `json:"port,omitempty"`
 	// +optional
 	// +kubebuilder:default:={}
 	Storage Storage `json:"storage,omitempty"`
@@ -345,6 +358,9 @@ type AmaltheaSessionStatus struct {
 	FailingSince metav1.Time `json:"failingSince,omitempty"`
 	// +kubebuilder:validation:Format:=date-time
 	HibernatedSince metav1.Time `json:"hibernatedSince,omitempty"`
+	// If the state is failed then the message will contain information about what went wrong, otherwise it is empty
+	// +optional
+	Error string `json:"error,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -420,11 +436,9 @@ func (a *AmaltheaSession) GetURL() *url.URL {
 	return &sessionURL
 }
 
-type Sidecars struct {
-	// The docker image with the sidecars CLI.
-	// The containers that are templated are decided based on the image version tag, falling back
-	// on the latest templates for the latest version. Using a non-official image here is strongly
-	// discouraged, if you must then you should use the same semver tags as the official image you
-	// started with or based your custom image on.
-	Image string `json:"image,omitempty"`
-}
+// +kubebuilder:validation:Enum={never,always,whenFailedOrHibernated}
+type ReconcileStrategy string
+
+const Never ReconcileStrategy = "never"
+const Always ReconcileStrategy = "always"
+const WhenFailedOrHibernated ReconcileStrategy = "whenFailedOrHibernated"
