@@ -14,28 +14,38 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package cloner
 
 import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	rootCmd = &cobra.Command{
-		Use:   "cloner",
+func Command() (*cobra.Command, error) {
+	cmd := &cobra.Command{
+		Use:   "clone",
 		Short: "A small utility to clone repositories",
-		Long: `cloner is a helper to Amalthea to clone project
-related repositories`,
+		Long:  `cloner is a helper to Amalthea to clone project related repositories`,
+		Run:   clone,
 	}
-)
+	preCloningStrategy := newEnum(PreCloningStrategies, NoStrategy)
+	cmd.Flags().StringVar(&configPath, ConfigFlag, "", "Path to configuration file")
 
-func Execute() error {
-	return rootCmd.Execute()
-}
+	cmd.Flags().StringVar(&remote, RemoteFlag, "", "remote URL to proxy to")
+	err := cmd.MarkFlagRequired(RemoteFlag)
+	if err != nil {
+		return nil, err
+	}
 
-func init() {
-	cobra.OnInitialize(initConfig)
-}
+	cmd.Flags().StringVar(&revision, RevisionFlag, "", "remote revision (branch, tag, etc.)")
 
-func initConfig() {
+	cmd.Flags().StringVar(&path, PathFlag, "", "clone path")
+	err = cmd.MarkFlagRequired(PathFlag)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd.Flags().BoolVar(&verbose, VerboseFlag, false, "make the command verbose")
+
+	cmd.Flags().VarP(preCloningStrategy, StrategyFlag, "", "the pre cloning strategy")
+	return cmd, nil
 }

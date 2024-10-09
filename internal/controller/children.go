@@ -64,6 +64,12 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
 				return err
 			}
+			for i := range desired.Spec.Template.Spec.InitContainers {
+				cont := &desired.Spec.Template.Spec.InitContainers[i]
+				if cont.Name == "" {
+					cont.Image = ""
+				}
+			}
 			current.Spec.Replicas = desired.Spec.Replicas
 			current.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
 			current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
@@ -137,11 +143,14 @@ type ChildResourceUpdates struct {
 	DataSourcesPVCs []ChildResourceUpdate[v1.PersistentVolumeClaim]
 }
 
-func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResources {
+func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	desiredService := cr.Service()
 	desiredPVC := cr.PVC()
-	desiredStatefulSet := cr.StatefulSet()
+	desiredStatefulSet, err := cr.StatefulSet()
+	if err != nil {
+		return ChildResources{}, err
+	}
 	desiredIngress := cr.Ingress()
 	output := ChildResources{
 		Service:     ChildResource[v1.Service]{&v1.Service{ObjectMeta: metadata}, &desiredService},
@@ -164,7 +173,7 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResources {
 	}
 	output.DataSourcesPVCs = desiredDataSourcesPVCs
 
-	return output
+	return output, nil
 }
 
 func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResourceUpdates, error) {

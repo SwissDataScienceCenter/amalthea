@@ -34,6 +34,7 @@ IMAGE_TAG_BASE ?= renku/amalthea
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
+SIDECARS_IMG ?= $(IMAGE_TAG_BASE)-sidecars:v$(VERSION) 
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -89,6 +90,8 @@ all: build
 # More info on the awk command:
 # http://linuxcommand.org/lc3_adv_awk.php
 
+HELM_CRD_TEMPLATE ?= helm-chart/amalthea-sessions/templates/amaltheasession-crd.yaml
+
 .PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -98,6 +101,9 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	echo "{{- if .Values.deployCrd -}}" > $(HELM_CRD_TEMPLATE)
+	echo "# This manifest is auto-generated from the makefile do not edit manually." >> $(HELM_CRD_TEMPLATE)
+	cat config/crd/bases/*yaml >> $(HELM_CRD_TEMPLATE)
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -141,6 +147,14 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
 	go build -o bin/manager cmd/amalthea/main.go
+
+.PHONY: build-sidecars
+build-sidecars: fmt vet
+	go build -o bin/sidecars cmd/sidecars/main.go
+
+.PHONY: build-sidecars
+docker-build-sidecars: build-sidecars
+	$(CONTAINER_TOOL) build -t ${SIDECARS_IMG} -f sidecars.Dockerfile .
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.

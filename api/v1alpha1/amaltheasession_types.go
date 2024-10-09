@@ -86,6 +86,9 @@ type AmaltheaSessionSpec struct {
 	// Passed right through to the Statefulset used for the session.
 	// +optional
 	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
+
+	//Control over the sidecars and init containers Amalthea adds to each session
+	Sidecars Sidecars `json:"sidecars,omitempty"`
 }
 
 type Session struct {
@@ -407,4 +410,13 @@ func (a *AmaltheaSession) GetURL() *url.URL {
 		Host:   a.Spec.Ingress.Host,
 	}
 	return &sessionURL
+}
+
+type Sidecars struct {
+	// The docker image with the sidecars CLI.
+	// The containers that are templated are decided based on the image version tag, falling back
+	// on the latest templates for the latest version. Using a non-official image here is strongly
+	// discouraged, if you must then you should use the same semver tags as the official image you
+	// started with or based your custom image on.
+	Image string `json:"image,omitempty"`
 }

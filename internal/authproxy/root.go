@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package authproxy
 
 import (
 	"fmt"
@@ -27,52 +27,37 @@ import (
 
 const ConfigFlag = "config"
 
-var (
-	rootCmd = &cobra.Command{
-		Use:   "proxyauth",
-		Short: "A small authentication proxy",
-		Long: `authproxy is an reverse proxy that can be used
-for token based authentication either through a cookie or
-a header.`,
-	}
-)
+func initConfig(cmd *cobra.Command, args []string) {
+	aViper := viper.New()
 
-func Execute() error {
-	return rootCmd.Execute()
-}
+	aViper.SetEnvPrefix("authproxy") // will be uppercased automatically
+	aViper.AutomaticEnv()
 
-func init() {
-	viper.SetEnvPrefix("authproxy") // will be uppercased automatically
-	viper.AutomaticEnv()
+	cmd.PersistentFlags().String(ConfigFlag, "", "config file (default is $HOME/.authproxy)")
+	err := viper.BindPFlag(ConfigFlag, cmd.PersistentFlags().Lookup(ConfigFlag))
+	cobra.CheckErr(err)
 
-	rootCmd.PersistentFlags().String(ConfigFlag, "", "config file (default is $HOME/.authproxy)")
-	viper.BindPFlag(ConfigFlag, rootCmd.PersistentFlags().Lookup(ConfigFlag))
+	cfgFile := aViper.GetString(ConfigFlag)
 
-	cobra.OnInitialize(initConfig)
-}
-
-func initConfig() {
-	cfgFile := viper.GetString(ConfigFlag)
-
-	viper.SetConfigType("yaml")
+	aViper.SetConfigType("yaml")
 
 	if cfgFile != "" {
 		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
+		aViper.SetConfigFile(cfgFile)
 	} else {
 		// Find home directory.
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
 		// Search config in home directory with name ".authproxy" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".authproxy")
+		aViper.AddConfigPath(home)
+		aViper.SetConfigName(".authproxy")
 	}
 
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
+	if err := aViper.ReadInConfig(); err == nil {
+		fmt.Println("Using config file:", aViper.ConfigFileUsed())
 	} else {
-		if !rootCmd.Flags().Changed("config") {
+		if !cmd.Flags().Changed("config") {
 			if _, isNotFound := err.(viper.ConfigFileNotFoundError); isNotFound {
 				return
 			}
@@ -84,9 +69,9 @@ func initConfig() {
 	// Workaround as mandatory flag error triggers when loaded from configuration
 	// file or environment variable.
 	// https://github.com/spf13/viper/issues/397#issuecomment-1304749092
-	serveCmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if viper.IsSet(f.Name) {
-			serveCmd.Flags().Set(f.Name, viper.GetString(f.Name))
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if aViper.IsSet(f.Name) {
+			cmd.Flags().Set(f.Name, aViper.GetString(f.Name))
 		}
 	})
 }

@@ -5640,6 +5640,19 @@ spec:
                 - image
                 - port
                 type: object
+              sidecars:
+                description: Control over the sidecars and init containers Amalthea
+                  adds to each session
+                properties:
+                  image:
+                    description: |-
+                      The docker image with the sidecars CLI.
+                      The containers that are templated are decided based on the image version tag, falling back
+                      on the latest templates for the latest version. Using a non-official image here is strongly
+                      discouraged, if you must then you should use the same semver tags as the official image you
+                      started with or based your custom image on.
+                    type: string
+                type: object
               tolerations:
                 description: |-
                   If specified, the pod's tolerations.

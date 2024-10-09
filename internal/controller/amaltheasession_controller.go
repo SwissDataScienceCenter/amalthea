@@ -40,6 +40,7 @@ import (
 type AmaltheaSessionReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Config config
 }
 
 // Definitions to manage status conditions
@@ -143,7 +144,18 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	log.Info("spec", "cr", amaltheasession)
 
-	children := NewChildResources(amaltheasession)
+	children, err := NewChildResources(amaltheasession)
+	if err != nil {
+		log.Error(
+			err,
+			"Could not template child resources",
+			"name",
+			amaltheasession.GetName(),
+			"namespace",
+			amaltheasession.GetNamespace(),
+		)
+		return ctrl.Result{}, err
+	}
 	updates, err := children.Reconcile(ctx, r.Client, amaltheasession)
 	if err != nil {
 		log.Error(err, "Failed when reconciling children")
