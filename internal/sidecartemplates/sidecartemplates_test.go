@@ -75,25 +75,25 @@ func TestGetFunc(t *testing.T) {
 	f, err := templs.GetFunc("renku/sidecars:0.0.5")
 	require.NoError(err)
 	res := f(&testResource{})
-	assert.Equal(t, "v0.0.4", res.name)
+	assert.Equal("v0.0.4", res.name)
 	// Alpha versions are properly sorted
 	f, err = templs.GetFunc("renku/sidecars:0.0.3")
 	require.NoError(err)
 	res = f(&testResource{})
-	assert.Equal(t, "0.0.3-alpha", res.name)
+	assert.Equal("0.0.3-alpha", res.name)
 	// Asking for a version that is newer than anything stored should return the newest
 	f, err = templs.GetFunc("renku/sidecars:0.4.0")
 	require.NoError(err)
 	res = f(&testResource{})
-	assert.Equal(t, "0.1.0", res.name)
+	assert.Equal("0.1.0", res.name)
 	// Changing the image name does not matter - just the semver matters
 	f, err = templs.GetFunc("image:0.4.0")
 	require.NoError(err)
 	res = f(&testResource{})
-	assert.Equal(t, "0.1.0", res.name)
+	assert.Equal("0.1.0", res.name)
 	// Ensure that prerelease versions are sorted correctly
 	f, err = templs.GetFunc("image:0.0.10")
 	require.NoError(err)
 	res = f(&testResource{})
-	assert.Equal(t, "0.0.10-beta", res.name)
+	assert.Equal("0.0.10-beta", res.name)
 }

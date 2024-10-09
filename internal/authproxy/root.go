@@ -71,7 +71,10 @@ func initConfig(cmd *cobra.Command, args []string) {
 	// https://github.com/spf13/viper/issues/397#issuecomment-1304749092
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		if aViper.IsSet(f.Name) {
-			cmd.Flags().Set(f.Name, aViper.GetString(f.Name))
+			err := cmd.Flags().Set(f.Name, aViper.GetString(f.Name))
+			if err != nil {
+				cobra.CheckErr(err)
+			}
 		}
 	})
 }

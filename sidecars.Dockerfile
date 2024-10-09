@@ -28,6 +28,6 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o si
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/sidecars .
-USER nonroot:nonroot
+USER 65532:65532
 
 ENTRYPOINT ["/sidecars"]
