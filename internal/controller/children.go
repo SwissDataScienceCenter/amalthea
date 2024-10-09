@@ -164,10 +164,11 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResources,
 
 	desiredDataSourcesPVCs := []ChildResource[v1.PersistentVolumeClaim]{}
 	specPVCs, _, _ := cr.DataSources()
-	for _, desiredPVC := range specPVCs {
+	for i := range specPVCs {
+		desiredPVC := &specPVCs[i]
 		childRes := ChildResource[v1.PersistentVolumeClaim]{
 			Current: &v1.PersistentVolumeClaim{ObjectMeta: desiredPVC.ObjectMeta},
-			Desired: &desiredPVC,
+			Desired: desiredPVC,
 		}
 		desiredDataSourcesPVCs = append(desiredDataSourcesPVCs, childRes)
 	}
@@ -183,11 +184,12 @@ func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *a
 		Service:     c.Service.Reconcile(ctx, clnt, cr),
 		Ingress:     c.Ingress.Reconcile(ctx, clnt, cr),
 	}
-	dataSrouceUpdates := []ChildResourceUpdate[v1.PersistentVolumeClaim]{}
+
+	dataSourceUpdates := []ChildResourceUpdate[v1.PersistentVolumeClaim]{}
 	for _, pvc := range c.DataSourcesPVCs {
-		dataSrouceUpdates = append(dataSrouceUpdates, pvc.Reconcile(ctx, clnt, cr))
+		dataSourceUpdates = append(dataSourceUpdates, pvc.Reconcile(ctx, clnt, cr))
 	}
-	output.DataSourcesPVCs = dataSrouceUpdates
+	output.DataSourcesPVCs = dataSourceUpdates
 	return output, output.combineErrors()
 }
 
@@ -201,6 +203,10 @@ func (c ChildResourceUpdates) AllEqual(op controllerutil.OperationResult) bool {
 }
 
 func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
+	// TODO: Try to re-enable the two checks below and potentially use them to determine readiness.
+	// Currently the resources created by the operator have slight changes that k8s itself applies in a few places outside
+	// of the status field. So these are picked up by the functions below. For example a PVC or a statefulset gets automatic
+	// updates from k8s (I think from a mutating or defaulting webhook) to fields other than the status.
 	// onlyStatusUpdates := c.AllEqual(controllerutil.OperationResultUpdatedStatusOnly)
 	// noUpdates := c.AllEqual(controllerutil.OperationResultNone)
 	stsReady := c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
@@ -224,10 +230,10 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	}
 }
 
-func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) amaltheadevv1alpha1.AmaltheaSessionStatus {
+func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReconciler, cr *amaltheadevv1alpha1.AmaltheaSession) amaltheadevv1alpha1.AmaltheaSessionStatus {
 	log := log.FromContext(ctx)
 
-	idle := isIdle()
+	idle := isIdle(ctx, r.MetricsClient, cr)
 	idleSince := cr.Status.IdleSince
 	if idle && idleSince.IsZero() {
 		idleSince = metav1.NewTime(time.Now())
@@ -245,7 +251,7 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 		hibernatedSince = metav1.Time{}
 	}
 
-	pod, err := cr.Pod(ctx, clnt)
+	pod, err := cr.Pod(ctx, r.Client)
 	if err != nil && !apierrors.IsNotFound(err) {
 		log.Error(err, "Could not read the session pod when updating the status")
 	}
@@ -284,7 +290,7 @@ func (c ChildResourceUpdates) Status(ctx context.Context, clnt client.Client, cr
 		case amaltheadevv1alpha1.AmaltheaSessionRoutingReady:
 			ingressExists := func() bool {
 				namespacedName := types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}
-				err := clnt.Get(ctx, namespacedName, &networkingv1.Ingress{})
+				err := r.Client.Get(ctx, namespacedName, &networkingv1.Ingress{})
 				return err == nil
 			}
 			if cr.Spec.Ingress == nil && condition.Status == metav1.ConditionTrue {

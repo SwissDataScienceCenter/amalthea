@@ -22,12 +22,17 @@ import (
 // We should prefix reserved names like below with `amalthea-` and then add checks in our spec to prevent people from naming things where they
 // start with the same `amalthea-` prefix.
 const prefix string = "amalthea-"
-const sessionContainerName string = prefix + "session"
+const SessionContainerName string = prefix + "session"
 const servicePortName string = prefix + "http"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
 const authProxyPort int32 = 65535
+
+var rcloneStorageClass string = getStorageClass()
+var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
+
+const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
 var rcloneStorageClass string = getStorageClass()
 var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
@@ -116,7 +121,7 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 	// in the CR can point to either the session container or another container.
 	sessionContainer := v1.Container{
 		Image:                    session.Image,
-		Name:                     sessionContainerName,
+		Name:                     SessionContainerName,
 		ImagePullPolicy:          v1.PullIfNotPresent,
 		Args:                     session.Args,
 		Command:                  session.Command,
@@ -386,7 +391,7 @@ func (cr *AmaltheaSession) initClones() ([]v1.Container, []v1.Volume) {
 func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 	secrets := v1.SecretList{}
 
-	if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecret != nil && cr.Spec.Ingress.TLSSecret.Name != "" && cr.Spec.Ingress.TLSSecret.Adopt {
+	if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecret.isAdopted() {
 		secrets.Items = append(secrets.Items, v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cr.Namespace,
@@ -396,7 +401,7 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 	}
 
 	auth := cr.Spec.Authentication
-	if auth != nil && auth.Enabled && auth.SecretRef.Name != "" && auth.SecretRef.Adopt {
+	if auth != nil && auth.Enabled && auth.SecretRef.isAdopted() {
 		secrets.Items = append(secrets.Items, v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cr.Namespace,
@@ -406,7 +411,7 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 	}
 
 	for _, pv := range cr.Spec.DataSources {
-		if pv.SecretRef != nil && pv.SecretRef.Name != "" && pv.SecretRef.Adopt {
+		if pv.SecretRef.isAdopted() {
 			secrets.Items = append(secrets.Items, v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      pv.SecretRef.Name,
@@ -417,7 +422,7 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 	}
 
 	for _, codeRepo := range cr.Spec.CodeRepositories {
-		if codeRepo.CloningConfigSecretRef != nil && codeRepo.CloningConfigSecretRef.Name != "" && codeRepo.CloningConfigSecretRef.Adopt {
+		if codeRepo.CloningConfigSecretRef.isAdopted() {
 			secrets.Items = append(secrets.Items, v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      codeRepo.CloningConfigSecretRef.Name,
@@ -425,7 +430,7 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 				},
 			})
 		}
-		if codeRepo.ConfigSecretRef != nil && codeRepo.ConfigSecretRef.Name != "" && codeRepo.ConfigSecretRef.Adopt {
+		if codeRepo.ConfigSecretRef.isAdopted() {
 			secrets.Items = append(secrets.Items, v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      codeRepo.ConfigSecretRef.Name,
@@ -474,13 +479,22 @@ func (cr *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 			vols = append(
 				vols,
 				v1.Volume{
-					Name:         pvcName,
-					VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvcName, ReadOnly: readOnly}},
+					Name: pvcName,
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvcName,
+							ReadOnly:  readOnly,
+						},
+					},
 				},
 			)
 			volMounts = append(
 				volMounts,
-				v1.VolumeMount{Name: pvcName, ReadOnly: readOnly, MountPath: ds.MountPath},
+				v1.VolumeMount{
+					Name:      pvcName,
+					ReadOnly:  readOnly,
+					MountPath: ds.MountPath,
+				},
 			)
 		default:
 			continue
