@@ -2,6 +2,8 @@ name: publish-chart
 
 on:
   push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
 
 jobs:
@@ -28,7 +30,9 @@ jobs:
           echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
           export TAG=$(echo ${GITHUB_REF} | cut -d/ -f3)
           helm dep update amalthea
+          helm dep update amalthea-sessions
           helm lint amalthea
+          helm lint amalthea-sessions
           cd ..
           chartpress --tag $TAG
           chartpress --tag $TAG --push --publish-chart
