@@ -35,6 +35,8 @@ spec:
           value: {{ .Values.clusterScoped | quote }}
         - name: RCLONE_STORAGE_CLASS
           value: {{ .Values.rcloneStorageClass | quote }}
+        - name: SIDECARS_IMAGE
+          value: {{ .Values.sidecars.image.repository }}:{{ .Values.sidecars.image.tag }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
         livenessProbe:

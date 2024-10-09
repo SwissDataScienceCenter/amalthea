@@ -28,3 +28,4 @@ charts:
       sidecars:
         contextPath: .
         dockerfilePath: sidecars.Dockerfile
+        valuesPath: sidecars.image

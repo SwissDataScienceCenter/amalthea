@@ -17,12 +17,32 @@ limitations under the License.
 package utils
 
 import (
+	"bufio"
+	"bytes"
+	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"strings"
 
+	"flag"
+	"path/filepath"
+
 	. "github.com/onsi/ginkgo/v2" //nolint:golint,revive
+
+	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	"github.com/SwissDataScienceCenter/amalthea/internal/controller"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
+	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 const (
@@ -32,10 +52,13 @@ const (
 
 	certmanagerVersion = "v1.5.3"
 	certmanagerURLTmpl = "https://github.com/jetstack/cert-manager/releases/download/%s/cert-manager.yaml"
+
+	metricsServerVersion = "v0.7.2"
+	metricsServerURLTmpl = "https://github.com/kubernetes-sigs/metrics-server/releases/download/%s/components.yaml"
 )
 
 func warnError(err error) {
-	fmt.Fprintf(GinkgoWriter, "warning: %v\n", err)
+	GinkgoLogr.Error(err, "warning error occurred")
 }
 
 // InstallPrometheusOperator installs the prometheus Operator to be used to export the enabled metrics.
@@ -52,12 +75,12 @@ func Run(cmd *exec.Cmd) ([]byte, error) {
 	cmd.Dir = dir
 
 	if err := os.Chdir(cmd.Dir); err != nil {
-		fmt.Fprintf(GinkgoWriter, "chdir dir: %s\n", err)
+		GinkgoLogr.Error(err, "changing directory failed")
 	}
 
 	cmd.Env = append(os.Environ(), "GO111MODULE=on")
 	command := strings.Join(cmd.Args, " ")
-	fmt.Fprintf(GinkgoWriter, "running: %s\n", command)
+	GinkgoLogr.Info("running command", "command", command)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return output, fmt.Errorf("%s failed with error: (%v) %s", command, err, string(output))
@@ -103,6 +126,42 @@ func InstallCertManager() error {
 	return err
 }
 
+// InstallMetricsServer installs the metrics server
+func InstallMetricsServer() error {
+	url := fmt.Sprintf(metricsServerURLTmpl, metricsServerVersion)
+	cmd := exec.Command("kubectl", "apply", "-f", url)
+	if _, err := Run(cmd); err != nil {
+		return err
+	}
+
+	cmd = exec.Command("kubectl", "patch", "-n", "kube-system", "deployment", "metrics-server", "--type=json",
+		"-p", "[{\"op\":\"add\",\"path\":\"/spec/template/spec/containers/0/args/-\",\"value\":\"--kubelet-insecure-tls\"}]")
+
+	if _, err := Run(cmd); err != nil {
+		return err
+	}
+
+	// Wait for metrics-server pod to be ready, which can take time
+	cmd = exec.Command("kubectl", "wait", "deployment.apps/metrics-server",
+		"--for", "condition=Available",
+		"--namespace", "kube-system",
+		"--timeout", "5m",
+	)
+
+	_, err := Run(cmd)
+
+	return err
+}
+
+// UninstallMetricsServer uninstalls the metrics server
+func UninstallMetricsServer() {
+	url := fmt.Sprintf(metricsServerURLTmpl, metricsServerVersion)
+	cmd := exec.Command("kubectl", "delete", "-f", url)
+	if _, err := Run(cmd); err != nil {
+		warnError(err)
+	}
+}
+
 // LoadImageToKindCluster loads a local docker image to the kind cluster
 func LoadImageToKindClusterWithName(name string) error {
 	cluster := "kind"
@@ -137,4 +196,164 @@ func GetProjectDir() (string, error) {
 	}
 	wd = strings.Replace(wd, "/test/e2e", "", -1)
 	return wd, nil
+}
+
+func InstallHelmChart(ctx context.Context, namespace string, releaseName string, chart string) error {
+	cmd := exec.CommandContext(ctx, "chartpress")
+	_, err := Run(cmd)
+	if err != nil {
+		return err
+	}
+	cmd = exec.CommandContext(ctx, "make", "list-chartpress-images")
+	stdout := bytes.NewBuffer(nil)
+	cmd.Stdout = stdout
+	projDir, err := GetProjectDir()
+	if err != nil {
+		return err
+	}
+	cmd.Dir = projDir
+	GinkgoLogr.Info("running command", "command", cmd)
+	err = cmd.Run()
+	if err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		image := scanner.Text()
+		if image == "" {
+			continue
+		}
+		err = LoadImageToKindClusterWithName(image)
+		if err != nil {
+			return err
+		}
+	}
+	err = scanner.Err()
+	if err != nil {
+		return err
+	}
+	cmd = exec.CommandContext(
+		ctx,
+		"helm",
+		"-n",
+		namespace,
+		"upgrade",
+		"--create-namespace",
+		"--install",
+		"--wait",
+		"--timeout",
+		"6m",
+		releaseName,
+		chart,
+	)
+	_, err = Run(cmd)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func UninstallHelmChart(ctx context.Context, namespace string, releaseName string) error {
+	cmd := exec.CommandContext(ctx, "helm", "-n", namespace, "uninstall", releaseName, "--wait", "--timeout", "5m")
+	_, err := Run(cmd)
+	return err
+}
+
+func getScheme() (*runtime.Scheme, error) {
+	scheme := runtime.NewScheme()
+	err := clientgoscheme.AddToScheme(scheme)
+	if err != nil {
+		return nil, err
+	}
+	err = amaltheadevv1alpha1.AddToScheme(scheme)
+	if err != nil {
+		return nil, err
+	}
+	return scheme, nil
+}
+
+func GetK8sClient(ctx context.Context, namespace string) (client.Client, error) {
+	scheme, err := getScheme()
+	if err != nil {
+		return nil, err
+	}
+	var kubeconfig *string
+	testFlags := flag.NewFlagSet("", flag.PanicOnError)
+	if home := homedir.HomeDir(); home != "" {
+		kubeconfig = testFlags.String(
+			"kubeconfig",
+			filepath.Join(home, ".kube", "config"),
+			"(optional) absolute path to the kubeconfig file",
+		)
+	} else {
+		kubeconfig = testFlags.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	}
+	flag.Parse()
+
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+
+	mgr, err := ctrl.NewManager(
+		config,
+		ctrl.Options{
+			Scheme: scheme,
+			Client: client.Options{
+				Cache: &client.CacheOptions{
+					DisableFor: []client.Object{
+						&amaltheadevv1alpha1.AmaltheaSession{},
+						&corev1.Pod{},
+					},
+				},
+			},
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return mgr.GetClient(), nil
+}
+
+func GetRandomName() string {
+	prefix := "amalthea-test-"
+	const length int = 8
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	result := make([]byte, length)
+	for i := range result {
+		result[i] = charset[rand.Intn(len(charset))]
+	}
+	return prefix + string(result)
+}
+
+func GetController(namespace string) (manager.Manager, error) {
+	scheme, err := getScheme()
+	if err != nil {
+		return nil, err
+	}
+	cacheOptions := cache.Options{
+		DefaultNamespaces: map[string]cache.Config{namespace: {}},
+	}
+	config, err := ctrl.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+	mgr, err := ctrl.NewManager(config, ctrl.Options{
+		Scheme: scheme,
+		Cache:  cacheOptions,
+	})
+	if err != nil {
+		return nil, err
+	}
+	metricsClient := metricsv.NewForConfigOrDie(config).MetricsV1beta1()
+	reconciler := &controller.AmaltheaSessionReconciler{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		MetricsClient: metricsClient,
+	}
+	err = reconciler.SetupWithManager(mgr)
+	if err != nil {
+		return nil, err
+	}
+	return mgr, nil
 }

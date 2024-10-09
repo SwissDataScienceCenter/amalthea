@@ -17,13 +17,14 @@ limitations under the License.
 package controller
 
 import (
-	"context"
+	"math/rand"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -43,26 +44,44 @@ func newReconciler() *AmaltheaSessionReconciler {
 	}
 }
 
+var foregroundDelete metav1.DeletionPropagation = metav1.DeletePropagationForeground
+var deleteOptions *client.DeleteOptions = &client.DeleteOptions{PropagationPolicy: &foregroundDelete}
+
+const namespace string = "default"
+
+func getRandomName() string {
+	prefix := "amalthea-test-"
+	const length int = 8
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	result := make([]byte, length)
+	for i := range result {
+		result[i] = charset[rand.Intn(len(charset))]
+	}
+	return prefix + string(result)
+}
+
 var _ = Describe("AmaltheaSession Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+		var resourceName string
+		var typeNamespacedName types.NamespacedName
+		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
 
-		ctx := context.Background()
-
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
-		amaltheasession := &amaltheadevv1alpha1.AmaltheaSession{}
-
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			By("creating the custom resource for the Kind AmaltheaSession")
+			resourceName = getRandomName()
+			typeNamespacedName = types.NamespacedName{
+				Name:      resourceName,
+				Namespace: namespace,
+			}
+			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
+				ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
+			}
 			err := k8sClient.Get(ctx, typeNamespacedName, amaltheasession)
 			if err != nil && errors.IsNotFound(err) {
 				resource := &amaltheadevv1alpha1.AmaltheaSession{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
-						Namespace: "default",
+						Namespace: namespace,
 					},
 					Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
 						Session: amaltheadevv1alpha1.Session{
@@ -72,26 +91,19 @@ var _ = Describe("AmaltheaSession Controller", func() {
 						Ingress: &amaltheadevv1alpha1.Ingress{
 							Host: "test.com",
 						},
-						Sidecars: amaltheadevv1alpha1.Sidecars{
-							Image: "renku/sidecars:0.0.1",
-						},
 					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
 		})
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &amaltheadevv1alpha1.AmaltheaSession{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
-
 			By("Cleanup the specific resource instance AmaltheaSession")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, amaltheasession, deleteOptions)).To(Succeed())
 		})
 
-		It("should successfully reconcile the resource", func() {
+		It("should successfully reconcile the resource", func(ctx SpecContext) {
 			By("Reconciling the created resource")
 			controllerReconciler := newReconciler()
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -104,32 +116,31 @@ var _ = Describe("AmaltheaSession Controller", func() {
 	})
 
 	Context("When reconciling a resource without ingress", func() {
-		const resourceName = "test-resource"
+		var resourceName string
+		var typeNamespacedName types.NamespacedName
+		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
 
-		ctx := context.Background()
-
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
-		amaltheasession := &amaltheadevv1alpha1.AmaltheaSession{}
-
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			By("creating the custom resource for the Kind AmaltheaSession")
+			resourceName = getRandomName()
+			typeNamespacedName = types.NamespacedName{
+				Name:      resourceName,
+				Namespace: namespace,
+			}
+			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
+				ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
+			}
 			err := k8sClient.Get(ctx, typeNamespacedName, amaltheasession)
 			if err != nil && errors.IsNotFound(err) {
 				resource := &amaltheadevv1alpha1.AmaltheaSession{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
-						Namespace: "default",
+						Namespace: namespace,
 					},
 					Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
 						Session: amaltheadevv1alpha1.Session{
 							Image: "debian:bookworm-slim",
 							Port:  8000,
-						},
-						Sidecars: amaltheadevv1alpha1.Sidecars{
-							Image: "renku/sidecars:0.0.1",
 						},
 					},
 				}
@@ -137,17 +148,17 @@ var _ = Describe("AmaltheaSession Controller", func() {
 			}
 		})
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
 			resource := &amaltheadevv1alpha1.AmaltheaSession{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Cleanup the specific resource instance AmaltheaSession")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, resource, deleteOptions)).To(Succeed())
 		})
 
-		It("should successfully reconcile the resource", func() {
+		It("should successfully reconcile the resource", func(ctx SpecContext) {
 			By("Reconciling the created resource")
 			controllerReconciler := newReconciler()
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -160,30 +171,34 @@ var _ = Describe("AmaltheaSession Controller", func() {
 	})
 
 	Context("Adopting secrets", func() {
-		const resourceName = "test-resource"
-		const secretName = "test-secret"
+		var resourceName string
+		var secretName string
+		var typeNamespacedName types.NamespacedName
+		var secretNamespacedName types.NamespacedName
+		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
+		var secret *corev1.Secret
 
-		ctx := context.Background()
-
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
-		amaltheasession := &amaltheadevv1alpha1.AmaltheaSession{}
-
-		secretNamespacedName := types.NamespacedName{
-			Name:      secretName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
-		secret := &corev1.Secret{}
-
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
+			resourceName = getRandomName()
+			secretName = getRandomName()
+			typeNamespacedName = types.NamespacedName{
+				Name:      resourceName,
+				Namespace: namespace,
+			}
+			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
+				ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
+			}
+			secretNamespacedName = types.NamespacedName{
+				Name:      secretName,
+				Namespace: namespace,
+			}
+			secret = &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: secretNamespacedName.Namespace}}
 			tlsSecretName := secretName
 
 			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
-					Namespace: "default",
+					Namespace: namespace,
 				},
 				Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
 					Session: amaltheadevv1alpha1.Session{
@@ -194,9 +209,6 @@ var _ = Describe("AmaltheaSession Controller", func() {
 						Host:      "test.com",
 						TLSSecret: &amaltheadevv1alpha1.SessionSecretRef{Name: tlsSecretName},
 					},
-					Sidecars: amaltheadevv1alpha1.Sidecars{
-						Image: "renku/sidecars:0.0.1",
-					},
 				},
 			}
 
@@ -205,19 +217,20 @@ var _ = Describe("AmaltheaSession Controller", func() {
 				secret := &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      secretName,
-						Namespace: "default",
+						Namespace: namespace,
 					},
 				}
 				Expect(k8sClient.Create(ctx, secret)).To(Succeed())
 			}
 		})
 
-		AfterEach(func() {
-			Expect(k8sClient.Delete(ctx, secret)).To(Succeed())
+		AfterEach(func(ctx SpecContext) {
+			Expect(k8sClient.Delete(ctx, secret, deleteOptions)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, amaltheasession, deleteOptions)).To(Succeed())
 		})
 
 		DescribeTable("Manage secrets",
-			func(adoptSecrets bool) {
+			func(ctx SpecContext, adoptSecrets bool) {
 				By("Ensuring the session has the correct configuration")
 				amaltheasession.Spec.Ingress.TLSSecret.Adopt = adoptSecrets
 				err := k8sClient.Get(ctx, typeNamespacedName, amaltheasession)
@@ -225,12 +238,14 @@ var _ = Describe("AmaltheaSession Controller", func() {
 					Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
 				}
 
-				actual := amaltheadevv1alpha1.AmaltheaSession{}
+				actual := amaltheadevv1alpha1.AmaltheaSession{
+					ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
+				}
 				Expect(k8sClient.Get(ctx, typeNamespacedName, &actual)).To(Succeed())
 				Expect(actual.Spec.Ingress.TLSSecret.Adopt).To(Equal(adoptSecrets))
 
 				By("Deleting the session")
-				Expect(k8sClient.Delete(ctx, &actual)).To(Succeed())
+				Expect(k8sClient.Delete(ctx, &actual, deleteOptions)).To(Succeed())
 
 				By("Checking the secret existence matches expectation")
 				err = k8sClient.Get(ctx, secretNamespacedName, secret)
@@ -246,47 +261,45 @@ var _ = Describe("AmaltheaSession Controller", func() {
 	})
 
 	Context("Handling SHM", func() {
-		const resourceName = "test-resource"
+		var resourceName string
+		var typeNamespacedName types.NamespacedName
+		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
 		const shmSize = "1Mi"
 
-		ctx := context.Background()
-
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
-		amaltheasession := &amaltheadevv1alpha1.AmaltheaSession{}
-
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
+			resourceName = getRandomName()
+			typeNamespacedName = types.NamespacedName{
+				Name:      resourceName,
+				Namespace: namespace,
+			}
 			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
-					Namespace: "default",
+					Namespace: namespace,
 				},
 				Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
 					Session: amaltheadevv1alpha1.Session{
 						Image: "debian:bookworm-slim",
 						Port:  8000,
 					},
-					Sidecars: amaltheadevv1alpha1.Sidecars{
-						Image: "renku/sidecars:0.0.1",
-					},
 				},
 			}
 		})
 
-		AfterEach(func() {
+		AfterEach(func(ctx SpecContext) {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &amaltheadevv1alpha1.AmaltheaSession{}
+			resource := &amaltheadevv1alpha1.AmaltheaSession{
+				ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
+			}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Cleanup the specific resource instance AmaltheaSession")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, resource, deleteOptions)).To(Succeed())
 		})
 
 		DescribeTable("Manage SHM",
-			func(hasSHM bool) {
+			func(ctx SpecContext, hasSHM bool) {
 				By("Ensuring the StatefulSet contains SHM accordingly")
 				if hasSHM {
 					quantity, err := resource.ParseQuantity(shmSize)
@@ -320,77 +333,68 @@ var _ = Describe("AmaltheaSession Controller", func() {
 	})
 
 	Context("When testing hibernation", func() {
-		const resourceName = "test-resource"
+		var resourceName string
+		var typeNamespacedName types.NamespacedName
+		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
 
-		ctx := context.Background()
-
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
-		amaltheasession := &amaltheadevv1alpha1.AmaltheaSession{}
-
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			By("creating the custom resource for the Kind AmaltheaSession")
-			err := k8sClient.Get(ctx, typeNamespacedName, amaltheasession)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &amaltheadevv1alpha1.AmaltheaSession{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
-					},
-					Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
-						Session: amaltheadevv1alpha1.Session{
-							Image:   "debian:bookworm-slim",
-							Command: []string{"sleep"},
-							Args:    []string{"3600"},
-							Port:    8000,
-						},
-						Culling: amaltheadevv1alpha1.Culling{
-							MaxAge: metav1.Duration{
-								Duration: 10 * time.Minute,
-							},
-							MaxIdleDuration: metav1.Duration{
-								Duration: 10 * time.Second,
-							},
-							MaxStartingDuration: metav1.Duration{
-								Duration: 2 * time.Minute,
-							},
-							MaxFailedDuration: metav1.Duration{
-								Duration: 5 * time.Minute,
-							},
-							MaxHibernatedDuration: metav1.Duration{
-								Duration: 15 * time.Second,
-							},
-						},
-						Sidecars: amaltheadevv1alpha1.Sidecars{
-							Image: "renku/sidecars:0.0.1",
-						},
-					},
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			resourceName = getRandomName()
+			typeNamespacedName = types.NamespacedName{
+				Name:      resourceName,
+				Namespace: namespace,
 			}
+			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resourceName,
+					Namespace: namespace,
+				},
+				Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
+					Session: amaltheadevv1alpha1.Session{
+						Image:   "debian:bookworm-slim",
+						Command: []string{"sleep"},
+						Args:    []string{"3600"},
+						Port:    8000,
+					},
+					Culling: amaltheadevv1alpha1.Culling{
+						MaxAge: metav1.Duration{
+							Duration: 10 * time.Minute,
+						},
+						MaxIdleDuration: metav1.Duration{
+							Duration: 10 * time.Second,
+						},
+						MaxStartingDuration: metav1.Duration{
+							Duration: 2 * time.Minute,
+						},
+						MaxFailedDuration: metav1.Duration{
+							Duration: 5 * time.Minute,
+						},
+						MaxHibernatedDuration: metav1.Duration{
+							Duration: 15 * time.Second,
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
 		})
 
-		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &amaltheadevv1alpha1.AmaltheaSession{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(errors.IsNotFound(err)).To(BeTrue())
+		AfterEach(func(ctx SpecContext) {
+			err := k8sClient.Delete(ctx, amaltheasession, deleteOptions)
+			Expect(err == nil || errors.IsNotFound(err)).To(BeTrue())
 		})
 
-		It("should successfully delete hibernated resources", func() {
+		It("should successfully delete hibernated resources", func(ctx SpecContext) {
 			By("Checking if the custom resource was successfully created")
-			Eventually(func() error {
-				found := &amaltheadevv1alpha1.AmaltheaSession{}
-				return k8sClient.Get(ctx, typeNamespacedName, found)
-			}, time.Minute, time.Second).Should(Succeed())
-
 			controllerReconciler := newReconciler()
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() error {
+				found := &amaltheadevv1alpha1.AmaltheaSession{}
+				return k8sClient.Get(ctx, typeNamespacedName, found)
+			}, time.Minute, time.Second).WithContext(ctx).Should(Succeed())
 
 			By("Checking if StatefulSet was successfully created in the reconciliation")
 			Eventually(func() error {
@@ -415,7 +419,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 				found := &amaltheadevv1alpha1.AmaltheaSession{}
 				err := k8sClient.Get(ctx, typeNamespacedName, found)
 				return errors.IsNotFound(err)
-			}, time.Minute, time.Second).Should(BeTrue())
+			}, time.Minute, time.Second).WithContext(ctx).Should(BeTrue())
 		})
 	})
 })
