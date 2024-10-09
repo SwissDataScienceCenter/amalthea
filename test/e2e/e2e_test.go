@@ -19,6 +19,8 @@ package e2e
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -37,6 +39,9 @@ var _ = Describe("controller", Ordered, func() {
 		By("installing the cert-manager")
 		Expect(utils.InstallCertManager()).To(Succeed())
 
+		By("installing the metrics server")
+		Expect(utils.InstallMetricsServer()).To(Succeed())
+
 		By("creating manager namespace")
 		cmd := exec.Command("kubectl", "create", "ns", namespace)
 		_, _ = utils.Run(cmd)
@@ -47,6 +52,9 @@ var _ = Describe("controller", Ordered, func() {
 		utils.UninstallPrometheusOperator()
 
 		By("uninstalling the cert-manager bundle")
+		utils.UninstallCertManager()
+
+		By("uninstalling the metrics server bundel")
 		utils.UninstallCertManager()
 
 		By("removing manager namespace")
@@ -116,7 +124,52 @@ var _ = Describe("controller", Ordered, func() {
 				return nil
 			}
 			EventuallyWithOffset(1, verifyControllerUp, time.Minute, time.Second).Should(Succeed())
-
 		})
+
+		It("should delete the session when idle and hibernate hits threshold", func() {
+			session_namespace := "default"
+			projectDir, _ := utils.GetProjectDir()
+
+			By("creating an instance of the session")
+			EventuallyWithOffset(1, func() error {
+				cmd := exec.Command("kubectl", "apply", "-f", filepath.Join(projectDir,
+					"config/samples/culling-configured.yaml"), "-n", session_namespace)
+				_, err := utils.Run(cmd)
+				return err
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("validating that pod(s) status.phase=Running")
+			getPodStatus := func() error {
+				cmd := exec.Command("kubectl", "get",
+					"pods", "-l", "app.kubernetes.io/instance=test-amalthea-session",
+					"-o", "jsonpath={.items[*].status}", "-n", session_namespace,
+				)
+				status, err := utils.Run(cmd)
+				fmt.Println(string(status))
+				ExpectWithOffset(2, err).NotTo(HaveOccurred())
+				if !strings.Contains(string(status), "\"phase\":\"Running\"") {
+					return fmt.Errorf("amaltheasession pod in %s status", status)
+				}
+				return nil
+			}
+			EventuallyWithOffset(1, getPodStatus, 5*time.Minute, time.Second).Should(Succeed())
+
+			By("validating that the status of the custom resource created is updated or not")
+			getStatus := func() error {
+				cmd := exec.Command("kubectl", "get", "amaltheasession",
+					"test-amalthea-session", "-o", "jsonpath={.status.idle}",
+					"-n", session_namespace,
+				)
+				status, err := utils.Run(cmd)
+				fmt.Println(string(status))
+				ExpectWithOffset(2, err).NotTo(HaveOccurred())
+				if !strings.Contains(string(status), "true") {
+					return fmt.Errorf("status condition with type Idle should be set")
+				}
+				return nil
+			}
+			Eventually(getStatus, time.Minute, time.Second).Should(Succeed())
+		})
+
 	})
 })
