@@ -1,0 +1,19 @@
+apiVersion: "amalthea.dev/v1alpha1"
+kind: "AmaltheaSession"
+metadata:
+  name: test-amalthea-session
+spec:
+  session:
+    image: "debian:bookworm-slim"
+    command:
+      - "sleep"
+    args:
+      - "3600"
+  culling:
+    maxAge: 5m
+    maxIdleDuration: 20s
+    maxStartingDuration: 2m
+    maxFailedDuration: 5m
+    maxHibernatedDuration: 30s
+  sidecars:
+    image: renku/sidecars:0.0.1

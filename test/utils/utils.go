@@ -32,6 +32,9 @@ const (
 
 	certmanagerVersion = "v1.5.3"
 	certmanagerURLTmpl = "https://github.com/jetstack/cert-manager/releases/download/%s/cert-manager.yaml"
+
+	metricsServerVersion = "v0.7.2"
+	metricsServerURLTmpl = "https://github.com/kubernetes-sigs/metrics-server/releases/download/%s/components.yaml"
 )
 
 func warnError(err error) {
@@ -101,6 +104,42 @@ func InstallCertManager() error {
 
 	_, err := Run(cmd)
 	return err
+}
+
+// InstallMetricsServer installs the metrics server
+func InstallMetricsServer() error {
+	url := fmt.Sprintf(metricsServerURLTmpl, metricsServerVersion)
+	cmd := exec.Command("kubectl", "apply", "-f", url)
+	if _, err := Run(cmd); err != nil {
+		return err
+	}
+
+	cmd = exec.Command("kubectl", "patch", "-n", "kube-system", "deployment", "metrics-server", "--type=json",
+		"-p", "[{\"op\":\"add\",\"path\":\"/spec/template/spec/containers/0/args/-\",\"value\":\"--kubelet-insecure-tls\"}]")
+
+	if _, err := Run(cmd); err != nil {
+		return err
+	}
+
+	// Wait for metrics-server pod to be ready, which can take time
+	cmd = exec.Command("kubectl", "wait", "deployment.apps/metrics-server",
+		"--for", "condition=Available",
+		"--namespace", "kube-system",
+		"--timeout", "5m",
+	)
+
+	_, err := Run(cmd)
+
+	return err
+}
+
+// UninstallMetricsServer uninstalls the metrics server
+func UninstallMetricsServer() {
+	url := fmt.Sprintf(metricsServerURLTmpl, metricsServerVersion)
+	cmd := exec.Command("kubectl", "delete", "-f", url)
+	if _, err := Run(cmd); err != nil {
+		warnError(err)
+	}
 }
 
 // LoadImageToKindCluster loads a local docker image to the kind cluster
