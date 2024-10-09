@@ -36,7 +36,6 @@ rules:
   - statefulsets
   verbs:
   - create
-  - delete
   - get
   - list
   - patch
@@ -77,7 +76,6 @@ rules:
   - services
   verbs:
   - create
-  - delete
   - get
   - list
   - patch
@@ -97,7 +95,6 @@ rules:
   - ingresses
   verbs:
   - create
-  - delete
   - get
   - list
   - patch
