@@ -64,12 +64,6 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
 				return err
 			}
-			for i := range desired.Spec.Template.Spec.InitContainers {
-				cont := &desired.Spec.Template.Spec.InitContainers[i]
-				if cont.Name == "" {
-					cont.Image = ""
-				}
-			}
 			current.Spec.Replicas = desired.Spec.Replicas
 			current.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
 			current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
