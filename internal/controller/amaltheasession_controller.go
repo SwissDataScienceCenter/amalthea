@@ -148,7 +148,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err != nil {
 		log.Error(
 			err,
-			"Could not template child resources",
+			"There was an error in generating the Kubernetes resources based on AmaltheaSession specification. Please report this with the Renku developers.",
 			"name",
 			amaltheasession.GetName(),
 			"namespace",
