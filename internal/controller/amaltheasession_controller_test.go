@@ -72,6 +72,9 @@ var _ = Describe("AmaltheaSession Controller", func() {
 						Ingress: &amaltheadevv1alpha1.Ingress{
 							Host: "test.com",
 						},
+						Sidecars: amaltheadevv1alpha1.Sidecars{
+							Image: "renku/sidecars:0.0.1",
+						},
 					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
@@ -124,6 +127,9 @@ var _ = Describe("AmaltheaSession Controller", func() {
 						Session: amaltheadevv1alpha1.Session{
 							Image: "debian:bookworm-slim",
 							Port:  8000,
+						},
+						Sidecars: amaltheadevv1alpha1.Sidecars{
+							Image: "renku/sidecars:0.0.1",
 						},
 					},
 				}
@@ -187,6 +193,9 @@ var _ = Describe("AmaltheaSession Controller", func() {
 					Ingress: &amaltheadevv1alpha1.Ingress{
 						Host:      "test.com",
 						TLSSecret: &amaltheadevv1alpha1.SessionSecretRef{Name: tlsSecretName},
+					},
+					Sidecars: amaltheadevv1alpha1.Sidecars{
+						Image: "renku/sidecars:0.0.1",
 					},
 				},
 			}
@@ -258,6 +267,9 @@ var _ = Describe("AmaltheaSession Controller", func() {
 					Session: amaltheadevv1alpha1.Session{
 						Image: "debian:bookworm-slim",
 						Port:  8000,
+					},
+					Sidecars: amaltheadevv1alpha1.Sidecars{
+						Image: "renku/sidecars:0.0.1",
 					},
 				},
 			}
@@ -350,6 +362,9 @@ var _ = Describe("AmaltheaSession Controller", func() {
 							MaxHibernatedDuration: metav1.Duration{
 								Duration: 15 * time.Second,
 							},
+						},
+						Sidecars: amaltheadevv1alpha1.Sidecars{
+							Image: "renku/sidecars:0.0.1",
 						},
 					},
 				}

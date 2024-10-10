@@ -16,7 +16,7 @@ limitations under the License.
 
 // Based on: https://github.com/spf13/pflag/issues/236#issuecomment-931600452
 
-package cmd
+package cloner
 
 import (
 	"fmt"

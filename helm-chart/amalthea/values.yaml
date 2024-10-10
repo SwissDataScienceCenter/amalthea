@@ -12,8 +12,7 @@ global:
     image:
       repository: renku/certificates
       tag: "0.0.2"
-    customCAs:
-      []
+    customCAs: []
       # - secret:
 # Inject some extra env variables directly from a config map
 envFromConfigMaps: []
@@ -81,8 +80,7 @@ kopf:
 # [statefulset, persistentvolumeclaims, services, ingresses, secrets, configmaps]
 # which are necessary for Amalthea to work, add the corresponding API groups and
 # resources here as an array of name/group objects, eg:
-extraChildResources:
-  []
+extraChildResources: []
   # - name: jupyterservers
   #   group: amalthea.dev
 

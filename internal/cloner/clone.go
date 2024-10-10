@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package cloner
 
 import (
 	"errors"
@@ -62,30 +62,6 @@ type CloneFonfig struct {
 	Username   *string `yaml:"username,omitempty"`
 	PrivateKey *string `yaml:"privateKey,omitempty"`
 	Password   string  `yaml:"password"`
-}
-
-func init() {
-	rootCmd.AddCommand(cloneCmd)
-
-	cloneCmd.Flags().StringVar(&configPath, ConfigFlag, "", "Path to configuration file")
-
-	cloneCmd.Flags().StringVar(&remote, RemoteFlag, "", "remote URL to proxy to")
-	cloneCmd.MarkFlagRequired(RemoteFlag)
-
-	cloneCmd.Flags().StringVar(&revision, RevisionFlag, "", "remote revision (branch, tag, etc.)")
-
-	cloneCmd.Flags().StringVar(&path, PathFlag, "", "clone path")
-	cloneCmd.MarkFlagRequired(PathFlag)
-
-	cloneCmd.Flags().BoolVar(&verbose, VerboseFlag, false, "make the command verbose")
-
-	cloneCmd.Flags().VarP(preCloningStrategy, StrategyFlag, "", "the pre cloning strategy")
-}
-
-var cloneCmd = &cobra.Command{
-	Use:   "clone",
-	Short: "Clone the repository",
-	Run:   clone,
 }
 
 func applyPreCloningStrategy(clonePath string) {

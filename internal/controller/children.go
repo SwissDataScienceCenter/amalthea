@@ -137,11 +137,14 @@ type ChildResourceUpdates struct {
 	DataSourcesPVCs []ChildResourceUpdate[v1.PersistentVolumeClaim]
 }
 
-func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResources {
+func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	desiredService := cr.Service()
 	desiredPVC := cr.PVC()
-	desiredStatefulSet := cr.StatefulSet()
+	desiredStatefulSet, err := cr.StatefulSet()
+	if err != nil {
+		return ChildResources{}, err
+	}
 	desiredIngress := cr.Ingress()
 	output := ChildResources{
 		Service:     ChildResource[v1.Service]{&v1.Service{ObjectMeta: metadata}, &desiredService},
@@ -165,7 +168,7 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResources {
 	}
 	output.DataSourcesPVCs = desiredDataSourcesPVCs
 
-	return output
+	return output, nil
 }
 
 func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResourceUpdates, error) {

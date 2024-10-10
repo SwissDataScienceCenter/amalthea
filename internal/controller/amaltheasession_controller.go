@@ -144,7 +144,18 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	log.Info("spec", "cr", amaltheasession)
 
-	children := NewChildResources(amaltheasession)
+	children, err := NewChildResources(amaltheasession)
+	if err != nil {
+		log.Error(
+			err,
+			"There was an error in generating the Kubernetes resources based on AmaltheaSession specification. Please report this with the Renku developers.",
+			"name",
+			amaltheasession.GetName(),
+			"namespace",
+			amaltheasession.GetNamespace(),
+		)
+		return ctrl.Result{}, err
+	}
 	updates, err := children.Reconcile(ctx, r.Client, amaltheasession)
 	if err != nil {
 		log.Error(err, "Failed when reconciling children")

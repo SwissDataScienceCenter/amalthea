@@ -15,8 +15,9 @@ spec:
       kind: AmaltheaSession
       name: amaltheasessions.amalthea.dev
       statusDescriptors:
-      - description: Conditions store the status conditions of the AmaltheaSessions.
-          This is a standard thing that many operators implement see https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
+      - description: |-
+          Conditions store the status conditions of the AmaltheaSessions. This is a standard thing that
+          many operators implement see https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
         displayName: Conditions
         path: conditions
       version: v1alpha1

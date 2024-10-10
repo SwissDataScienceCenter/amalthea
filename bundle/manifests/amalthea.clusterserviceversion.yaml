@@ -21,8 +21,8 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-10-09T09:14:53Z"
-    operators.operatorframework.io/builder: operator-sdk-v1.35.0
+    createdAt: "2024-10-09T13:22:54Z"
+    operators.operatorframework.io/builder: operator-sdk-v1.36.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: amalthea.v0.0.1
   namespace: placeholder
@@ -35,8 +35,9 @@ spec:
       kind: AmaltheaSession
       name: amaltheasessions.amalthea.dev
       statusDescriptors:
-      - description: Conditions store the status conditions of the AmaltheaSessions.
-          This is a standard thing that many operators implement see https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
+      - description: |-
+          Conditions store the status conditions of the AmaltheaSessions. This is a standard thing that
+          many operators implement see https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
         displayName: Conditions
         path: conditions
       version: v1alpha1

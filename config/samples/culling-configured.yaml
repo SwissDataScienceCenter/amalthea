@@ -15,3 +15,5 @@ spec:
     maxStartingDuration: 2m
     maxFailedDuration: 5m
     maxHibernatedDuration: 30s
+  sidecars:
+    image: renku/sidecars:0.0.1
