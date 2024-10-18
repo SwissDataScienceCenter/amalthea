@@ -29,38 +29,14 @@ const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
 const authProxyPort int32 = 65535
 
+var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
 var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
 
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
-// StatefulSet returns a AmaltheaSession StatefulSet object
-func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
-	labels := labelsForAmaltheaSession(cr.Name)
-	replicas := int32(1)
-	if cr.Spec.Hibernated {
-		replicas = 0
-	}
-
-	session := cr.Spec.Session
+func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 	pvc := cr.PVC()
-	extraMounts := []v1.VolumeMount{}
-	if len(cr.Spec.Session.ExtraVolumeMounts) > 0 {
-		extraMounts = cr.Spec.Session.ExtraVolumeMounts
-	}
-	_, dsVols, dsVolMounts := cr.DataSources()
-
-	volumeMounts := append(
-		[]v1.VolumeMount{
-			{
-				Name:      sessionVolumeName,
-				MountPath: session.Storage.MountPath,
-			},
-		},
-		extraMounts...,
-	)
-	volumeMounts = append(volumeMounts, dsVolMounts...)
-
 	volumes := []v1.Volume{
 		{
 			Name: sessionVolumeName,
@@ -71,10 +47,11 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 			},
 		},
 	}
-	volumes = append(volumes, dsVols...)
-
-	if len(cr.Spec.ExtraVolumes) > 0 {
-		volumes = append(volumes, cr.Spec.ExtraVolumes...)
+	volumeMounts := []v1.VolumeMount{
+		{
+			Name:      sessionVolumeName,
+			MountPath: cr.Spec.Session.Storage.MountPath,
+		},
 	}
 
 	if cr.Spec.Session.ShmSize != nil {
@@ -89,7 +66,6 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 				},
 			},
 		)
-
 		volumeMounts = append(volumeMounts,
 			v1.VolumeMount{
 				Name:      shmVolumeName,
@@ -98,18 +74,34 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 		)
 	}
 
-	initContainers := []v1.Container{}
+	return volumes, volumeMounts
+}
 
-	if len(cr.Spec.CodeRepositories) > 0 {
-		templateFunc, err := initCloneTemplate.GetFunc(cr.Spec.Sidecars.Image)
-		if err != nil {
-			return appsv1.StatefulSet{}, err
-		}
-		cloneManifests := templateFunc(cr)
-		initContainers = append(initContainers, cloneManifests.Containers...)
-		volumes = append(volumes, cloneManifests.Volumes...)
+// StatefulSet returns a AmaltheaSession StatefulSet object
+func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
+	labels := labelsForAmaltheaSession(cr.Name)
+	replicas := int32(1)
+	if cr.Spec.Hibernated {
+		replicas = 0
 	}
 
+	session := cr.Spec.Session
+	volumes := []v1.Volume{}
+	volumeMounts := []v1.VolumeMount{}
+	initContainers := []v1.Container{}
+	containers := []v1.Container{}
+
+	_, dsVols, dsVolMounts := cr.DataSources()
+	cloneInit := cr.cloneInit()
+	sessionVols, sessionMounts := cr.SessionVolumes()
+	volumes = append(volumes, sessionVols...)
+	volumes = append(volumes, cloneInit.Volumes...)
+	volumes = append(volumes, cr.Spec.ExtraVolumes...)
+	volumes = append(volumes, dsVols...)
+	volumeMounts = append(volumeMounts, sessionMounts...)
+	volumeMounts = append(volumeMounts, cr.Spec.Session.ExtraVolumeMounts...)
+	volumeMounts = append(volumeMounts, dsVolMounts...)
+	initContainers = append(initContainers, cloneInit.Containers...)
 	initContainers = append(initContainers, cr.Spec.ExtraInitContainers...)
 
 	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
@@ -132,23 +124,16 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 		RunAsUser:    ptr.To(session.RunAsUser),
 		RunAsGroup:   ptr.To(session.RunAsGroup),
 	}
-
 	if session.RunAsUser == 0 {
 		securityContext.RunAsNonRoot = ptr.To(false)
 	}
-
 	sessionContainer.SecurityContext = securityContext
 
-	containers := []v1.Container{sessionContainer}
+	auth := cr.auth()
+	containers = append(containers, sessionContainer)
+	containers = append(containers, auth.Containers...)
 	containers = append(containers, cr.Spec.ExtraContainers...)
-
-	authTemplateFn, err := authTemplate.GetFunc(cr.Spec.Sidecars.Image)
-	if err != nil {
-		return appsv1.StatefulSet{}, err
-	}
-	authManifests := authTemplateFn(cr)
-	containers = append(containers, authManifests.Containers...)
-	volumes = append(volumes, authManifests.Volumes...)
+	volumes = append(volumes, auth.Volumes...)
 
 	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -400,7 +385,7 @@ func (cr *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 	vols := []v1.Volume{}
 	volMounts := []v1.VolumeMount{}
 	for ids, ds := range cr.Spec.DataSources {
-		pvcName := fmt.Sprintf("%s-ds-%d", cr.Name, ids)
+		pvcName := fmt.Sprintf("%s%s-ds-%d", prefix, cr.Name, ids)
 		switch ds.Type {
 		case Rclone:
 			storageClass := rcloneStorageClass
@@ -457,6 +442,14 @@ func getStorageClass() string {
 	sc := os.Getenv("RCLONE_STORAGE_CLASS")
 	if sc == "" {
 		sc = "csi-rclone-secret-annotation"
+	}
+	return sc
+}
+
+func getSidecarsImage() string {
+	sc := os.Getenv("SIDECARS_IMAGE")
+	if sc == "" {
+		sc = "renku/sidecars:latest"
 	}
 	return sc
 }
