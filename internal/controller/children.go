@@ -283,17 +283,26 @@ func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReco
 
 	idle := false
 	idleSince := cr.Status.IdleSince
-	oldEnough := false
-	if pod != nil && pod.Status.StartTime != nil {
-		oldEnough = time.Since(pod.Status.StartTime.Time) >= freshContainerMinimalAge
-	}
-	if c.State(cr, pod) == amaltheadevv1alpha1.Running && oldEnough {
-		idle = isIdle(ctx, r.MetricsClient, cr)
-		if idle && idleSince.IsZero() {
-			idleSince = metav1.NewTime(time.Now())
+
+	if pod != nil {
+		oldEnough := false
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			if containerStatus.Name == amaltheadevv1alpha1.SessionContainerName {
+				if containerStatus.State.Running != nil {
+					oldEnough = time.Since(containerStatus.State.Running.StartedAt.Time) >= freshContainerMinimalAge
+				}
+				break
+			}
 		}
-		if !idle && !idleSince.IsZero() {
-			idleSince = metav1.Time{}
+
+		if c.State(cr, pod) == amaltheadevv1alpha1.Running && oldEnough {
+			idle = isIdle(ctx, r.MetricsClient, cr)
+			if idle && idleSince.IsZero() {
+				idleSince = metav1.NewTime(time.Now())
+			}
+			if !idle && !idleSince.IsZero() {
+				idleSince = metav1.Time{}
+			}
 		}
 	}
 
