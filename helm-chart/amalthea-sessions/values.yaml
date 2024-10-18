@@ -32,3 +32,7 @@ deployCrd: true
 # is needed in order to mount Rclone data sources in amalthea sessions.
 # Changing the storage class name will result in the restart of all active amalthea sessions.
 rcloneStorageClass: csi-rclone-secret-annotation
+sidecars:
+  image:
+    repository: renku/sidecars
+    tag: latest
