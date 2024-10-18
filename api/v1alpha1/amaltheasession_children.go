@@ -310,7 +310,8 @@ func NewConditions() []AmaltheaSessionCondition {
 
 func (cr *AmaltheaSession) NeedsDeletion() bool {
 	hibernatedDuration := time.Since(cr.Status.HibernatedSince.Time)
-	return cr.Status.State == Hibernated &&
+	durationIsZero := cr.Spec.Culling.MaxHibernatedDuration == metav1.Duration{}
+	return cr.Status.State == Hibernated && !durationIsZero &&
 		hibernatedDuration > cr.Spec.Culling.MaxHibernatedDuration.Duration
 }
 
