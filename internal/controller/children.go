@@ -28,6 +28,11 @@ type ChildResource[T ChildResourceType] struct {
 	Desired *T
 }
 
+// The metrics server requires at least 10 seconds before container metrics can
+// be considered accurate, let's wait a little longer before requesting metrics
+// https://github.com/kubernetes-sigs/metrics-server/blob/9ebbad973db2a54193712c4d9292bbe3eaa849dc/pkg/storage/pod.go#L31
+const freshContainerMinimalAge = 15 * time.Second
+
 func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] {
 	log := log.FromContext(ctx)
 	if c.Current == nil {
@@ -271,13 +276,34 @@ func (c ChildResourceUpdates) Conditions(state amaltheadevv1alpha1.State, ctx co
 func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReconciler, cr *amaltheadevv1alpha1.AmaltheaSession) amaltheadevv1alpha1.AmaltheaSessionStatus {
 	log := log.FromContext(ctx)
 
-	idle := isIdle(ctx, r.MetricsClient, cr)
-	idleSince := cr.Status.IdleSince
-	if idle && idleSince.IsZero() {
-		idleSince = metav1.NewTime(time.Now())
+	pod, err := cr.Pod(ctx, r.Client)
+	if err != nil && !apierrors.IsNotFound(err) {
+		log.Error(err, "Could not read the session pod when updating the status")
 	}
-	if !idle && !idleSince.IsZero() {
-		idleSince = metav1.Time{}
+
+	idle := false
+	idleSince := cr.Status.IdleSince
+
+	if pod != nil {
+		oldEnough := false
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			if containerStatus.Name == amaltheadevv1alpha1.SessionContainerName {
+				if containerStatus.State.Running != nil {
+					oldEnough = time.Since(containerStatus.State.Running.StartedAt.Time) >= freshContainerMinimalAge
+				}
+				break
+			}
+		}
+
+		if c.State(cr, pod) == amaltheadevv1alpha1.Running && oldEnough {
+			idle = isIdle(ctx, r.MetricsClient, cr)
+			if idle && idleSince.IsZero() {
+				idleSince = metav1.NewTime(time.Now())
+			}
+			if !idle && !idleSince.IsZero() {
+				idleSince = metav1.Time{}
+			}
+		}
 	}
 
 	hibernated := cr.Spec.Hibernated
@@ -287,11 +313,6 @@ func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReco
 	}
 	if !hibernated && !hibernatedSince.IsZero() {
 		hibernatedSince = metav1.Time{}
-	}
-
-	pod, err := cr.Pod(ctx, r.Client)
-	if err != nil && !apierrors.IsNotFound(err) {
-		log.Error(err, "Could not read the session pod when updating the status")
 	}
 
 	failing := pod != nil && podIsFailed(pod)
