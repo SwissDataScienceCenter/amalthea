@@ -11,13 +11,13 @@ type manifests struct {
 	Volumes    []v1.Volume
 }
 
-func (cr *AmaltheaSession) cloneInit() manifests {
+func (as *AmaltheaSession) cloneInit() manifests {
 	envVars := []v1.EnvVar{}
-	volMounts := []v1.VolumeMount{{Name: sessionVolumeName, MountPath: cr.Spec.Session.Storage.MountPath}}
+	volMounts := []v1.VolumeMount{{Name: sessionVolumeName, MountPath: as.Spec.Session.Storage.MountPath}}
 	vols := []v1.Volume{}
 	containers := []v1.Container{}
 
-	for irepo, repo := range cr.Spec.CodeRepositories {
+	for irepo, repo := range as.Spec.CodeRepositories {
 		args := []string{
 			"cloner",
 			"clone",
@@ -26,7 +26,7 @@ func (cr *AmaltheaSession) cloneInit() manifests {
 			"--remote",
 			repo.Remote,
 			"--path",
-			fmt.Sprintf("%s/%s", cr.Spec.Session.Storage.MountPath, repo.ClonePath),
+			fmt.Sprintf("%s/%s", as.Spec.Session.Storage.MountPath, repo.ClonePath),
 		}
 
 		if repo.CloningConfigSecretRef != nil {
@@ -56,11 +56,11 @@ func (cr *AmaltheaSession) cloneInit() manifests {
 			Name:         gitCloneContainerName,
 			Image:        sidecarsImage,
 			VolumeMounts: volMounts,
-			WorkingDir:   cr.Spec.Session.Storage.MountPath,
+			WorkingDir:   as.Spec.Session.Storage.MountPath,
 			Env:          envVars,
 			SecurityContext: &v1.SecurityContext{
-				RunAsUser:  &cr.Spec.Session.RunAsUser,
-				RunAsGroup: &cr.Spec.Session.RunAsGroup,
+				RunAsUser:  &as.Spec.Session.RunAsUser,
+				RunAsGroup: &as.Spec.Session.RunAsGroup,
 			},
 			Args: args,
 		})

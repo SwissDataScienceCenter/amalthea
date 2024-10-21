@@ -10,10 +10,10 @@ import (
 
 const authproxyImage string = "bitnami/oauth2-proxy:7.6.0"
 
-func (session *AmaltheaSession) auth() manifests {
+func (as *AmaltheaSession) auth() manifests {
 	output := manifests{}
 	volumeMounts := []v1.VolumeMount{}
-	auth := session.Spec.Authentication
+	auth := as.Spec.Authentication
 
 	if auth == nil || !auth.Enabled {
 		return output
@@ -33,7 +33,7 @@ func (session *AmaltheaSession) auth() manifests {
 	})
 
 	if auth.Type == Oidc {
-		sessionURL := session.sessionLocalhostURL().String()
+		sessionURL := as.sessionLocalhostURL().String()
 		if !strings.HasSuffix(sessionURL, "/") {
 			// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
 			// and does not proxy subpaths
@@ -84,7 +84,7 @@ func (session *AmaltheaSession) auth() manifests {
 				{Name: "AUTHPROXY_PORT", Value: fmt.Sprintf("%d", authProxyPort)},
 				// NOTE: The url for the remote has to not have a path at all, if it does, then the path
 				// in the url is appended to any path that is already there when the request comes in.
-				{Name: "AUTHPROXY_REMOTE", Value: fmt.Sprintf("http://127.0.0.1:%d", session.Spec.Session.Port)},
+				{Name: "AUTHPROXY_REMOTE", Value: fmt.Sprintf("http://127.0.0.1:%d", as.Spec.Session.Port)},
 			},
 			VolumeMounts: append(
 				[]v1.VolumeMount{

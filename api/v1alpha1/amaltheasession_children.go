@@ -381,12 +381,12 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 
 // Assuming that the csi-rclone driver from https://github.com/SwissDataScienceCenter/csi-rclone
 // is installed, this will generate PVCs for the data sources that have the rclone type.
-func (cr *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
+func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
 	pvcs := []v1.PersistentVolumeClaim{}
 	vols := []v1.Volume{}
 	volMounts := []v1.VolumeMount{}
-	for ids, ds := range cr.Spec.DataSources {
-		pvcName := fmt.Sprintf("%s%s-ds-%d", prefix, cr.Name, ids)
+	for ids, ds := range as.Spec.DataSources {
+		pvcName := fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)
 		switch ds.Type {
 		case Rclone:
 			storageClass := rcloneStorageClass
@@ -396,7 +396,7 @@ func (cr *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 				v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      pvcName,
-						Namespace: cr.Namespace,
+						Namespace: as.Namespace,
 						Annotations: map[string]string{
 							rcloneStorageSecretNameAnnotation: ds.SecretRef.Name,
 						},
