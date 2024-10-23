@@ -104,6 +104,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	echo "{{- if .Values.deployCrd -}}" > $(HELM_CRD_TEMPLATE)
 	echo "# This manifest is auto-generated from the makefile do not edit manually." >> $(HELM_CRD_TEMPLATE)
 	cat config/crd/bases/*yaml >> $(HELM_CRD_TEMPLATE)
+	echo "{{- end }}" >> $(HELM_CRD_TEMPLATE)
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.

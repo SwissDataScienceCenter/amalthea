@@ -23,5 +23,7 @@ jobs:
             make tests
             make test
             make test-e2e
+            helm lint helm-chart/amalthea
+            helm lint helm-chart/amalthea-sessions
           push: never
           skipContainerUserIdUpdate: false
