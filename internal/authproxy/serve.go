@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package authproxy
 
 import (
 	"fmt"
@@ -29,7 +29,6 @@ import (
 	"github.com/labstack/gommon/log"
 )
 
-
 // The configuration options for the authentication proxy used for anonymous users.
 // The fields below can be passed as arguments i.e. --token=some-very-complicated-random-value
 // or as a yaml config file.
@@ -39,36 +38,71 @@ const TokenFlag = "token"
 const CookieKeyFlag = "cookie_key"
 const VerboseFlag = "verbose"
 
-func init() {
-	rootCmd.AddCommand(serveCmd)
-
+func Command() (*cobra.Command, error) {
+	var serveCmd = &cobra.Command{
+		Use:    "serve",
+		Short:  "Run the proxy",
+		Run:    serve,
+		PreRun: initConfig,
+	}
 	serveCmd.PersistentFlags().String(RemoteFlag, "", "remote URL to proxy to")
-	serveCmd.MarkPersistentFlagRequired(RemoteFlag)
-	viper.BindPFlag(RemoteFlag, serveCmd.PersistentFlags().Lookup(RemoteFlag))
-	viper.BindEnv(RemoteFlag)
+	err := serveCmd.MarkPersistentFlagRequired(RemoteFlag)
+	if err != nil {
+		return nil, err
+	}
+	err = viper.BindPFlag(RemoteFlag, serveCmd.PersistentFlags().Lookup(RemoteFlag))
+	if err != nil {
+		return nil, err
+	}
+	err = viper.BindEnv(RemoteFlag)
+	if err != nil {
+		return nil, err
+	}
 
 	serveCmd.PersistentFlags().Int(PortFlag, 65535, "port on which the proxy will listen")
-	viper.BindPFlag(PortFlag, serveCmd.PersistentFlags().Lookup(PortFlag))
-	viper.BindEnv(PortFlag)
+	err = viper.BindPFlag(PortFlag, serveCmd.PersistentFlags().Lookup(PortFlag))
+	if err != nil {
+		return nil, err
+	}
+	err = viper.BindEnv(PortFlag)
+	if err != nil {
+		return nil, err
+	}
 
 	serveCmd.PersistentFlags().String(CookieKeyFlag, "renku-auth", "cookie key where to find the token")
-	viper.BindPFlag(CookieKeyFlag, serveCmd.PersistentFlags().Lookup(CookieKeyFlag))
-	viper.BindEnv(CookieKeyFlag)
+	err = viper.BindPFlag(CookieKeyFlag, serveCmd.PersistentFlags().Lookup(CookieKeyFlag))
+	if err != nil {
+		return nil, err
+	}
+	err = viper.BindEnv(CookieKeyFlag)
+	if err != nil {
+		return nil, err
+	}
 
 	serveCmd.PersistentFlags().String(TokenFlag, "", "secret token for authentication")
-	serveCmd.MarkPersistentFlagRequired(TokenFlag)
-	viper.BindPFlag(TokenFlag, serveCmd.PersistentFlags().Lookup(TokenFlag))
-	viper.BindEnv(TokenFlag)
+	err = serveCmd.MarkPersistentFlagRequired(TokenFlag)
+	if err != nil {
+		return nil, err
+	}
+	err = viper.BindPFlag(TokenFlag, serveCmd.PersistentFlags().Lookup(TokenFlag))
+	if err != nil {
+		return nil, err
+	}
+	err = viper.BindEnv(TokenFlag)
+	if err != nil {
+		return nil, err
+	}
 
 	serveCmd.PersistentFlags().Bool(VerboseFlag, false, "make the proxy verbose")
-	viper.BindPFlag(VerboseFlag, serveCmd.PersistentFlags().Lookup(VerboseFlag))
-	viper.BindEnv(VerboseFlag)
-}
-
-var serveCmd = &cobra.Command{
-	Use:   "serve",
-	Short: "Run the proxy",
-	Run:   serve,
+	err = viper.BindPFlag(VerboseFlag, serveCmd.PersistentFlags().Lookup(VerboseFlag))
+	if err != nil {
+		return nil, err
+	}
+	err = viper.BindEnv(VerboseFlag)
+	if err != nil {
+		return nil, err
+	}
+	return serveCmd, nil
 }
 
 func serve(cmd *cobra.Command, args []string) {
@@ -110,7 +144,7 @@ func serve(cmd *cobra.Command, args []string) {
 			return key == token, nil
 		},
 	}))
-	
+
 	remoteURL, err := url.Parse(remoteURLStr)
 	if err != nil {
 		e.Logger.Fatal(err)

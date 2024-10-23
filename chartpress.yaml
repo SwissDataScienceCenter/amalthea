@@ -25,3 +25,6 @@ charts:
         contextPath: .
         dockerfilePath: Dockerfile
         valuesPath: controllerManager.manager.image
+      sidecars:
+        contextPath: .
+        dockerfilePath: sidecars.Dockerfile

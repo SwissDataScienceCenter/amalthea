@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -29,8 +28,6 @@ const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
 const authProxyPort int32 = 65535
-const oauth2ProxyImage = "bitnami/oauth2-proxy:7.6.0"
-const authProxyImage = "renku/authproxy:0.0.1-test-1"
 
 var rcloneStorageClass string = getStorageClass()
 var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
@@ -38,7 +35,7 @@ var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
-func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
+func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 	labels := labelsForAmaltheaSession(cr.Name)
 	replicas := int32(1)
 	if cr.Spec.Hibernated {
@@ -104,9 +101,13 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	initContainers := []v1.Container{}
 
 	if len(cr.Spec.CodeRepositories) > 0 {
-		gitCloneContainers, gitCloneVols := cr.initClones()
-		initContainers = append(initContainers, gitCloneContainers...)
-		volumes = append(volumes, gitCloneVols...)
+		templateFunc, err := initCloneTemplate.GetFunc(cr.Spec.Sidecars.Image)
+		if err != nil {
+			return appsv1.StatefulSet{}, err
+		}
+		cloneManifests := templateFunc(cr)
+		initContainers = append(initContainers, cloneManifests.Containers...)
+		volumes = append(volumes, cloneManifests.Volumes...)
 	}
 
 	initContainers = append(initContainers, cr.Spec.ExtraInitContainers...)
@@ -141,84 +142,13 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 	containers := []v1.Container{sessionContainer}
 	containers = append(containers, cr.Spec.ExtraContainers...)
 
-	if auth := cr.Spec.Authentication; auth != nil && auth.Enabled {
-		extraAuthMounts := []v1.VolumeMount{}
-		if len(auth.ExtraVolumeMounts) > 0 {
-			extraAuthMounts = auth.ExtraVolumeMounts
-		}
-		volumes = append(volumes, v1.Volume{
-			Name: "proxy-configuration-secret",
-			VolumeSource: v1.VolumeSource{
-				Secret: &v1.SecretVolumeSource{
-					SecretName: auth.SecretRef.Name,
-					Optional:   ptr.To(false),
-				},
-			},
-		})
-
-		if auth.Type == Oidc {
-			sessionURL := cr.sessionLocalhostURL().String()
-			if !strings.HasSuffix(sessionURL, "/") {
-				// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
-				// and does not proxy subpaths
-				sessionURL += "/"
-			}
-			authContainer := v1.Container{
-				Image: oauth2ProxyImage,
-				Name:  "oauth2-proxy",
-				SecurityContext: &v1.SecurityContext{
-					AllowPrivilegeEscalation: ptr.To(false),
-					RunAsNonRoot:             ptr.To(true),
-				},
-				Args: []string{
-					fmt.Sprintf("--upstream=%s", sessionURL),
-					fmt.Sprintf("--http-address=:%d", authProxyPort),
-					"--silence-ping-logging",
-					"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key,
-				},
-				VolumeMounts: append(
-					[]v1.VolumeMount{
-						{
-							Name:      "proxy-configuration-secret",
-							MountPath: "/etc/oauth2-proxy",
-						},
-					},
-					extraAuthMounts...,
-				),
-			}
-
-			containers = append(containers, authContainer)
-		} else if auth.Type == Token {
-			authContainer := v1.Container{
-				Image: authProxyImage,
-				Name:  "authproxy",
-				SecurityContext: &v1.SecurityContext{
-					AllowPrivilegeEscalation: ptr.To(false),
-					RunAsNonRoot:             ptr.To(true),
-					RunAsUser:                ptr.To(int64(1000)),
-					RunAsGroup:               ptr.To(int64(1000)),
-				},
-				Args: []string{"serve", "--config", "/etc/authproxy/" + auth.SecretRef.Key},
-				Env: []v1.EnvVar{
-					{Name: "AUTHPROXY_PORT", Value: fmt.Sprintf("%d", authProxyPort)},
-					// NOTE: The url for the remote has to not have a path at all, if it does, then the path
-					// in the url is appended to any path that is already there when the request comes in.
-					{Name: "AUTHPROXY_REMOTE", Value: fmt.Sprintf("http://127.0.0.1:%d", cr.Spec.Session.Port)},
-				},
-				VolumeMounts: append(
-					[]v1.VolumeMount{
-						{
-							Name:      "proxy-configuration-secret",
-							MountPath: "/etc/authproxy",
-						},
-					},
-					extraAuthMounts...,
-				),
-			}
-
-			containers = append(containers, authContainer)
-		}
+	authTemplateFn, err := authTemplate.GetFunc(cr.Spec.Sidecars.Image)
+	if err != nil {
+		return appsv1.StatefulSet{}, err
 	}
+	authManifests := authTemplateFn(cr)
+	containers = append(containers, authManifests.Containers...)
+	volumes = append(volumes, authManifests.Volumes...)
 
 	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -249,7 +179,7 @@ func (cr *AmaltheaSession) StatefulSet() appsv1.StatefulSet {
 			},
 		},
 	}
-	return sts
+	return sts, nil
 }
 
 // Service returns a AmaltheaSession Service object
@@ -405,51 +335,6 @@ func (cr *AmaltheaSession) Pod(ctx context.Context, clnt client.Client) (*v1.Pod
 	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
 	err := clnt.Get(ctx, key, &pod)
 	return &pod, err
-}
-
-// Generates the init containers that clones the specified Git repositories
-func (cr *AmaltheaSession) initClones() ([]v1.Container, []v1.Volume) {
-	envVars := []v1.EnvVar{}
-	volMounts := []v1.VolumeMount{{Name: sessionVolumeName, MountPath: cr.Spec.Session.Storage.MountPath}}
-	vols := []v1.Volume{}
-	containers := []v1.Container{}
-
-	for irepo, repo := range cr.Spec.CodeRepositories {
-		args := []string{"clone", "--strategy", "notifexist", "--remote", repo.Remote, "--path", cr.Spec.Session.Storage.MountPath + "/" + repo.ClonePath}
-
-		if repo.CloningConfigSecretRef != nil {
-			secretVolName := fmt.Sprintf("git-clone-cred-volume-%d", irepo)
-			secretMountPath := "/git-clone-secrets"
-			secretFilePath := fmt.Sprintf("%s/%s", secretMountPath, repo.CloningConfigSecretRef.Key)
-			vols = append(
-				vols,
-				v1.Volume{
-					Name:         secretVolName,
-					VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: repo.CloningConfigSecretRef.Name}},
-				},
-			)
-			volMounts = append(volMounts, v1.VolumeMount{Name: secretVolName, MountPath: secretMountPath})
-
-			args = append(args, []string{"--config", secretFilePath}...)
-		}
-
-		if repo.Revision != "" {
-			args = append(args, []string{"--revision", repo.Revision}...)
-		}
-
-		gitCloneContainerName := fmt.Sprintf("git-clone-%d", irepo)
-		containers = append(containers, v1.Container{
-			Name:            gitCloneContainerName,
-			Image:           "renku/cloner:0.0.1",
-			VolumeMounts:    volMounts,
-			WorkingDir:      cr.Spec.Session.Storage.MountPath,
-			Env:             envVars,
-			SecurityContext: &v1.SecurityContext{RunAsUser: &cr.Spec.Session.RunAsUser, RunAsGroup: &cr.Spec.Session.RunAsGroup},
-			Args:            args,
-		})
-	}
-
-	return containers, vols
 }
 
 // Returns the list of all the secrets used in this CR
