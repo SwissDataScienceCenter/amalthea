@@ -28,93 +28,6 @@ type ChildResource[T ChildResourceType] struct {
 	Desired *T
 }
 
-func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] {
-	log := log.FromContext(ctx)
-	if c.Current == nil {
-		return ChildResourceUpdate[T]{}
-	}
-	switch current := any(c.Current).(type) {
-	case *networkingv1.Ingress:
-		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
-			desired, ok := any(c.Desired).(*networkingv1.Ingress)
-			if !ok {
-				return fmt.Errorf("Could not cast when reconciling")
-			}
-			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating an ingress")
-				current.Spec = desired.Spec
-				current.ObjectMeta = desired.ObjectMeta
-				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
-				return err
-			}
-			current.Spec = desired.Spec
-			return nil
-		})
-		return ChildResourceUpdate[T]{c.Current, res, err}
-	case *appsv1.StatefulSet:
-		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
-			desired, ok := any(c.Desired).(*appsv1.StatefulSet)
-			if !ok {
-				return fmt.Errorf("Could not cast when reconciling")
-			}
-			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a statefulset")
-				current.Spec = desired.Spec
-				current.ObjectMeta = desired.ObjectMeta
-				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
-				return err
-			}
-			current.Spec.Replicas = desired.Spec.Replicas
-			current.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
-			current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
-			current.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
-			return nil
-		})
-		return ChildResourceUpdate[T]{c.Current, res, err}
-	case *v1.PersistentVolumeClaim:
-		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
-			desired, ok := any(c.Desired).(*v1.PersistentVolumeClaim)
-			if !ok {
-				return fmt.Errorf("Could not cast when reconciling")
-			}
-			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a PVC")
-				current.Spec = desired.Spec
-				current.ObjectMeta = desired.ObjectMeta
-				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
-				return err
-			}
-			current.Spec.Resources.Requests = desired.Spec.Resources.Requests
-			if desired.Spec.StorageClassName != nil {
-				// NOTE: If the desired storage class is nil then the current spec contains the name for the default storage class
-				current.Spec.StorageClassName = desired.Spec.StorageClassName
-			}
-			return nil
-		})
-		return ChildResourceUpdate[T]{c.Current, res, err}
-	case *v1.Service:
-		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
-			desired, ok := any(c.Desired).(*v1.Service)
-			if !ok {
-				return fmt.Errorf("Could not cast when reconciling")
-			}
-			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a service")
-				current.Spec = desired.Spec
-				current.ObjectMeta = desired.ObjectMeta
-				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
-				return err
-			}
-			current.Spec.Ports = desired.Spec.Ports
-			current.Spec.Selector = desired.Spec.Selector
-			return nil
-		})
-		return ChildResourceUpdate[T]{c.Current, res, err}
-	default:
-		return ChildResourceUpdate[T]{Error: fmt.Errorf("Encountered an uknown child resource type")}
-	}
-}
-
 type ChildResourceUpdate[T ChildResourceType] struct {
 	Manifest     *T
 	UpdateResult controllerutil.OperationResult
@@ -135,6 +48,144 @@ type ChildResourceUpdates struct {
 	StatefulSet     ChildResourceUpdate[appsv1.StatefulSet]
 	PVC             ChildResourceUpdate[v1.PersistentVolumeClaim]
 	DataSourcesPVCs []ChildResourceUpdate[v1.PersistentVolumeClaim]
+}
+
+func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] {
+	log := log.FromContext(ctx)
+	if c.Current == nil {
+		return ChildResourceUpdate[T]{}
+	}
+	switch current := any(c.Current).(type) {
+	case *networkingv1.Ingress:
+		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
+			// NOTE: the callback function  in CreateOrPatch will load the
+			// state of the object referenced from k8s, then run the callback to update
+			// the object with the applied changes
+			desired, ok := any(c.Desired).(*networkingv1.Ingress)
+			if !ok {
+				return fmt.Errorf("Could not cast when reconciling")
+			}
+			if current.CreationTimestamp.IsZero() {
+				log.Info("Creating an ingress")
+				current.Spec = desired.Spec
+				current.ObjectMeta = desired.ObjectMeta
+				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				return err
+			}
+			switch strategy := cr.Spec.ReconcileStrategy; strategy {
+			case amaltheadevv1alpha1.Never:
+				return nil
+			case amaltheadevv1alpha1.WhenFailedOrHibernated:
+				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+					return nil
+				}
+				fallthrough
+			case amaltheadevv1alpha1.Always:
+				current.Spec = desired.Spec
+			default:
+				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
+			}
+			return nil
+		})
+		return ChildResourceUpdate[T]{c.Current, res, err}
+	case *appsv1.StatefulSet:
+		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
+			desired, ok := any(c.Desired).(*appsv1.StatefulSet)
+			if !ok {
+				return fmt.Errorf("Could not cast when reconciling")
+			}
+			if current.CreationTimestamp.IsZero() {
+				log.Info("Creating a statefulset")
+				current.Spec = desired.Spec
+				current.ObjectMeta = desired.ObjectMeta
+				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				return err
+			}
+			current.Spec.Replicas = desired.Spec.Replicas
+			switch strategy := cr.Spec.ReconcileStrategy; strategy {
+			case amaltheadevv1alpha1.Never:
+				return nil
+			case amaltheadevv1alpha1.WhenFailedOrHibernated:
+				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+					return nil
+				}
+				fallthrough
+			case amaltheadevv1alpha1.Always:
+				current.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
+				current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
+				current.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
+			default:
+				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
+			}
+			return nil
+		})
+		return ChildResourceUpdate[T]{c.Current, res, err}
+	case *v1.PersistentVolumeClaim:
+		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
+			desired, ok := any(c.Desired).(*v1.PersistentVolumeClaim)
+			if !ok {
+				return fmt.Errorf("Could not cast when reconciling")
+			}
+			if current.CreationTimestamp.IsZero() {
+				log.Info("Creating a PVC")
+				current.Spec = desired.Spec
+				current.ObjectMeta = desired.ObjectMeta
+				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				return err
+			}
+			switch strategy := cr.Spec.ReconcileStrategy; strategy {
+			case amaltheadevv1alpha1.Never:
+				return nil
+			case amaltheadevv1alpha1.WhenFailedOrHibernated:
+				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+					return nil
+				}
+				fallthrough
+			case amaltheadevv1alpha1.Always:
+				current.Spec.Resources.Requests = desired.Spec.Resources.Requests
+				if desired.Spec.StorageClassName != nil {
+					// NOTE: If the desired storage class is nil then the current spec contains the name for the default storage class
+					current.Spec.StorageClassName = desired.Spec.StorageClassName
+				}
+			default:
+				return fmt.Errorf("attempting to reconcile PVC with unknown stategy %s", strategy)
+			}
+			return nil
+		})
+		return ChildResourceUpdate[T]{c.Current, res, err}
+	case *v1.Service:
+		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
+			desired, ok := any(c.Desired).(*v1.Service)
+			if !ok {
+				return fmt.Errorf("Could not cast when reconciling")
+			}
+			if current.CreationTimestamp.IsZero() {
+				log.Info("Creating a service")
+				current.Spec = desired.Spec
+				current.ObjectMeta = desired.ObjectMeta
+				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				return err
+			}
+			switch strategy := cr.Spec.ReconcileStrategy; strategy {
+			case amaltheadevv1alpha1.Never:
+				return nil
+			case amaltheadevv1alpha1.WhenFailedOrHibernated:
+				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+					return nil
+				}
+				fallthrough
+			case amaltheadevv1alpha1.Always:
+				current.Spec.Ports = desired.Spec.Ports
+				current.Spec.Selector = desired.Spec.Selector
+			default:
+				return fmt.Errorf("attempting to reconcile service with unknown stategy %s", strategy)
+			}
+			return nil
+		})
+		return ChildResourceUpdate[T]{c.Current, res, err}
+	default:
+		return ChildResourceUpdate[T]{Error: fmt.Errorf("Encountered an uknown child resource type")}
+	}
 }
 
 func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResources, error) {
@@ -224,7 +275,12 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	}
 }
 
-func (c ChildResourceUpdates) Conditions(state amaltheadevv1alpha1.State, ctx context.Context, r *AmaltheaSessionReconciler, cr *amaltheadevv1alpha1.AmaltheaSession) []amaltheadevv1alpha1.AmaltheaSessionCondition {
+func Conditions(
+	state amaltheadevv1alpha1.State,
+	ctx context.Context,
+	r *AmaltheaSessionReconciler,
+	cr *amaltheadevv1alpha1.AmaltheaSession,
+) []amaltheadevv1alpha1.AmaltheaSessionCondition {
 	conditions := cr.Status.Conditions
 	if len(conditions) == 0 {
 		conditions = amaltheadevv1alpha1.NewConditions()
@@ -271,7 +327,11 @@ func (c ChildResourceUpdates) Conditions(state amaltheadevv1alpha1.State, ctx co
 	return conditions
 }
 
-func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReconciler, cr *amaltheadevv1alpha1.AmaltheaSession) amaltheadevv1alpha1.AmaltheaSessionStatus {
+func (c ChildResourceUpdates) Status(
+	ctx context.Context,
+	r *AmaltheaSessionReconciler,
+	cr *amaltheadevv1alpha1.AmaltheaSession,
+) amaltheadevv1alpha1.AmaltheaSessionStatus {
 	log := log.FromContext(ctx)
 
 	idle := isIdle(ctx, r.MetricsClient, cr)
@@ -309,7 +369,7 @@ func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReco
 	state := c.State(cr, pod)
 
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
-		Conditions:      c.Conditions(state, ctx, r, cr),
+		Conditions:      Conditions(state, ctx, r, cr),
 		State:           state,
 		URL:             cr.GetURLString(),
 		Idle:            idle,
