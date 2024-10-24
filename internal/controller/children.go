@@ -363,7 +363,7 @@ func (c ChildResourceUpdates) Status(
 			if idle && idleSince.IsZero() {
 				idleSince = metav1.NewTime(time.Now())
 			}
-			if !idle && !idleSince.IsZero() {
+			else if !idle && !idleSince.IsZero() {
 				idleSince = metav1.Time{}
 			}
 		}
