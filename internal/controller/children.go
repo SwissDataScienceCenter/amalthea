@@ -300,7 +300,7 @@ func (c ChildResourceUpdates) Status(ctx context.Context, r *AmaltheaSessionReco
 			if idle && idleSince.IsZero() {
 				idleSince = metav1.NewTime(time.Now())
 			}
-			if !idle && !idleSince.IsZero() {
+			else if !idle && !idleSince.IsZero() {
 				idleSince = metav1.Time{}
 			}
 		}
