@@ -362,8 +362,7 @@ func (c ChildResourceUpdates) Status(
 			idle = isIdle(ctx, r.MetricsClient, cr)
 			if idle && idleSince.IsZero() {
 				idleSince = metav1.NewTime(time.Now())
-			}
-			else if !idle && !idleSince.IsZero() {
+			} else if !idle && !idleSince.IsZero() {
 				idleSince = metav1.Time{}
 			}
 		}
