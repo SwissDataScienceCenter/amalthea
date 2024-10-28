@@ -118,13 +118,15 @@ func isIdle(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *ama
 
 	cpuUsage := metrics.Cpu()
 	if cpuUsage != nil && cpuUsage.Cmp(cpuUsageIdlenessThreshold) == -1 {
-		log.Info(
-			"the session was found to be idle",
-			"cpu usage milicores",
-			cpuUsage.MilliValue(),
-			"idle threshold milicores",
-			cpuUsageIdlenessThreshold.MilliValue(),
-		)
+		if cr.Status.IdleSince.IsZero() {
+			log.Info(
+				"the session was found to be idle",
+				"cpu usage milicores",
+				cpuUsage.MilliValue(),
+				"idle threshold milicores",
+				cpuUsageIdlenessThreshold.MilliValue(),
+			)
+		}
 		return true
 	}
 
