@@ -280,6 +280,36 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	}
 }
 
+func (c ChildResourceUpdates) failureMessage(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) string {
+	msg := stsFailureReason(c.StatefulSet.Manifest)
+	if msg != "" {
+		return msg
+	}
+	msg = podFailureReason(pod)
+	if msg != "" {
+		return msg
+	}
+	msg = pvcFailureReason(c.PVC.Manifest)
+	if msg != "" {
+		return msg
+	}
+	for ipvc := range c.DataSourcesPVCs {
+		msg = pvcFailureReason(c.DataSourcesPVCs[ipvc].Manifest)
+		if msg != "" {
+			return msg
+		}
+	}
+	msg = serviceFailureReason(c.Service.Manifest)
+	if msg != "" {
+		return msg
+	}
+	msg = ingressFailureReason(c.Ingress.Manifest)
+	if msg != "" {
+		return msg
+	}
+	return ""
+}
+
 func Conditions(
 	state amaltheadevv1alpha1.State,
 	ctx context.Context,
@@ -396,6 +426,7 @@ func (c ChildResourceUpdates) Status(
 		IdleSince:       idleSince,
 		FailingSince:    failingSince,
 		HibernatedSince: hibernatedSince,
+		Error:           c.failureMessage(cr, pod),
 	}
 
 	if pod != nil {
