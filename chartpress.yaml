@@ -1,17 +1,4 @@
 charts:
-  - name: helm-chart/amalthea
-    resetTag: latest
-    imagePrefix: renku/
-    repo:
-      git: SwissDataScienceCenter/helm-charts
-      published: https://swissdatasciencecenter.github.io/helm-charts
-    paths:
-      - .
-    images:
-      amalthea:
-        contextPath: .
-        dockerfilePath: kopf.Dockerfile
-        valuesPath: image
   - name: helm-chart/amalthea-sessions
     resetTag: latest
     imagePrefix: renku/
@@ -29,3 +16,16 @@ charts:
         contextPath: .
         dockerfilePath: sidecars.Dockerfile
         valuesPath: sidecars.image
+  - name: helm-chart/amalthea
+    resetTag: latest
+    imagePrefix: renku/
+    repo:
+      git: SwissDataScienceCenter/helm-charts
+      published: https://swissdatasciencecenter.github.io/helm-charts
+    paths:
+      - .
+    images:
+      amalthea:
+        contextPath: .
+        dockerfilePath: kopf.Dockerfile
+        valuesPath: image
