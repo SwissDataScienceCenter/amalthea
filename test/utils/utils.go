@@ -17,12 +17,28 @@ limitations under the License.
 package utils
 
 import (
+	"bufio"
+	"bytes"
+	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"strings"
 
+	"flag"
+	"path/filepath"
+
 	. "github.com/onsi/ginkgo/v2" //nolint:golint,revive
+
+	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -176,4 +192,107 @@ func GetProjectDir() (string, error) {
 	}
 	wd = strings.Replace(wd, "/test/e2e", "", -1)
 	return wd, nil
+}
+
+func InstallHelmChart(ctx context.Context, namespace string, releaseName string, chart string) error {
+	cmd := exec.CommandContext(ctx, "chartpress")
+	_, err := Run(cmd)
+	if err != nil {
+		return err
+	}
+	cmd = exec.CommandContext(ctx, "chartpress", "--list-images")
+	stdout := bytes.NewBuffer(nil)
+	cmd.Stdout = stdout
+	projDir, err := GetProjectDir()
+	if err != nil {
+		return err
+	}
+	cmd.Dir = projDir
+	fmt.Fprintf(GinkgoWriter, "running: %s\n", cmd)
+	err = cmd.Run()
+	if err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		image := scanner.Text()
+		if image == "" {
+			continue
+		}
+		err = LoadImageToKindClusterWithName(image)
+		if err != nil {
+			return err
+		}
+	}
+	err = scanner.Err()
+	if err != nil {
+		return err
+	}
+	cmd = exec.CommandContext(ctx, "helm", "-n", namespace, "upgrade", "--create-namespace", "--install", "--wait", "--timeout", "6m", releaseName, chart)
+	_, err = Run(cmd)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func UninstallHelmChart(ctx context.Context, namespace string, releaseName string) error {
+	cmd := exec.CommandContext(ctx, "helm", "-n", namespace, "uninstall", releaseName, "--wait", "--timeout", "5m")
+	_, err := Run(cmd)
+	return err
+}
+
+func GetK8sClient(ctx context.Context, namespace string) (client.Client, error) {
+	scheme := runtime.NewScheme()
+	err := clientgoscheme.AddToScheme(scheme)
+	if err != nil {
+		return nil, err
+	}
+	err = amaltheadevv1alpha1.AddToScheme(scheme)
+	if err != nil {
+		return nil, err
+	}
+	var kubeconfig *string
+	testFlags := flag.NewFlagSet("", flag.PanicOnError)
+	if home := homedir.HomeDir(); home != "" {
+		kubeconfig = testFlags.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	} else {
+		kubeconfig = testFlags.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	}
+	flag.Parse()
+
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+
+	mgr, err := ctrl.NewManager(
+		config,
+		ctrl.Options{
+			Scheme: scheme,
+			Client: client.Options{
+				Cache: &client.CacheOptions{
+					DisableFor: []client.Object{
+						&amaltheadevv1alpha1.AmaltheaSession{},
+						&corev1.Pod{},
+					},
+				},
+			},
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return mgr.GetClient(), nil
+}
+
+func GetRandomName() string {
+	prefix := "amalthea-test-"
+	const length int = 8
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	result := make([]byte, length)
+	for i := range result {
+		result[i] = charset[rand.Intn(len(charset))]
+	}
+	return prefix + string(result)
 }

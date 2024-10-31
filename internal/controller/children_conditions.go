@@ -46,7 +46,7 @@ func podFailureReason(pod *v1.Pod) string {
 			if contStatus.State.Waiting.Reason == "ImagePullBackOff" {
 				image := getImageOfContainer(pod, contStatus.Name)
 				if image != "" {
-					return fmt.Sprintf("the image %s for container %s cannot be found", contStatus.Name, image)
+					return fmt.Sprintf("the image %s for container %s cannot be found", image, contStatus.Name)
 				}
 			}
 			return fmt.Sprintf("the container %s is failing because %s", contStatus.Name, contStatus.State.Waiting.Message)

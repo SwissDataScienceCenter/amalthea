@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 
@@ -20,6 +21,7 @@ import (
 // a value that is too low it is possible that the pod will "heal itself" after a few restarts. If the
 // value is too high then the user will wait for a long time before they see their pod is failing.
 const restartThreshold int32 = 3
+const readyTimeout time.Duration = time.Minute * 10
 
 var cpuUsageIdlenessThreshold resource.Quantity = *resource.NewMilliQuantity(300, resource.DecimalSI)
 
@@ -54,26 +56,6 @@ func podIsReady(pod *v1.Pod) bool {
 	phaseOk := pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodRunning
 	initCounts, counts := containerCounts(pod)
 	return initCounts.Ok() && counts.Ok() && phaseOk
-}
-
-func podIsFailed(pod *v1.Pod) bool {
-	if pod == nil || pod.GetDeletionTimestamp() != nil {
-		// A missing pod or a pod being deleted is not considered failed
-		return false
-	}
-	for _, container := range pod.Status.InitContainerStatuses {
-		containerFailed := container.State.Waiting != nil && container.RestartCount >= restartThreshold
-		if containerFailed {
-			return true
-		}
-	}
-	for _, container := range pod.Status.ContainerStatuses {
-		containerFailed := container.State.Waiting != nil && container.RestartCount >= restartThreshold
-		if containerFailed {
-			return true
-		}
-	}
-	return false
 }
 
 func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *amaltheadevv1alpha1.AmaltheaSession) (v1.ResourceList, error) {

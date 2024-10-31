@@ -265,18 +265,19 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	return stsReady && podReady
 }
 
-func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) amaltheadevv1alpha1.State {
+func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
+	msg := c.failureMessage(cr, pod)
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
-		return amaltheadevv1alpha1.NotReady
+		return amaltheadevv1alpha1.NotReady, ""
 	case cr.Spec.Hibernated && c.StatefulSet.Manifest.Spec.Replicas != nil && *c.StatefulSet.Manifest.Spec.Replicas == 0:
-		return amaltheadevv1alpha1.Hibernated
-	case podIsFailed(pod):
-		return amaltheadevv1alpha1.Failed
+		return amaltheadevv1alpha1.Hibernated, ""
+	case msg != "":
+		return amaltheadevv1alpha1.Failed, msg
 	case c.IsRunning(pod):
-		return amaltheadevv1alpha1.Running
+		return amaltheadevv1alpha1.Running, ""
 	default:
-		return amaltheadevv1alpha1.NotReady
+		return amaltheadevv1alpha1.NotReady, ""
 	}
 }
 
@@ -407,7 +408,8 @@ func (c ChildResourceUpdates) Status(
 		hibernatedSince = metav1.Time{}
 	}
 
-	failing := pod != nil && podIsFailed(pod)
+	state, failMsg := c.State(cr, pod)
+	failing := state == amaltheadevv1alpha1.Failed
 	failingSince := cr.Status.FailingSince
 	if failing && failingSince.IsZero() {
 		failingSince = metav1.NewTime(time.Now())
@@ -415,8 +417,6 @@ func (c ChildResourceUpdates) Status(
 	if !hibernated && !failingSince.IsZero() {
 		failingSince = metav1.Time{}
 	}
-
-	state := c.State(cr, pod)
 
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
 		Conditions:      Conditions(state, ctx, r, cr),
@@ -426,7 +426,7 @@ func (c ChildResourceUpdates) Status(
 		IdleSince:       idleSince,
 		FailingSince:    failingSince,
 		HibernatedSince: hibernatedSince,
-		Error:           c.failureMessage(cr, pod),
+		Error:           failMsg,
 	}
 
 	if pod != nil {
