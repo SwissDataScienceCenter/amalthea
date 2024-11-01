@@ -5659,7 +5659,6 @@ spec:
                     type: string
                 required:
                 - image
-                - port
                 type: object
               tolerations:
                 description: |-

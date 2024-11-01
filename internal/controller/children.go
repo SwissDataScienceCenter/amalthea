@@ -382,6 +382,7 @@ func (c ChildResourceUpdates) Status(
 
 	idle := false
 	idleSince := cr.Status.IdleSince
+	state, failMsg := c.State(cr, pod)
 
 	if pod != nil {
 		oldEnough := false
@@ -394,7 +395,7 @@ func (c ChildResourceUpdates) Status(
 			}
 		}
 
-		if c.State(cr, pod) == amaltheadevv1alpha1.Running && oldEnough {
+		if state == amaltheadevv1alpha1.Running && oldEnough {
 			idle = isIdle(ctx, r.MetricsClient, cr)
 			if idle && idleSince.IsZero() {
 				idleSince = metav1.NewTime(time.Now())
@@ -413,7 +414,6 @@ func (c ChildResourceUpdates) Status(
 		hibernatedSince = metav1.Time{}
 	}
 
-	state, failMsg := c.State(cr, pod)
 	failing := state == amaltheadevv1alpha1.Failed
 	failingSince := cr.Status.FailingSince
 	if failing && failingSince.IsZero() {
