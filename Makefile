@@ -103,7 +103,6 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	echo "{{- if .Values.deployCrd -}}" > $(HELM_CRD_TEMPLATE)
 	echo "# This manifest is auto-generated from the makefile do not edit manually." >> $(HELM_CRD_TEMPLATE)
-	echo "{{- end }}" >> $(HELM_CRD_TEMPLATE)
 	cat config/crd/bases/*yaml >> $(HELM_CRD_TEMPLATE)
 	echo "{{- end }}" >> $(HELM_CRD_TEMPLATE)
 
