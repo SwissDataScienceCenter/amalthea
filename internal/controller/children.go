@@ -266,7 +266,7 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 }
 
 func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
-	msg := c.failureMessage(cr, pod)
+	msg := c.failureMessage(pod)
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
 		return amaltheadevv1alpha1.NotReady, ""
@@ -281,12 +281,8 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	}
 }
 
-func (c ChildResourceUpdates) failureMessage(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) string {
-	msg := stsFailureReason(c.StatefulSet.Manifest)
-	if msg != "" {
-		return msg
-	}
-	msg = podFailureReason(pod)
+func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
+	msg := podFailureReason(pod)
 	if msg != "" {
 		return msg
 	}
@@ -307,6 +303,15 @@ func (c ChildResourceUpdates) failureMessage(cr *amaltheadevv1alpha1.AmaltheaSes
 	msg = ingressFailureReason(c.Ingress.Manifest)
 	if msg != "" {
 		return msg
+	}
+	return ""
+}
+
+func (c ChildResourceUpdates) warningMessage(pod *v1.Pod) string {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Reason == "Unschedulable" {
+			return fmt.Sprintf("the session is requesting more resources than available, the reason is %q, this may correct itself if a Renku admin provisions more resources", condition.Reason)
+		}
 	}
 	return ""
 }
@@ -427,6 +432,10 @@ func (c ChildResourceUpdates) Status(
 		FailingSince:    failingSince,
 		HibernatedSince: hibernatedSince,
 		Error:           failMsg,
+	}
+	warning := c.warningMessage(pod)
+	if status.Error == "" && warning != "" {
+		status.Error = warning
 	}
 
 	if pod != nil {

@@ -3,14 +3,9 @@ package controller
 import (
 	"fmt"
 
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 )
-
-func stsFailureReason(sts *appsv1.StatefulSet) string {
-	return ""
-}
 
 func getImageOfContainer(pod *v1.Pod, containerName string) string {
 	for _, cont := range pod.Spec.InitContainers {
@@ -33,26 +28,34 @@ func podFailureReason(pod *v1.Pod) string {
 	if pod.GetDeletionTimestamp() != nil {
 		return ""
 	}
-	if pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodSucceeded {
-		return ""
-	}
+	// NOTE: Checking the pod phase is not useful because it will still say "Running" when a container
+	// fails to start for example when the command is referencing an executable that does not exist.
 	// NOTE: The messages from the container statuses list are more descriptive than the conditions
 	// so we check these first.
-	for _, contStatus := range pod.Status.ContainerStatuses {
-		if contStatus.Started != nil && *contStatus.Started && contStatus.Ready {
+	allStatuses := []v1.ContainerStatus{}
+	allStatuses = append(allStatuses, pod.Status.InitContainerStatuses...)
+	allStatuses = append(allStatuses, pod.Status.ContainerStatuses...)
+	for _, contStatus := range allStatuses {
+		switch {
+		case contStatus.Started != nil && *contStatus.Started && contStatus.Ready:
 			continue
-		}
-		if contStatus.State.Waiting != nil {
-			if contStatus.State.Waiting.Reason == "ImagePullBackOff" {
-				image := getImageOfContainer(pod, contStatus.Name)
-				if image != "" {
-					return fmt.Sprintf("the image %s for container %s cannot be found", image, contStatus.Name)
-				}
+		case contStatus.State.Waiting != nil && contStatus.State.Waiting.Reason == "ImagePullBackOff":
+			image := getImageOfContainer(pod, contStatus.Name)
+			if image != "" {
+				return fmt.Sprintf("the image %s for container %s cannot be found", image, contStatus.Name)
 			}
+			return fmt.Sprintf("the image for container %s cannot be found", contStatus.Name)
+		case contStatus.State.Waiting != nil && contStatus.State.Waiting.Reason == "CrashLoopBackOff":
+			return fmt.Sprintf("the command in container %s is crashing, this can occur when you run out of disk space, this is the best reason for the crash we could extract: %q", contStatus.Name, contStatus.State.Waiting.Message)
+		case contStatus.State.Waiting != nil && contStatus.State.Waiting.Message != "":
 			return fmt.Sprintf("the container %s is failing because %s", contStatus.Name, contStatus.State.Waiting.Message)
-		}
-		if contStatus.State.Terminated != nil && contStatus.State.Terminated.ExitCode != 0 {
-			return fmt.Sprintf("the container %s terminated with an error %s", contStatus.Name, contStatus.State.Terminated.Message)
+		case contStatus.State.Waiting != nil:
+			return fmt.Sprintf("the container %s is failing because %s", contStatus.Name, contStatus.State.Waiting.Reason)
+		case contStatus.State.Terminated != nil && contStatus.State.Terminated.ExitCode != 0:
+			if contStatus.State.Terminated.Message != "" {
+				return fmt.Sprintf("the container %s terminated with an error %s", contStatus.Name, contStatus.State.Terminated.Message)
+			}
+			return fmt.Sprintf("the command in container %s terminated with an error exit code, this could be because you are running out of disk space", contStatus.Name)
 		}
 	}
 	for _, condition := range pod.Status.Conditions {

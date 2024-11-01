@@ -3,25 +3,14 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
-
 	v1 "k8s.io/api/core/v1"
-
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
-
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-// How many times should a pod restart before we consider it Failed. This is required because if we take
-// a value that is too low it is possible that the pod will "heal itself" after a few restarts. If the
-// value is too high then the user will wait for a long time before they see their pod is failing.
-const restartThreshold int32 = 3
-const readyTimeout time.Duration = time.Minute * 10
 
 var cpuUsageIdlenessThreshold resource.Quantity = *resource.NewMilliQuantity(300, resource.DecimalSI)
 
