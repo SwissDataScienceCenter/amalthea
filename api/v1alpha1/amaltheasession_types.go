@@ -144,8 +144,9 @@ type Session struct {
 	RunAsGroup int64 `json:"runAsGroup,omitempty"`
 	// +optional
 	// +kubebuilder:default:="/"
-	// The path where the session can be accessed. If an ingress is enabled then this will be
-	// the path prefix for the ingress.
+	// The path where the session can be accessed, if an ingress is used this should be a subpath
+	// of the ingress.pathPrefix field. For example if the pathPrefix is /foo, this should be /foo or /foo/bar,
+	// but it cannot be /baz.
 	URLPath string `json:"urlPath,omitempty"`
 	// +optional
 	// Additional volume mounts for the session container
@@ -161,6 +162,11 @@ type Ingress struct {
 	// +optional
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
 	TLSSecret *SessionSecretRef `json:"tlsSecret,omitempty"`
+	// +optional
+	// The path prefix that will be used in the ingress. If left unset or set to "" then
+	// the value will default to the session.urlPath value. If this is explicitly set, then the
+	// urlPath value should be a subpath of this value.
+	PathPrefix string `json:"pathPrefix,omitempty"`
 }
 
 type Storage struct {

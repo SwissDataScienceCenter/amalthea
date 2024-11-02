@@ -33,7 +33,7 @@ func (as *AmaltheaSession) auth() manifests {
 	})
 
 	if auth.Type == Oidc {
-		sessionURL := as.sessionLocalhostURL().String()
+		sessionURL := as.localhostPathPrefixURL().String()
 		if !strings.HasSuffix(sessionURL, "/") {
 			// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
 			// and does not proxy subpaths
