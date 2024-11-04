@@ -4009,6 +4009,12 @@ spec:
                       rule: self == oldSelf
                   ingressClassName:
                     type: string
+                  pathPrefix:
+                    default: /
+                    description: |-
+                      The path prefix that will be used in the ingress. If this is explicitly set, then the
+                      urlPath value should be a subpath of this value.
+                    type: string
                   tlsSecret:
                     description: The name of the TLS secret, same as what is specified
                       in a regular Kubernetes Ingress.
@@ -5649,8 +5655,9 @@ spec:
                   urlPath:
                     default: /
                     description: |-
-                      The path where the session can be accessed. If an ingress is enabled then this will be
-                      the path prefix for the ingress.
+                      The path where the session can be accessed, if an ingress is used this should be a subpath
+                      of the ingress.pathPrefix field. For example if the pathPrefix is /foo, this should be /foo or /foo/bar,
+                      but it cannot be /baz.
                     type: string
                   workingDir:
                     description: |-

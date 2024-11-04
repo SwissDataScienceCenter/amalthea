@@ -193,20 +193,9 @@ func (cr *AmaltheaSession) Service() v1.Service {
 	return svc
 }
 
-// The URL where the session can be accessed. It excludes the auth proxy and the ingress and
-// the host is always 127.0.0.1.
-func (cr *AmaltheaSession) sessionLocalhostURL() *url.URL {
-	host := fmt.Sprintf("127.0.0.1:%d", cr.Spec.Session.Port)
-	output := url.URL{Host: host, Scheme: "http", Path: cr.Spec.Session.URLPath}
-	return &output
-}
-
 // The localhost path prefix URL for the session. It excludes the auth proxy and the ingress and
 // the host is always 127.0.0.1.
 func (cr *AmaltheaSession) localhostPathPrefixURL() *url.URL {
-	if cr.Spec.Ingress.PathPrefix == "" {
-		return cr.sessionLocalhostURL()
-	}
 	host := fmt.Sprintf("127.0.0.1:%d", cr.Spec.Session.Port)
 	output := url.URL{Host: host, Scheme: "http", Path: cr.Spec.Ingress.PathPrefix}
 	return &output

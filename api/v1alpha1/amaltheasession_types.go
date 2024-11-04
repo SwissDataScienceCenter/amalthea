@@ -163,8 +163,8 @@ type Ingress struct {
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
 	TLSSecret *SessionSecretRef `json:"tlsSecret,omitempty"`
 	// +optional
-	// The path prefix that will be used in the ingress. If left unset or set to "" then
-	// the value will default to the session.urlPath value. If this is explicitly set, then the
+	// +kubebuilder:default:="/"
+	// The path prefix that will be used in the ingress. If this is explicitly set, then the
 	// urlPath value should be a subpath of this value.
 	PathPrefix string `json:"pathPrefix,omitempty"`
 }

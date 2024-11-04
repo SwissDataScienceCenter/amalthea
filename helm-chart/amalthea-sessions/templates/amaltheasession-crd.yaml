@@ -4012,9 +4012,9 @@ spec:
                   ingressClassName:
                     type: string
                   pathPrefix:
+                    default: /
                     description: |-
-                      The path prefix that will be used in the ingress. If left unset or set to "" then
-                      the value will default to the session.urlPath value. If this is explicitly set, then the
+                      The path prefix that will be used in the ingress. If this is explicitly set, then the
                       urlPath value should be a subpath of this value.
                     type: string
                   tlsSecret:
