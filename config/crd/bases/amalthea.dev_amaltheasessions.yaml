@@ -5659,7 +5659,6 @@ spec:
                     type: string
                 required:
                 - image
-                - port
                 type: object
               tolerations:
                 description: |-
@@ -5741,6 +5740,10 @@ spec:
                   total:
                     type: integer
                 type: object
+              error:
+                description: If the state is failed then the message will contain
+                  information about what went wrong, otherwise it is empty
+                type: string
               failingSince:
                 format: date-time
                 type: string

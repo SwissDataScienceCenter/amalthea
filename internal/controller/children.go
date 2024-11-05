@@ -265,19 +265,55 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	return stsReady && podReady
 }
 
-func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) amaltheadevv1alpha1.State {
+func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
+	msg := c.failureMessage(pod)
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
-		return amaltheadevv1alpha1.NotReady
+		return amaltheadevv1alpha1.NotReady, ""
 	case cr.Spec.Hibernated && c.StatefulSet.Manifest.Spec.Replicas != nil && *c.StatefulSet.Manifest.Spec.Replicas == 0:
-		return amaltheadevv1alpha1.Hibernated
-	case podIsFailed(pod):
-		return amaltheadevv1alpha1.Failed
+		return amaltheadevv1alpha1.Hibernated, ""
+	case msg != "":
+		return amaltheadevv1alpha1.Failed, msg
 	case c.IsRunning(pod):
-		return amaltheadevv1alpha1.Running
+		return amaltheadevv1alpha1.Running, ""
 	default:
-		return amaltheadevv1alpha1.NotReady
+		return amaltheadevv1alpha1.NotReady, ""
 	}
+}
+
+func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
+	msg := podFailureReason(pod)
+	if msg != "" {
+		return msg
+	}
+	msg = pvcFailureReason(c.PVC.Manifest)
+	if msg != "" {
+		return msg
+	}
+	for ipvc := range c.DataSourcesPVCs {
+		msg = pvcFailureReason(c.DataSourcesPVCs[ipvc].Manifest)
+		if msg != "" {
+			return msg
+		}
+	}
+	msg = serviceFailureReason(c.Service.Manifest)
+	if msg != "" {
+		return msg
+	}
+	msg = ingressFailureReason(c.Ingress.Manifest)
+	if msg != "" {
+		return msg
+	}
+	return ""
+}
+
+func (c ChildResourceUpdates) warningMessage(pod *v1.Pod) string {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Reason == "Unschedulable" {
+			return fmt.Sprintf("the session is requesting more resources than available, the reason is %q, this may correct itself if a Renku admin provisions more resources", condition.Reason)
+		}
+	}
+	return ""
 }
 
 func Conditions(
@@ -346,6 +382,7 @@ func (c ChildResourceUpdates) Status(
 
 	idle := false
 	idleSince := cr.Status.IdleSince
+	state, failMsg := c.State(cr, pod)
 
 	if pod != nil {
 		oldEnough := false
@@ -358,7 +395,7 @@ func (c ChildResourceUpdates) Status(
 			}
 		}
 
-		if c.State(cr, pod) == amaltheadevv1alpha1.Running && oldEnough {
+		if state == amaltheadevv1alpha1.Running && oldEnough {
 			idle = isIdle(ctx, r.MetricsClient, cr)
 			if idle && idleSince.IsZero() {
 				idleSince = metav1.NewTime(time.Now())
@@ -377,7 +414,7 @@ func (c ChildResourceUpdates) Status(
 		hibernatedSince = metav1.Time{}
 	}
 
-	failing := pod != nil && podIsFailed(pod)
+	failing := state == amaltheadevv1alpha1.Failed
 	failingSince := cr.Status.FailingSince
 	if failing && failingSince.IsZero() {
 		failingSince = metav1.NewTime(time.Now())
@@ -385,8 +422,6 @@ func (c ChildResourceUpdates) Status(
 	if !hibernated && !failingSince.IsZero() {
 		failingSince = metav1.Time{}
 	}
-
-	state := c.State(cr, pod)
 
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
 		Conditions:      Conditions(state, ctx, r, cr),
@@ -396,6 +431,11 @@ func (c ChildResourceUpdates) Status(
 		IdleSince:       idleSince,
 		FailingSince:    failingSince,
 		HibernatedSince: hibernatedSince,
+		Error:           failMsg,
+	}
+	warning := c.warningMessage(pod)
+	if status.Error == "" && warning != "" {
+		status.Error = warning
 	}
 
 	if pod != nil {

@@ -122,7 +122,7 @@ type Session struct {
 	// If the session has authentication enabled then the ingress and service will point to the authentication container
 	// and the authentication proxy container will proxy to this port. If authentication is disabled then the ingress and service
 	// route directly to this port. Note that renku reserves the highest TCP value 65535 to run the authentication proxy.
-	Port int32 `json:"port"`
+	Port int32 `json:"port,omitempty"`
 	// +optional
 	// +kubebuilder:default:={}
 	Storage Storage `json:"storage,omitempty"`
@@ -358,6 +358,9 @@ type AmaltheaSessionStatus struct {
 	FailingSince metav1.Time `json:"failingSince,omitempty"`
 	// +kubebuilder:validation:Format:=date-time
 	HibernatedSince metav1.Time `json:"hibernatedSince,omitempty"`
+	// If the state is failed then the message will contain information about what went wrong, otherwise it is empty
+	// +optional
+	Error string `json:"error,omitempty"`
 }
 
 //+kubebuilder:object:root=true
