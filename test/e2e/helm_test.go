@@ -23,7 +23,7 @@ var _ = Describe("controller", Ordered, func() {
 	var k8sClient client.Client
 
 	BeforeAll(func(ctx SpecContext) {
-		utils.Run(exec.Command("make", "uninstall"))
+		utils.Run(exec.Command("make", "uninstall")) //nolint:errcheck
 		ctrl.SetLogger(logr.Discard())
 		By("installing amalthea session helm chart")
 		Expect(utils.InstallHelmChart(ctx, namespace, release, helmChart)).To(Succeed())
