@@ -360,7 +360,7 @@ type AmaltheaSessionStatus struct {
 	HibernatedSince metav1.Time `json:"hibernatedSince,omitempty"`
 	// If the state is failed then the message will contain information about what went wrong, otherwise it is empty
 	// +optional
-	Error string `json:"message,omitempty"`
+	Error string `json:"error,omitempty"`
 }
 
 //+kubebuilder:object:root=true
