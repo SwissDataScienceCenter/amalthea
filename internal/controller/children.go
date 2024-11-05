@@ -55,7 +55,7 @@ type ChildResourceUpdates struct {
 // https://github.com/kubernetes-sigs/metrics-server/blob/9ebbad973db2a54193712c4d9292bbe3eaa849dc/pkg/storage/pod.go#L31
 const freshContainerMinimalAge = 15 * time.Second
 
-func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] {
+func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
 	log := log.FromContext(ctx)
 	if c.Current == nil {
 		return ChildResourceUpdate[T]{}

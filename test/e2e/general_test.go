@@ -29,6 +29,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 	BeforeAll(func(ctx SpecContext) {
 		var ctrlCtx context.Context
 		ctrlCtx, stopController = context.WithCancel(context.Background())
+		utils.CreateNamespace(namespace)
 		By("installing CRDs")
 		cmd := exec.Command("make", "install")
 		_, err := utils.Run(cmd)
