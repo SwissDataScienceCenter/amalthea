@@ -2,7 +2,6 @@ package v1alpha1
 
 import (
 	"fmt"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
@@ -34,11 +33,6 @@ func (as *AmaltheaSession) auth() manifests {
 
 	if auth.Type == Oidc {
 		sessionURL := as.localhostPathPrefixURL().String()
-		if !strings.HasSuffix(sessionURL, "/") {
-			// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
-			// and does not proxy subpaths
-			sessionURL += "/"
-		}
 		authContainer := v1.Container{
 			Image: authproxyImage,
 			Name:  "oauth2-proxy",

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -193,11 +194,17 @@ func (cr *AmaltheaSession) Service() v1.Service {
 	return svc
 }
 
-// The localhost path prefix URL for the session. It excludes the auth proxy and the ingress and
+// The localhost path prefix URL leading straight to the session. It excludes the auth proxy and the ingress and
 // the host is always 127.0.0.1.
 func (cr *AmaltheaSession) localhostPathPrefixURL() *url.URL {
 	host := fmt.Sprintf("127.0.0.1:%d", cr.Spec.Session.Port)
-	output := url.URL{Host: host, Scheme: "http", Path: cr.Spec.Ingress.PathPrefix}
+	path := cr.Spec.Ingress.PathPrefix
+	// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
+	// and does not proxy subpaths
+	if !strings.HasSuffix(path, "/") {
+		path = path + "/"
+	}
+	output := url.URL{Host: host, Scheme: "http", Path: path}
 	return &output
 }
 
