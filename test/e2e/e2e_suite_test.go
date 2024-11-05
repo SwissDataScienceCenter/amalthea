@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -27,6 +26,6 @@ import (
 // Run e2e tests using the Ginkgo runner.
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	fmt.Fprintf(GinkgoWriter, "Starting amalthea suite\n")
+	GinkgoLogr.Info("Starting amalthea suite")
 	RunSpecs(t, "e2e suite")
 }

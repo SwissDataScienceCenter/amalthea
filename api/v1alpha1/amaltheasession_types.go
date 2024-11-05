@@ -122,7 +122,7 @@ type Session struct {
 	// If the session has authentication enabled then the ingress and service will point to the authentication container
 	// and the authentication proxy container will proxy to this port. If authentication is disabled then the ingress and service
 	// route directly to this port. Note that renku reserves the highest TCP value 65535 to run the authentication proxy.
-	Port int32 `json:"port"`
+	Port int32 `json:"port,omitempty"`
 	// +optional
 	// +kubebuilder:default:={}
 	Storage Storage `json:"storage,omitempty"`
@@ -144,8 +144,9 @@ type Session struct {
 	RunAsGroup int64 `json:"runAsGroup,omitempty"`
 	// +optional
 	// +kubebuilder:default:="/"
-	// The path where the session can be accessed. If an ingress is enabled then this will be
-	// the path prefix for the ingress.
+	// The path where the session can be accessed, if an ingress is used this should be a subpath
+	// of the ingress.pathPrefix field. For example if the pathPrefix is /foo, this should be /foo or /foo/bar,
+	// but it cannot be /baz.
 	URLPath string `json:"urlPath,omitempty"`
 	// +optional
 	// Additional volume mounts for the session container
@@ -161,6 +162,11 @@ type Ingress struct {
 	// +optional
 	// The name of the TLS secret, same as what is specified in a regular Kubernetes Ingress.
 	TLSSecret *SessionSecretRef `json:"tlsSecret,omitempty"`
+	// +optional
+	// +kubebuilder:default:="/"
+	// The path prefix that will be used in the ingress. If this is explicitly set, then the
+	// urlPath value should be a subpath of this value.
+	PathPrefix string `json:"pathPrefix,omitempty"`
 }
 
 type Storage struct {
@@ -358,6 +364,9 @@ type AmaltheaSessionStatus struct {
 	FailingSince metav1.Time `json:"failingSince,omitempty"`
 	// +kubebuilder:validation:Format:=date-time
 	HibernatedSince metav1.Time `json:"hibernatedSince,omitempty"`
+	// If the state is failed then the message will contain information about what went wrong, otherwise it is empty
+	// +optional
+	Error string `json:"error,omitempty"`
 }
 
 //+kubebuilder:object:root=true

@@ -128,7 +128,7 @@ test-e2e:
 	go test ./test/e2e/ -v -ginkgo.v
 	
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION ?= v1.54.2
+GOLANGCI_LINT_VERSION ?= v1.61.0
 golangci-lint:
 	@[ -f $(GOLANGCI_LINT) ] || { \
 	set -e ;\
@@ -280,6 +280,17 @@ bundle-build: ## Build the bundle image.
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+
+.PHONY: list-chartpress-images
+list-chartpress-images:
+	@# Chartpress has a bug where it only lists the images from the first helm chart in the yaml file
+	@# We have 2 charts so we have to do this to compensate
+	@chartpress --list-images
+	@cp chartpress.yaml chartpress.backup.yaml
+	@yq "del(.charts[0])" -i chartpress.yaml
+	@chartpress --list-images
+	@rm chartpress.yaml
+	@mv chartpress.backup.yaml chartpress.yaml
 
 .PHONY: opm
 OPM = $(LOCALBIN)/opm
