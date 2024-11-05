@@ -39,6 +39,12 @@ func podFailureReason(pod *v1.Pod) string {
 		switch {
 		case contStatus.Started != nil && *contStatus.Started && contStatus.Ready:
 			continue
+		case contStatus.State.Waiting != nil && contStatus.State.Waiting.Reason == "ContainerCreating":
+			// NOTE: This is the default status the pod starts with when it is starting up when it has no init containers
+			continue
+		case contStatus.State.Waiting != nil && contStatus.State.Waiting.Reason == "PodInitializing":
+			// NOTE: This is the default status the pod starts with when it is starting up and it has init containers
+			continue
 		case contStatus.State.Waiting != nil && contStatus.State.Waiting.Reason == "ImagePullBackOff":
 			image := getImageOfContainer(pod, contStatus.Name)
 			if image != "" {
