@@ -18,14 +18,14 @@ jobs:
         uses: devcontainers/ci@v0.3
         with:
           runCmd: |
-            make style_checks
-            make lint
-            make tests
-            make test
-            make test-e2e
-            helm dep update helm-chart/amalthea
-            helm lint helm-chart/amalthea
-            helm dep update helm-chart/amalthea-sessions
+            make style_checks && \
+            make lint && \
+            make tests && \
+            make test && \
+            make test-e2e && \
+            helm dep update helm-chart/amalthea && \
+            helm lint helm-chart/amalthea && \
+            helm dep update helm-chart/amalthea-sessions && \
             helm lint helm-chart/amalthea-sessions
           push: never
           skipContainerUserIdUpdate: false
