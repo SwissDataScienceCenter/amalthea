@@ -162,6 +162,14 @@ func UninstallMetricsServer() {
 	}
 }
 
+func CreateNamespace(namespace string) {
+	cmd := exec.Command("kubectl", "create", "ns", namespace)
+	_, err := cmd.CombinedOutput()
+	if err != nil && !strings.Contains(err.Error(), "AlreadyExists") {
+		warnError(err)
+	}
+}
+
 // LoadImageToKindCluster loads a local docker image to the kind cluster
 func LoadImageToKindClusterWithName(name string) error {
 	cluster := "kind"
@@ -200,11 +208,16 @@ func GetProjectDir() (string, error) {
 
 func InstallHelmChart(ctx context.Context, namespace string, releaseName string, chart string) error {
 	cmd := exec.CommandContext(ctx, "chartpress")
-	_, err := Run(cmd)
+	dir, err := GetProjectDir()
 	if err != nil {
 		return err
 	}
-	cmd = exec.CommandContext(ctx, "make", "list-chartpress-images")
+	cmd.Dir = dir
+	_, err = Run(cmd)
+	if err != nil {
+		return err
+	}
+	cmd = exec.CommandContext(ctx, "make", "-s", "list-chartpress-images")
 	stdout := bytes.NewBuffer(nil)
 	cmd.Stdout = stdout
 	projDir, err := GetProjectDir()

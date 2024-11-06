@@ -17,9 +17,14 @@ limitations under the License.
 package authproxy
 
 import (
+	"context"
 	"fmt"
-
+	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -32,76 +37,90 @@ import (
 // The configuration options for the authentication proxy used for anonymous users.
 // The fields below can be passed as arguments i.e. --token=some-very-complicated-random-value
 // or as a yaml config file.
-const RemoteFlag = "remote"
-const PortFlag = "port"
-const TokenFlag = "token"
-const CookieKeyFlag = "cookie_key"
-const VerboseFlag = "verbose"
+const remoteFlag = "remote"
+const portFlag = "port"
+const tokenFlag = "token"
+const cookieKeyFlag = "cookie_key"
+const verboseFlag = "verbose"
+const configFlag = "config"
+
+var remote string
+var port int
+var token string
+var cookieKey string
+var verbose bool
+var config string
+
+const prefix = "authproxy"
 
 func Command() (*cobra.Command, error) {
 	var serveCmd = &cobra.Command{
-		Use:    "serve",
-		Short:  "Run the proxy",
-		Run:    serve,
-		PreRun: initConfig,
+		Use:     "serve",
+		Short:   "Run the proxy",
+		Run:     serve,
+		PreRunE: loadConfig,
 	}
-	serveCmd.PersistentFlags().String(RemoteFlag, "", "remote URL to proxy to")
-	err := serveCmd.MarkPersistentFlagRequired(RemoteFlag)
+
+	serveCmd.PersistentFlags().StringVar(&remote, remoteFlag, "", "remote URL to proxy to")
+	err := serveCmd.MarkPersistentFlagRequired(remoteFlag)
 	if err != nil {
 		return nil, err
 	}
-	err = viper.BindPFlag(RemoteFlag, serveCmd.PersistentFlags().Lookup(RemoteFlag))
+	err = viper.BindPFlag(prefix+"."+remoteFlag, serveCmd.PersistentFlags().Lookup(remoteFlag))
 	if err != nil {
 		return nil, err
 	}
-	err = viper.BindEnv(RemoteFlag)
+	err = viper.BindEnv(prefix+"."+remoteFlag, strings.ToUpper(prefix+"_"+remoteFlag))
 	if err != nil {
 		return nil, err
 	}
 
-	serveCmd.PersistentFlags().Int(PortFlag, 65535, "port on which the proxy will listen")
-	err = viper.BindPFlag(PortFlag, serveCmd.PersistentFlags().Lookup(PortFlag))
+	serveCmd.PersistentFlags().IntVar(&port, portFlag, 65535, "port on which the proxy will listen")
+	err = viper.BindPFlag(prefix+"."+portFlag, serveCmd.PersistentFlags().Lookup(portFlag))
 	if err != nil {
 		return nil, err
 	}
-	err = viper.BindEnv(PortFlag)
-	if err != nil {
-		return nil, err
-	}
-
-	serveCmd.PersistentFlags().String(CookieKeyFlag, "renku-auth", "cookie key where to find the token")
-	err = viper.BindPFlag(CookieKeyFlag, serveCmd.PersistentFlags().Lookup(CookieKeyFlag))
-	if err != nil {
-		return nil, err
-	}
-	err = viper.BindEnv(CookieKeyFlag)
+	err = viper.BindEnv(prefix+"."+portFlag, strings.ToUpper(prefix+"_"+portFlag))
 	if err != nil {
 		return nil, err
 	}
 
-	serveCmd.PersistentFlags().String(TokenFlag, "", "secret token for authentication")
-	err = serveCmd.MarkPersistentFlagRequired(TokenFlag)
+	serveCmd.PersistentFlags().StringVar(&cookieKey, cookieKeyFlag, "renku-auth", "cookie key where to find the token")
+	err = viper.BindPFlag(prefix+"."+cookieKeyFlag, serveCmd.PersistentFlags().Lookup(cookieKeyFlag))
 	if err != nil {
 		return nil, err
 	}
-	err = viper.BindPFlag(TokenFlag, serveCmd.PersistentFlags().Lookup(TokenFlag))
-	if err != nil {
-		return nil, err
-	}
-	err = viper.BindEnv(TokenFlag)
+	err = viper.BindEnv(prefix+"."+cookieKeyFlag, strings.ToUpper(prefix+"_"+cookieKeyFlag))
 	if err != nil {
 		return nil, err
 	}
 
-	serveCmd.PersistentFlags().Bool(VerboseFlag, false, "make the proxy verbose")
-	err = viper.BindPFlag(VerboseFlag, serveCmd.PersistentFlags().Lookup(VerboseFlag))
+	serveCmd.PersistentFlags().StringVar(&token, tokenFlag, "", "secret token for authentication")
+	err = serveCmd.MarkPersistentFlagRequired(tokenFlag)
 	if err != nil {
 		return nil, err
 	}
-	err = viper.BindEnv(VerboseFlag)
+	err = viper.BindPFlag(prefix+"."+tokenFlag, serveCmd.PersistentFlags().Lookup(tokenFlag))
 	if err != nil {
 		return nil, err
 	}
+	err = viper.BindEnv(prefix+"."+tokenFlag, strings.ToUpper(prefix+"_"+tokenFlag))
+	if err != nil {
+		return nil, err
+	}
+
+	serveCmd.PersistentFlags().BoolVar(&verbose, verboseFlag, false, "make the proxy verbose")
+	err = viper.BindPFlag(prefix+"."+verboseFlag, serveCmd.PersistentFlags().Lookup(verboseFlag))
+	if err != nil {
+		return nil, err
+	}
+	err = viper.BindEnv(prefix+"."+verboseFlag, strings.ToUpper(prefix+"_"+verboseFlag))
+	if err != nil {
+		return nil, err
+	}
+
+	serveCmd.PersistentFlags().StringVar(&config, configFlag, "", "config file that can provide all the other config options, precedence is given to CLI args over values in the file")
+
 	return serveCmd, nil
 }
 
@@ -111,30 +130,9 @@ func serve(cmd *cobra.Command, args []string) {
 
 	e.Use(middleware.Recover())
 	e.Use(middleware.Logger())
-
-	verbose := viper.GetBool(VerboseFlag)
+	e.Logger.SetLevel(log.INFO)
 	if verbose {
-		e.Logger.SetLevel(log.INFO)
-	}
-
-	remoteURLStr := viper.GetString(RemoteFlag)
-	if remoteURLStr == "" {
-		e.Logger.Fatal("Invalid remote URL")
-	}
-
-	port := viper.GetInt(PortFlag)
-	if port == 0 {
-		e.Logger.Warn("Using random port")
-	}
-
-	cookieKey := viper.GetString(CookieKeyFlag)
-	if cookieKey == "" {
-		e.Logger.Fatal("Invalid cookie key")
-	}
-
-	token := viper.GetString(TokenFlag)
-	if token == "" {
-		e.Logger.Fatal("Invalid token")
+		e.Logger.SetLevel(log.DEBUG)
 	}
 
 	keyLookup := fmt.Sprintf("cookie:%v,header:Authorization", cookieKey)
@@ -145,7 +143,7 @@ func serve(cmd *cobra.Command, args []string) {
 		},
 	}))
 
-	remoteURL, err := url.Parse(remoteURLStr)
+	remoteURL, err := url.Parse(remote)
 	if err != nil {
 		e.Logger.Fatal(err)
 	}
@@ -156,6 +154,23 @@ func serve(cmd *cobra.Command, args []string) {
 	}
 	e.Use(middleware.Proxy(middleware.NewRoundRobinBalancer(targets)))
 
-	e.Logger.Info(fmt.Sprintf("Starting proxy for %v", remoteURL))
+	e.Logger.Infof("Starting proxy for remote: %s, cookie key: %s, token of length %d", remoteURL.String(), cookieKey, len(token))
 	e.Logger.Fatal(e.Start(fmt.Sprintf(":%d", port)))
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	// Start server
+	go func() {
+		if err := e.Start(fmt.Sprintf(":%d", port)); err != nil && err != http.ErrServerClosed {
+			e.Logger.Fatal("shutting down the server")
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 10 seconds.
+	<-ctx.Done()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := e.Shutdown(ctx); err != nil {
+		e.Logger.Fatal(err)
+	}
 }

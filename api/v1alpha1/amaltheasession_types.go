@@ -423,7 +423,7 @@ func (a *AmaltheaSession) GetURLString() string {
 	if sessionURL == nil {
 		return "None"
 	}
-	return strings.TrimSuffix(sessionURL.String(), "/")
+	return sessionURL.String()
 }
 
 func (a *AmaltheaSession) GetURL() *url.URL {
@@ -434,9 +434,15 @@ func (a *AmaltheaSession) GetURL() *url.URL {
 	if a.Spec.Ingress.TLSSecret != nil && a.Spec.Ingress.TLSSecret.Name != "" {
 		urlScheme = "https"
 	}
+	path := a.Spec.Session.URLPath
+	// NOTE: We have to end with / because of the oauth2proxy, it matches paths
+	// that do not end with / exactly and wont match subpaths.
+	if !strings.HasSuffix(path, "/") {
+		path = path + "/"
+	}
 	sessionURL := url.URL{
 		Scheme: urlScheme,
-		Path:   a.Spec.Session.URLPath,
+		Path:   path,
 		Host:   a.Spec.Ingress.Host,
 	}
 	return &sessionURL
