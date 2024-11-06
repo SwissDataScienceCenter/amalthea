@@ -1,3 +1,5 @@
+## Note that the changelog has moved exclusively to https://github.com/SwissDataScienceCenter/amalthea/releases
+
 ## [0.12.3](https://github.com/SwissDataScienceCenter/amalthea/compare/0.12.2...0.12.3) (2024-08-10)
 
 
