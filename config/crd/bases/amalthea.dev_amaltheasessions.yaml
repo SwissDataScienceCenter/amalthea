@@ -5353,7 +5353,7 @@ spec:
                   Passed right through to the Statefulset used for the session.
                 type: object
                 x-kubernetes-map-type: atomic
-              reconcileSrategy:
+              reconcileStrategy:
                 default: always
                 description: |-
                   Indicates how Amalthea should reconcile the child resources for a session. This can be problematic because

@@ -101,7 +101,7 @@ type AmaltheaSessionSpec struct {
 	// - always: This is the expected method of operation for an operator, changes to the spec are always reconciled
 	// - whenHibernatedOrFailed: To avoid interrupting a running session, reconciliation of the child components
 	//   are only done when the session has a Failed or Hibernated status
-	ReconcileStrategy ReconcileStrategy `json:"reconcileSrategy,omitempty"`
+	ReconcileStrategy ReconcileStrategy `json:"reconcileStrategy,omitempty"`
 }
 
 type Session struct {
