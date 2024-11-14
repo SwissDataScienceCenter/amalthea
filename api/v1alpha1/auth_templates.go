@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 )
 
@@ -33,6 +34,12 @@ func (as *AmaltheaSession) auth() manifests {
 
 	if auth.Type == Oidc {
 		sessionURL := as.localhostPathPrefixURL().String()
+		probeHandler := v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/ping",
+				Port: intstr.FromInt32(authProxyPort),
+			},
+		}
 		authContainer := v1.Container{
 			Image: authproxyImage,
 			Name:  "oauth2-proxy",
@@ -55,10 +62,18 @@ func (as *AmaltheaSession) auth() manifests {
 				},
 				volumeMounts...,
 			),
+			ReadinessProbe: &v1.Probe{ProbeHandler: probeHandler},
+			LivenessProbe:  &v1.Probe{ProbeHandler: probeHandler},
 		}
 
 		output.Containers = append(output.Containers, authContainer)
 	} else if auth.Type == Token {
+		probeHandler := v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/__amalthea__/health",
+				Port: intstr.FromInt32(authProxyPort),
+			},
+		}
 		authContainer := v1.Container{
 			Image: sidecarsImage,
 			Name:  "authproxy",
@@ -89,6 +104,8 @@ func (as *AmaltheaSession) auth() manifests {
 				},
 				volumeMounts...,
 			),
+			ReadinessProbe: &v1.Probe{ProbeHandler: probeHandler},
+			LivenessProbe:  &v1.Probe{ProbeHandler: probeHandler},
 		}
 
 		output.Containers = append(output.Containers, authContainer)

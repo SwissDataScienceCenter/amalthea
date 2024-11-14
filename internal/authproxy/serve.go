@@ -152,7 +152,13 @@ func serve(cmd *cobra.Command, args []string) {
 			URL: remoteURL,
 		},
 	}
-	e.Use(middleware.Proxy(middleware.NewRoundRobinBalancer(targets)))
+	e.Group("/", middleware.Logger(), middleware.Proxy(middleware.NewRoundRobinBalancer(targets)))
+
+	//Healthcheck
+	health := e.Group("/__amalthea__")
+	health.GET("/health", func(c echo.Context) error {
+		return c.NoContent(http.StatusOK)
+	})
 
 	e.Logger.Infof("Starting proxy for remote: %s, cookie key: %s, token of length %d", remoteURL.String(), cookieKey, len(token))
 	e.Logger.Fatal(e.Start(fmt.Sprintf(":%d", port)))
