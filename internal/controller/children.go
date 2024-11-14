@@ -293,11 +293,11 @@ func (c ChildResourceUpdates) IsRunning(ctx context.Context, pod *v1.Pod, health
 			log.Error(err, "the healtcheck response failed", "sessionName", c.StatefulSet.Manifest.GetName(), "sessionNamespace", c.StatefulSet.Manifest.GetNamespace(), "url", healthcheckURL.String())
 			return false
 		}
-		healthCheckOK = healthCheckOK && res.StatusCode < 400
+		healthCheckOK = healthCheckOK && (res.StatusCode < 400)
 		if !healthCheckOK {
 			break
 		}
-		time.Sleep(time.Millisecond * 500)
+		time.Sleep(time.Millisecond * 1000)
 	}
 	return stsReady && podReady && healthCheckOK
 }
