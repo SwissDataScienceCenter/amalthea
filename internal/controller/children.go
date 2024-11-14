@@ -3,6 +3,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -18,6 +20,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+var healtcheckClient = http.Client{
+	Timeout: time.Second * 1,
+	// NOTE: We definitely do not want to follow redirects since some sessions like rstudio
+	// will cause an infinite redirect loop when visited by something that is not a browser
+	CheckRedirect: func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse },
+}
 
 type ChildResourceType interface {
 	networkingv1.Ingress | v1.Service | v1.PersistentVolumeClaim | appsv1.StatefulSet
@@ -252,7 +261,8 @@ func (c ChildResourceUpdates) AllEqual(op controllerutil.OperationResult) bool {
 	return ingressOK && c.Service.UpdateResult == op && c.PVC.UpdateResult == op && c.StatefulSet.UpdateResult == op && dataSourcesOK
 }
 
-func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
+func (c ChildResourceUpdates) IsRunning(ctx context.Context, pod *v1.Pod, healthcheckURL *url.URL) bool {
+	log := log.FromContext(ctx)
 	// TODO: Try to re-enable the two checks below and potentially use them to determine readiness.
 	// Currently the resources created by the operator have slight changes that k8s itself applies in a few places outside
 	// of the status field. So these are picked up by the functions below. For example a PVC or a statefulset gets automatic
@@ -262,10 +272,28 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	stsReady := c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
 	podExists := pod != nil
 	podReady := podExists && podIsReady(pod)
-	return stsReady && podReady
+	if healthcheckURL == nil {
+		log.Error(fmt.Errorf("healtcheck url is nil"), "failed to do the healtcheck", "sessionName", c.StatefulSet.Manifest.GetName(), "sessionNamespace", c.StatefulSet.Manifest.GetNamespace())
+		return false
+	}
+	// NOTE: This could be achieved with a healthcheck in k8s, however when we have rstudio in a session
+	// then hitting the url for the session leads to redirect loop that fails the readiness check after 10
+	// redirects. K8s does not have a way to specify whether healthchecks should follow redirects - they
+	// just always do. So to avoid this problem we send a request here and apply the logic we want.
+	req, err := http.NewRequestWithContext(ctx, "GET", healthcheckURL.String(), nil)
+	if err != nil {
+		log.Error(err, "failed to create a new request for the healtcheck", "sessionName", c.StatefulSet.Manifest.GetName(), "sessionNamespace", c.StatefulSet.Manifest.GetNamespace(), "url", healthcheckURL.String())
+		return false
+	}
+	res, err := healtcheckClient.Do(req)
+	if err != nil {
+		log.Error(err, "the healtcheck response failed", "sessionName", c.StatefulSet.Manifest.GetName(), "sessionNamespace", c.StatefulSet.Manifest.GetNamespace(), "url", healthcheckURL.String())
+		return false
+	}
+	return stsReady && podReady && res.StatusCode < 400
 }
 
-func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
+func (c ChildResourceUpdates) State(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
 	msg := c.failureMessage(pod)
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
@@ -274,7 +302,7 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 		return amaltheadevv1alpha1.Hibernated, ""
 	case msg != "":
 		return amaltheadevv1alpha1.Failed, msg
-	case c.IsRunning(pod):
+	case c.IsRunning(ctx, pod, cr.GetHealthcheckURL()):
 		return amaltheadevv1alpha1.Running, ""
 	default:
 		return amaltheadevv1alpha1.NotReady, ""
@@ -382,7 +410,7 @@ func (c ChildResourceUpdates) Status(
 
 	idle := false
 	idleSince := cr.Status.IdleSince
-	state, failMsg := c.State(cr, pod)
+	state, failMsg := c.State(ctx, cr, pod)
 
 	if pod != nil {
 		oldEnough := false

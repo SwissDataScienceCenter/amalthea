@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -446,6 +447,21 @@ func (a *AmaltheaSession) GetURL() *url.URL {
 		Host:   a.Spec.Ingress.Host,
 	}
 	return &sessionURL
+}
+
+func (a *AmaltheaSession) GetHealthcheckURL() *url.URL {
+	healthcheckURL := a.GetURL()
+	if healthcheckURL != nil {
+		return healthcheckURL
+	}
+	// At this point it means the session has no ingress, so the request will have to go
+	// through the k8s service.
+	healthcheckURL = &url.URL{
+		Host:   fmt.Sprintf("%s:%d", a.Service().Name, servicePort),
+		Scheme: "http",
+		Path:   a.Spec.Session.URLPath,
+	}
+	return healthcheckURL
 }
 
 // +kubebuilder:validation:Enum={never,always,whenFailedOrHibernated}
