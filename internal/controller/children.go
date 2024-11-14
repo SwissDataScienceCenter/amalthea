@@ -285,12 +285,21 @@ func (c ChildResourceUpdates) IsRunning(ctx context.Context, pod *v1.Pod, health
 		log.Error(err, "failed to create a new request for the healtcheck", "sessionName", c.StatefulSet.Manifest.GetName(), "sessionNamespace", c.StatefulSet.Manifest.GetNamespace(), "url", healthcheckURL.String())
 		return false
 	}
-	res, err := healtcheckClient.Do(req)
-	if err != nil {
-		log.Error(err, "the healtcheck response failed", "sessionName", c.StatefulSet.Manifest.GetName(), "sessionNamespace", c.StatefulSet.Manifest.GetNamespace(), "url", healthcheckURL.String())
-		return false
+	healthCheckOK := true
+	// NOTE: If we send only a single request then we can still get a 502 when the session loads
+	for i := 0; i < 5; i++ {
+		res, err := healtcheckClient.Do(req)
+		if err != nil {
+			log.Error(err, "the healtcheck response failed", "sessionName", c.StatefulSet.Manifest.GetName(), "sessionNamespace", c.StatefulSet.Manifest.GetNamespace(), "url", healthcheckURL.String())
+			return false
+		}
+		healthCheckOK = healthCheckOK && res.StatusCode < 400
+		if !healthCheckOK {
+			break
+		}
+		time.Sleep(time.Millisecond * 500)
 	}
-	return stsReady && podReady && res.StatusCode < 400
+	return stsReady && podReady && healthCheckOK
 }
 
 func (c ChildResourceUpdates) State(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
