@@ -104,11 +104,6 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 	volumeMounts = append(volumeMounts, dsVolMounts...)
 	initContainers = append(initContainers, cloneInit.Containers...)
 	initContainers = append(initContainers, cr.Spec.ExtraInitContainers...)
-	probeHandler := v1.ProbeHandler{
-		TCPSocket: &v1.TCPSocketAction{
-			Port: intstr.FromInt32(cr.Spec.Session.Port),
-		},
-	}
 
 	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
 	// in the CR can point to either the session container or another container.
@@ -123,12 +118,33 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 		VolumeMounts:             volumeMounts,
 		TerminationMessagePath:   "/dev/termination-log",
 		TerminationMessagePolicy: v1.TerminationMessageReadFile,
-		ReadinessProbe: &v1.Probe{
-			ProbeHandler:        probeHandler,
+	}
+
+	// Assign a readiness probe to the session container
+	switch cr.Spec.Session.ReadinessProbe.Type {
+	case HTTP:
+		sessionContainer.ReadinessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					Port: intstr.FromInt32(cr.Spec.Session.Port),
+					Path: cr.Spec.Session.URLPath,
+				},
+			},
 			SuccessThreshold:    5,
 			PeriodSeconds:       5,
 			InitialDelaySeconds: 10,
-		},
+		}
+	case TCP:
+		sessionContainer.ReadinessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.FromInt32(cr.Spec.Session.Port),
+				},
+			},
+			SuccessThreshold:    5,
+			PeriodSeconds:       5,
+			InitialDelaySeconds: 10,
+		}
 	}
 
 	securityContext := &v1.SecurityContext{

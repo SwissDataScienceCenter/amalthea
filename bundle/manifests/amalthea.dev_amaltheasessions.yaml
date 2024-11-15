@@ -5559,6 +5559,19 @@ spec:
                     maximum: 65535
                     minimum: 0
                     type: integer
+                  readinessProbe:
+                    default: {}
+                    description: The readiness probe to use on the session container
+                    properties:
+                      type:
+                        default: tcp
+                        description: The type of readiness probe
+                        enum:
+                        - none
+                        - tcp
+                        - http
+                        type: string
+                    type: object
                   resources:
                     description: Resource requirements and limits in the same format
                       as a Pod in Kubernetes

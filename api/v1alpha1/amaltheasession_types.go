@@ -152,6 +152,10 @@ type Session struct {
 	// +optional
 	// Additional volume mounts for the session container
 	ExtraVolumeMounts []v1.VolumeMount `json:"extraVolumeMounts,omitempty"`
+	// +optional
+	// +kubebuilder:default:={}
+	// The readiness probe to use on the session container
+	ReadinessProbe ReadinessProbe `json:"readinessProbe,omitempty"`
 }
 
 type Ingress struct {
@@ -470,3 +474,17 @@ type ReconcileStrategy string
 const Never ReconcileStrategy = "never"
 const Always ReconcileStrategy = "always"
 const WhenFailedOrHibernated ReconcileStrategy = "whenFailedOrHibernated"
+
+// +kubebuilder:validation:Enum={none,tcp,http}
+type ReadinessProbeType string
+
+const None ReadinessProbeType = "none"
+const TCP ReadinessProbeType = "tcp"
+const HTTP ReadinessProbeType = "http"
+
+type ReadinessProbe struct {
+	// +kubebuilder:default:=tcp
+	// +optional
+	// The type of readiness probe
+	Type ReadinessProbeType `json:"type,omitempty"`
+}

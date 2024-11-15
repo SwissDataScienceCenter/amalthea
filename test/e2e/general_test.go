@@ -82,9 +82,10 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 				ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
 				Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
 					Session: amaltheadevv1alpha1.Session{
-						Image:   "debian:bookworm-slim",
-						Command: []string{"sleep"},
-						Args:    []string{"3600"},
+						Image:          "debian:bookworm-slim",
+						Command:        []string{"sleep"},
+						Args:           []string{"3600"},
+						ReadinessProbe: amaltheadevv1alpha1.ReadinessProbe{Type: amaltheadevv1alpha1.None},
 					},
 				},
 			}
@@ -236,9 +237,10 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 				ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
 				Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
 					Session: amaltheadevv1alpha1.Session{
-						Image:   "debian:bookworm-slim",
-						Command: []string{"sleep"},
-						Args:    []string{"3600"},
+						Image:          "debian:bookworm-slim",
+						Command:        []string{"sleep"},
+						Args:           []string{"3600"},
+						ReadinessProbe: amaltheadevv1alpha1.ReadinessProbe{Type: amaltheadevv1alpha1.None},
 					},
 				},
 			}
