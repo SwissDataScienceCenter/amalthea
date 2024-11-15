@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -151,6 +152,10 @@ type Session struct {
 	// +optional
 	// Additional volume mounts for the session container
 	ExtraVolumeMounts []v1.VolumeMount `json:"extraVolumeMounts,omitempty"`
+	// +optional
+	// +kubebuilder:default:={}
+	// The readiness probe to use on the session container
+	ReadinessProbe ReadinessProbe `json:"readinessProbe,omitempty"`
 }
 
 type Ingress struct {
@@ -448,9 +453,38 @@ func (a *AmaltheaSession) GetURL() *url.URL {
 	return &sessionURL
 }
 
+func (a *AmaltheaSession) GetHealthcheckURL() *url.URL {
+	healthcheckURL := a.GetURL()
+	if healthcheckURL != nil {
+		return healthcheckURL
+	}
+	// At this point it means the session has no ingress, so the request will have to go
+	// through the k8s service.
+	healthcheckURL = &url.URL{
+		Host:   fmt.Sprintf("%s:%d", a.Service().Name, servicePort),
+		Scheme: "http",
+		Path:   a.Spec.Session.URLPath,
+	}
+	return healthcheckURL
+}
+
 // +kubebuilder:validation:Enum={never,always,whenFailedOrHibernated}
 type ReconcileStrategy string
 
 const Never ReconcileStrategy = "never"
 const Always ReconcileStrategy = "always"
 const WhenFailedOrHibernated ReconcileStrategy = "whenFailedOrHibernated"
+
+// +kubebuilder:validation:Enum={none,tcp,http}
+type ReadinessProbeType string
+
+const None ReadinessProbeType = "none"
+const TCP ReadinessProbeType = "tcp"
+const HTTP ReadinessProbeType = "http"
+
+type ReadinessProbe struct {
+	// +kubebuilder:default:=tcp
+	// +optional
+	// The type of readiness probe
+	Type ReadinessProbeType `json:"type,omitempty"`
+}

@@ -9,6 +9,8 @@ spec:
       - "sleep"
     args:
       - "3600"
+    readinessProbe:
+      type: "none"
   culling:
     maxAge: 5m
     maxIdleDuration: 20s

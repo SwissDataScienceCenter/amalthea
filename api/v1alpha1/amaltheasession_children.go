@@ -120,6 +120,33 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 		TerminationMessagePolicy: v1.TerminationMessageReadFile,
 	}
 
+	// Assign a readiness probe to the session container
+	switch cr.Spec.Session.ReadinessProbe.Type {
+	case HTTP:
+		sessionContainer.ReadinessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					Port: intstr.FromInt32(cr.Spec.Session.Port),
+					Path: cr.Spec.Session.URLPath,
+				},
+			},
+			SuccessThreshold:    5,
+			PeriodSeconds:       5,
+			InitialDelaySeconds: 10,
+		}
+	case TCP:
+		sessionContainer.ReadinessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.FromInt32(cr.Spec.Session.Port),
+				},
+			},
+			SuccessThreshold:    5,
+			PeriodSeconds:       5,
+			InitialDelaySeconds: 10,
+		}
+	}
+
 	securityContext := &v1.SecurityContext{
 		RunAsNonRoot: ptr.To(true),
 		RunAsUser:    ptr.To(session.RunAsUser),

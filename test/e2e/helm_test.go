@@ -45,8 +45,9 @@ var _ = Describe("controller", Ordered, func() {
 				ObjectMeta: v1.ObjectMeta{Name: "test1", Namespace: namespace},
 				Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
 					Session: amaltheadevv1alpha1.Session{
-						Image:   "debian:bookworm-slim",
-						Command: []string{"sleep", "infinity"},
+						Image:          "debian:bookworm-slim",
+						Command:        []string{"sleep", "infinity"},
+						ReadinessProbe: amaltheadevv1alpha1.ReadinessProbe{Type: amaltheadevv1alpha1.None},
 					},
 				},
 			}
