@@ -129,19 +129,18 @@ func serve(cmd *cobra.Command, args []string) {
 	e := echo.New()
 
 	e.Use(middleware.Recover())
-	e.Use(middleware.Logger())
 	e.Logger.SetLevel(log.INFO)
 	if verbose {
 		e.Logger.SetLevel(log.DEBUG)
 	}
 
 	keyLookup := fmt.Sprintf("cookie:%v,header:Authorization", cookieKey)
-	e.Use(middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
+	authnMW := middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
 		KeyLookup: keyLookup,
 		Validator: func(key string, c echo.Context) (bool, error) {
 			return key == token, nil
 		},
-	}))
+	})
 
 	remoteURL, err := url.Parse(remote)
 	if err != nil {
@@ -152,7 +151,9 @@ func serve(cmd *cobra.Command, args []string) {
 			URL: remoteURL,
 		},
 	}
-	e.Group("/", middleware.Logger(), middleware.Proxy(middleware.NewRoundRobinBalancer(targets)))
+	// NOTE: You have to have "/*", if you just use "/" for the group path it will not route properly
+	proxy := e.Group("/*")
+	proxy.Use(middleware.Logger(), authnMW, middleware.Proxy(middleware.NewRoundRobinBalancer(targets)))
 
 	//Healthcheck
 	health := e.Group("/__amalthea__")
