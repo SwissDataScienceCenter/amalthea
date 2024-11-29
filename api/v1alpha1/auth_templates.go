@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 )
@@ -64,6 +65,19 @@ func (as *AmaltheaSession) auth() manifests {
 			),
 			ReadinessProbe: &v1.Probe{ProbeHandler: probeHandler},
 			LivenessProbe:  &v1.Probe{ProbeHandler: probeHandler},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					"memory": resource.MustParse("16Mi"),
+					"cpu":    resource.MustParse("20m"),
+				},
+				Limits: v1.ResourceList{
+					"memory": resource.MustParse("32Mi"),
+					// NOTE: Cpu limit not set on purpose
+					// Without cpu limit if there is spare you can go over the request
+					// If there is no spare cpu then all things get throttled relative to their request
+					// With cpu limits you get throttled when you go over the request always, even with spare capacity
+				},
+			},
 		}
 
 		output.Containers = append(output.Containers, authContainer)
@@ -106,6 +120,19 @@ func (as *AmaltheaSession) auth() manifests {
 			),
 			ReadinessProbe: &v1.Probe{ProbeHandler: probeHandler},
 			LivenessProbe:  &v1.Probe{ProbeHandler: probeHandler},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					"memory": resource.MustParse("16Mi"),
+					"cpu":    resource.MustParse("20m"),
+				},
+				Limits: v1.ResourceList{
+					"memory": resource.MustParse("32Mi"),
+					// NOTE: Cpu limit not set on purpose
+					// Without cpu limit if there is spare you can go over the request
+					// If there is no spare cpu then all things get throttled relative to their request
+					// With cpu limits you get throttled when you go over the request always, even with spare capacity
+				},
+			},
 		}
 
 		output.Containers = append(output.Containers, authContainer)
