@@ -103,6 +103,10 @@ type AmaltheaSessionSpec struct {
 	// - whenHibernatedOrFailed: To avoid interrupting a running session, reconciliation of the child components
 	//   are only done when the session has a Failed or Hibernated status
 	ReconcileStrategy ReconcileStrategy `json:"reconcileStrategy,omitempty"`
+
+	// +optional
+	// The name of the priority class assigned to the session Pod.
+	PriorityClassName string `json:"priorityClassName,omitempty"`
 }
 
 type Session struct {

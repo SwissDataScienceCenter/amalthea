@@ -5353,6 +5353,10 @@ spec:
                   Passed right through to the Statefulset used for the session.
                 type: object
                 x-kubernetes-map-type: atomic
+              priorityClassName:
+                description: The name of the priority class assigned to the session
+                  Pod.
+                type: string
               reconcileStrategy:
                 default: always
                 description: |-
