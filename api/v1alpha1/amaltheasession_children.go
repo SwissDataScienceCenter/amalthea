@@ -190,6 +190,7 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 					Tolerations:                  cr.Spec.Tolerations,
 					NodeSelector:                 cr.Spec.NodeSelector,
 					Affinity:                     cr.Spec.Affinity,
+					PriorityClassName:            cr.Spec.PriorityClassName,
 				},
 			},
 		},
