@@ -29,9 +29,10 @@ type ChildResource[T ChildResourceType] struct {
 }
 
 type ChildResourceUpdate[T ChildResourceType] struct {
-	Manifest     *T
-	UpdateResult controllerutil.OperationResult
-	Error        error
+	Manifest       *T
+	UpdateResult   controllerutil.OperationResult
+	Error          error
+	statusCallback func(*amaltheadevv1alpha1.AmaltheaSessionStatus)
 }
 
 type ChildResources struct {
@@ -92,8 +93,9 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			}
 			return nil
 		})
-		return ChildResourceUpdate[T]{c.Current, res, err}
+		return ChildResourceUpdate[T]{c.Current, res, err, nil}
 	case *appsv1.StatefulSet:
+		var statusCallback func(*amaltheadevv1alpha1.AmaltheaSessionStatus)
 		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
 			desired, ok := any(c.Desired).(*appsv1.StatefulSet)
 			if !ok {
@@ -105,6 +107,22 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
 				return err
+			}
+			if current.Spec.Replicas != nil && desired.Spec.Replicas != nil && *current.Spec.Replicas == 0 && *desired.Spec.Replicas == 1 {
+				// The session is being resumed
+				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+					status.IdleSince = metav1.Time{}
+					status.FailingSince = metav1.Time{}
+					status.HibernatedSince = metav1.Time{}
+				}
+			}
+			if current.Spec.Replicas != nil && desired.Spec.Replicas != nil && *current.Spec.Replicas == 1 && *desired.Spec.Replicas == 0 {
+				// The session is being hibernated
+				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+					status.IdleSince = metav1.Time{}
+					status.FailingSince = metav1.Time{}
+					status.HibernatedSince = metav1.Now()
+				}
 			}
 			current.Spec.Replicas = desired.Spec.Replicas
 			switch strategy := cr.Spec.ReconcileStrategy; strategy {
@@ -124,7 +142,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			}
 			return nil
 		})
-		return ChildResourceUpdate[T]{c.Current, res, err}
+		return ChildResourceUpdate[T]{c.Current, res, err, statusCallback}
 	case *v1.PersistentVolumeClaim:
 		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
 			desired, ok := any(c.Desired).(*v1.PersistentVolumeClaim)
@@ -157,7 +175,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			}
 			return nil
 		})
-		return ChildResourceUpdate[T]{c.Current, res, err}
+		return ChildResourceUpdate[T]{c.Current, res, err, nil}
 	case *v1.Service:
 		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
 			desired, ok := any(c.Desired).(*v1.Service)
@@ -187,7 +205,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			}
 			return nil
 		})
-		return ChildResourceUpdate[T]{c.Current, res, err}
+		return ChildResourceUpdate[T]{c.Current, res, err, nil}
 	default:
 		return ChildResourceUpdate[T]{Error: fmt.Errorf("Encountered an uknown child resource type")}
 	}
@@ -368,6 +386,29 @@ func Conditions(
 	return conditions
 }
 
+// statusCallback modifies an amalthea status based on the reconciliation of different child resources.
+// Certain status updates can only be done based on the current and previous values of child resources,
+// these should take precedence over other statuses dervied only on current values and are applied here.
+func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+	if c.Ingress.statusCallback != nil {
+		c.Ingress.statusCallback(status)
+	}
+	if c.Service.statusCallback != nil {
+		c.Service.statusCallback(status)
+	}
+	if c.PVC.statusCallback != nil {
+		c.PVC.statusCallback(status)
+	}
+	for _, dc := range c.DataSourcesPVCs {
+		if dc.statusCallback != nil {
+			dc.statusCallback(status)
+		}
+	}
+	if c.StatefulSet.statusCallback != nil {
+		c.StatefulSet.statusCallback(status)
+	}
+}
+
 func (c ChildResourceUpdates) Status(
 	ctx context.Context,
 	r *AmaltheaSessionReconciler,
@@ -447,6 +488,8 @@ func (c ChildResourceUpdates) Status(
 		status.ContainerCounts.Ready = 0
 		status.InitContainerCounts.Ready = 0
 	}
+
+	c.statusCallback(&status)
 
 	// Used for debugging to ensure the reconcile loop does not needlessly reschdule or update child resources
 	// log.Info("Update summary", "Ingress", c.Ingress.UpdateResult, "StatefulSet", c.StatefulSet.UpdateResult, "PVC", c.StatefulSet.UpdateResult, "Service", c.Service.UpdateResult)

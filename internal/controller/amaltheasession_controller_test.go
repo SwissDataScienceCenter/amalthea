@@ -421,5 +421,83 @@ var _ = Describe("AmaltheaSession Controller", func() {
 				return errors.IsNotFound(err)
 			}, time.Minute, time.Second).WithContext(ctx).Should(BeTrue())
 		})
+
+		It("should clear statuses after hibernation", func(ctx SpecContext) {
+			By("Checking if the custom resource was successfully created")
+			controllerReconciler := newReconciler()
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+
+			By("Aritificially adding statuses")
+			newTimestamp := metav1.NewTime(time.Now().Round(time.Second))
+			amaltheasession.Status.FailingSince = newTimestamp
+			amaltheasession.Status.IdleSince = newTimestamp
+			Expect(controllerReconciler.Status().Update(ctx, amaltheasession)).To(Succeed())
+			Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+			Expect(amaltheasession.Status.FailingSince).To(Equal(newTimestamp))
+			Expect(amaltheasession.Status.IdleSince).To(Equal(newTimestamp))
+
+			By("Marking the session as hibernated")
+			amaltheasession.Spec.Hibernated = true
+			Expect(controllerReconciler.Update(ctx, amaltheasession)).To(Succeed())
+
+			By("Checking that the appropriate timestamps in the status have been reset")
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+			Expect(amaltheasession.Status.HibernatedSince).ToNot(BeZero())
+			Expect(amaltheasession.Status.IdleSince).To(BeZero())
+			Expect(amaltheasession.Status.FailingSince).To(BeZero())
+			Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.Hibernated))
+		})
+
+		It("should clear statuses after resuming", func(ctx SpecContext) {
+			By("Checking if the custom resource was successfully created")
+			controllerReconciler := newReconciler()
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+
+			By("Marking the session as hibernated")
+			amaltheasession.Spec.Hibernated = true
+			Expect(controllerReconciler.Update(ctx, amaltheasession)).To(Succeed())
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+
+			By("Aritificially adding statuses")
+			newTimestamp := metav1.NewTime(time.Now().Round(time.Second))
+			amaltheasession.Status.FailingSince = newTimestamp
+			amaltheasession.Status.IdleSince = newTimestamp
+			Expect(controllerReconciler.Status().Update(ctx, amaltheasession)).To(Succeed())
+			Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+			Expect(amaltheasession.Status.HibernatedSince).ToNot(BeZero())
+			Expect(amaltheasession.Status.FailingSince).To(Equal(newTimestamp))
+			Expect(amaltheasession.Status.IdleSince).To(Equal(newTimestamp))
+
+			By("Resuming the session")
+			amaltheasession.Spec.Hibernated = false
+			Expect(controllerReconciler.Update(ctx, amaltheasession)).To(Succeed())
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Checking that the appropriate timestamps in the status have been reset")
+			Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+			Expect(amaltheasession.Status.HibernatedSince).To(BeZero())
+			Expect(amaltheasession.Status.IdleSince).To(BeZero())
+			Expect(amaltheasession.Status.FailingSince).To(BeZero())
+			Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.NotReady))
+		})
 	})
 })
