@@ -107,6 +107,10 @@ type AmaltheaSessionSpec struct {
 	// +optional
 	// The name of the priority class assigned to the session Pod.
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	//+optional
+	//List of secrets that contain credentials for pulling private images
+	ImagePullSecrets []SessionSecretRef `json:"imagePullSecrets,omitempty"`
 }
 
 type Session struct {
