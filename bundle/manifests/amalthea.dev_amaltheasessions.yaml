@@ -3994,6 +3994,24 @@ spec:
                 description: Will hibernate the session, scaling the session's statefulset
                   to zero.
                 type: boolean
+              imagePullSecrets:
+                description: List of secrets that contain credentials for pulling
+                  private images
+                items:
+                  description: A reference to a whole Kubernetes secret where the
+                    key is not important
+                  properties:
+                    adopt:
+                      description: If the secret is adopted then the operator will
+                        delete the secret when the custom resource that uses it is
+                        deleted.
+                      type: boolean
+                    name:
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               ingress:
                 description: Configuration for an ingress to the session, if omitted
                   a Kubernetes Ingress will not be created

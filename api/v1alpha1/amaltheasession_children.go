@@ -163,6 +163,11 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 	containers = append(containers, cr.Spec.ExtraContainers...)
 	volumes = append(volumes, auth.Volumes...)
 
+	imagePullSecrets := []v1.LocalObjectReference{}
+	for _, sec := range cr.Spec.ImagePullSecrets {
+		imagePullSecrets = append(imagePullSecrets, v1.LocalObjectReference{Name: sec.Name})
+	}
+
 	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Name,
@@ -191,6 +196,7 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 					NodeSelector:                 cr.Spec.NodeSelector,
 					Affinity:                     cr.Spec.Affinity,
 					PriorityClassName:            cr.Spec.PriorityClassName,
+					ImagePullSecrets:             imagePullSecrets,
 				},
 			},
 		},
@@ -407,6 +413,17 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 			secrets.Items = append(secrets.Items, v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      codeRepo.ConfigSecretRef.Name,
+					Namespace: cr.Namespace,
+				},
+			})
+		}
+	}
+
+	for _, imagePull := range cr.Spec.ImagePullSecrets {
+		if imagePull.isAdopted() {
+			secrets.Items = append(secrets.Items, v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      imagePull.Name,
 					Namespace: cr.Namespace,
 				},
 			})
