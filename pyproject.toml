@@ -15,9 +15,9 @@ jsonpatch = "^1.33"
 json-merge-patch = "^0.2"
 expiringdict = "^1.2.2"
 jinja2 = "^3.1.4"
-prometheus-client = "^0.21.0"
+prometheus-client = "^0.21.1"
 dataconf = "^3.3.0"
-boto3 = "^1.35.73"
+boto3 = "^1.35.75"
 kopf = {extras = ["uvloop"], version = "^1.37.3"}
 
 
