@@ -431,7 +431,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
 
-			By("Aritificially adding statuses")
+			By("Artificially adding statuses")
 			newTimestamp := metav1.NewTime(time.Now().Round(time.Second))
 			amaltheasession.Status.FailingSince = newTimestamp
 			amaltheasession.Status.IdleSince = newTimestamp
@@ -474,7 +474,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
 
-			By("Aritificially adding statuses")
+			By("Artificially adding statuses")
 			newTimestamp := metav1.NewTime(time.Now().Round(time.Second))
 			amaltheasession.Status.FailingSince = newTimestamp
 			amaltheasession.Status.IdleSince = newTimestamp

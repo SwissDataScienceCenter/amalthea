@@ -388,7 +388,7 @@ func Conditions(
 
 // statusCallback modifies an amalthea status based on the reconciliation of different child resources.
 // Certain status updates can only be done based on the current and previous values of child resources,
-// these should take precedence over other statuses dervied only on current values and are applied here.
+// these should take precedence over other statuses derived only on current values and are applied here.
 func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 	if c.Ingress.statusCallback != nil {
 		c.Ingress.statusCallback(status)
