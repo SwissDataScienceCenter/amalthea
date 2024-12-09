@@ -21,8 +21,8 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-11-01T02:52:56Z"
-    operators.operatorframework.io/builder: operator-sdk-v1.36.1
+    createdAt: "2024-12-09T08:25:56Z"
+    operators.operatorframework.io/builder: operator-sdk-v1.38.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: amalthea.v0.0.1
   namespace: placeholder
@@ -50,6 +50,47 @@ spec:
     spec:
       clusterPermissions:
       - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - persistentvolumeclaims
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - delete
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - services
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          - metrics.k8s.io
+          resources:
+          - pods
+          verbs:
+          - get
+          - list
+          - watch
         - apiGroups:
           - amalthea.dev
           resources:
@@ -86,54 +127,6 @@ spec:
           - list
           - patch
           - update
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - persistentvolumeclaims
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - pods
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - secrets
-          verbs:
-          - delete
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - services
-          verbs:
-          - create
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - metrics.k8s.io
-          resources:
-          - pods
-          verbs:
-          - get
-          - list
           - watch
         - apiGroups:
           - networking.k8s.io
