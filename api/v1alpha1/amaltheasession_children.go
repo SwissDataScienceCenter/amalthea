@@ -314,7 +314,7 @@ func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Resources:        v1.ResourceRequirements{Requests: requests},
+			Resources:        v1.VolumeResourceRequirements{Requests: requests},
 			StorageClassName: cr.Spec.Session.Storage.ClassName,
 		},
 	}
@@ -457,7 +457,7 @@ func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 					},
 					Spec: v1.PersistentVolumeClaimSpec{
 						AccessModes: []v1.PersistentVolumeAccessMode{ds.AccessMode},
-						Resources: v1.ResourceRequirements{
+						Resources: v1.VolumeResourceRequirements{
 							Requests: v1.ResourceList{
 								v1.ResourceStorage: rcloneDefaultStorage,
 							},

@@ -127,7 +127,7 @@ func pvcFailureReason(pvc *v1.PersistentVolumeClaim) string {
 	}
 	for resName, resStatus := range pvc.Status.AllocatedResourceStatuses {
 		switch resStatus {
-		case v1.PersistentVolumeClaimNodeResizeFailed, v1.PersistentVolumeClaimControllerResizeFailed:
+		case v1.PersistentVolumeClaimNodeResizeInfeasible, v1.PersistentVolumeClaimControllerResizeInfeasible:
 			return fmt.Sprintf("the PVC %q failed with status %q for resource %s", pvc.GetName(), resStatus, resName)
 		default:
 			continue
