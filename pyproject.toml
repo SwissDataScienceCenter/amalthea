@@ -14,10 +14,10 @@ kubernetes = "^31.0.0"
 jsonpatch = "^1.33"
 json-merge-patch = "^0.2"
 expiringdict = "^1.2.2"
-jinja2 = "^3.1.4"
+jinja2 = "^3.1.5"
 prometheus-client = "^0.21.1"
 dataconf = "^3.3.0"
-boto3 = "^1.35.82"
+boto3 = "^1.35.94"
 kopf = {extras = ["uvloop"], version = "^1.37.4"}
 python-json-logger = "3.2.1" # Needed by kopf but kopf uses a wrong version which is missing APIs that kopf needs
 
@@ -26,7 +26,7 @@ python-json-logger = "3.2.1" # Needed by kopf but kopf uses a wrong version whic
 black = "^24.10.0"
 flake8 = "^7.1.1"
 pytest = "^8.3.4"
-pylint = "^3.3.2"
+pylint = "^3.3.3"
 pytest-mock = "^3.14.0"
 flake8-pyproject = "^1.2.3"
 
