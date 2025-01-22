@@ -42,8 +42,8 @@ jobs:
     if: github.event.action != 'closed' && needs.check-deploy.outputs.pr-contains-string == 'true'
     runs-on: ubuntu-22.04
     environment:
-      name: renku-ci-ds-${{ github.event.number }}
-      url: https://renku-ci-ds-${{ github.event.number }}.dev.renku.ch
+      name: renku-ci-am-${{ github.event.number }}
+      url: https://renku-ci-am-${{ github.event.number }}.dev.renku.ch
     steps:
       - uses: actions/checkout@v4
       - name: Login to Docker Hub
@@ -65,7 +65,7 @@ jobs:
           token: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            You can access the deployment of this PR at https://renku-ci-ds-${{ github.event.number }}.dev.renku.ch
+            You can access the deployment of this PR at https://renku-ci-am-${{ github.event.number }}.dev.renku.ch
       - name: Build and deploy
         uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.13.0
         env:
@@ -74,7 +74,7 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
           GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
           KUBECONFIG: ${{ github.workspace }}/renkubot-kube.config
-          RENKU_RELEASE: renku-ci-ds-${{ github.event.number }}
+          RENKU_RELEASE: renku-ci-am-${{ github.event.number }}
           RENKU_VALUES_FILE: ${{ github.workspace }}/values.yaml
           RENKU_VALUES: ${{ secrets.COMBINED_CHARTS_CI_RENKU_VALUES }}
           RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
@@ -117,7 +117,7 @@ jobs:
       - name: renku teardown
         uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.13.0
         env:
-          HELM_RELEASE_REGEX: "^renku-ci-ds-${{ github.event.number }}$"
+          HELM_RELEASE_REGEX: "^renku-ci-am-${{ github.event.number }}$"
           GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
           RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
           MAX_AGE_SECONDS: 0
