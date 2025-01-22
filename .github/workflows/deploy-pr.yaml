@@ -1,0 +1,124 @@
+name: Deploy PR
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+      - closed
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  check-deploy:
+    runs-on: ubuntu-22.04
+    outputs:
+      pr-contains-string: ${{ steps.deploy-comment.outputs.pr-contains-string }}
+      renku: ${{ steps.deploy-comment.outputs.renku}}
+      renku-core: ${{ steps.deploy-comment.outputs.renku-core}}
+      renku-gateway: ${{ steps.deploy-comment.outputs.renku-gateway}}
+      renku-graph: ${{ steps.deploy-comment.outputs.renku-graph}}
+      renku-notebooks: ${{ steps.deploy-comment.outputs.renku-notebooks}}
+      renku-ui: ${{ steps.deploy-comment.outputs.renku-ui}}
+      amalthea-sessions: ${{ steps.deploy-comment.outputs.amalthea-sessions}}
+      amalthea: ${{ steps.deploy-comment.outputs.amalthea}}
+      test-enabled: ${{ steps.deploy-comment.outputs.test-enabled}}
+      test-cypress-enabled: ${{ steps.deploy-comment.outputs.test-cypress-enabled}}
+      persist: ${{ steps.deploy-comment.outputs.persist}}
+      extra-values: ${{ steps.deploy-comment.outputs.extra-values}}
+    steps:
+      - id: deploy-comment
+        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v1.13.0
+        with:
+          string: /deploy
+          pr_ref: ${{ github.event.number }}
+
+  deploy-pr:
+    needs: [check-deploy]
+    if: github.event.action != 'closed' && needs.check-deploy.outputs.pr-contains-string == 'true'
+    runs-on: ubuntu-22.04
+    environment:
+      name: renku-ci-ds-${{ github.event.number }}
+      url: https://renku-ci-ds-${{ github.event.number }}.dev.renku.ch
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.RENKU_DOCKER_USERNAME }}
+          password: ${{ secrets.RENKU_DOCKER_PASSWORD }}
+      - name: Find deplyoment url
+        uses: peter-evans/find-comment@v3
+        id: deploymentUrlMessage
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: "RenkuBot"
+          body-includes: "You can access the deployment of this PR at"
+      - name: Create comment deployment url
+        if: steps.deploymentUrlMessage.outputs.comment-id == 0
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            You can access the deployment of this PR at https://renku-ci-ds-${{ github.event.number }}.dev.renku.ch
+      - name: Build and deploy
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.13.0
+        env:
+          RANCHER_PROJECT_ID: ${{ secrets.CI_RANCHER_PROJECT }}
+          DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
+          DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
+          GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
+          KUBECONFIG: ${{ github.workspace }}/renkubot-kube.config
+          RENKU_RELEASE: renku-ci-ds-${{ github.event.number }}
+          RENKU_VALUES_FILE: ${{ github.workspace }}/values.yaml
+          RENKU_VALUES: ${{ secrets.COMBINED_CHARTS_CI_RENKU_VALUES }}
+          RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
+          RENKUBOT_RANCHER_BEARER_TOKEN: ${{ secrets.RENKUBOT_RANCHER_BEARER_TOKEN }}
+          RANCHER_DEV_API_ENDPOINT: ${{ secrets.RANCHER_DEV_API_ENDPOINT }}
+          RENKU_BOT_DEV_PASSWORD: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
+          RENKU_TESTS_ENABLED: true
+          TEST_ARTIFACTS_PATH: "tests-artifacts-${{ github.sha }}"
+          renku_ui: "${{ needs.check-deploy.outputs.renku-ui }}"
+          renku: "${{ needs.check-deploy.outputs.renku }}"
+          renku_core: "${{ needs.check-deploy.outputs.renku-core }}"
+          renku_gateway: "${{ needs.check-deploy.outputs.renku-gateway }}"
+          renku_graph: "${{ needs.check-deploy.outputs.renku-graph }}"
+          renku_notebooks: "${{ needs.check-deploy.outputs.renku-notebooks }}"
+          renku_data_services: "@${{ github.head_ref }}"
+          amalthea: "${{ needs.check-deploy.outputs.amalthea }}"
+          amalthea_sessions: "${{ needs.check-deploy.outputs.amalthea-sessions }}"
+          extra_values: "${{ needs.check-deploy.outputs.extra-values }}"
+
+  cleanup:
+    needs: check-deploy
+    if: github.event.action == 'closed' && needs.check-deploy.outputs.pr-contains-string == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Find deplyoment url
+        uses: peter-evans/find-comment@v3
+        id: deploymentUrlMessage
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: "RenkuBot"
+          body-includes: "Tearing down the temporary RenkuLab deplyoment"
+      - name: Create comment deployment url
+        if: steps.deploymentUrlMessage.outputs.comment-id == 0
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            Tearing down the temporary RenkuLab deplyoment for this PR.
+      - name: renku teardown
+        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.13.0
+        env:
+          HELM_RELEASE_REGEX: "^renku-ci-ds-${{ github.event.number }}$"
+          GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
+          RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
+          MAX_AGE_SECONDS: 0
+          DELETE_NAMESPACE: "true"
