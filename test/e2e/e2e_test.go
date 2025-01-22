@@ -54,7 +54,7 @@ var _ = Describe("controller", Ordered, func() {
 		By("uninstalling the cert-manager bundle")
 		utils.UninstallCertManager()
 
-		By("uninstalling the metrics server bundel")
+		By("uninstalling the metrics server bundle")
 		utils.UninstallCertManager()
 
 		By("removing manager namespace")
