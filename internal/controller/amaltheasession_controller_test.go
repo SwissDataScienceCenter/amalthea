@@ -250,7 +250,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 				By("Checking the secret existence matches expectation")
 				err = k8sClient.Get(ctx, secretNamespacedName, secret)
 				if adoptSecrets {
-					Expect(errors.IsNotFound(err))
+					Expect(errors.IsNotFound(err)).To(BeTrue())
 				} else {
 					Expect(err).NotTo(HaveOccurred())
 				}
@@ -303,7 +303,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 				By("Ensuring the StatefulSet contains SHM accordingly")
 				if hasSHM {
 					quantity, err := resource.ParseQuantity(shmSize)
-					Expect(err).To(BeNil())
+					Expect(err).ToNot(HaveOccurred())
 					amaltheasession.Spec.Session.ShmSize = &quantity
 				}
 
