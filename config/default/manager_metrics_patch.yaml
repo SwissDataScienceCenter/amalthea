@@ -6,8 +6,3 @@
 - op: add
   path: /spec/template/spec/containers/0/args/0
   value: --metrics-secure
-# This patch adds the args to allow RBAC-based authn/authz the metrics endpoint
-- op: add
-  path: /spec/template/spec/containers/0/args/0
-  value: --metrics-require-rbac
-

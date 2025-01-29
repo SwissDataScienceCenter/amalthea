@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-01-29T17:47:19Z"
+    createdAt: "2025-01-29T18:19:02Z"
     operators.operatorframework.io/builder: operator-sdk-v1.38.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: amalthea.v0.0.1
@@ -177,7 +177,6 @@ spec:
             spec:
               containers:
               - args:
-                - --metrics-require-rbac
                 - --metrics-secure
                 - --metrics-bind-address=:8443
                 - --leader-elect

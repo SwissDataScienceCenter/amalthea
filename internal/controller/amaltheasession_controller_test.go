@@ -225,7 +225,8 @@ var _ = Describe("AmaltheaSession Controller", func() {
 		})
 
 		AfterEach(func(ctx SpecContext) {
-			Expect(k8sClient.Delete(ctx, secret, deleteOptions)).To(Succeed())
+			err := k8sClient.Delete(ctx, secret, deleteOptions)
+			Expect(err == nil || errors.IsNotFound(err)).To(BeTrue())
 			Expect(k8sClient.Delete(ctx, amaltheasession, deleteOptions)).To(Succeed())
 		})
 
@@ -238,6 +239,12 @@ var _ = Describe("AmaltheaSession Controller", func() {
 					Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
 				}
 
+				controllerReconciler := newReconciler()
+				_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
 				actual := amaltheadevv1alpha1.AmaltheaSession{
 					ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
 				}
@@ -246,6 +253,11 @@ var _ = Describe("AmaltheaSession Controller", func() {
 
 				By("Deleting the session")
 				Expect(k8sClient.Delete(ctx, &actual, deleteOptions)).To(Succeed())
+
+				_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
 
 				By("Checking the secret existence matches expectation")
 				err = k8sClient.Get(ctx, secretNamespacedName, secret)
