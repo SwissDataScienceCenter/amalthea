@@ -22,7 +22,7 @@
 		"ghcr.io/devcontainers-contrib/features/poetry:2": {},
 		"ghcr.io/dhoeric/features/k9s:1": {},
 		"ghcr.io/devcontainers/features/go:1": {
-			"version": "1.21"
+			"version": "1.23"
 		}
 	},
 	"containerEnv": {"LOCALBIN": "/${containerWorkspaceFolder}/bin_devcontainer"}
