@@ -2,6 +2,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: metrics-reader
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: metrics-reader
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: amalthea
+    app.kubernetes.io/part-of: amalthea
+    app.kubernetes.io/managed-by: kustomize
 rules:
 - nonResourceURLs:
   - "/metrics"
