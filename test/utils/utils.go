@@ -248,6 +248,17 @@ func InstallHelmChart(ctx context.Context, namespace string, releaseName string,
 	cmd = exec.CommandContext(
 		ctx,
 		"helm",
+		"dep",
+		"build",
+		chart,
+	)
+	_, err = Run(cmd)
+	if err != nil {
+		return err
+	}
+	cmd = exec.CommandContext(
+		ctx,
+		"helm",
 		"-n",
 		namespace,
 		"upgrade",
