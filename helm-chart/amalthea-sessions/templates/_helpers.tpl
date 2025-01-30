@@ -2,7 +2,7 @@
 Check consistency requirements.
 */}}
 {{- $expectedName := printf "%s-%s" .Values.csiRclone.storageClassName "secret-annotation" -}}
-{{- if .Values.deploy.csi-rclone }}
+{{- if .Values.deploy.csiRclone }}
 {{- if not eq .Values.rcloneStorageClass $expectedName }}
 {{- fail "ERROR: .Values.rcloneStorageClass does not match " $expectedName ". Please Refer to csi-rclone documentation." }}
 {{- end }}

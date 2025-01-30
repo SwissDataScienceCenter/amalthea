@@ -1,0 +1,6 @@
+dependencies:
+- name: csi-rclone
+  repository: https://swissdatasciencecenter.github.io/helm-charts/
+  version: 0.3.5
+digest: sha256:e01a0bf875e7c87289b0908245339012b4d0985b7b651692b8c9a33bc06265c6
+generated: "2025-01-30T11:06:40.414153+01:00"

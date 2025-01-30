@@ -6,8 +6,9 @@ dependencies:
   - name: csi-rclone
     repository: "https://swissdatasciencecenter.github.io/helm-charts/"
     version: "0.3.5"
-    # deploy.csi-rclone instruct to also deploy csi-rclone with amalthea-sessions.
-    condition: deploy.csi-rclone
+    alias: csiRclone
+    # deploy.csiRclone instruct to also deploy csi-rclone with amalthea-sessions.
+    condition: deploy.csiRclone
 
 # A chart can be either an 'application' or a 'library' chart.
 #

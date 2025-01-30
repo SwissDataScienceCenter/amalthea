@@ -29,7 +29,7 @@ clusterScoped: false
 deployCrd: true
 # Whether to install the dependencies or not
 deploy:
-  csi-rclone: false
+  csiRclone: false
 
 # rcloneStorageClass is the storage class name for the csi-rclone Helm chart
 # from https://github.com/SwissDataScienceCenter/csi-rclone.
