@@ -258,8 +258,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
 				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.Failed))
-				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("the image"))
-				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("cannot be found"))
+				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("failure to retrieve image for container"))
 			}).WithContext(ctx).WithTimeout(time.Minute * 2).Should(Succeed())
 		})
 
