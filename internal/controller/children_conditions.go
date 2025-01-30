@@ -2,23 +2,28 @@ package controller
 
 import (
 	"fmt"
+	"slices"
 
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 )
 
-func getImageOfContainer(pod *v1.Pod, containerName string) string {
-	for _, cont := range pod.Spec.InitContainers {
-		if cont.Name == containerName {
-			return cont.Image
-		}
+func handleBadWaitingState(status v1.ContainerStatus) string {
+	waitingState := status.State.Waiting
+
+	switch waitingState.Reason {
+	// NOTE: both reasons concerns the same issue but happen at different time of the pod life cycle
+	case "ErrImagePull", "ImagePullBackOff":
+		return fmt.Sprintf("failure to retrieve image for container %s: %s", status.Name, waitingState.Message)
+	case "CrashLoopBackOff":
+		return fmt.Sprintf("the command in container %s is crashing, this can occur when you run out of disk space, this is the best reason for the crash we could extract: %q", status.Name, waitingState.Message)
 	}
-	for _, cont := range pod.Spec.Containers {
-		if cont.Name == containerName {
-			return cont.Image
-		}
+
+	if waitingState.Message != "" {
+		return fmt.Sprintf("the container %s is failing because %s", status.Name, waitingState.Message)
 	}
-	return ""
+
+	return fmt.Sprintf("the container %s is failing because %s", status.Name, waitingState.Reason)
 }
 
 func podFailureReason(pod *v1.Pod) string {
@@ -32,6 +37,13 @@ func podFailureReason(pod *v1.Pod) string {
 	// fails to start for example when the command is referencing an executable that does not exist.
 	// NOTE: The messages from the container statuses list are more descriptive than the conditions
 	// so we check these first.
+	valid_waiting_reasons := []string{
+		// NOTE: This is the default status the pod starts with when it is starting up when it has no init containers
+		"ContainerCreating",
+		// NOTE: This is the default status the pod starts with when it is starting up and it has init containers
+		"PodInitializing",
+	}
+
 	allStatuses := []v1.ContainerStatus{}
 	allStatuses = append(allStatuses, pod.Status.InitContainerStatuses...)
 	allStatuses = append(allStatuses, pod.Status.ContainerStatuses...)
@@ -39,24 +51,11 @@ func podFailureReason(pod *v1.Pod) string {
 		switch {
 		case contStatus.Started != nil && *contStatus.Started && contStatus.Ready:
 			continue
-		case contStatus.State.Waiting != nil && contStatus.State.Waiting.Reason == "ContainerCreating":
-			// NOTE: This is the default status the pod starts with when it is starting up when it has no init containers
-			continue
-		case contStatus.State.Waiting != nil && contStatus.State.Waiting.Reason == "PodInitializing":
-			// NOTE: This is the default status the pod starts with when it is starting up and it has init containers
-			continue
-		case contStatus.State.Waiting != nil && contStatus.State.Waiting.Reason == "ImagePullBackOff":
-			image := getImageOfContainer(pod, contStatus.Name)
-			if image != "" {
-				return fmt.Sprintf("the image %s for container %s cannot be found", image, contStatus.Name)
-			}
-			return fmt.Sprintf("the image for container %s cannot be found", contStatus.Name)
-		case contStatus.State.Waiting != nil && contStatus.State.Waiting.Reason == "CrashLoopBackOff":
-			return fmt.Sprintf("the command in container %s is crashing, this can occur when you run out of disk space, this is the best reason for the crash we could extract: %q", contStatus.Name, contStatus.State.Waiting.Message)
-		case contStatus.State.Waiting != nil && contStatus.State.Waiting.Message != "":
-			return fmt.Sprintf("the container %s is failing because %s", contStatus.Name, contStatus.State.Waiting.Message)
 		case contStatus.State.Waiting != nil:
-			return fmt.Sprintf("the container %s is failing because %s", contStatus.Name, contStatus.State.Waiting.Reason)
+			if slices.Contains(valid_waiting_reasons, contStatus.State.Waiting.Reason) {
+				continue
+			}
+			return handleBadWaitingState(contStatus)
 		case contStatus.State.Terminated != nil && contStatus.State.Terminated.ExitCode != 0:
 			if contStatus.State.Terminated.Message != "" {
 				return fmt.Sprintf("the container %s terminated with an error %s", contStatus.Name, contStatus.State.Terminated.Message)
