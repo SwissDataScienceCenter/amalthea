@@ -383,6 +383,7 @@ type AmaltheaSessionStatus struct {
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:resource:shortName=ams;amss
 //+kubebuilder:subresource:status
 
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=`.status.state`,description="The overall status of the session."
