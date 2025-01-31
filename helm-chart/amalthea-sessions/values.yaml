@@ -27,10 +27,19 @@ kubernetesClusterDomain: cluster.local
 clusterScoped: false
 # Whether to install the CRD
 deployCrd: true
-# This is the default class name from the csi-rclone Helm chart, if you use the defaults there
-# you can use the default here as well. The csi-rclone Helm chart https://github.com/SwissDataScienceCenter/csi-rclone
-# is needed in order to mount Rclone data sources in amalthea sessions.
-# Changing the storage class name will result in the restart of all active amalthea sessions.
+# Whether to install the dependencies or not
+deploy:
+  csiRclone: false
+
+# rcloneStorageClass is the storage class name for the csi-rclone Helm chart
+# from https://github.com/SwissDataScienceCenter/csi-rclone.
+# It is required to mount Rclone data sources in amalthea sessions.
+# NOTE:
+#  1. Changing the storage class name will result in the restart of all active
+#     amalthea sessions.
+#  2. This names has to match the following pattern:
+#      "{{ csiRclone.storageClassName }}-secret-annotation"
+#     For more details, refer to the README of csi-rclone.
 rcloneStorageClass: csi-rclone-secret-annotation
 sidecars:
   image:

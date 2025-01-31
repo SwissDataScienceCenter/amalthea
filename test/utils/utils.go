@@ -55,6 +55,8 @@ const (
 
 	metricsServerVersion = "v0.7.2"
 	metricsServerURLTmpl = "https://github.com/kubernetes-sigs/metrics-server/releases/download/%s/components.yaml"
+
+	sdscHelmRepository = "https://swissdatasciencecenter.github.io/helm-charts/"
 )
 
 func warnError(err error) {
@@ -242,6 +244,29 @@ func InstallHelmChart(ctx context.Context, namespace string, releaseName string,
 		}
 	}
 	err = scanner.Err()
+	if err != nil {
+		return err
+	}
+	cmd = exec.CommandContext(
+		ctx,
+		"helm",
+		"repo",
+		"add",
+		"renku",
+		sdscHelmRepository,
+	)
+	_, err = Run(cmd)
+	if err != nil {
+		return err
+	}
+	cmd = exec.CommandContext(
+		ctx,
+		"helm",
+		"dep",
+		"build",
+		chart,
+	)
+	_, err = Run(cmd)
 	if err != nil {
 		return err
 	}

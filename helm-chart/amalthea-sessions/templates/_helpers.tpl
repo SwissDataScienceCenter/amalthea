@@ -1,4 +1,14 @@
 {{/*
+Check consistency requirements.
+*/}}
+{{- $expectedName := printf "%s-%s" .Values.csiRclone.storageClassName "secret-annotation" -}}
+{{- if .Values.deploy.csiRclone }}
+{{- if not eq .Values.rcloneStorageClass $expectedName }}
+{{- fail "ERROR: .Values.rcloneStorageClass does not match " $expectedName ". Please Refer to csi-rclone documentation." }}
+{{- end }}
+{{- end }}
+
+{{/*
 Expand the name of the chart.
 */}}
 {{- define "amalthea-sessions.name" -}}
