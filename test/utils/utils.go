@@ -58,7 +58,7 @@ const (
 	metricsServerURLTmpl = "https://github.com/kubernetes-sigs/metrics-server/releases/download/%s/components.yaml"
 
 	sdscHelmRepository = "https://swissdatasciencecenter.github.io/helm-charts/"
-	helmRepoName = "renku-test"
+	helmRepoName       = "renku-test"
 )
 
 func warnError(err error) {

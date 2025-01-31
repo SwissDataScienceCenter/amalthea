@@ -323,21 +323,21 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 
 		It("should not fail when it is not schedulable for topology given", func(ctx SpecContext) {
 			nodeSelector := corev1.NodeSelector{
-						NodeSelectorTerms: []corev1.NodeSelectorTerm{
-							corev1.NodeSelectorTerm{
-								MatchExpressions: []corev1.NodeSelectorRequirement{
-									corev1.NodeSelectorRequirement{
-										Key: "topology",
-										Operator: corev1.NodeSelectorOpIn,
-										Values: []string{"antartica-east1", "antartica-east2"},
-									},
-								},
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "topology",
+								Operator: corev1.NodeSelectorOpIn,
+								Values:   []string{"antartica-east1", "antartica-east2"},
 							},
 						},
-					}
+					},
+				},
+			}
 			nodeAffinity := corev1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: ptr.To(nodeSelector),
-				}
+				RequiredDuringSchedulingIgnoredDuringExecution: ptr.To(nodeSelector),
+			}
 			affinity := corev1.Affinity{
 				NodeAffinity: ptr.To(nodeAffinity),
 			}
