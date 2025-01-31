@@ -12,6 +12,8 @@ import (
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -300,7 +302,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			}).WithContext(ctx).WithTimeout(time.Minute * 3).Should(Succeed())
 		})
 
-		It("should not fail when it is not schedulable", func(ctx SpecContext) {
+		It("should not fail when it is not schedulable due to ", func(ctx SpecContext) {
 			amaltheasession.Spec.Session.Resources = corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{"cpu": resource.MustParse("10000")},
 			}
@@ -314,7 +316,44 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
 				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.NotReady))
-				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("more resources than available"))
+				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("the session cannot be scheduled due to"))
+				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("Insufficient cpu"))
+			}).WithContext(ctx).WithTimeout(time.Minute * 3).Should(Succeed())
+		})
+
+		It("should not fail when it is not schedulable for topology given", func(ctx SpecContext) {
+			nodeSelector := corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							corev1.NodeSelectorTerm{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									corev1.NodeSelectorRequirement{
+										Key: "topology",
+										Operator: corev1.NodeSelectorOpIn,
+										Values: []string{"antartica-east1", "antartica-east2"},
+									},
+								},
+							},
+						},
+					}
+			nodeAffinity := corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: ptr.To(nodeSelector),
+				}
+			affinity := corev1.Affinity{
+				NodeAffinity: ptr.To(nodeAffinity),
+			}
+			amaltheasession.Spec.Affinity = ptr.To(affinity)
+			By("Checking if the custom resource was successfully created")
+			Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
+			By("Eventually the status should be failed and contain the error")
+			Consistently(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.NotReady))
+			}, "30s").WithContext(ctx).Should(Succeed())
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.NotReady))
+				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("the session cannot be scheduled due to"))
+				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("didn't match Pod's node affinity/selector"))
 			}).WithContext(ctx).WithTimeout(time.Minute * 3).Should(Succeed())
 		})
 	})
