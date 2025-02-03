@@ -328,7 +328,7 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
 func (c ChildResourceUpdates) warningMessage(pod *v1.Pod) string {
 	for _, condition := range pod.Status.Conditions {
 		if condition.Reason == "Unschedulable" {
-			return fmt.Sprintf("the session is requesting more resources than available, the reason is %q, this may correct itself if a Renku admin provisions more resources", condition.Reason)
+			return fmt.Sprintf("the session cannot be scheduled due to: %s. Please contact an administrator.", condition.Message)
 		}
 	}
 	return ""

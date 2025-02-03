@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -57,6 +58,7 @@ const (
 	metricsServerURLTmpl = "https://github.com/kubernetes-sigs/metrics-server/releases/download/%s/components.yaml"
 
 	sdscHelmRepository = "https://swissdatasciencecenter.github.io/helm-charts/"
+	helmRepoName       = "renku-test"
 )
 
 func warnError(err error) {
@@ -94,7 +96,7 @@ func Run(cmd *exec.Cmd) ([]byte, error) {
 // UninstallPrometheusOperator uninstalls the prometheus
 func UninstallPrometheusOperator() {
 	url := fmt.Sprintf(prometheusOperatorURL, prometheusOperatorVersion)
-	cmd := exec.Command("kubectl", "delete", "-f", url)
+	cmd := exec.Command("kubectl", "delete", "--ignore-not-found", "-f", url)
 	if _, err := Run(cmd); err != nil {
 		warnError(err)
 	}
@@ -103,7 +105,7 @@ func UninstallPrometheusOperator() {
 // UninstallCertManager uninstalls the cert manager
 func UninstallCertManager() {
 	url := fmt.Sprintf(certmanagerURLTmpl, certmanagerVersion)
-	cmd := exec.Command("kubectl", "delete", "-f", url)
+	cmd := exec.Command("kubectl", "delete", "--ignore-not-found", "-f", url)
 	if _, err := Run(cmd); err != nil {
 		warnError(err)
 	}
@@ -158,7 +160,7 @@ func InstallMetricsServer() error {
 // UninstallMetricsServer uninstalls the metrics server
 func UninstallMetricsServer() {
 	url := fmt.Sprintf(metricsServerURLTmpl, metricsServerVersion)
-	cmd := exec.Command("kubectl", "delete", "-f", url)
+	cmd := exec.Command("kubectl", "delete", "--ignore-not-found", "-f", url)
 	if _, err := Run(cmd); err != nil {
 		warnError(err)
 	}
@@ -252,7 +254,7 @@ func InstallHelmChart(ctx context.Context, namespace string, releaseName string,
 		"helm",
 		"repo",
 		"add",
-		"renku",
+		helmRepoName,
 		sdscHelmRepository,
 	)
 	_, err = Run(cmd)
@@ -293,8 +295,11 @@ func InstallHelmChart(ctx context.Context, namespace string, releaseName string,
 
 func UninstallHelmChart(ctx context.Context, namespace string, releaseName string) error {
 	cmd := exec.CommandContext(ctx, "helm", "-n", namespace, "uninstall", releaseName, "--wait", "--timeout", "5m")
-	_, err := Run(cmd)
-	return err
+	_, errUninstall := Run(cmd)
+	cmd = exec.CommandContext(ctx, "helm", "repo", "remove", helmRepoName)
+	_, errRemove := Run(cmd)
+
+	return errors.Join(errUninstall, errRemove)
 }
 
 func getScheme() (*runtime.Scheme, error) {
