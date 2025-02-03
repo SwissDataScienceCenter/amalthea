@@ -328,7 +328,7 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
 func (c ChildResourceUpdates) warningMessage(pod *v1.Pod) string {
 	for _, condition := range pod.Status.Conditions {
 		if condition.Reason == "Unschedulable" {
-			return fmt.Sprintf("the session cannot be scheduled due to: %s", condition.Message)
+			return fmt.Sprintf("the session cannot be scheduled due to: %s. Please contact an administrator.", condition.Message)
 		}
 	}
 	return ""
