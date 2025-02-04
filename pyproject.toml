@@ -10,23 +10,23 @@ packages = [{include = "controller"}]
 [tool.poetry.dependencies]
 python = "^3.12"
 pyyaml = "^6.0.2"
-kubernetes = "^31.0.0"
+kubernetes = "^32.0.0"
 jsonpatch = "^1.33"
 json-merge-patch = "^0.2"
 expiringdict = "^1.2.2"
 jinja2 = "^3.1.5"
 prometheus-client = "^0.21.1"
 dataconf = "^3.3.0"
-boto3 = "^1.36.3"
+boto3 = "^1.36.12"
 kopf = {extras = ["uvloop"], version = "^1.37.4"}
 python-json-logger = "3.2.1" # Needed by kopf but kopf uses a wrong version which is missing APIs that kopf needs
 
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.10.0"
+black = "^25.1.0"
 flake8 = "^7.1.1"
 pytest = "^8.3.4"
-pylint = "^3.3.3"
+pylint = "^3.3.4"
 pytest-mock = "^3.14.0"
 flake8-pyproject = "^1.2.3"
 
