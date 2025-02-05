@@ -108,8 +108,8 @@ type AmaltheaSessionSpec struct {
 	// The name of the priority class assigned to the session Pod.
 	PriorityClassName string `json:"priorityClassName,omitempty"`
 
-	//+optional
-	//List of secrets that contain credentials for pulling private images
+	// +optional
+	// List of secrets that contain credentials for pulling private images
 	ImagePullSecrets []SessionSecretRef `json:"imagePullSecrets,omitempty"`
 }
 
@@ -401,7 +401,7 @@ type AmaltheaSession struct {
 	Status AmaltheaSessionStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // AmaltheaSessionList contains a list of AmaltheaSession
 type AmaltheaSessionList struct {

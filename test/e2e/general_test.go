@@ -202,7 +202,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 					g.Expect(sessionPod.Status.Phase).To(Equal(corev1.PodRunning))
 					g.Expect(sessionPod.GetUID()).To(Equal(initialUID))
 					g.Expect(sessionPod.Spec.Containers[0].Resources.Requests.Memory()).ShouldNot(Equal(&newMemory))
-				}, "30s").WithContext(ctx)
+				}, "30s").WithContext(ctx).Should(Succeed())
 				By("Hibernating the session")
 				patched = &amaltheadevv1alpha1.AmaltheaSession{}
 				Expect(k8sClient.Get(ctx, typeNamespacedName, patched)).To(Succeed())
