@@ -5,6 +5,43 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - amalthea.dev
+  resources:
+  - amaltheasessions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - amalthea.dev
+  resources:
+  - amaltheasessions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - amalthea.dev
+  resources:
+  - amaltheasessions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - ""
   resources:
   - persistentvolumeclaims
@@ -44,43 +81,6 @@ rules:
   verbs:
   - get
   - list
-  - watch
-- apiGroups:
-  - amalthea.dev
-  resources:
-  - amaltheasessions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - amalthea.dev
-  resources:
-  - amaltheasessions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - amalthea.dev
-  resources:
-  - amaltheasessions/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - networking.k8s.io

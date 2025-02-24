@@ -155,7 +155,7 @@ func serve(cmd *cobra.Command, args []string) {
 	proxy := e.Group("/*")
 	proxy.Use(middleware.Logger(), authnMW, middleware.Proxy(middleware.NewRoundRobinBalancer(targets)))
 
-	//Healthcheck
+	// Healthcheck
 	health := e.Group("/__amalthea__")
 	health.GET("/health", func(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
