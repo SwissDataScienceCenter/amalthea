@@ -12,6 +12,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -101,6 +102,26 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			if !ok {
 				return fmt.Errorf("Could not cast when reconciling")
 			}
+			events := v1.EventList{}
+			selector, err := fields.ParseSelector(fmt.Sprintf("involvedObject.name=%s,involvedObject.namespace=%s,involvedObject.kind=StatefulSet", current.ObjectMeta.Name, current.ObjectMeta.Namespace))
+			if err == nil {
+				if err := clnt.List(ctx, &events, &client.ListOptions{FieldSelector: selector}); err == nil {
+					for _, event := range events.Items {
+						if event.Reason == "FailedCreate" && strings.Contains(event.Message, "exceeded quota") {
+							statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+								status.State = amaltheadevv1alpha1.Failed
+								status.Error = "Quota exceeded"
+							}
+							return nil
+						}
+					}
+				} else {
+					log.Error(err, "couldn't list events")
+
+				}
+			} else {
+				log.Error(err, "couldn't parse selector")
+			}
 			if current.CreationTimestamp.IsZero() {
 				log.Info("Creating a statefulset")
 				current.Spec = desired.Spec
@@ -108,7 +129,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
 				return err
 			}
-			if current.Spec.Replicas != nil && desired.Spec.Replicas != nil && *current.Spec.Replicas == 0 && *desired.Spec.Replicas == 1 {
+			if statusCallback == nil && current.Spec.Replicas != nil && desired.Spec.Replicas != nil && *current.Spec.Replicas == 0 && *desired.Spec.Replicas == 1 {
 				// The session is being resumed
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
