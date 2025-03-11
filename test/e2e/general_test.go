@@ -115,7 +115,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			var sessionPod *corev1.Pod
 			var initialUID types.UID
 			Eventually(func(g Gomega) {
-				sessionPod, err = amaltheasession.Pod(ctx, k8sClient)
+				sessionPod, err = amaltheasession.GetPod(ctx, k8sClient)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(sessionPod).NotTo(BeNil())
 				g.Expect(sessionPod.Status.Phase).To(Equal(corev1.PodRunning))
@@ -128,7 +128,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			Expect(k8sClient.Update(ctx, patched)).To(Succeed())
 			By("Checking the session was restarted")
 			Eventually(func(g Gomega) {
-				sessionPod, err = patched.Pod(ctx, k8sClient)
+				sessionPod, err = patched.GetPod(ctx, k8sClient)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(sessionPod).NotTo(BeNil())
 				g.Expect(sessionPod.Spec.Containers[0].Resources.Requests.Memory()).To(Equal(&newMemory))
@@ -148,7 +148,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			var sessionPod *corev1.Pod
 			var initialUID types.UID
 			Eventually(func(g Gomega) {
-				sessionPod, err = amaltheasession.Pod(ctx, k8sClient)
+				sessionPod, err = amaltheasession.GetPod(ctx, k8sClient)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(sessionPod).NotTo(BeNil())
 				g.Expect(sessionPod.Status.Phase).To(Equal(corev1.PodRunning))
@@ -161,7 +161,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			Expect(k8sClient.Update(ctx, patched)).To(Succeed())
 			By("Checking the session is not restarted")
 			Consistently(func(g Gomega) {
-				sessionPod, err = patched.Pod(ctx, k8sClient)
+				sessionPod, err = patched.GetPod(ctx, k8sClient)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(sessionPod).NotTo(BeNil())
 				g.Expect(sessionPod.Status.Phase).To(Equal(corev1.PodRunning))
@@ -183,7 +183,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 				var sessionPod *corev1.Pod
 				var initialUID types.UID
 				Eventually(func(g Gomega) {
-					sessionPod, err = amaltheasession.Pod(ctx, k8sClient)
+					sessionPod, err = amaltheasession.GetPod(ctx, k8sClient)
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(sessionPod).NotTo(BeNil())
 					g.Expect(sessionPod.Status.Phase).To(Equal(corev1.PodRunning))
@@ -196,7 +196,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 				Expect(k8sClient.Update(ctx, patched)).To(Succeed())
 				By("Checking the session is not restarted or changed")
 				Consistently(func(g Gomega) {
-					sessionPod, err = patched.Pod(ctx, k8sClient)
+					sessionPod, err = patched.GetPod(ctx, k8sClient)
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(sessionPod).NotTo(BeNil())
 					g.Expect(sessionPod.Status.Phase).To(Equal(corev1.PodRunning))
@@ -214,7 +214,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 				patched.Spec.Hibernated = false
 				Expect(k8sClient.Update(ctx, patched)).To(Succeed())
 				Eventually(func(g Gomega) {
-					sessionPod, err = amaltheasession.Pod(ctx, k8sClient)
+					sessionPod, err = amaltheasession.GetPod(ctx, k8sClient)
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(sessionPod).NotTo(BeNil())
 					g.Expect(sessionPod.Status.Phase).To(Equal(corev1.PodRunning))
@@ -227,6 +227,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 		var resourceName string
 		var typeNamespacedName types.NamespacedName
 		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
+		var quota *corev1.ResourceQuota
 
 		BeforeEach(func(ctx SpecContext) {
 			By("creating the custom resource for the Kind AmaltheaSession")
@@ -246,9 +247,30 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 					},
 				},
 			}
+
+			By("creating a resource quota")
+			quota = &corev1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "mem-quota", Namespace: typeNamespacedName.Namespace},
+				Spec: corev1.ResourceQuotaSpec{
+					Hard: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("10Gi"),
+					},
+					ScopeSelector: &corev1.ScopeSelector{
+						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
+							{
+								ScopeName: corev1.ResourceQuotaScopePriorityClass,
+								Operator:  corev1.ScopeSelectorOpIn,
+								Values:    []string{"memclass"},
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, quota)).To(Succeed())
 		})
 
 		AfterEach(func(ctx SpecContext) {
+			Expect(k8sClient.Delete(ctx, quota)).To(Succeed())
 			Expect(k8sClient.Delete(ctx, amaltheasession)).To(Succeed())
 		})
 
@@ -318,6 +340,25 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.NotReady))
 				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("the session cannot be scheduled due to"))
 				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("Insufficient cpu"))
+			}).WithContext(ctx).WithTimeout(time.Minute * 3).Should(Succeed())
+		})
+		It("should indicate when the quota was exceeded", func(ctx SpecContext) {
+			amaltheasession.Spec.Session.Resources = corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{"memory": resource.MustParse("10000Gi")},
+			}
+			amaltheasession.Spec.PriorityClassName = "memclass"
+			By("Checking if the custom resource was successfully created")
+			Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
+			By("Eventually the status should be failed and contain the error")
+			Consistently(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.Failed))
+			}, "30s").WithContext(ctx).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.Failed))
+				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("Quota exceeded"))
 			}).WithContext(ctx).WithTimeout(time.Minute * 3).Should(Succeed())
 		})
 

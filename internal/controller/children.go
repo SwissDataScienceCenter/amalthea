@@ -12,7 +12,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -101,26 +100,6 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			desired, ok := any(c.Desired).(*appsv1.StatefulSet)
 			if !ok {
 				return fmt.Errorf("Could not cast when reconciling")
-			}
-			events := v1.EventList{}
-			selector, err := fields.ParseSelector(fmt.Sprintf("involvedObject.name=%s,involvedObject.namespace=%s,involvedObject.kind=StatefulSet", current.ObjectMeta.Name, current.ObjectMeta.Namespace))
-			if err == nil {
-				if err := clnt.List(ctx, &events, &client.ListOptions{FieldSelector: selector}); err == nil {
-					for _, event := range events.Items {
-						if event.Reason == "FailedCreate" && strings.Contains(event.Message, "exceeded quota") {
-							statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
-								status.State = amaltheadevv1alpha1.Failed
-								status.Error = "Quota exceeded"
-							}
-							return nil
-						}
-					}
-				} else {
-					log.Error(err, "couldn't list events")
-
-				}
-			} else {
-				log.Error(err, "couldn't parse selector")
 			}
 			if current.CreationTimestamp.IsZero() {
 				log.Info("Creating a statefulset")
@@ -437,7 +416,7 @@ func (c ChildResourceUpdates) Status(
 ) amaltheadevv1alpha1.AmaltheaSessionStatus {
 	log := log.FromContext(ctx)
 
-	pod, err := cr.Pod(ctx, r.Client)
+	pod, err := cr.GetPod(ctx, r.Client)
 	if err != nil && !apierrors.IsNotFound(err) {
 		log.Error(err, "Could not read the session pod when updating the status")
 	}
@@ -464,6 +443,26 @@ func (c ChildResourceUpdates) Status(
 			} else if !idle && !idleSince.IsZero() {
 				idleSince = metav1.Time{}
 			}
+		}
+	} else {
+		events := v1.EventList{}
+		if err := r.Client.List(ctx,
+			&events,
+			client.MatchingFields{
+				"involvedObject.name":      cr.ObjectMeta.Name,
+				"involvedObject.namespace": cr.ObjectMeta.Namespace,
+				"involvedObject.kind":      "StatefulSet",
+			},
+		); err == nil {
+			for _, event := range events.Items {
+				if event.Reason == "FailedCreate" && strings.Contains(event.Message, "exceeded quota") {
+					state = amaltheadevv1alpha1.Failed
+					failMsg = "Quota exceeded: Your resource pool does not contain enough free resources (CPU / Memory / GPU / Storage) to schedule the session"
+				}
+			}
+		} else {
+			log.Error(err, "couldn't list events")
+
 		}
 	}
 

@@ -11,6 +11,9 @@ spec:
     kind: AmaltheaSession
     listKind: AmaltheaSessionList
     plural: amaltheasessions
+    shortNames:
+    - ams
+    - amss
     singular: amaltheasession
   scope: Namespaced
   versions:
