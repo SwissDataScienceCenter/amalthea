@@ -363,6 +363,9 @@ func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.
 	podName := fmt.Sprintf("%s-0", cr.Name)
 	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
 	err := clnt.Get(ctx, key, &pod)
+	if err != nil {
+		return nil, err
+	}
 	return &pod, err
 }
 

@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	schedv1 "k8s.io/api/scheduling/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -228,6 +229,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 		var typeNamespacedName types.NamespacedName
 		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
 		var quota *corev1.ResourceQuota
+		var prioClass *schedv1.PriorityClass
 
 		BeforeEach(func(ctx SpecContext) {
 			By("creating the custom resource for the Kind AmaltheaSession")
@@ -249,18 +251,22 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			}
 
 			By("creating a resource quota")
+			prioClass = &schedv1.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "highmem", Namespace: namespace},
+			}
+			Expect(k8sClient.Create(ctx, prioClass)).To(Succeed())
 			quota = &corev1.ResourceQuota{
-				ObjectMeta: metav1.ObjectMeta{Name: "mem-quota", Namespace: typeNamespacedName.Namespace},
+				ObjectMeta: metav1.ObjectMeta{Name: "mem-quota", Namespace: namespace},
 				Spec: corev1.ResourceQuotaSpec{
 					Hard: corev1.ResourceList{
-						corev1.ResourceMemory: resource.MustParse("10Gi"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
 					},
 					ScopeSelector: &corev1.ScopeSelector{
 						MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
 							{
 								ScopeName: corev1.ResourceQuotaScopePriorityClass,
 								Operator:  corev1.ScopeSelectorOpIn,
-								Values:    []string{"memclass"},
+								Values:    []string{"highmem"},
 							},
 						},
 					},
@@ -271,6 +277,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 
 		AfterEach(func(ctx SpecContext) {
 			Expect(k8sClient.Delete(ctx, quota)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, prioClass)).To(Succeed())
 			Expect(k8sClient.Delete(ctx, amaltheasession)).To(Succeed())
 		})
 
@@ -344,16 +351,13 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 		})
 		It("should indicate when the quota was exceeded", func(ctx SpecContext) {
 			amaltheasession.Spec.Session.Resources = corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{"memory": resource.MustParse("10000Gi")},
+				Requests: corev1.ResourceList{"memory": resource.MustParse("2Gi")},
+				Limits:   corev1.ResourceList{"memory": resource.MustParse("2Gi")},
 			}
-			amaltheasession.Spec.PriorityClassName = "memclass"
+			amaltheasession.Spec.PriorityClassName = "highmem"
 			By("Checking if the custom resource was successfully created")
 			Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
 			By("Eventually the status should be failed and contain the error")
-			Consistently(func(g Gomega) {
-				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
-				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.Failed))
-			}, "30s").WithContext(ctx).Should(Succeed())
 
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())

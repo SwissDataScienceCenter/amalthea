@@ -108,7 +108,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
 				return err
 			}
-			if statusCallback == nil && current.Spec.Replicas != nil && desired.Spec.Replicas != nil && *current.Spec.Replicas == 0 && *desired.Spec.Replicas == 1 {
+			if current.Spec.Replicas != nil && desired.Spec.Replicas != nil && *current.Spec.Replicas == 0 && *desired.Spec.Replicas == 1 {
 				// The session is being resumed
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
@@ -326,6 +326,9 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
 }
 
 func (c ChildResourceUpdates) warningMessage(pod *v1.Pod) string {
+	if pod == nil {
+		return ""
+	}
 	for _, condition := range pod.Status.Conditions {
 		if condition.Reason == "Unschedulable" {
 			return fmt.Sprintf("the session cannot be scheduled due to: %s. Please contact an administrator.", condition.Message)
@@ -417,8 +420,11 @@ func (c ChildResourceUpdates) Status(
 	log := log.FromContext(ctx)
 
 	pod, err := cr.GetPod(ctx, r.Client)
-	if err != nil && !apierrors.IsNotFound(err) {
-		log.Error(err, "Could not read the session pod when updating the status")
+	if err != nil {
+		pod = nil
+		if !apierrors.IsNotFound(err) {
+			log.Error(err, "Could not read the session pod when updating the status")
+		}
 	}
 
 	idle := false
