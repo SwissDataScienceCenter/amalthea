@@ -17,9 +17,12 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
+	"errors"
 	"flag"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -30,6 +33,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -38,6 +42,7 @@ import (
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller"
+	corev1 "k8s.io/api/core/v1"
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 	// +kubebuilder:scaffold:imports
 )
@@ -175,6 +180,42 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "AmaltheaSession")
 		os.Exit(1)
 	}
+	ctx := ctrl.SetupSignalHandler()
+	field_ctx, cancel := context.WithTimeoutCause(
+		ctx,
+		30*time.Second,
+		errors.New("Timeout exceeded for setting up field indexers"),
+	)
+	err = mgr.GetFieldIndexer().IndexField(
+		field_ctx,
+		&corev1.Event{},
+		"involvedObject.name",
+		func(obj client.Object) []string {
+			return []string{obj.(*corev1.Event).InvolvedObject.Name}
+		})
+	if err != nil {
+		setupLog.Error(err, "unable to index field involvedObject.name on events")
+	}
+	err = mgr.GetFieldIndexer().IndexField(field_ctx,
+		&corev1.Event{},
+		"involvedObject.namespace",
+		func(obj client.Object) []string {
+			return []string{obj.(*corev1.Event).InvolvedObject.Namespace}
+		})
+	if err != nil {
+		setupLog.Error(err, "unable to index field involvedObject.namespace on events")
+	}
+	err = mgr.GetFieldIndexer().IndexField(field_ctx,
+		&corev1.Event{},
+		"involvedObject.kind",
+		func(obj client.Object) []string {
+			return []string{obj.(*corev1.Event).InvolvedObject.Kind}
+		})
+	if err != nil {
+		setupLog.Error(err, "unable to index field involvedObject.kind on events")
+	}
+	cancel()
+
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -187,7 +228,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

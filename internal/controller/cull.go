@@ -32,7 +32,7 @@ func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, a
 	status := amaltheasession.Status
 	log := log.FromContext(ctx)
 	if !amaltheasession.Spec.Hibernated {
-		pod, err := amaltheasession.Pod(ctx, r.Client)
+		pod, err := amaltheasession.GetPod(ctx, r.Client)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil

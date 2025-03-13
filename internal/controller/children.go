@@ -326,6 +326,9 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
 }
 
 func (c ChildResourceUpdates) warningMessage(pod *v1.Pod) string {
+	if pod == nil {
+		return ""
+	}
 	for _, condition := range pod.Status.Conditions {
 		if condition.Reason == "Unschedulable" {
 			return fmt.Sprintf("the session cannot be scheduled due to: %s. Please contact an administrator.", condition.Message)
@@ -416,9 +419,12 @@ func (c ChildResourceUpdates) Status(
 ) amaltheadevv1alpha1.AmaltheaSessionStatus {
 	log := log.FromContext(ctx)
 
-	pod, err := cr.Pod(ctx, r.Client)
-	if err != nil && !apierrors.IsNotFound(err) {
-		log.Error(err, "Could not read the session pod when updating the status")
+	pod, err := cr.GetPod(ctx, r.Client)
+	if err != nil {
+		pod = nil
+		if !apierrors.IsNotFound(err) {
+			log.Error(err, "Could not read the session pod when updating the status")
+		}
 	}
 
 	idle := false
@@ -443,6 +449,26 @@ func (c ChildResourceUpdates) Status(
 			} else if !idle && !idleSince.IsZero() {
 				idleSince = metav1.Time{}
 			}
+		}
+	} else {
+		events := v1.EventList{}
+		if err := r.Client.List(ctx,
+			&events,
+			client.MatchingFields{
+				"involvedObject.name":      cr.ObjectMeta.Name,
+				"involvedObject.namespace": cr.ObjectMeta.Namespace,
+				"involvedObject.kind":      "StatefulSet",
+			},
+		); err == nil {
+			for _, event := range events.Items {
+				if event.Reason == "FailedCreate" && strings.Contains(event.Message, "exceeded quota") {
+					state = amaltheadevv1alpha1.Failed
+					failMsg = "Quota exceeded: Your resource pool does not contain enough free resources (CPU / Memory / GPU / Storage) to schedule the session"
+				}
+			}
+		} else {
+			log.Error(err, "couldn't list events")
+
 		}
 	}
 

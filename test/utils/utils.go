@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"flag"
 	"path/filepath"
@@ -347,6 +348,7 @@ func GetK8sClient(ctx context.Context, namespace string) (client.Client, error) 
 					DisableFor: []client.Object{
 						&amaltheadevv1alpha1.AmaltheaSession{},
 						&corev1.Pod{},
+						&corev1.Event{},
 					},
 				},
 			},
@@ -398,5 +400,40 @@ func GetController(namespace string) (manager.Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	ctx := ctrl.SetupSignalHandler()
+	field_ctx, cancel := context.WithTimeoutCause(
+		ctx,
+		30*time.Second,
+		errors.New("Timeout exceeded for setting up field indexers"),
+	)
+	err = mgr.GetFieldIndexer().IndexField(
+		field_ctx,
+		&corev1.Event{},
+		"involvedObject.name",
+		func(obj client.Object) []string {
+			return []string{obj.(*corev1.Event).InvolvedObject.Name}
+		})
+	if err != nil {
+		fmt.Printf("unable to index field involvedObject.name on events: %s", err)
+	}
+	err = mgr.GetFieldIndexer().IndexField(field_ctx,
+		&corev1.Event{},
+		"involvedObject.namespace",
+		func(obj client.Object) []string {
+			return []string{obj.(*corev1.Event).InvolvedObject.Namespace}
+		})
+	if err != nil {
+		fmt.Printf("unable to index field involvedObject.namespace on events: %s", err)
+	}
+	err = mgr.GetFieldIndexer().IndexField(field_ctx,
+		&corev1.Event{},
+		"involvedObject.kind",
+		func(obj client.Object) []string {
+			return []string{obj.(*corev1.Event).InvolvedObject.Kind}
+		})
+	if err != nil {
+		fmt.Printf("unable to index field involvedObject.kind on events: %s", err)
+	}
+	cancel()
 	return mgr, nil
 }

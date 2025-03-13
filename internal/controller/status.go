@@ -19,6 +19,9 @@ var cpuUsageIdlenessThreshold resource.Quantity = *resource.NewMilliQuantity(300
 func containerCounts(pod *v1.Pod) (amaltheadevv1alpha1.ContainerCounts, amaltheadevv1alpha1.ContainerCounts) {
 	initCounts := amaltheadevv1alpha1.ContainerCounts{}
 	counts := amaltheadevv1alpha1.ContainerCounts{}
+	if pod == nil {
+		return initCounts, counts
+	}
 	for _, container := range pod.Status.InitContainerStatuses {
 		containerCompleted := container.State.Terminated != nil && container.State.Terminated.ExitCode == 0 && container.State.Terminated.Reason == "Completed"
 		initCounts.Total += 1
