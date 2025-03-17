@@ -31,7 +31,7 @@ jobs:
       extra-values: ${{ steps.deploy-comment.outputs.extra-values}}
     steps:
       - id: deploy-comment
-        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v1.13.0
+        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v1.16.0
         with:
           string: /deploy
           pr_ref: ${{ github.event.number }}
@@ -45,6 +45,10 @@ jobs:
       url: https://renku-ci-am-${{ github.event.number }}.dev.renku.ch
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: SwissDataScienceCenter/renku
+          sparse-checkout: |
+            minimal-deployment
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -66,7 +70,7 @@ jobs:
           body: |
             You can access the deployment of this PR at https://renku-ci-am-${{ github.event.number }}.dev.renku.ch
       - name: Build and deploy
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.13.0
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.16.0
         env:
           RANCHER_PROJECT_ID: ${{ secrets.CI_RANCHER_PROJECT }}
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
@@ -75,7 +79,7 @@ jobs:
           KUBECONFIG: ${{ github.workspace }}/renkubot-kube.config
           RENKU_RELEASE: renku-ci-am-${{ github.event.number }}
           RENKU_VALUES_FILE: ${{ github.workspace }}/values.yaml
-          RENKU_VALUES: ${{ secrets.COMBINED_CHARTS_CI_RENKU_VALUES }}
+          RENKU_VALUES: minimal-deployment/minimal-deployment-values.yaml
           RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
           RENKUBOT_RANCHER_BEARER_TOKEN: ${{ secrets.RENKUBOT_RANCHER_BEARER_TOKEN }}
           RANCHER_DEV_API_ENDPOINT: ${{ secrets.RANCHER_DEV_API_ENDPOINT }}
@@ -114,7 +118,7 @@ jobs:
           body: |
             Tearing down the temporary RenkuLab deplyoment for this PR.
       - name: renku teardown
-        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.13.0
+        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.16.0
         env:
           HELM_RELEASE_REGEX: "^renku-ci-am-${{ github.event.number }}$"
           GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
