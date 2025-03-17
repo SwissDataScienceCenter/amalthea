@@ -21,7 +21,7 @@ jobs:
           push: never
           skipContainerUserIdUpdate: false
       - name: Generate CRD documentation
-        uses: SwissDataScienceCenter/renku-actions/generate-crd-docs@v1.11.3
+        uses: SwissDataScienceCenter/renku-actions/generate-crd-docs@v1.16.0
         env:
           RESOURCES: ./manifests/crd.yaml
           OUTPUT: ./docs/crd.md
