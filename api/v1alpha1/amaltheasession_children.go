@@ -110,7 +110,7 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 	sessionContainer := v1.Container{
 		Image:                    session.Image,
 		Name:                     SessionContainerName,
-		ImagePullPolicy:          v1.PullIfNotPresent,
+		ImagePullPolicy:          cr.Spec.Session.ImagePullPolicy,
 		Args:                     session.Args,
 		Command:                  session.Command,
 		Env:                      session.Env,
