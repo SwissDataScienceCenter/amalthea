@@ -6182,6 +6182,10 @@ spec:
                     type: array
                   image:
                     type: string
+                  imagePullPolicy:
+                    default: Always
+                    description: The image pull policy to apply to the session image
+                    type: string
                   port:
                     default: 8000
                     description: |-
