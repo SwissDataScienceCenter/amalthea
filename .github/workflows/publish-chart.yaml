@@ -17,6 +17,7 @@ jobs:
           python-version: 3.8
       - uses: azure/setup-helm@v4.2.0
       - name: Publish chart and push images
+        id: publish-chart
         env:
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
@@ -37,3 +38,31 @@ jobs:
           chartpress --tag $TAG
           chartpress --tag $TAG --push --publish-chart
           chartpress --tag latest --push
+          echo "amalthea-sessions-image=renku/amalthea-sessions:$TAG" >> $GITHUB_OUTPUT
+          echo "amalthea-sidecars-image=renku/sidecars:$TAG" >> $GITHUB_OUTPUT
+      - name: Scan amalthea-sessions image
+        uses: snyk/actions/docker@master
+        continue-on-error: true
+        with:
+          image: ${{ steps.publish-chart.outputs.amalthea-sessions-image}}
+          args: --file=./Dockerfile --severity-threshold=high --sarif-file-output=as.sarif
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Upload Snyk report
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: as.sarif
+          category: snyk_amalthea-sessions
+      - name: Scan sidecars image
+        uses: snyk/actions/docker@master
+        continue-on-error: true
+        with:
+          image: ${{ steps.publish-chart.outputs.amalthea-sidecars-image}}
+          args: --file=./sidecars.Dockerfile --severity-threshold=high --sarif-file-output=sc.sarif
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Upload Snyk report
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sc.sarif
+          category: snyk_sidecars
