@@ -117,6 +117,7 @@ type Session struct {
 	Image string `json:"image"`
 	// +optional
 	// +kubebuilder:default:=Always
+	// +kubebuilder:validation:Enum={Always,Never,IfNotPresent}
 	// The image pull policy to apply to the session image
 	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy,omitempty"`
 	// The command to run in the session container, if omitted it will use the Docker image ENTRYPOINT

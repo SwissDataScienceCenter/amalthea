@@ -6187,6 +6187,10 @@ spec:
                   imagePullPolicy:
                     default: Always
                     description: The image pull policy to apply to the session image
+                    enum:
+                    - Always
+                    - Never
+                    - IfNotPresent
                     type: string
                   port:
                     default: 8000
