@@ -1062,12 +1062,16 @@ spec:
                   secretRef:
                     description: |-
                       Kubernetes secret that contains the authentication configuration
-                      For `token` a yaml file with the following keys is required:
+                      For `token` a single key in the secret should have a yaml file with the following keys is required:
                         - token: the token value used to authenticate the user
                         - cookie_key: the name of the cookie where the token will be saved and searched for
-                      For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
-                      Note that the `upstream` and `http_address` configuration options cannot be set from the secret because
-                      the operator knows how to set these options to the proper values.
+                      For `oauth2proxy` a single key in the secret should have the configuration:
+                        - see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file
+                        - the `upstream` and `http_address` configuration options are ignored and overridden by the operator
+                      For `oidc` the secret should have the following keys with the corresponding values:
+                        - OIDC_CLIENT_ID
+                        - OIDC_CLIENT_SECRET
+                        - OIDC_ISSUER_URL
                     properties:
                       adopt:
                         description: If the secret is adopted then the operator will
@@ -1075,17 +1079,19 @@ spec:
                           is deleted.
                         type: boolean
                       key:
+                        description: The key is optional because it may not be relevant
+                          depending on where or how the secret is used
                         type: string
                       name:
                         type: string
                     required:
-                    - key
                     - name
                     type: object
                   type:
                     enum:
                     - token
                     - oauth2proxy
+                    - oidc
                     type: string
                 required:
                 - secretRef
@@ -1241,6 +1247,10 @@ spec:
                             will delete the secret when the custom resource that uses
                             it is deleted.
                           type: boolean
+                        key:
+                          description: The key is optional because it may not be relevant
+                            depending on where or how the secret is used
+                          type: string
                         name:
                           type: string
                       required:
@@ -4483,6 +4493,10 @@ spec:
                         delete the secret when the custom resource that uses it is
                         deleted.
                       type: boolean
+                    key:
+                      description: The key is optional because it may not be relevant
+                        depending on where or how the secret is used
+                      type: string
                     name:
                       type: string
                   required:
@@ -4519,6 +4533,10 @@ spec:
                           delete the secret when the custom resource that uses it
                           is deleted.
                         type: boolean
+                      key:
+                        description: The key is optional because it may not be relevant
+                          depending on where or how the secret is used
+                        type: string
                       name:
                         type: string
                     required:
@@ -6315,6 +6333,12 @@ spec:
                         pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                         x-kubernetes-int-or-string: true
                     type: object
+                  stripURLPath:
+                    default: false
+                    description: |-
+                      Will strip the url path defined in URLPath above from all requests that reach the session.
+                      This is useful for session frontends like Rstudio which cannot run on any path other than `/`
+                    type: boolean
                   urlPath:
                     default: /
                     description: |-
