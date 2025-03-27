@@ -39,7 +39,7 @@ jobs:
               image: jupyter/all-spark-notebook
               env: lab
               spec: jupyterlab.cy.js
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Pull Code
         uses: actions/checkout@v2
