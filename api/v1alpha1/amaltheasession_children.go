@@ -572,34 +572,37 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		},
 	}
 	if as.Spec.Session.StripURLPath {
-		upstreamConfig = map[string]any{
-			"upstreams": []map[string]any{
-				// This path matches what the session url path is set to
-				// This may be a subpath of the ingress path prefix or be equal to it
-				{
-					"id":                    "amalthea-upstream-session",
-					"path":                  fmt.Sprintf("%s(.*)", as.urlPath()),
-					"rewriteTarget":         "/$1",
-					"uri":                   fmt.Sprintf("http://127.0.0.1:%d", as.Spec.Session.Port),
-					"insecureSkipTLSVerify": true,
-				},
-				// We should not rewrite the paths for the oauth2 proxy callback
-				{
-					"id":                    "amalthea-oauth2-proxy",
-					"path":                  pathPrefixURL.JoinPath("oauth2").Path,
-					"uri":                   fmt.Sprintf("http://127.0.0.1:%d", authProxyPort),
-					"insecureSkipTLSVerify": true,
-				},
-				// This path matches what the ingress path prefix is set to
-				{
-					"id":                    "amalthea-upstream-general",
-					"path":                  fmt.Sprintf("%s(.*)", pathPrefix),
-					"rewriteTarget":         "/$1",
-					"uri":                   fmt.Sprintf("http://127.0.0.1:%d", as.Spec.Session.Port),
-					"insecureSkipTLSVerify": true,
-				},
+		upstreams := []map[string]any{
+			// This path matches what the session url path is set to
+			// This may be a subpath of the ingress path prefix or be equal to it
+			{
+				"id":                    "amalthea-upstream-session",
+				"path":                  fmt.Sprintf("%s(.*)", as.urlPath()),
+				"rewriteTarget":         "/$1",
+				"uri":                   fmt.Sprintf("http://127.0.0.1:%d", as.Spec.Session.Port),
+				"insecureSkipTLSVerify": true,
 			},
+			// We should not rewrite the paths for the oauth2 proxy callback
+			// TODO: Check if this is needed or not
+			// {
+			// 	"id":                    "amalthea-oauth2-proxy",
+			// 	"path":                  pathPrefixURL.JoinPath("oauth2").Path,
+			// 	"uri":                   fmt.Sprintf("http://127.0.0.1:%d", authProxyPort),
+			// 	"insecureSkipTLSVerify": true,
+			// },
 		}
+		if pathPrefix != as.urlPath() {
+			// In this case the ingress prefix path is different than the session url path.
+			// So we strip both prefixes.
+			upstreams = append(upstreams, map[string]any{
+				"id":                    "amalthea-upstream-general",
+				"path":                  fmt.Sprintf("%s(.*)", pathPrefix),
+				"rewriteTarget":         "/$1",
+				"uri":                   fmt.Sprintf("http://127.0.0.1:%d", as.Spec.Session.Port),
+				"insecureSkipTLSVerify": true,
+			})
+		}
+		upstreamConfig = map[string]any{"upstreams": upstreams}
 	}
 	newConfig := map[string]any{
 		"providers": []map[string]any{
