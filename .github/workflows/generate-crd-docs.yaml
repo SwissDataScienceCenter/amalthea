@@ -8,7 +8,7 @@ on:
 
 jobs:
   generate-crd-docs:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v2
         with:
@@ -21,7 +21,7 @@ jobs:
           push: never
           skipContainerUserIdUpdate: false
       - name: Generate CRD documentation
-        uses: SwissDataScienceCenter/renku-actions/generate-crd-docs@v1.16.0
+        uses: SwissDataScienceCenter/renku-actions/generate-crd-docs@v1.17.0
         env:
           RESOURCES: ./manifests/crd.yaml
           OUTPUT: ./docs/crd.md

@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   check-deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       pr-contains-string: ${{ steps.deploy-comment.outputs.pr-contains-string }}
       renku: ${{ steps.deploy-comment.outputs.renku}}
@@ -31,7 +31,7 @@ jobs:
       extra-values: ${{ steps.deploy-comment.outputs.extra-values}}
     steps:
       - id: deploy-comment
-        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v1.16.0
+        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v1.17.0
         with:
           string: /deploy
           pr_ref: ${{ github.event.number }}
@@ -39,7 +39,7 @@ jobs:
   deploy-pr:
     needs: [check-deploy]
     if: github.event.action != 'closed' && needs.check-deploy.outputs.pr-contains-string == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     environment:
       name: renku-ci-am-${{ github.event.number }}
       url: https://renku-ci-am-${{ github.event.number }}.dev.renku.ch
@@ -70,7 +70,7 @@ jobs:
           body: |
             You can access the deployment of this PR at https://renku-ci-am-${{ github.event.number }}.dev.renku.ch
       - name: Build and deploy
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.16.0
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.17.0
         env:
           RANCHER_PROJECT_ID: ${{ secrets.CI_RANCHER_PROJECT }}
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
@@ -116,11 +116,11 @@ jobs:
     steps:
       - name: Extract Renku repository reference
         run: echo "RENKU_REFERENCE=`echo '${{ needs.check-deploy.outputs.renku }}' | cut -d'@' -f2`" >> $GITHUB_ENV
-      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.16.0
+      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.17.0
         with:
           e2e-target: ${{ matrix.tests }}
           renku-reference: ${{ env.RENKU_REFERENCE }}
-          renku-release: renku-ci-nb-${{ github.event.number }}
+          renku-release: renku-ci-am-${{ github.event.number }}
           test-user-password: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
     
   cypress-acceptance-tests:
@@ -142,17 +142,18 @@ jobs:
     steps:
       - name: Extract Renku repository reference
         run: echo "RENKU_REFERENCE=`echo '${{ needs.check-deploy.outputs.renku }}' | cut -d'@' -f2`" >> $GITHUB_ENV
-      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.16.0
+      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.17.0
         with:
+          e2e-folder: cypress/e2e/v2/
           e2e-target: ${{ matrix.tests }}
           renku-reference: ${{ env.RENKU_REFERENCE }}
-          renku-release: renku-ci-nb-${{ github.event.number }}
+          renku-release: renku-ci-am-${{ github.event.number }}
           test-user-password: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
 
   cleanup:
     needs: check-deploy
     if: github.event.action == 'closed' && needs.check-deploy.outputs.pr-contains-string == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Find deplyoment url
         uses: peter-evans/find-comment@v3
@@ -170,7 +171,7 @@ jobs:
           body: |
             Tearing down the temporary RenkuLab deplyoment for this PR.
       - name: renku teardown
-        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.16.0
+        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.17.0
         env:
           HELM_RELEASE_REGEX: "^renku-ci-am-${{ github.event.number }}$"
           GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
