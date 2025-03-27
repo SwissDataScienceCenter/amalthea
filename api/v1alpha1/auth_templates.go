@@ -11,29 +11,32 @@ import (
 
 const authproxyImage string = "bitnami/oauth2-proxy:7.6.0"
 
-func (as *AmaltheaSession) auth() manifests {
+func (as *AmaltheaSession) auth() (manifests, error) {
 	output := manifests{}
 	volumeMounts := []v1.VolumeMount{}
 	auth := as.Spec.Authentication
 
 	if auth == nil || !auth.Enabled {
-		return output
+		return output, nil
 	}
 	if len(auth.ExtraVolumeMounts) > 0 {
 		volumeMounts = auth.ExtraVolumeMounts
 	}
-	volName := fmt.Sprintf("%sproxy-configuration-secret", prefix)
-	output.Volumes = append(output.Volumes, v1.Volume{
-		Name: volName,
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{
-				SecretName: auth.SecretRef.Name,
-				Optional:   ptr.To(false),
-			},
-		},
-	})
 
-	if auth.Type == Oidc {
+	if auth.Type == OauthProxy {
+		volName := fmt.Sprintf("%sproxy-configuration-secret", prefix)
+		output.Volumes = append(output.Volumes, v1.Volume{
+			Name: volName,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: auth.SecretRef.Name,
+					Optional:   ptr.To(false),
+				},
+			},
+		})
+		if len(auth.SecretRef.Key) == 0 {
+			return output, fmt.Errorf("the authentication secret key has to be defined when using %s authentication", OauthProxy)
+		}
 		sessionURL := as.localhostPathPrefixURL().String()
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
@@ -82,6 +85,19 @@ func (as *AmaltheaSession) auth() manifests {
 
 		output.Containers = append(output.Containers, authContainer)
 	} else if auth.Type == Token {
+		volName := fmt.Sprintf("%sproxy-configuration-secret", prefix)
+		output.Volumes = append(output.Volumes, v1.Volume{
+			Name: volName,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: auth.SecretRef.Name,
+					Optional:   ptr.To(false),
+				},
+			},
+		})
+		if len(auth.SecretRef.Key) == 0 {
+			return output, fmt.Errorf("the authentication secret key has to be defined when using %s authentication", Token)
+		}
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: "/__amalthea__/health",
@@ -134,8 +150,77 @@ func (as *AmaltheaSession) auth() manifests {
 				},
 			},
 		}
+		if as.Spec.Session.StripURLPath {
+			authContainer.Env = append(authContainer.Env, v1.EnvVar{
+				Name: "AUTHPROXY_STRIP_PATH_PREFIX", Value: as.urlPath(),
+			})
+		}
 
 		output.Containers = append(output.Containers, authContainer)
+	} else if auth.Type == Oidc {
+		volNameFixedConfig := fmt.Sprintf("%s-fixed-proxy-configuration-secret", prefix)
+		output.Volumes = append(output.Volumes, v1.Volume{
+			Name: volNameFixedConfig,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: as.Name,
+					Optional:   ptr.To(false),
+				},
+			},
+		})
+		probeHandler := v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/ping",
+				Port: intstr.FromInt32(authProxyPort),
+			},
+		}
+		authContainer := v1.Container{
+			Image: authproxyImage,
+			Name:  "oauth2-proxy",
+			SecurityContext: &v1.SecurityContext{
+				AllowPrivilegeEscalation: ptr.To(false),
+				RunAsNonRoot:             ptr.To(true),
+			},
+			Args: []string{
+				fmt.Sprintf("--http-address=:%d", authProxyPort),
+				"--silence-ping-logging",
+				"--alpha-config=/etc/oauth2-proxy/oauth2-proxy-alpha-config.yaml",
+				"--config=/etc/auth2-proxy/oauth2-proxy-config.yaml",
+			},
+			EnvFrom: []v1.EnvFromSource{
+				{
+					// This secret contains the client ID, secret and issuer URL for oidc
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{Name: auth.SecretRef.Name},
+					},
+				},
+			},
+			VolumeMounts: append(
+				[]v1.VolumeMount{
+					{
+						Name:      volNameFixedConfig,
+						MountPath: "/etc/oauth2-proxy",
+					},
+				},
+				volumeMounts...,
+			),
+			ReadinessProbe: &v1.Probe{ProbeHandler: probeHandler},
+			LivenessProbe:  &v1.Probe{ProbeHandler: probeHandler},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					"memory": resource.MustParse("16Mi"),
+					"cpu":    resource.MustParse("20m"),
+				},
+				Limits: v1.ResourceList{
+					"memory": resource.MustParse("32Mi"),
+					// NOTE: Cpu limit not set on purpose
+					// Without cpu limit if there is spare you can go over the request
+					// If there is no spare cpu then all things get throttled relative to their request
+					// With cpu limits you get throttled when you go over the request always, even with spare capacity
+				},
+			},
+		}
+		output.Containers = append(output.Containers, authContainer)
 	}
-	return output
+	return output, nil
 }

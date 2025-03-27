@@ -163,6 +163,10 @@ type Session struct {
 	// but it cannot be /baz.
 	URLPath string `json:"urlPath,omitempty"`
 	// +optional
+	// +kubebuilder:default:=false
+	// Will strip the url path defined in URLPath above from all requests that reach the session.
+	// This is useful for session frontends like Rstudio which cannot run on any path other than `/`
+	StripURLPath bool `json:"stripURLPath,omitempty"`
 	// Additional volume mounts for the session container
 	ExtraVolumeMounts []v1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 	// +optional
@@ -292,11 +296,12 @@ type Culling struct {
 	MaxHibernatedDuration metav1.Duration `json:"maxHibernatedDuration,omitempty"`
 }
 
-// +kubebuilder:validation:Enum={token,oauth2proxy}
+// +kubebuilder:validation:Enum={token,oauth2proxy,oidc}
 type AuthenticationType string
 
 const Token AuthenticationType = "token"
-const Oidc AuthenticationType = "oauth2proxy"
+const OauthProxy AuthenticationType = "oauth2proxy"
+const Oidc AuthenticationType = "oidc"
 
 type Authentication struct {
 	// +optional
@@ -305,13 +310,17 @@ type Authentication struct {
 	Enabled bool               `json:"enabled"`
 	Type    AuthenticationType `json:"type"`
 	// Kubernetes secret that contains the authentication configuration
-	// For `token` a yaml file with the following keys is required:
+	// For `token` a single key in the secret should have a yaml file with the following keys is required:
 	//   - token: the token value used to authenticate the user
 	//   - cookie_key: the name of the cookie where the token will be saved and searched for
-	// For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
-	// Note that the `upstream` and `http_address` configuration options cannot be set from the secret because
-	// the operator knows how to set these options to the proper values.
-	SecretRef SessionSecretKeyRef `json:"secretRef"`
+	// For `oauth2proxy` a single key in the secret should have the configuration:
+	//   - see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file
+	//   - the `upstream` and `http_address` configuration options are ignored and overridden by the operator
+	// For `oidc` the secret should have the following keys with the corresponding values:
+	//   - OIDC_CLIENT_ID
+	//   - OIDC_CLIENT_SECRET
+	//   - OIDC_ISSUER_URL
+	SecretRef SessionSecretRef `json:"secretRef"`
 	// +optional
 	// Additional volume mounts for the authentication container.
 	ExtraVolumeMounts []v1.VolumeMount `json:"extraVolumeMounts,omitempty"`
@@ -334,6 +343,10 @@ func (s *SessionSecretKeyRef) isAdopted() bool {
 // A reference to a whole Kubernetes secret where the key is not important
 type SessionSecretRef struct {
 	Name string `json:"name"`
+	// +optional
+	// +kubebuilder:validation:Optional
+	// The key is optional because it may not be relevant depending on where or how the secret is used
+	Key string `json:"key,omitempty"`
 	// +optional
 	// +kubebuilder:validation:Optional
 	// If the secret is adopted then the operator will delete the secret when the custom resource that uses it is deleted.

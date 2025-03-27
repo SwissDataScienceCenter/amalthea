@@ -43,6 +43,7 @@ const tokenFlag = "token"
 const cookieKeyFlag = "cookie_key"
 const verboseFlag = "verbose"
 const configFlag = "config"
+const stripPathPrefixFlag = "strip_path_prefix"
 
 var remote string
 var port int
@@ -50,6 +51,7 @@ var token string
 var cookieKey string
 var verbose bool
 var config string
+var stripPathPrefix string
 
 const prefix = "authproxy"
 
@@ -71,6 +73,16 @@ func Command() (*cobra.Command, error) {
 		return nil, err
 	}
 	err = viper.BindEnv(prefix+"."+remoteFlag, strings.ToUpper(prefix+"_"+remoteFlag))
+	if err != nil {
+		return nil, err
+	}
+
+	serveCmd.PersistentFlags().StringVar(&stripPathPrefix, stripPathPrefixFlag, "", "the URL path prefix to strip from all requests")
+	err = viper.BindPFlag(prefix+"."+stripPathPrefixFlag, serveCmd.PersistentFlags().Lookup(stripPathPrefixFlag))
+	if err != nil {
+		return nil, err
+	}
+	err = viper.BindEnv(prefix+"."+stripPathPrefixFlag, strings.ToUpper(prefix+"_"+stripPathPrefixFlag))
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +165,22 @@ func serve(cmd *cobra.Command, args []string) {
 	}
 	// NOTE: You have to have "/*", if you just use "/" for the group path it will not route properly
 	proxy := e.Group("/*")
-	proxy.Use(middleware.Logger(), authnMW, middleware.Proxy(middleware.NewRoundRobinBalancer(targets)))
+	proxyMWs := []echo.MiddlewareFunc{middleware.Logger(), authnMW}
+	if len(stripPathPrefix) > 0 {
+		if !strings.HasPrefix(stripPathPrefix, "/") {
+			stripPathPrefix = "/" + stripPathPrefix
+		}
+		if !strings.HasSuffix(stripPathPrefix, "/") {
+			stripPathPrefix = stripPathPrefix + "/"
+		}
+		rules := map[string]string{
+			fmt.Sprintf("%s*", stripPathPrefix): "/$1",
+		}
+		e.Logger.Info("Will use path rewrite rules %+v", rules)
+		proxyMWs = append(proxyMWs, middleware.Rewrite(rules))
+	}
+	proxyMWs = append(proxyMWs, middleware.Proxy(middleware.NewRoundRobinBalancer(targets)))
+	proxy.Use(proxyMWs...)
 
 	// Healthcheck
 	health := e.Group("/__amalthea__")
