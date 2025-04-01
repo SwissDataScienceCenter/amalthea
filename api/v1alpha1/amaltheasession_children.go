@@ -2,6 +2,8 @@ package v1alpha1
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"os"
@@ -553,6 +555,13 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 	pathPrefix := as.ingressPathPrefix()
 	sessionURL := as.GetURL()
 	pathPrefixURL := url.URL{Host: sessionURL.Host, Path: pathPrefix, Scheme: sessionURL.Scheme}
+	cookieSecret := make([]byte, 32)
+	_, err := rand.Read(cookieSecret)
+	if err != nil {
+		// NOTE: Read cannot panic except for on legacy Linux systems
+		// See: https://pkg.go.dev/crypto/rand#Read
+		panic(err)
+	}
 	oldConfigLines := []string{
 		"session_cookie_minimal = true",
 		"skip_provider_button = true",
@@ -560,6 +569,9 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		fmt.Sprintf("cookie_path = \"%s\"", pathPrefix),
 		fmt.Sprintf("proxy_prefix = \"%soauth2\"", pathPrefix),
 		"authenticated_emails_file = \"/authorized_emails\"",
+		"session_cookie_minimal = true",
+		"skip_provider_button = true",
+		fmt.Sprintf("cookie_secret = \"%s\"", base64.URLEncoding.EncodeToString(cookieSecret)),
 	}
 	upstreamConfig := map[string]any{
 		"upstreams": []map[string]any{
@@ -611,8 +623,9 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 				"clientSecret": "${OIDC_CLIENT_SECRET}",
 				"id":           "amalthea-oidc",
 				"oidcConfig": map[string]any{
-					"insecureSkipNonce": false,
-					"issuerURL":         "${OIDC_ISSUER_URL}",
+					"insecureSkipNonce":            false,
+					"issuerURL":                    "${OIDC_ISSUER_URL}",
+					"insecureAllowUnverifiedEmail": "${ALLOW_UNVERIFIED_EMAILS}",
 				},
 			},
 		},
