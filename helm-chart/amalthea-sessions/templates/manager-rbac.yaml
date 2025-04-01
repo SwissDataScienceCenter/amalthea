@@ -65,7 +65,7 @@ rules:
 # Required for deleting of adopted secrets when the session is deleted
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: [delete, list, watch]
+  verbs: [delete, list, watch, create, patch]
 - apiGroups: [""]
   resources: [events]
   verbs: [get, list, watch]

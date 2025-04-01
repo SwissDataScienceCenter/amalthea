@@ -317,9 +317,11 @@ type Authentication struct {
 	//   - see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file
 	//   - the `upstream` and `http_address` configuration options are ignored and overridden by the operator
 	// For `oidc` the secret should have the following keys with the corresponding values:
-	//   - OIDC_CLIENT_ID
-	//   - OIDC_CLIENT_SECRET
-	//   - OIDC_ISSUER_URL
+	//   - OIDC_CLIENT_ID - the OIDC client ID
+	//   - OIDC_CLIENT_SECRET - the OIDC client secret
+	//   - OIDC_ISSUER_URL - the OIDC issuer url
+	//   - AUTHORIZED_EMAILS - newline delimited list of user emails that should have access the session
+	//   - ALLOW_UNVERIFIED_EMAILS - allow users with unverified emails to authenticate, set to "true" or "false"
 	SecretRef SessionSecretRef `json:"secretRef"`
 	// +optional
 	// Additional volume mounts for the authentication container.

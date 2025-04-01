@@ -159,7 +159,8 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 		output.Containers = append(output.Containers, authContainer)
 	} else if auth.Type == Oidc {
 		volNameFixedConfig := fmt.Sprintf("%s-fixed-proxy-configuration-secret", prefix)
-		output.Volumes = append(output.Volumes, v1.Volume{
+		volNameAuthorizedEmails := fmt.Sprintf("%s-authorized-emails-secret", prefix)
+		fixedConfigVol := v1.Volume{
 			Name: volNameFixedConfig,
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
@@ -167,7 +168,17 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 					Optional:   ptr.To(false),
 				},
 			},
-		})
+		}
+		authorizedEmailsVol := v1.Volume{
+			Name: volNameAuthorizedEmails,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: auth.SecretRef.Name,
+					Optional:   ptr.To(false),
+				},
+			},
+		}
+		output.Volumes = append(output.Volumes, fixedConfigVol, authorizedEmailsVol)
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: "/ping",
@@ -185,7 +196,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				fmt.Sprintf("--http-address=:%d", authProxyPort),
 				"--silence-ping-logging",
 				"--alpha-config=/etc/oauth2-proxy/oauth2-proxy-alpha-config.yaml",
-				"--config=/etc/auth2-proxy/oauth2-proxy-config.yaml",
+				"--config=/etc/oauth2-proxy/oauth2-proxy-config.yaml",
 			},
 			EnvFrom: []v1.EnvFromSource{
 				{
@@ -200,6 +211,11 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 					{
 						Name:      volNameFixedConfig,
 						MountPath: "/etc/oauth2-proxy",
+					},
+					{
+						Name:      volNameAuthorizedEmails,
+						MountPath: "/authorized_emails",
+						SubPath:   "AUTHORIZED_EMAILS",
 					},
 				},
 				volumeMounts...,
