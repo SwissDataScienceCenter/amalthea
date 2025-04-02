@@ -193,7 +193,6 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				RunAsNonRoot:             ptr.To(true),
 			},
 			Args: []string{
-				fmt.Sprintf("--http-address=:%d", authProxyPort),
 				"--silence-ping-logging",
 				"--alpha-config=/etc/oauth2-proxy/oauth2-proxy-alpha-config.yaml",
 				"--config=/etc/oauth2-proxy/oauth2-proxy-config.yaml",
