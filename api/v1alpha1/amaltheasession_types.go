@@ -131,11 +131,11 @@ type Session struct {
 	// +kubebuilder:validation:ExclusiveMinimum:=true
 	// +kubebuilder:validation:ExclusiveMaximum:=true
 	// +kubebuilder:validation:Minimum:=0
-	// +kubebuilder:validation:Maximum:=65535
+	// +kubebuilder:validation:Maximum:=65530
 	// The TCP port on the pod where the session can be accessed.
 	// If the session has authentication enabled then the ingress and service will point to the authentication container
 	// and the authentication proxy container will proxy to this port. If authentication is disabled then the ingress and service
-	// route directly to this port. Note that renku reserves the highest TCP value 65535 to run the authentication proxy.
+	// route directly to this port. Note that renku reserves the highest TCP values in the range 65530 to 65535 to run the authentication proxy and other auxiliary services.
 	Port int32 `json:"port,omitempty"`
 	// +optional
 	// +kubebuilder:default:={}
