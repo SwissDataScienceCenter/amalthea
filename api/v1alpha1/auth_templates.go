@@ -98,64 +98,22 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 		if len(auth.SecretRef.Key) == 0 {
 			return output, fmt.Errorf("the authentication secret key has to be defined when using %s authentication", Token)
 		}
-		probeHandler := v1.ProbeHandler{
-			HTTPGet: &v1.HTTPGetAction{
-				Path: "/__amalthea__/health",
-				Port: intstr.FromInt32(authProxyPort),
-			},
+		authContainer := as.get_rewrite_authn_proxy(authProxyPort)
+		authContainer.Args = []string{
+			"proxy",
+			"serve",
+			"--config",
+			fmt.Sprintf("/etc/authproxy/%s", auth.SecretRef.Key),
 		}
-		authContainer := v1.Container{
-			Image: sidecarsImage,
-			Name:  "authproxy",
-			SecurityContext: &v1.SecurityContext{
-				AllowPrivilegeEscalation: ptr.To(false),
-				RunAsNonRoot:             ptr.To(true),
-				RunAsUser:                ptr.To(int64(1000)),
-				RunAsGroup:               ptr.To(int64(1000)),
-			},
-			Args: []string{
-				"proxy",
-				"serve",
-				"--config",
-				fmt.Sprintf("/etc/authproxy/%s", auth.SecretRef.Key),
-			},
-			Env: []v1.EnvVar{
-				{Name: "AUTHPROXY_PORT", Value: fmt.Sprintf("%d", authProxyPort)},
-				// NOTE: The url for the remote has to not have a path at all, if it does, then the path
-				// in the url is appended to any path that is already there when the request comes in.
-				{Name: "AUTHPROXY_REMOTE", Value: fmt.Sprintf("http://127.0.0.1:%d", as.Spec.Session.Port)},
-			},
-			VolumeMounts: append(
-				[]v1.VolumeMount{
-					{
-						Name:      volName,
-						MountPath: "/etc/authproxy",
-					},
-				},
-				volumeMounts...,
-			),
-			ReadinessProbe: &v1.Probe{ProbeHandler: probeHandler},
-			LivenessProbe:  &v1.Probe{ProbeHandler: probeHandler},
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					"memory": resource.MustParse("16Mi"),
-					"cpu":    resource.MustParse("20m"),
-				},
-				Limits: v1.ResourceList{
-					"memory": resource.MustParse("32Mi"),
-					// NOTE: Cpu limit not set on purpose
-					// Without cpu limit if there is spare you can go over the request
-					// If there is no spare cpu then all things get throttled relative to their request
-					// With cpu limits you get throttled when you go over the request always, even with spare capacity
+		authContainer.VolumeMounts = append(
+			[]v1.VolumeMount{
+				{
+					Name:      volName,
+					MountPath: "/etc/authproxy",
 				},
 			},
-		}
-		if as.Spec.Session.StripURLPath {
-			authContainer.Env = append(authContainer.Env, v1.EnvVar{
-				Name: "AUTHPROXY_STRIP_PATH_PREFIX", Value: as.urlPath(),
-			})
-		}
-
+			volumeMounts...,
+		)
 		output.Containers = append(output.Containers, authContainer)
 	} else if auth.Type == Oidc {
 		volNameFixedConfig := fmt.Sprintf("%s-fixed-proxy-configuration-secret", prefix)
@@ -236,6 +194,60 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 			},
 		}
 		output.Containers = append(output.Containers, authContainer)
+		if as.Spec.Session.StripURLPath {
+			output.Containers = append(output.Containers, as.get_rewrite_authn_proxy(authProxyRewriteOnlyPort))
+		}
 	}
 	return output, nil
+}
+
+func (as *AmaltheaSession) get_rewrite_authn_proxy(listenPort int32) v1.Container {
+	probeHandler := v1.ProbeHandler{
+		HTTPGet: &v1.HTTPGetAction{
+			Path: "/__amalthea__/health",
+			Port: intstr.FromInt32(listenPort),
+		},
+	}
+	authContainer := v1.Container{
+		Image: sidecarsImage,
+		Name:  "authproxy",
+		SecurityContext: &v1.SecurityContext{
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsNonRoot:             ptr.To(true),
+			RunAsUser:                ptr.To(int64(1000)),
+			RunAsGroup:               ptr.To(int64(1000)),
+		},
+		Args: []string{
+			"proxy",
+			"serve",
+			"--verbose",
+		},
+		Env: []v1.EnvVar{
+			{Name: "AUTHPROXY_PORT", Value: fmt.Sprintf("%d", listenPort)},
+			// NOTE: The url for the remote has to not have a path at all, if it does, then the path
+			// in the url is appended to any path that is already there when the request comes in.
+			{Name: "AUTHPROXY_REMOTE", Value: fmt.Sprintf("http://127.0.0.1:%d", as.Spec.Session.Port)},
+		},
+		ReadinessProbe: &v1.Probe{ProbeHandler: probeHandler},
+		LivenessProbe:  &v1.Probe{ProbeHandler: probeHandler},
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				"memory": resource.MustParse("16Mi"),
+				"cpu":    resource.MustParse("20m"),
+			},
+			Limits: v1.ResourceList{
+				"memory": resource.MustParse("32Mi"),
+				// NOTE: Cpu limit not set on purpose
+				// Without cpu limit if there is spare you can go over the request
+				// If there is no spare cpu then all things get throttled relative to their request
+				// With cpu limits you get throttled when you go over the request always, even with spare capacity
+			},
+		},
+	}
+	if as.Spec.Session.StripURLPath {
+		authContainer.Env = append(authContainer.Env, v1.EnvVar{
+			Name: "AUTHPROXY_STRIP_PATH_PREFIX", Value: as.urlPath(),
+		})
+	}
+	return authContainer
 }

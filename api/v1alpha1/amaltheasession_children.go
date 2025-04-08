@@ -33,6 +33,10 @@ const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
 const authProxyPort int32 = 65535
 
+// The port below is used only when the oauth2proxy AND the custom made proxy run together
+// Because we need to strip the prefix from a logged-in user session.
+const authProxyRewriteOnlyPort int32 = 65534
+
 var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
 var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
@@ -571,48 +575,23 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		"authenticated_emails_file = \"/authorized_emails\"",
 		fmt.Sprintf("cookie_secret = \"%s\"", base64.URLEncoding.EncodeToString(cookieSecret)),
 	}
+	upstreamPort := as.Spec.Session.Port
+	if as.Spec.Authentication.Type == Oidc && as.Spec.Session.StripURLPath {
+		// NOTE: if the path has to be stripped route to the rewrite proxy,
+		// then the rewrite proxy will route to the session.
+		upstreamPort = authProxyRewriteOnlyPort
+	}
 	upstreamConfig := map[string]any{
 		"upstreams": []map[string]any{
 			{
 				"id":                    "amalthea-upstream",
 				"path":                  pathPrefix,
-				"uri":                   fmt.Sprintf("http://127.0.0.1:%d", as.Spec.Session.Port),
+				"uri":                   fmt.Sprintf("http://127.0.0.1:%d", upstreamPort),
 				"insecureSkipTLSVerify": true,
+				"passHostHeader":        true,
+				"proxyWebSockets":       true,
 			},
 		},
-	}
-	if as.Spec.Session.StripURLPath {
-		upstreams := []map[string]any{
-			// This path matches what the session url path is set to
-			// This may be a subpath of the ingress path prefix or be equal to it
-			{
-				"id":                    "amalthea-upstream-session",
-				"path":                  fmt.Sprintf("%s(.*)", as.urlPath()),
-				"rewriteTarget":         "/$1",
-				"uri":                   fmt.Sprintf("http://127.0.0.1:%d", as.Spec.Session.Port),
-				"insecureSkipTLSVerify": true,
-			},
-			// We should not rewrite the paths for the oauth2 proxy callback
-			// TODO: Check if this is needed or not
-			// {
-			// 	"id":                    "amalthea-oauth2-proxy",
-			// 	"path":                  pathPrefixURL.JoinPath("oauth2").Path,
-			// 	"uri":                   fmt.Sprintf("http://127.0.0.1:%d", authProxyPort),
-			// 	"insecureSkipTLSVerify": true,
-			// },
-		}
-		if pathPrefix != as.urlPath() {
-			// In this case the ingress prefix path is different than the session url path.
-			// So we strip both prefixes.
-			upstreams = append(upstreams, map[string]any{
-				"id":                    "amalthea-upstream-general",
-				"path":                  fmt.Sprintf("%s(.*)", pathPrefix),
-				"rewriteTarget":         "/$1",
-				"uri":                   fmt.Sprintf("http://127.0.0.1:%d", as.Spec.Session.Port),
-				"insecureSkipTLSVerify": true,
-			})
-		}
-		upstreamConfig = map[string]any{"upstreams": upstreams}
 	}
 	newConfig := map[string]any{
 		"providers": []map[string]any{

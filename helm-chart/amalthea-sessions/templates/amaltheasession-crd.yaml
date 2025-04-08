@@ -6218,11 +6218,11 @@ spec:
                       The TCP port on the pod where the session can be accessed.
                       If the session has authentication enabled then the ingress and service will point to the authentication container
                       and the authentication proxy container will proxy to this port. If authentication is disabled then the ingress and service
-                      route directly to this port. Note that renku reserves the highest TCP value 65535 to run the authentication proxy.
+                      route directly to this port. Note that renku reserves the highest TCP values in the range 65530 to 65535 to run the authentication proxy and other auxiliary services.
                     exclusiveMaximum: true
                     exclusiveMinimum: true
                     format: int32
-                    maximum: 65535
+                    maximum: 65530
                     minimum: 0
                     type: integer
                   readinessProbe:
