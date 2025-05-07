@@ -124,6 +124,10 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 					status.HibernatedSince = metav1.Now()
 				}
 			}
+			current.Spec.Template.Spec.Tolerations = desired.Spec.Template.Spec.Tolerations
+			current.Spec.Template.Spec.Affinity = desired.Spec.Template.Spec.Affinity
+			current.Spec.Template.Spec.NodeSelector = desired.Spec.Template.Spec.NodeSelector
+			current.Spec.Template.Spec.PriorityClassName = desired.Spec.Template.Spec.PriorityClassName
 			current.Spec.Replicas = desired.Spec.Replicas
 			switch strategy := cr.Spec.ReconcileStrategy; strategy {
 			case amaltheadevv1alpha1.Never:
