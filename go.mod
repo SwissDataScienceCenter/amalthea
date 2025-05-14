@@ -1,8 +1,6 @@
 module github.com/SwissDataScienceCenter/amalthea
 
-go 1.23.0
-
-toolchain go1.23.2
+go 1.24.3
 
 require (
 	github.com/go-git/go-git/v5 v5.14.0
