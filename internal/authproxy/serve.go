@@ -43,6 +43,7 @@ const tokenFlag = "token"
 const cookieKeyFlag = "cookie_key"
 const verboseFlag = "verbose"
 const configFlag = "config"
+const stripPathPrefixFlag = "strip_path_prefix"
 
 var remote string
 var port int
@@ -50,6 +51,7 @@ var token string
 var cookieKey string
 var verbose bool
 var config string
+var stripPathPrefix string
 
 const prefix = "authproxy"
 
@@ -75,6 +77,16 @@ func Command() (*cobra.Command, error) {
 		return nil, err
 	}
 
+	serveCmd.PersistentFlags().StringVar(&stripPathPrefix, stripPathPrefixFlag, "", "the URL path prefix to strip from all requests")
+	err = viper.BindPFlag(prefix+"."+stripPathPrefixFlag, serveCmd.PersistentFlags().Lookup(stripPathPrefixFlag))
+	if err != nil {
+		return nil, err
+	}
+	err = viper.BindEnv(prefix+"."+stripPathPrefixFlag, strings.ToUpper(prefix+"_"+stripPathPrefixFlag))
+	if err != nil {
+		return nil, err
+	}
+
 	serveCmd.PersistentFlags().IntVar(&port, portFlag, 65535, "port on which the proxy will listen")
 	err = viper.BindPFlag(prefix+"."+portFlag, serveCmd.PersistentFlags().Lookup(portFlag))
 	if err != nil {
@@ -95,11 +107,7 @@ func Command() (*cobra.Command, error) {
 		return nil, err
 	}
 
-	serveCmd.PersistentFlags().StringVar(&token, tokenFlag, "", "secret token for authentication")
-	err = serveCmd.MarkPersistentFlagRequired(tokenFlag)
-	if err != nil {
-		return nil, err
-	}
+	serveCmd.PersistentFlags().StringVar(&token, tokenFlag, "", "secret token for authentication, if not defined or left blank then there will be no authentication.")
 	err = viper.BindPFlag(prefix+"."+tokenFlag, serveCmd.PersistentFlags().Lookup(tokenFlag))
 	if err != nil {
 		return nil, err
@@ -134,13 +142,20 @@ func serve(cmd *cobra.Command, args []string) {
 		e.Logger.SetLevel(log.DEBUG)
 	}
 
-	keyLookup := fmt.Sprintf("cookie:%v,header:Authorization", cookieKey)
-	authnMW := middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
-		KeyLookup: keyLookup,
-		Validator: func(key string, c echo.Context) (bool, error) {
-			return key == token, nil
-		},
-	})
+	proxyMWs := []echo.MiddlewareFunc{middleware.Logger()}
+
+	if len(token) > 0 {
+		keyLookup := fmt.Sprintf("cookie:%v,header:Authorization", cookieKey)
+		authnMW := middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
+			KeyLookup: keyLookup,
+			Validator: func(key string, c echo.Context) (bool, error) {
+				return key == token, nil
+			},
+		})
+		proxyMWs = append(proxyMWs, authnMW)
+	} else {
+		e.Logger.Info("Token is not defined, running without authentication.")
+	}
 
 	remoteURL, err := url.Parse(remote)
 	if err != nil {
@@ -153,7 +168,23 @@ func serve(cmd *cobra.Command, args []string) {
 	}
 	// NOTE: You have to have "/*", if you just use "/" for the group path it will not route properly
 	proxy := e.Group("/*")
-	proxy.Use(middleware.Logger(), authnMW, middleware.Proxy(middleware.NewRoundRobinBalancer(targets)))
+	if len(stripPathPrefix) > 0 {
+		if !strings.HasPrefix(stripPathPrefix, "/") {
+			stripPathPrefix = "/" + stripPathPrefix
+		}
+		if !strings.HasSuffix(stripPathPrefix, "/") {
+			stripPathPrefix = stripPathPrefix + "/"
+		}
+		rules := map[string]string{
+			fmt.Sprintf("%s*", stripPathPrefix): "/$1",
+		}
+		e.Logger.Info("Will use path rewrite rules %+v", rules)
+		proxyMWs = append(proxyMWs, middleware.Rewrite(rules))
+	} else {
+		e.Logger.Info("Running without path rewriting")
+	}
+	proxyMWs = append(proxyMWs, middleware.Proxy(middleware.NewRoundRobinBalancer(targets)))
+	proxy.Use(proxyMWs...)
 
 	// Healthcheck
 	health := e.Group("/__amalthea__")
@@ -162,7 +193,6 @@ func serve(cmd *cobra.Command, args []string) {
 	})
 
 	e.Logger.Infof("Starting proxy for remote: %s, cookie key: %s, token of length %d", remoteURL.String(), cookieKey, len(token))
-	e.Logger.Fatal(e.Start(fmt.Sprintf(":%d", port)))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
