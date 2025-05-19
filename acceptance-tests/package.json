@@ -8,9 +8,9 @@
   },
   "author": "",
   "devDependencies": {
-    "axios": "^1.8.4",
-    "cypress": "^14.2.0",
-    "mocha": "^11.1.0"
+    "axios": "^1.9.0",
+    "cypress": "^14.3.3",
+    "mocha": "^11.3.0"
   },
   "dependencies": {}
 }
