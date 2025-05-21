@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -132,6 +133,37 @@ func Command() (*cobra.Command, error) {
 	return serveCmd, nil
 }
 
+type (
+	RequestStats struct {
+		LastRequest time.Time
+		mutex       sync.RWMutex
+	}
+)
+
+func NewStats() *RequestStats {
+	return &RequestStats{
+		LastRequest: time.Now(),
+	}
+}
+
+func (l *RequestStats) Process(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+
+		if err := next(c); err != nil {
+			c.Error(err)
+		}
+		l.mutex.Lock()
+		defer l.mutex.Unlock()
+		l.LastRequest = time.Now()
+		return nil
+	}
+}
+func (l *RequestStats) Handle(c echo.Context) error {
+	l.mutex.RLock()
+	defer l.mutex.RUnlock()
+	return c.String(http.StatusOK, l.LastRequest.String())
+}
+
 func serve(cmd *cobra.Command, args []string) {
 
 	e := echo.New()
@@ -142,7 +174,8 @@ func serve(cmd *cobra.Command, args []string) {
 		e.Logger.SetLevel(log.DEBUG)
 	}
 
-	proxyMWs := []echo.MiddlewareFunc{middleware.Logger()}
+	rs := NewStats()
+	proxyMWs := []echo.MiddlewareFunc{middleware.Logger(), rs.Process}
 
 	if len(token) > 0 {
 		keyLookup := fmt.Sprintf("cookie:%v,header:Authorization", cookieKey)
@@ -191,6 +224,7 @@ func serve(cmd *cobra.Command, args []string) {
 	health.GET("/health", func(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	})
+	health.GET("/request_stats", rs.Handle)
 
 	e.Logger.Infof("Starting proxy for remote: %s, cookie key: %s, token of length %d", remoteURL.String(), cookieKey, len(token))
 
