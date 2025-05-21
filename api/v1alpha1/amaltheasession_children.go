@@ -542,6 +542,10 @@ func getSidecarsImage() string {
 	return sc
 }
 
+// This secret currently is needed only when the oauth2proxy is used AND the type of
+// authentication is oidc. If the type of authentication is oauth2proxy then we expect
+// the creator of the AmaltheaSession to create the secret in a format acceptable for
+// oauth2proxy. But this is annoying and it leaks the oauth2proxy api to AmaltheaSession users.
 func (as *AmaltheaSession) Secret() v1.Secret {
 	labels := labelsForAmaltheaSession(as.Name)
 	secret := v1.Secret{
@@ -551,7 +555,7 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 			Labels:    labels,
 		},
 	}
-	if as.Spec.Authentication.Type != Oidc {
+	if as.Spec.Authentication == nil || as.Spec.Authentication.Type != Oidc {
 		// In this case we do not need anything in the secret - we just return an empty one
 		return secret
 	}
@@ -576,9 +580,13 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		fmt.Sprintf("cookie_secret = \"%s\"", base64.URLEncoding.EncodeToString(cookieSecret)),
 	}
 	upstreamPort := as.Spec.Session.Port
-	if as.Spec.Authentication.Type == Oidc && as.Spec.Session.StripURLPath {
-		// NOTE: if the path has to be stripped route to the rewrite proxy,
-		// then the rewrite proxy will route to the session.
+	if as.Spec.Authentication != nil && as.Spec.Authentication.Type == Oidc && as.Spec.Session.StripURLPath {
+		// NOTE: The rewrite/auth proxy can also handle authentication but only with fixed values, not Oauth2.
+		// For oauth2 we use the oauth2 proxy.
+		// So the following paths are possible:
+		// With rewrite and oidc authn we have ingress -> oauth2proxy -> rewrite proxy -> session
+		// With rewrite and oauth2proxy authn we have ingress -> oauth2proxy -> rewrite proxy -> session
+		// With rewrite and token authn we have ingress -> rewrite proxy -> session
 		upstreamPort = authProxyRewriteOnlyPort
 	}
 	upstreamConfig := map[string]any{
