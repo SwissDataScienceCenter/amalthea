@@ -28,14 +28,13 @@ import (
 const prefix string = "amalthea-"
 const SessionContainerName string = prefix + "session"
 const servicePortName string = prefix + "http"
+const serviceMetaPortName string = prefix + "http-meta"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
 const authProxyPort int32 = 65535
-
-// The port below is used only when the oauth2proxy AND the custom made proxy run together
-// Because we need to strip the prefix from a logged-in user session.
-const authProxyRewriteOnlyPort int32 = 65534
+const AuthProxyMetaPort int32 = 65534
+const oauth2ProxyPort int32 = 65533
 
 var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
@@ -234,7 +233,13 @@ func (cr *AmaltheaSession) Service() v1.Service {
 				Name:       servicePortName,
 				Port:       servicePort,
 				TargetPort: intstr.FromInt32(targetPort),
-			}},
+			},
+				{
+					Protocol:   v1.ProtocolTCP,
+					Name:       serviceMetaPortName,
+					Port:       AuthProxyMetaPort,
+					TargetPort: intstr.FromInt32(AuthProxyMetaPort),
+				}},
 		},
 	}
 	return svc
@@ -590,15 +595,6 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		fmt.Sprintf("cookie_secret = \"%s\"", base64.URLEncoding.EncodeToString(cookieSecret)),
 	}
 	upstreamPort := as.Spec.Session.Port
-	if as.Spec.Authentication != nil && as.Spec.Authentication.Type == Oidc && as.Spec.Session.StripURLPath {
-		// NOTE: The rewrite/auth proxy can also handle authentication but only with fixed values, not Oauth2.
-		// For oauth2 we use the oauth2 proxy.
-		// So the following paths are possible:
-		// With rewrite and oidc authn we have ingress -> oauth2proxy -> rewrite proxy -> session
-		// With rewrite and oauth2proxy authn we have ingress -> oauth2proxy -> rewrite proxy -> session
-		// With rewrite and token authn we have ingress -> rewrite proxy -> session
-		upstreamPort = authProxyRewriteOnlyPort
-	}
 	upstreamConfig := map[string]any{
 		"upstreams": []map[string]any{
 			{
@@ -628,7 +624,7 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 			},
 		},
 		"server": map[string]string{
-			"bindAddress": fmt.Sprintf("0.0.0.0:%d", authProxyPort),
+			"bindAddress": fmt.Sprintf("0.0.0.0:%d", oauth2ProxyPort),
 		},
 		"upstreamConfig": upstreamConfig,
 	}

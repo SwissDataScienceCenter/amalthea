@@ -40,6 +40,7 @@ import (
 // or as a yaml config file.
 const remoteFlag = "remote"
 const portFlag = "port"
+const metaPortFlag = "meta_port"
 const tokenFlag = "token"
 const cookieKeyFlag = "cookie_key"
 const verboseFlag = "verbose"
@@ -48,6 +49,7 @@ const stripPathPrefixFlag = "strip_path_prefix"
 
 var remote string
 var port int
+var metaPort int
 var token string
 var cookieKey string
 var verbose bool
@@ -94,6 +96,15 @@ func Command() (*cobra.Command, error) {
 		return nil, err
 	}
 	err = viper.BindEnv(prefix+"."+portFlag, strings.ToUpper(prefix+"_"+portFlag))
+	if err != nil {
+		return nil, err
+	}
+	serveCmd.PersistentFlags().IntVar(&metaPort, metaPortFlag, 65534, "port on which the proxy will expose metadata endpoints")
+	err = viper.BindPFlag(prefix+"."+metaPortFlag, serveCmd.PersistentFlags().Lookup(metaPortFlag))
+	if err != nil {
+		return nil, err
+	}
+	err = viper.BindEnv(prefix+"."+metaPortFlag, strings.ToUpper(prefix+"_"+metaPortFlag))
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +172,7 @@ func (l *RequestStats) Process(next echo.HandlerFunc) echo.HandlerFunc {
 func (l *RequestStats) Handle(c echo.Context) error {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
-	return c.String(http.StatusOK, l.LastRequest.String())
+	return c.String(http.StatusOK, l.LastRequest.Format("2006-01-02 15:04:05"))
 }
 
 func serve(cmd *cobra.Command, args []string) {
@@ -224,7 +235,6 @@ func serve(cmd *cobra.Command, args []string) {
 	health.GET("/health", func(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	})
-	health.GET("/request_stats", rs.Handle)
 
 	e.Logger.Infof("Starting proxy for remote: %s, cookie key: %s, token of length %d", remoteURL.String(), cookieKey, len(token))
 
@@ -237,11 +247,28 @@ func serve(cmd *cobra.Command, args []string) {
 		}
 	}()
 
+	// set up metadata service
+	meta := echo.New()
+	meta.Use(middleware.Recover())
+	meta.Logger.SetLevel(log.INFO)
+	if verbose {
+		meta.Logger.SetLevel(log.DEBUG)
+	}
+	meta.GET("/request_stats", rs.Handle)
+	go func() {
+		if err := meta.Start(fmt.Sprintf(":%d", metaPort)); err != nil && err != http.ErrServerClosed {
+			meta.Logger.Fatal("shutting down the server")
+		}
+	}()
+
 	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 10 seconds.
 	<-ctx.Done()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := e.Shutdown(ctx); err != nil {
 		e.Logger.Fatal(err)
+	}
+	if err := meta.Shutdown(ctx); err != nil {
+		meta.Logger.Fatal(err)
 	}
 }

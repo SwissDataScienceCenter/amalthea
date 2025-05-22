@@ -462,7 +462,7 @@ func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.Amalthe
 	}
 }
 func lastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error) {
-	url := fmt.Sprintf("http://%s:65535/__amalthea__/request_stats", cr.Service().Name)
+	url := fmt.Sprintf("http://%s:%s/request_stats", cr.Service().Name, string(amaltheadevv1alpha1.AuthProxyMetaPort))
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -481,7 +481,7 @@ func lastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error)
 	if resp.StatusCode != 200 {
 		return time.Time{}, fmt.Errorf("Couldn't get last request time: %s", body)
 	}
-	rt, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", string(body))
+	rt, err := time.Parse("2006-01-02 15:04:05", string(body))
 	if err != nil {
 		return time.Time{}, fmt.Errorf("Couldn't parse date from url %s : %w", url, err)
 	}
@@ -502,8 +502,9 @@ func getIdleSince(
 		// check last request time before setting session to idle
 		rt, err := lastRequestTime(cr)
 		if err == nil && (idleSince.IsZero() || idleSince.Time.Before(rt)) {
+			log.Info("the last request to the session happened after the session became idle, skipping marking as idle")
 			idleSince = metav1.NewTime(rt)
-		} else {
+		} else if err != nil {
 			// note, if there was an error getting the time, we continue as normal
 			log.Error(err, "Couldn't get last request time from proxy")
 		}
