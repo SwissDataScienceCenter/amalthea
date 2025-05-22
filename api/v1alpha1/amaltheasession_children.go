@@ -28,10 +28,13 @@ import (
 const prefix string = "amalthea-"
 const SessionContainerName string = prefix + "session"
 const servicePortName string = prefix + "http"
+const serviceMetaPortName string = prefix + "http-meta"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
 const authProxyPort int32 = 65535
+const authProxyMetaPort int32 = 65534
+const oauth2ProxyPort int32 = 65533
 
 // The port below is used only when the oauth2proxy AND the custom made proxy run together
 // Because we need to strip the prefix from a logged-in user session.
@@ -234,7 +237,13 @@ func (cr *AmaltheaSession) Service() v1.Service {
 				Name:       servicePortName,
 				Port:       servicePort,
 				TargetPort: intstr.FromInt32(targetPort),
-			}},
+			},
+				{
+					Protocol:   v1.ProtocolTCP,
+					Name:       serviceMetaPortName,
+					Port:       authProxyMetaPort,
+					TargetPort: intstr.FromInt32(authProxyMetaPort),
+				}},
 		},
 	}
 	return svc

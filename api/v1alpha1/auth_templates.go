@@ -23,6 +23,8 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 		volumeMounts = auth.ExtraVolumeMounts
 	}
 
+	var authContainer v1.Container
+
 	if auth.Type == OauthProxy {
 		volName := fmt.Sprintf("%sproxy-configuration-secret", prefix)
 		output.Volumes = append(output.Volumes, v1.Volume{
@@ -41,10 +43,10 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: "/ping",
-				Port: intstr.FromInt32(authProxyPort),
+				Port: intstr.FromInt32(oauth2ProxyPort),
 			},
 		}
-		authContainer := v1.Container{
+		oauth2ProxyContainer := v1.Container{
 			Image: authproxyImage,
 			Name:  "oauth2-proxy",
 			SecurityContext: &v1.SecurityContext{
@@ -53,7 +55,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 			},
 			Args: []string{
 				fmt.Sprintf("--upstream=%s", sessionURL),
-				fmt.Sprintf("--http-address=:%d", authProxyPort),
+				fmt.Sprintf("--http-address=:%d", oauth2ProxyPort),
 				"--silence-ping-logging",
 				"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key,
 			},
@@ -82,8 +84,9 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				},
 			},
 		}
+		authContainer = as.get_rewrite_authn_proxy(authProxyPort, authProxyMetaPort, oauth2ProxyPort)
 
-		output.Containers = append(output.Containers, authContainer)
+		output.Containers = append(output.Containers, oauth2ProxyContainer)
 	} else if auth.Type == Token {
 		volName := fmt.Sprintf("%sproxy-configuration-secret", prefix)
 		output.Volumes = append(output.Volumes, v1.Volume{
@@ -98,7 +101,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 		if len(auth.SecretRef.Key) == 0 {
 			return output, fmt.Errorf("the authentication secret key has to be defined when using %s authentication", Token)
 		}
-		authContainer := as.get_rewrite_authn_proxy(authProxyPort)
+		authContainer = as.get_rewrite_authn_proxy(authProxyPort, authProxyMetaPort, as.Spec.Session.Port)
 		authContainer.Args = []string{
 			"proxy",
 			"serve",
@@ -140,10 +143,10 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: "/ping",
-				Port: intstr.FromInt32(authProxyPort),
+				Port: intstr.FromInt32(oauth2ProxyPort),
 			},
 		}
-		authContainer := v1.Container{
+		oauth2ProxyContainer := v1.Container{
 			Image: authproxyImage,
 			Name:  "oauth2-proxy",
 			SecurityContext: &v1.SecurityContext{
@@ -193,15 +196,14 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				},
 			},
 		}
-		output.Containers = append(output.Containers, authContainer)
-		if as.Spec.Session.StripURLPath {
-			output.Containers = append(output.Containers, as.get_rewrite_authn_proxy(authProxyRewriteOnlyPort))
-		}
+		authContainer = as.get_rewrite_authn_proxy(authProxyPort, authProxyMetaPort, oauth2ProxyPort)
+		output.Containers = append(output.Containers, oauth2ProxyContainer)
 	}
+	output.Containers = append(output.Containers, authContainer)
 	return output, nil
 }
 
-func (as *AmaltheaSession) get_rewrite_authn_proxy(listenPort int32) v1.Container {
+func (as *AmaltheaSession) get_rewrite_authn_proxy(listenPort int32, metaListenPort int32, oauth2proxyPort int32) v1.Container {
 	probeHandler := v1.ProbeHandler{
 		HTTPGet: &v1.HTTPGetAction{
 			Path: "/__amalthea__/health",
@@ -224,9 +226,10 @@ func (as *AmaltheaSession) get_rewrite_authn_proxy(listenPort int32) v1.Containe
 		},
 		Env: []v1.EnvVar{
 			{Name: "AUTHPROXY_PORT", Value: fmt.Sprintf("%d", listenPort)},
+			{Name: "AUTHPROXY_META_PORT", Value: fmt.Sprintf("%d", metaListenPort)},
 			// NOTE: The url for the remote has to not have a path at all, if it does, then the path
 			// in the url is appended to any path that is already there when the request comes in.
-			{Name: "AUTHPROXY_REMOTE", Value: fmt.Sprintf("http://127.0.0.1:%d", as.Spec.Session.Port)},
+			{Name: "AUTHPROXY_REMOTE", Value: fmt.Sprintf("http://127.0.0.1:%d", oauth2proxyPort)},
 		},
 		ReadinessProbe: &v1.Probe{ProbeHandler: probeHandler},
 		LivenessProbe:  &v1.Probe{ProbeHandler: probeHandler},
