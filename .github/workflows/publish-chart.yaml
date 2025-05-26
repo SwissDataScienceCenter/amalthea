@@ -12,9 +12,9 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/')"
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: 3.8
+          python-version: 3.12
       - uses: azure/setup-helm@v4.2.0
       - name: Publish chart and push images
         id: publish-chart
@@ -35,9 +35,10 @@ jobs:
           helm lint amalthea
           helm lint amalthea-sessions
           cd ..
-          chartpress --tag $TAG
-          chartpress --tag $TAG --push --publish-chart
-          chartpress --tag latest --push
+          export PLATFORM_ARGS="--platform linux/amd64 --platform linux/arm64 --builder docker-buildx"
+          chartpress --tag $TAG $PLATFORM_ARGS
+          chartpress --tag $TAG --push --publish-chart $PLATFORM_ARGS
+          chartpress --tag latest --push $PLATFORM_ARGS
           echo "amalthea-sessions-image=renku/amalthea-sessions:$TAG" >> $GITHUB_OUTPUT
           echo "amalthea-sidecars-image=renku/sidecars:$TAG" >> $GITHUB_OUTPUT
       - name: Scan amalthea-sessions image
