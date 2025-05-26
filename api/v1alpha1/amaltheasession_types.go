@@ -309,19 +309,22 @@ type Authentication struct {
 	// +kubebuilder:default:=true
 	Enabled bool               `json:"enabled"`
 	Type    AuthenticationType `json:"type"`
-	// Kubernetes secret that contains the authentication configuration
-	// For `token` a single key in the secret should have a yaml file with the following keys is required:
+	// Kubernetes secret that contains the authentication configuration.
+	// For `token` a single key in the secret should have a yaml file with the following format:
 	//   - token: the token value used to authenticate the user
 	//   - cookie_key: the name of the cookie where the token will be saved and searched for
+	//   - the `key` field in `secretRef` should point to the the `key` of the Kubernetes secret that has this format.
 	// For `oauth2proxy` a single key in the secret should have the configuration:
 	//   - see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file
 	//   - the `upstream` and `http_address` configuration options are ignored and overridden by the operator
+	//   - the `key` field in `secretRef` should point to the the `key` of the Kubernetes secret that has this format.
 	// For `oidc` the secret should have the following keys with the corresponding values:
 	//   - OIDC_CLIENT_ID - the OIDC client ID
 	//   - OIDC_CLIENT_SECRET - the OIDC client secret
 	//   - OIDC_ISSUER_URL - the OIDC issuer url
 	//   - AUTHORIZED_EMAILS - newline delimited list of user emails that should have access the session
 	//   - ALLOW_UNVERIFIED_EMAILS - allow users with unverified emails to authenticate, set to "true" or "false"
+	//   - the `key` field in `secretRef` should be left unset or it will be ignored
 	SecretRef SessionSecretRef `json:"secretRef"`
 	// +optional
 	// Additional volume mounts for the authentication container.
@@ -347,7 +350,9 @@ type SessionSecretRef struct {
 	Name string `json:"name"`
 	// +optional
 	// +kubebuilder:validation:Optional
-	// The key is optional because it may not be relevant depending on where or how the secret is used
+	// The key is optional because it may not be relevant depending on where or how the secret is used.
+	// For example, for authentication see the `secretRef` field in `spec.authentication`
+	// for more details.
 	Key string `json:"key,omitempty"`
 	// +optional
 	// +kubebuilder:validation:Optional

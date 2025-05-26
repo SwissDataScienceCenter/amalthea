@@ -542,10 +542,12 @@ func getSidecarsImage() string {
 	return sc
 }
 
-// This secret currently is needed only when the oauth2proxy is used AND the type of
-// authentication is oidc. If the type of authentication is oauth2proxy then we expect
-// the creator of the AmaltheaSession to create the secret in a format acceptable for
-// oauth2proxy. But this is annoying and it leaks the oauth2proxy api to AmaltheaSession users.
+// The secret created by this method is populated with data only when the type of authentication is 'oidc'.
+// If the type of authentication is 'oauth2proxy', then it is expected that
+// the secret with OAuth configuration created by the creator of the AmaltheaSession CR will be in
+// a format acceptable to oauth2proxy. With the 'oidc' method we do not have to expose
+// the oauth2proxy configuration API in the format of the secret we expect from users.
+// We define our own API - specific only to OIDC and limited strictly to fields we need.
 func (as *AmaltheaSession) Secret() v1.Secret {
 	labels := labelsForAmaltheaSession(as.Name)
 	secret := v1.Secret{

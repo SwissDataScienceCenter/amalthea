@@ -19,6 +19,10 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 	if auth == nil || !auth.Enabled {
 		return output, nil
 	}
+	if (auth.Type == OauthProxy || auth.Type == Token) && len(auth.SecretRef.Key) == 0 {
+		// NOTE: For oidc we need the whole secret - we dont need a specific key of the secret
+		return output, fmt.Errorf("the authentication secret key has to be defined when using %s authentication", auth.Type)
+	}
 	if len(auth.ExtraVolumeMounts) > 0 {
 		volumeMounts = auth.ExtraVolumeMounts
 	}
@@ -34,9 +38,6 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				},
 			},
 		})
-		if len(auth.SecretRef.Key) == 0 {
-			return output, fmt.Errorf("the authentication secret key has to be defined when using %s authentication", OauthProxy)
-		}
 		sessionURL := as.localhostPathPrefixURL().String()
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
@@ -95,9 +96,6 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				},
 			},
 		})
-		if len(auth.SecretRef.Key) == 0 {
-			return output, fmt.Errorf("the authentication secret key has to be defined when using %s authentication", Token)
-		}
 		authContainer := as.get_rewrite_authn_proxy(authProxyPort)
 		authContainer.Args = []string{
 			"proxy",
