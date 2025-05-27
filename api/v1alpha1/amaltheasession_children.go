@@ -542,6 +542,14 @@ func getSidecarsImage() string {
 	return sc
 }
 
+// internalSecretName returns the name of the secret that is a child
+// of the AmaltheaSession CR, as opposed to all other adopted secrets that
+// are not children of the AmaltheaSession CR and are created by the creator of each AmaltheaSession CR.
+// This secret is both created and deleted by Amalthea.
+func (as *AmaltheaSession) internalSecretName() string {
+	return fmt.Sprintf("%s---internal", as.Name)
+}
+
 // The secret created by this method is populated with data only when the type of authentication is 'oidc'.
 // If the type of authentication is 'oauth2proxy', then it is expected that
 // the secret with OAuth configuration created by the creator of the AmaltheaSession CR will be in
@@ -552,7 +560,7 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 	labels := labelsForAmaltheaSession(as.Name)
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      as.Name,
+			Name:      as.internalSecretName(),
 			Namespace: as.Namespace,
 			Labels:    labels,
 		},
