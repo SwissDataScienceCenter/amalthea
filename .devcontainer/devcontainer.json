@@ -20,7 +20,9 @@
 			"minikube": "none"
 		},
 		"ghcr.io/devcontainers-contrib/features/poetry:2": {},
-		"ghcr.io/dhoeric/features/k9s:1": {},
+		"ghcr.io/dhoeric/features/k9s:1": {
+			"version": "0.40.9"
+		},
 		"ghcr.io/devcontainers/features/go:1": {
 			"version": "1.24"
 		}

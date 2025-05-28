@@ -20,7 +20,7 @@ import (
 )
 
 type ChildResourceType interface {
-	networkingv1.Ingress | v1.Service | v1.PersistentVolumeClaim | appsv1.StatefulSet
+	networkingv1.Ingress | v1.Service | v1.PersistentVolumeClaim | appsv1.StatefulSet | v1.Secret
 }
 
 type ChildResource[T ChildResourceType] struct {
@@ -41,6 +41,7 @@ type ChildResources struct {
 	StatefulSet     ChildResource[appsv1.StatefulSet]
 	PVC             ChildResource[v1.PersistentVolumeClaim]
 	DataSourcesPVCs []ChildResource[v1.PersistentVolumeClaim]
+	Secret          ChildResource[v1.Secret]
 }
 
 type ChildResourceUpdates struct {
@@ -49,6 +50,7 @@ type ChildResourceUpdates struct {
 	StatefulSet     ChildResourceUpdate[appsv1.StatefulSet]
 	PVC             ChildResourceUpdate[v1.PersistentVolumeClaim]
 	DataSourcesPVCs []ChildResourceUpdate[v1.PersistentVolumeClaim]
+	Secret          ChildResourceUpdate[v1.Secret]
 }
 
 // The metrics server requires at least 10 seconds before container metrics can
@@ -210,6 +212,41 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			return nil
 		})
 		return ChildResourceUpdate[T]{c.Current, res, err, nil}
+	case *v1.Secret:
+		// NOTE: When the secret is updated we have nothing that will restart the Statefulset pods
+		// So secret updates on a running session will not take effect until hibernating/resuming
+		// This can be added in the future - there is also nothing that will restart the session when
+		// an adopted secret has changed.
+		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
+			desired, ok := any(c.Desired).(*v1.Secret)
+			if !ok {
+				return fmt.Errorf("Could not cast when reconciling")
+			}
+			if current.CreationTimestamp.IsZero() {
+				log.Info("Creating a secret")
+				current.Data = desired.Data
+				current.StringData = desired.StringData
+				current.ObjectMeta = desired.ObjectMeta
+				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				return err
+			}
+			switch strategy := cr.Spec.ReconcileStrategy; strategy {
+			case amaltheadevv1alpha1.Never:
+				return nil
+			case amaltheadevv1alpha1.WhenFailedOrHibernated:
+				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+					return nil
+				}
+				fallthrough
+			case amaltheadevv1alpha1.Always:
+				current.Data = desired.Data
+				current.StringData = desired.StringData
+			default:
+				return fmt.Errorf("attempting to reconcile secret with unknown stategy %s", strategy)
+			}
+			return nil
+		})
+		return ChildResourceUpdate[T]{c.Current, res, err, nil}
 	default:
 		return ChildResourceUpdate[T]{Error: fmt.Errorf("Encountered an uknown child resource type")}
 	}
@@ -217,6 +254,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 
 func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
+	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredService := cr.Service()
 	desiredPVC := cr.PVC()
 	desiredStatefulSet, err := cr.StatefulSet()
@@ -224,10 +262,12 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResources,
 		return ChildResources{}, err
 	}
 	desiredIngress := cr.Ingress()
+	desiredSecret := cr.Secret()
 	output := ChildResources{
 		Service:     ChildResource[v1.Service]{&v1.Service{ObjectMeta: metadata}, &desiredService},
 		PVC:         ChildResource[v1.PersistentVolumeClaim]{&v1.PersistentVolumeClaim{ObjectMeta: metadata}, &desiredPVC},
 		StatefulSet: ChildResource[appsv1.StatefulSet]{&appsv1.StatefulSet{ObjectMeta: metadata}, &desiredStatefulSet},
+		Secret:      ChildResource[v1.Secret]{&v1.Secret{ObjectMeta: secretMetadata}, &desiredSecret},
 	}
 
 	if desiredIngress != nil {
@@ -255,6 +295,7 @@ func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *a
 		PVC:         c.PVC.Reconcile(ctx, clnt, cr),
 		Service:     c.Service.Reconcile(ctx, clnt, cr),
 		Ingress:     c.Ingress.Reconcile(ctx, clnt, cr),
+		Secret:      c.Secret.Reconcile(ctx, clnt, cr),
 	}
 
 	dataSourceUpdates := []ChildResourceUpdate[v1.PersistentVolumeClaim]{}
@@ -271,7 +312,7 @@ func (c ChildResourceUpdates) AllEqual(op controllerutil.OperationResult) bool {
 	for _, ds := range c.DataSourcesPVCs {
 		dataSourcesOK = dataSourcesOK && (ds.UpdateResult == op)
 	}
-	return ingressOK && c.Service.UpdateResult == op && c.PVC.UpdateResult == op && c.StatefulSet.UpdateResult == op && dataSourcesOK
+	return ingressOK && c.Service.UpdateResult == op && c.PVC.UpdateResult == op && c.StatefulSet.UpdateResult == op && dataSourcesOK && c.Secret.UpdateResult == op
 }
 
 func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
@@ -402,6 +443,9 @@ func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.Amalthe
 	}
 	if c.Service.statusCallback != nil {
 		c.Service.statusCallback(status)
+	}
+	if c.Secret.statusCallback != nil {
+		c.Secret.statusCallback(status)
 	}
 	if c.PVC.statusCallback != nil {
 		c.PVC.statusCallback(status)
@@ -534,6 +578,7 @@ func (c ChildResourceUpdates) combineErrors() error {
 		"Service":     c.Service.Error,
 		"PVC":         c.PVC.Error,
 		"StatefulSet": c.StatefulSet.Error,
+		"Secret":      c.Secret.Error,
 	}
 	for _, pvc := range c.DataSourcesPVCs {
 		if pvc.Error == nil {

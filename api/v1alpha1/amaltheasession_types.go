@@ -131,11 +131,11 @@ type Session struct {
 	// +kubebuilder:validation:ExclusiveMinimum:=true
 	// +kubebuilder:validation:ExclusiveMaximum:=true
 	// +kubebuilder:validation:Minimum:=0
-	// +kubebuilder:validation:Maximum:=65535
+	// +kubebuilder:validation:Maximum:=65530
 	// The TCP port on the pod where the session can be accessed.
 	// If the session has authentication enabled then the ingress and service will point to the authentication container
 	// and the authentication proxy container will proxy to this port. If authentication is disabled then the ingress and service
-	// route directly to this port. Note that renku reserves the highest TCP value 65535 to run the authentication proxy.
+	// route directly to this port. Note that renku reserves the highest TCP values in the range 65530 to 65535 to run the authentication proxy and other auxiliary services.
 	Port int32 `json:"port,omitempty"`
 	// +optional
 	// +kubebuilder:default:={}
@@ -163,6 +163,10 @@ type Session struct {
 	// but it cannot be /baz.
 	URLPath string `json:"urlPath,omitempty"`
 	// +optional
+	// +kubebuilder:default:=false
+	// Will strip the url path defined in URLPath above from all requests that reach the session.
+	// This is useful for session frontends like Rstudio which cannot run on any path other than `/`
+	StripURLPath bool `json:"stripURLPath,omitempty"`
 	// Additional volume mounts for the session container
 	ExtraVolumeMounts []v1.VolumeMount `json:"extraVolumeMounts,omitempty"`
 	// +optional
@@ -292,11 +296,12 @@ type Culling struct {
 	MaxHibernatedDuration metav1.Duration `json:"maxHibernatedDuration,omitempty"`
 }
 
-// +kubebuilder:validation:Enum={token,oauth2proxy}
+// +kubebuilder:validation:Enum={token,oauth2proxy,oidc}
 type AuthenticationType string
 
 const Token AuthenticationType = "token"
-const Oidc AuthenticationType = "oauth2proxy"
+const OauthProxy AuthenticationType = "oauth2proxy"
+const Oidc AuthenticationType = "oidc"
 
 type Authentication struct {
 	// +optional
@@ -304,14 +309,23 @@ type Authentication struct {
 	// +kubebuilder:default:=true
 	Enabled bool               `json:"enabled"`
 	Type    AuthenticationType `json:"type"`
-	// Kubernetes secret that contains the authentication configuration
-	// For `token` a yaml file with the following keys is required:
+	// Kubernetes secret that contains the authentication configuration.
+	// For `token` a single key in the secret should have a yaml file with the following format:
 	//   - token: the token value used to authenticate the user
 	//   - cookie_key: the name of the cookie where the token will be saved and searched for
-	// For `oauth2proxy` please see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file.
-	// Note that the `upstream` and `http_address` configuration options cannot be set from the secret because
-	// the operator knows how to set these options to the proper values.
-	SecretRef SessionSecretKeyRef `json:"secretRef"`
+	//   - the `key` field in `secretRef` should point to the the `key` of the Kubernetes secret that has this format.
+	// For `oauth2proxy` a single key in the secret should have the configuration:
+	//   - see https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview#config-file
+	//   - the `upstream` and `http_address` configuration options are ignored and overridden by the operator
+	//   - the `key` field in `secretRef` should point to the the `key` of the Kubernetes secret that has this format.
+	// For `oidc` the secret should have the following keys with the corresponding values:
+	//   - OIDC_CLIENT_ID - the OIDC client ID
+	//   - OIDC_CLIENT_SECRET - the OIDC client secret
+	//   - OIDC_ISSUER_URL - the OIDC issuer url
+	//   - AUTHORIZED_EMAILS - newline delimited list of user emails that should have access the session
+	//   - ALLOW_UNVERIFIED_EMAILS - allow users with unverified emails to authenticate, set to "true" or "false"
+	//   - the `key` field in `secretRef` should be left unset or it will be ignored
+	SecretRef SessionSecretRef `json:"secretRef"`
 	// +optional
 	// Additional volume mounts for the authentication container.
 	ExtraVolumeMounts []v1.VolumeMount `json:"extraVolumeMounts,omitempty"`
@@ -334,6 +348,12 @@ func (s *SessionSecretKeyRef) isAdopted() bool {
 // A reference to a whole Kubernetes secret where the key is not important
 type SessionSecretRef struct {
 	Name string `json:"name"`
+	// +optional
+	// +kubebuilder:validation:Optional
+	// The key is optional because it may not be relevant depending on where or how the secret is used.
+	// For example, for authentication see the `secretRef` field in `spec.authentication`
+	// for more details.
+	Key string `json:"key,omitempty"`
 	// +optional
 	// +kubebuilder:validation:Optional
 	// If the secret is adopted then the operator will delete the secret when the custom resource that uses it is deleted.
