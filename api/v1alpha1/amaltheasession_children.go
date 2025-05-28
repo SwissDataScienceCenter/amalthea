@@ -542,11 +542,11 @@ func getSidecarsImage() string {
 	return sc
 }
 
-// internalSecretName returns the name of the secret that is a child
+// InternalSecretName returns the name of the secret that is a child
 // of the AmaltheaSession CR, as opposed to all other adopted secrets that
 // are not children of the AmaltheaSession CR and are created by the creator of each AmaltheaSession CR.
 // This secret is both created and deleted by Amalthea.
-func (as *AmaltheaSession) internalSecretName() string {
+func (as *AmaltheaSession) InternalSecretName() string {
 	return fmt.Sprintf("%s---internal", as.Name)
 }
 
@@ -560,7 +560,7 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 	labels := labelsForAmaltheaSession(as.Name)
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      as.internalSecretName(),
+			Name:      as.InternalSecretName(),
 			Namespace: as.Namespace,
 			Labels:    labels,
 		},

@@ -254,6 +254,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 
 func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
+	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredService := cr.Service()
 	desiredPVC := cr.PVC()
 	desiredStatefulSet, err := cr.StatefulSet()
@@ -266,7 +267,7 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResources,
 		Service:     ChildResource[v1.Service]{&v1.Service{ObjectMeta: metadata}, &desiredService},
 		PVC:         ChildResource[v1.PersistentVolumeClaim]{&v1.PersistentVolumeClaim{ObjectMeta: metadata}, &desiredPVC},
 		StatefulSet: ChildResource[appsv1.StatefulSet]{&appsv1.StatefulSet{ObjectMeta: metadata}, &desiredStatefulSet},
-		Secret:      ChildResource[v1.Secret]{&v1.Secret{ObjectMeta: metadata}, &desiredSecret},
+		Secret:      ChildResource[v1.Secret]{&v1.Secret{ObjectMeta: secretMetadata}, &desiredSecret},
 	}
 
 	if desiredIngress != nil {
