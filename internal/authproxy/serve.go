@@ -144,17 +144,19 @@ func Command() (*cobra.Command, error) {
 	return serveCmd, nil
 }
 
-type (
-	RequestStats struct {
-		LastRequest time.Time
-		mutex       sync.RWMutex
-	}
-)
+type RequestStats struct {
+	LastRequest time.Time
+	mutex       sync.RWMutex
+}
 
 func NewStats() *RequestStats {
 	return &RequestStats{
 		LastRequest: time.Now(),
 	}
+}
+
+type RequestStatsResponse struct {
+	LastRequestTime time.Time `json:"last_request_time"`
 }
 
 func (l *RequestStats) Process(next echo.HandlerFunc) echo.HandlerFunc {
@@ -172,7 +174,7 @@ func (l *RequestStats) Process(next echo.HandlerFunc) echo.HandlerFunc {
 func (l *RequestStats) Handle(c echo.Context) error {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
-	return c.String(http.StatusOK, l.LastRequest.Format("2006-01-02 15:04:05"))
+	return c.JSON(http.StatusOK, RequestStatsResponse{LastRequestTime: l.LastRequest})
 }
 
 func serve(cmd *cobra.Command, args []string) {

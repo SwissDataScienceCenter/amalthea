@@ -3,8 +3,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
 
@@ -461,61 +459,6 @@ func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.Amalthe
 		c.StatefulSet.statusCallback(status)
 	}
 }
-func lastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error) {
-	url := fmt.Sprintf("http://%s:%s/request_stats", cr.Service().Name, string(amaltheadevv1alpha1.AuthProxyMetaPort))
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return time.Time{}, err
-	}
-	body, err := io.ReadAll(resp.Body)
-	defer func() {
-		err := resp.Body.Close()
-		if err != nil {
-			log.Log.Error(err, "couldn't close request body")
-		}
-	}()
-	if err != nil {
-		return time.Time{}, err
-	}
-	if resp.StatusCode != 200 {
-		return time.Time{}, fmt.Errorf("Couldn't get last request time: %s", body)
-	}
-	rt, err := time.Parse("2006-01-02 15:04:05", string(body))
-	if err != nil {
-		return time.Time{}, fmt.Errorf("Couldn't parse date from url %s : %w", url, err)
-	}
-	return rt, nil
-}
-
-func getIdleSince(
-	ctx context.Context,
-	r *AmaltheaSessionReconciler,
-	cr *amaltheadevv1alpha1.AmaltheaSession,
-
-) (metav1.Time, bool) {
-	log := log.FromContext(ctx)
-	idleSince := cr.Status.IdleSince
-	idle := isIdle(ctx, r.MetricsClient, cr)
-	if idle {
-
-		// check last request time before setting session to idle
-		rt, err := lastRequestTime(cr)
-		if err == nil && (idleSince.IsZero() || idleSince.Time.Before(rt)) {
-			log.Info("the last request to the session happened after the session became idle, skipping marking as idle")
-			idleSince = metav1.NewTime(rt)
-		} else if err != nil {
-			// note, if there was an error getting the time, we continue as normal
-			log.Error(err, "Couldn't get last request time from proxy")
-		}
-	}
-	if idle && idleSince.IsZero() {
-		idleSince = metav1.NewTime(time.Now())
-	} else if !idle && !idleSince.IsZero() {
-		idleSince = metav1.Time{}
-	}
-	return idleSince, idle
-}
 
 func (c ChildResourceUpdates) Status(
 	ctx context.Context,
@@ -548,7 +491,7 @@ func (c ChildResourceUpdates) Status(
 		}
 
 		if state == amaltheadevv1alpha1.Running && oldEnough {
-			idleSince, idle = getIdleSince(ctx, r, cr)
+			idleSince, idle = getIdleState(ctx, r, cr)
 		}
 	} else {
 		events := v1.EventList{}

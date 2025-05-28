@@ -228,12 +228,13 @@ func (cr *AmaltheaSession) Service() v1.Service {
 		},
 		Spec: v1.ServiceSpec{
 			Selector: labels,
-			Ports: []v1.ServicePort{{
-				Protocol:   v1.ProtocolTCP,
-				Name:       servicePortName,
-				Port:       servicePort,
-				TargetPort: intstr.FromInt32(targetPort),
-			},
+			Ports: []v1.ServicePort{
+				{
+					Protocol:   v1.ProtocolTCP,
+					Name:       servicePortName,
+					Port:       servicePort,
+					TargetPort: intstr.FromInt32(targetPort),
+				},
 				{
 					Protocol:   v1.ProtocolTCP,
 					Name:       serviceMetaPortName,
