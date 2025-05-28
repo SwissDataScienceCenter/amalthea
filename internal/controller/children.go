@@ -493,7 +493,7 @@ func getIdleSince(
 	r *AmaltheaSessionReconciler,
 	cr *amaltheadevv1alpha1.AmaltheaSession,
 
-) metav1.Time {
+) (metav1.Time, bool) {
 	log := log.FromContext(ctx)
 	idleSince := cr.Status.IdleSince
 	idle := isIdle(ctx, r.MetricsClient, cr)
@@ -514,7 +514,7 @@ func getIdleSince(
 	} else if !idle && !idleSince.IsZero() {
 		idleSince = metav1.Time{}
 	}
-	return idleSince
+	return idleSince, idle
 }
 
 func (c ChildResourceUpdates) Status(
@@ -548,7 +548,7 @@ func (c ChildResourceUpdates) Status(
 		}
 
 		if state == amaltheadevv1alpha1.Running && oldEnough {
-			idleSince = getIdleSince(ctx, r, cr)
+			idleSince, idle = getIdleSince(ctx, r, cr)
 		}
 	} else {
 		events := v1.EventList{}

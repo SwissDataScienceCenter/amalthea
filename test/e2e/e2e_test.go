@@ -164,12 +164,6 @@ var _ = Describe("controller", Ordered, func() {
 				fmt.Println(string(status))
 				ExpectWithOffset(2, err).NotTo(HaveOccurred())
 				if !strings.Contains(string(status), "true") {
-					cmd := exec.Command("kubectl", "get", "amaltheasession",
-						"test-amalthea-session", "-o", "jsonpath={.status}",
-						"-n", session_namespace,
-					)
-					status, _ := utils.Run(cmd)
-					fmt.Println(string(status))
 					return fmt.Errorf("status condition with type Idle should be set")
 				}
 				return nil
