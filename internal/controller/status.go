@@ -2,9 +2,13 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"time"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	"github.com/SwissDataScienceCenter/amalthea/internal/authproxy"
 	v1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,16 +82,47 @@ func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *am
 	return nil, fmt.Errorf("could not find the metrics for the session container %s", amaltheadevv1alpha1.SessionContainerName)
 }
 
-func isIdle(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *amaltheadevv1alpha1.AmaltheaSession) bool {
-	log := log.FromContext(ctx)
-	if cr == nil {
-		return false
+func lastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error) {
+	url := fmt.Sprintf("http://%s:%d/request_stats", cr.Service().Name, amaltheadevv1alpha1.AuthProxyMetaPort)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if resp.StatusCode != 200 {
+		return time.Time{}, fmt.Errorf("Couldn't get last request time due to status: %d", resp.StatusCode)
 	}
 
-	metrics, err := metrics(ctx, clnt, cr)
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			log.Log.Error(err, "couldn't close request body")
+		}
+	}()
+	req_stats := authproxy.RequestStatsResponse{}
+	err = json.NewDecoder(resp.Body).Decode(&req_stats)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return req_stats.LastRequestTime, nil
+}
+
+func getIdleState(
+	ctx context.Context,
+	r *AmaltheaSessionReconciler,
+	cr *amaltheadevv1alpha1.AmaltheaSession,
+) (metav1.Time, bool) {
+	log := log.FromContext(ctx)
+	if cr == nil {
+		return metav1.Time{}, false
+	}
+	idleSince := cr.Status.IdleSince
+	idle := false
+
+	metrics, err := metrics(ctx, r.MetricsClient, cr)
 	if err != nil {
 		log.Info("Metrics returned error", "error", err)
-		return false
+		return metav1.Time{}, false
 	}
 
 	cpuUsage := metrics.Cpu()
@@ -101,8 +136,22 @@ func isIdle(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *ama
 				cpuUsageIdlenessThreshold.MilliValue(),
 			)
 		}
-		return true
+		idle = true
+		// check last request time before setting session to idle
+		rt, err := lastRequestTime(cr)
+		if err == nil && (idleSince.IsZero() || idleSince.Time.Before(rt)) {
+			log.Info("the last request to the session happened after the session became idle, skipping marking as idle")
+			idleSince = metav1.NewTime(rt)
+		} else if err != nil {
+			// note, if there was an error getting the time, we continue as normal
+			log.Info("Couldn't get last request time from proxy", "err", err)
+		}
 	}
 
-	return false
+	if idle && idleSince.IsZero() {
+		idleSince = metav1.NewTime(time.Now())
+	} else if !idle && !idleSince.IsZero() {
+		idleSince = metav1.Time{}
+	}
+	return idleSince, idle
 }

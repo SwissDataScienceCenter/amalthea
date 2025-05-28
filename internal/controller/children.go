@@ -491,12 +491,7 @@ func (c ChildResourceUpdates) Status(
 		}
 
 		if state == amaltheadevv1alpha1.Running && oldEnough {
-			idle = isIdle(ctx, r.MetricsClient, cr)
-			if idle && idleSince.IsZero() {
-				idleSince = metav1.NewTime(time.Now())
-			} else if !idle && !idleSince.IsZero() {
-				idleSince = metav1.Time{}
-			}
+			idleSince, idle = getIdleState(ctx, r, cr)
 		}
 	} else {
 		events := v1.EventList{}
