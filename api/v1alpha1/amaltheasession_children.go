@@ -2,12 +2,15 @@ package v1alpha1
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -29,6 +32,10 @@ const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
 const authProxyPort int32 = 65535
+
+// The port below is used only when the oauth2proxy AND the custom made proxy run together
+// Because we need to strip the prefix from a logged-in user session.
+const authProxyRewriteOnlyPort int32 = 65534
 
 var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
@@ -157,7 +164,10 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 	}
 	sessionContainer.SecurityContext = securityContext
 
-	auth := cr.auth()
+	auth, err := cr.auth()
+	if err != nil {
+		return appsv1.StatefulSet{}, err
+	}
 	containers = append(containers, sessionContainer)
 	containers = append(containers, auth.Containers...)
 	containers = append(containers, cr.Spec.ExtraContainers...)
@@ -234,14 +244,34 @@ func (cr *AmaltheaSession) Service() v1.Service {
 // the host is always 127.0.0.1.
 func (cr *AmaltheaSession) localhostPathPrefixURL() *url.URL {
 	host := fmt.Sprintf("127.0.0.1:%d", cr.Spec.Session.Port)
+	path := cr.ingressPathPrefix()
+	output := url.URL{Host: host, Scheme: "http", Path: path}
+	return &output
+}
+
+// The path prefix for the session
+func (cr *AmaltheaSession) urlPath() string {
+	path := cr.Spec.Session.URLPath
+	// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
+	// and does not proxy subpaths
+	if !strings.HasSuffix(path, "/") {
+		path = path + "/"
+	}
+	return path
+}
+
+// The path prefix from the ingress spec for the session
+func (cr *AmaltheaSession) ingressPathPrefix() string {
+	if cr.Spec.Ingress == nil {
+		return "/"
+	}
 	path := cr.Spec.Ingress.PathPrefix
 	// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
 	// and does not proxy subpaths
 	if !strings.HasSuffix(path, "/") {
 		path = path + "/"
 	}
-	output := url.URL{Host: host, Scheme: "http", Path: path}
-	return &output
+	return path
 }
 
 // Ingress returns a AmaltheaSession Ingress object
@@ -268,7 +298,7 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 				IngressRuleValue: networkingv1.IngressRuleValue{
 					HTTP: &networkingv1.HTTPIngressRuleValue{
 						Paths: []networkingv1.HTTPIngressPath{{
-							Path: cr.localhostPathPrefixURL().Path,
+							Path: cr.ingressPathPrefix(),
 							PathType: func() *networkingv1.PathType {
 								pt := networkingv1.PathTypePrefix
 								return &pt
@@ -510,4 +540,106 @@ func getSidecarsImage() string {
 		sc = "renku/sidecars:latest"
 	}
 	return sc
+}
+
+// InternalSecretName returns the name of the secret that is a child
+// of the AmaltheaSession CR, as opposed to all other adopted secrets that
+// are not children of the AmaltheaSession CR and are created by the creator of each AmaltheaSession CR.
+// This secret is both created and deleted by Amalthea.
+func (as *AmaltheaSession) InternalSecretName() string {
+	return fmt.Sprintf("%s---internal", as.Name)
+}
+
+// The secret created by this method is populated with data only when the type of authentication is 'oidc'.
+// If the type of authentication is 'oauth2proxy', then it is expected that
+// the secret with OAuth configuration created by the creator of the AmaltheaSession CR will be in
+// a format acceptable to oauth2proxy. With the 'oidc' method we do not have to expose
+// the oauth2proxy configuration API in the format of the secret we expect from users.
+// We define our own API - specific only to OIDC and limited strictly to fields we need.
+func (as *AmaltheaSession) Secret() v1.Secret {
+	labels := labelsForAmaltheaSession(as.Name)
+	secret := v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      as.InternalSecretName(),
+			Namespace: as.Namespace,
+			Labels:    labels,
+		},
+	}
+	if as.Spec.Authentication == nil || as.Spec.Authentication.Type != Oidc {
+		// In this case we do not need anything in the secret - we just return an empty one
+		return secret
+	}
+
+	pathPrefix := as.ingressPathPrefix()
+	sessionURL := as.GetURL()
+	pathPrefixURL := url.URL{Host: sessionURL.Host, Path: pathPrefix, Scheme: sessionURL.Scheme}
+	cookieSecret := make([]byte, 32)
+	_, err := rand.Read(cookieSecret)
+	if err != nil {
+		// NOTE: Read cannot panic except for on legacy Linux systems
+		// See: https://pkg.go.dev/crypto/rand#Read
+		panic(err)
+	}
+	oldConfigLines := []string{
+		"session_cookie_minimal = true",
+		"skip_provider_button = true",
+		fmt.Sprintf("redirect_url = \"%s\"", pathPrefixURL.JoinPath("oauth2/callback").String()),
+		fmt.Sprintf("cookie_path = \"%s\"", pathPrefix),
+		fmt.Sprintf("proxy_prefix = \"%soauth2\"", pathPrefix),
+		"authenticated_emails_file = \"/authorized_emails\"",
+		fmt.Sprintf("cookie_secret = \"%s\"", base64.URLEncoding.EncodeToString(cookieSecret)),
+	}
+	upstreamPort := as.Spec.Session.Port
+	if as.Spec.Authentication != nil && as.Spec.Authentication.Type == Oidc && as.Spec.Session.StripURLPath {
+		// NOTE: The rewrite/auth proxy can also handle authentication but only with fixed values, not Oauth2.
+		// For oauth2 we use the oauth2 proxy.
+		// So the following paths are possible:
+		// With rewrite and oidc authn we have ingress -> oauth2proxy -> rewrite proxy -> session
+		// With rewrite and oauth2proxy authn we have ingress -> oauth2proxy -> rewrite proxy -> session
+		// With rewrite and token authn we have ingress -> rewrite proxy -> session
+		upstreamPort = authProxyRewriteOnlyPort
+	}
+	upstreamConfig := map[string]any{
+		"upstreams": []map[string]any{
+			{
+				"id":                    "amalthea-upstream",
+				"path":                  pathPrefix,
+				"uri":                   fmt.Sprintf("http://127.0.0.1:%d", upstreamPort),
+				"insecureSkipTLSVerify": true,
+				"passHostHeader":        true,
+				"proxyWebSockets":       true,
+			},
+		},
+	}
+	newConfig := map[string]any{
+		"providers": []map[string]any{
+			{
+				"clientID":     "${OIDC_CLIENT_ID}",
+				"clientSecret": "${OIDC_CLIENT_SECRET}",
+				"id":           "amalthea-oidc",
+				"provider":     "oidc",
+				"oidcConfig": map[string]any{
+					"insecureSkipNonce":            false,
+					"issuerURL":                    "${OIDC_ISSUER_URL}",
+					"insecureAllowUnverifiedEmail": "${ALLOW_UNVERIFIED_EMAILS}",
+					"emailClaim":                   "email",
+					"audienceClaims":               []string{"aud"},
+				},
+			},
+		},
+		"server": map[string]string{
+			"bindAddress": fmt.Sprintf("0.0.0.0:%d", authProxyPort),
+		},
+		"upstreamConfig": upstreamConfig,
+	}
+	newConfigStr, err := yaml.Marshal(newConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	secret.StringData = map[string]string{
+		"oauth2-proxy-alpha-config.yaml": string(newConfigStr),
+		"oauth2-proxy-config.yaml":       strings.Join(oldConfigLines, "\n"),
+	}
+	return secret
 }
