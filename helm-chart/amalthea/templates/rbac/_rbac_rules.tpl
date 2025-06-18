@@ -26,15 +26,21 @@
   # Note that we do not patch/update/delete them ever.
   - apiGroups:
       - ""
-      - apps
-      - networking.k8s.io
     resources:
-      - statefulsets
       - persistentvolumeclaims
       - services
-      - ingresses
       - secrets
       - configmaps
+    verbs: [create, get, list, watch]
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs: [create, get, list, watch]
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses
     verbs: [create, get, list, watch]
 
   # Required for hibernating sessions
