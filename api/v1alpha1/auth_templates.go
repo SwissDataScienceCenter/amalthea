@@ -115,7 +115,6 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 			},
 			volumeMounts...,
 		)
-		output.Containers = append(output.Containers, authContainer)
 	} else if auth.Type == Oidc {
 		volNameFixedConfig := fmt.Sprintf("%s-fixed-proxy-configuration-secret", prefix)
 		volNameAuthorizedEmails := fmt.Sprintf("%s-authorized-emails-secret", prefix)
