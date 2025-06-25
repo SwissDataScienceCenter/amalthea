@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-05-26T12:51:04Z"
+    createdAt: "2025-06-25T07:56:15Z"
     operators.operatorframework.io/builder: operator-sdk-v1.38.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: amalthea.v0.0.1
@@ -100,9 +100,9 @@ spec:
           - ""
           resources:
           - persistentvolumeclaims
+          - services
           verbs:
           - create
-          - delete
           - get
           - list
           - patch
@@ -117,17 +117,6 @@ spec:
           - delete
           - list
           - patch
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - services
-          verbs:
-          - create
-          - get
-          - list
-          - patch
-          - update
           - watch
         - apiGroups:
           - metrics.k8s.io

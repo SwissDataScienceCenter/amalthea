@@ -53,7 +53,7 @@ const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
 // +kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=list;watch;delete;create;patch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
-// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch
