@@ -57,7 +57,7 @@ rules:
     - persistentvolumeclaims
     - services
     - ingresses
-  verbs: [create, get, list, watch]
+  verbs: [create, get, list, watch, patch, update]
 # Required for hibernating sessions
 - apiGroups: ["apps"]
   resources: ["statefulsets"]
