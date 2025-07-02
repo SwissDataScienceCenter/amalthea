@@ -35,8 +35,6 @@ scope:
   #    will only operate in the namespace where the helm chart is deployed.
   # namespaces: ["default"]
 
-deployCrd: true # whether to deploy the jupyterserver CRD
-
 networkPolicies:
   # # Enable sensible, default network policies. Note that until cluster-wide
   # # network policies are available in Kubernetes (https://github.com/kubernetes/enhancements/issues/2091),

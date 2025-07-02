@@ -47,15 +47,20 @@ rules:
   resources: [pods]
   verbs: [get, list, watch]
 # Amalthea: child resources we produce
-# Note that we do not patch/update/delete them ever.
 - apiGroups:
   - ""
-  - apps
-  - networking.k8s.io
   resources:
-    - statefulsets
     - persistentvolumeclaims
     - services
+  verbs: [create, get, list, watch]
+- apiGroups:
+  - apps
+  resources:
+    - statefulsets
+  verbs: [create, get, list, watch]
+- apiGroups:
+  - networking.k8s.io
+  resources:
     - ingresses
   verbs: [create, get, list, watch, patch, update]
 # Required for hibernating sessions
