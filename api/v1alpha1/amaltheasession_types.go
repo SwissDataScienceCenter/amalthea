@@ -111,6 +111,10 @@ type AmaltheaSessionSpec struct {
 	// +optional
 	// List of secrets that contain credentials for pulling private images
 	ImagePullSecrets []SessionSecretRef `json:"imagePullSecrets,omitempty"`
+
+	// +optional
+	// The name of the service account that should be used for the session Pod
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 }
 
 type Session struct {
