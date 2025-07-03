@@ -195,6 +195,7 @@ func (cr *AmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 					Labels: labels,
 				},
 				Spec: v1.PodSpec{
+					ServiceAccountName:           cr.Spec.ServiceAccountName,
 					EnableServiceLinks:           ptr.To(false),
 					AutomountServiceAccountToken: ptr.To(false),
 					SecurityContext:              &v1.PodSecurityContext{FSGroup: &cr.Spec.Session.RunAsGroup},

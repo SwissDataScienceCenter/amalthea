@@ -6016,6 +6016,10 @@ spec:
                 - always
                 - whenFailedOrHibernated
                 type: string
+              serviceAccountName:
+                description: The name of the service account that should be used for
+                  the session Pod
+                type: string
               session:
                 description: Specification for the main session container that the
                   user will access and use
