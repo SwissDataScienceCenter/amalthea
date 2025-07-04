@@ -487,7 +487,8 @@ func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 		case Rclone:
 			storageClass := rcloneStorageClass
 			readOnly := ds.AccessMode == v1.ReadOnlyMany
-			annotations := maps.Clone(as.Spec.Template.Metadata.Annotations)
+			annotations := map[string]string{}
+			maps.Copy(annotations, as.Spec.Template.Metadata.Annotations)
 			annotations[rcloneStorageSecretNameAnnotation] = ds.SecretRef.Name
 			pvcs = append(
 				pvcs,
@@ -646,7 +647,8 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 }
 
 func (cr *AmaltheaSession) childLabels() map[string]string {
-	labels := maps.Clone(cr.Spec.Template.Metadata.Labels)
+	labels := map[string]string{}
+	maps.Copy(labels, cr.Spec.Template.Metadata.Labels)
 	// NOTE: stuff from selectorLabels will overwrite conflicts in labels (if there are any)
 	// This is the desired behaviour, we do not want to overwrite the selector labels.
 	maps.Copy(labels, selectorLabels(cr.Name))
