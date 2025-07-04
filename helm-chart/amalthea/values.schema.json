@@ -66,6 +66,10 @@
             },
             "type": "object"
         },
+        "deployCrd": {
+            "description": "Should the helm chart apply the k8s CRD.",
+            "type": "boolean"
+        },
         "networkPolicies": {
             "description": "Enable and configure network policies for the controller and jupyter servers.",
             "type": "object",
@@ -432,6 +436,7 @@
     },
     "required": [
         "scope",
+        "deployCrd",
         "networkPolicies",
         "kopf",
         "extraChildResources",
