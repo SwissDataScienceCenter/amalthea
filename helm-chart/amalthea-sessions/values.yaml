@@ -25,6 +25,8 @@ controllerManager:
 kubernetesClusterDomain: cluster.local
 # If set to true then the operator will watch and operate in all namespaces
 clusterScoped: false
+# Whether to install the CRD
+deployCrd: true
 # Whether to install the dependencies or not
 deploy:
   csiRclone: false

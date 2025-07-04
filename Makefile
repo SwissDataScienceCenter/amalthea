@@ -90,7 +90,7 @@ all: build
 # More info on the awk command:
 # http://linuxcommand.org/lc3_adv_awk.php
 
-HELM_CRD_TEMPLATE ?= helm-chart/amalthea-sessions/crds/amaltheasession.yaml
+HELM_CRD_TEMPLATE ?= helm-chart/amalthea-sessions/templates/amaltheasession-crd.yaml
 
 .PHONY: help
 help: ## Display this help.
@@ -101,8 +101,10 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	echo "# This manifest is auto-generated from the makefile do not edit manually." > $(HELM_CRD_TEMPLATE)
+	echo "{{- if .Values.deployCrd -}}" > $(HELM_CRD_TEMPLATE)
+	echo "# This manifest is auto-generated from the makefile do not edit manually." >> $(HELM_CRD_TEMPLATE)
 	cat config/crd/bases/*yaml >> $(HELM_CRD_TEMPLATE)
+	echo "{{- end }}" >> $(HELM_CRD_TEMPLATE)
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
