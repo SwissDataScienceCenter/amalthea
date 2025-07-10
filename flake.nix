@@ -31,8 +31,12 @@
       devShells = {
         default = pkgs.mkShellNoCC {
           buildInputs = devshellPkgs;
+        };
+        eike = pkgs.mkShellNoCC {
+          buildInputs = devshellPkgs;
           shellHook = ''
             export FLAKE_ROOT="$(git rev-parse --show-toplevel)"
+            export KUBECONFIG=~/.kube/config_azure
           '';
         };
       };
