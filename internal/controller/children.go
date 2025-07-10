@@ -460,6 +460,32 @@ func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.Amalthe
 	}
 }
 
+func findAutoscaleEvents(r *AmaltheaSessionReconciler,
+	ctx context.Context,
+	cr *amaltheadevv1alpha1.AmaltheaSession) (v1.Event, error) {
+	events := v1.EventList{}
+	// how to figure what events belongs to this session?
+	// "name": "eike-kettner-0f3f12b33eef
+	err := r.Client.List(ctx,
+		&events,
+		client.MatchingFields{
+			"involvedObject.namespace": cr.ObjectMeta.Namespace,
+			"involvedObject.kind":      "Pod",
+			"reportingComponent":       "cluster-autoscaler",
+			"reason":                   "TriggeredScaleUp",
+		},
+	)
+	if err == nil {
+		for _, event := range events.Items {
+			// the involvedObject.name starts with the amalheasession.name
+			if strings.HasPrefix(event.InvolvedObject.Name, cr.ObjectMeta.Name) {
+				return event, nil
+			}
+		}
+	}
+	return nil
+}
+
 func (c ChildResourceUpdates) Status(
 	ctx context.Context,
 	r *AmaltheaSessionReconciler,
