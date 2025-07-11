@@ -460,12 +460,10 @@ func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.Amalthe
 	}
 }
 
-func findAutoscaleEvents(r *AmaltheaSessionReconciler,
+func findAutoscaleEvent(r *AmaltheaSessionReconciler,
 	ctx context.Context,
-	cr *amaltheadevv1alpha1.AmaltheaSession) (v1.Event, error) {
+	cr *amaltheadevv1alpha1.AmaltheaSession) (*v1.Event, error) {
 	events := v1.EventList{}
-	// how to figure what events belongs to this session?
-	// "name": "eike-kettner-0f3f12b33eef
 	err := r.Client.List(ctx,
 		&events,
 		client.MatchingFields{
@@ -479,11 +477,11 @@ func findAutoscaleEvents(r *AmaltheaSessionReconciler,
 		for _, event := range events.Items {
 			// the involvedObject.name starts with the amalheasession.name
 			if strings.HasPrefix(event.InvolvedObject.Name, cr.ObjectMeta.Name) {
-				return event, nil
+				return &event, nil
 			}
 		}
 	}
-	return nil
+	return nil, err
 }
 
 func (c ChildResourceUpdates) Status(
@@ -504,6 +502,13 @@ func (c ChildResourceUpdates) Status(
 	idle := false
 	idleSince := cr.Status.IdleSince
 	state, failMsg := c.State(cr, pod)
+
+	if state == amaltheadevv1alpha1.Failed {
+		autoscaleEvent, err := findAutoscaleEvent(r, ctx, cr)
+		if err == nil && autoscaleEvent != nil {
+			state = amaltheadevv1alpha1.NotReady //??? 🤔🤨
+		}
+	}
 
 	if pod != nil {
 		oldEnough := false
