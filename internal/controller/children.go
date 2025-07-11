@@ -463,7 +463,9 @@ func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.Amalthe
 func findAutoscaleEvent(r *AmaltheaSessionReconciler,
 	ctx context.Context,
 	cr *amaltheadevv1alpha1.AmaltheaSession) (*v1.Event, error) {
+	log := log.FromContext(ctx)
 	events := v1.EventList{}
+	log.Info("Getting event list for searching for auto-scaled event")
 	err := r.Client.List(ctx,
 		&events,
 		client.MatchingFields{
@@ -474,13 +476,16 @@ func findAutoscaleEvent(r *AmaltheaSessionReconciler,
 		},
 	)
 	if err == nil {
+		log.Info("Got events", "events", events.Items)
 		for _, event := range events.Items {
 			// the involvedObject.name starts with the amalheasession.name
 			if strings.HasPrefix(event.InvolvedObject.Name, cr.ObjectMeta.Name) {
+				log.Info("Found auto-scale event", "event", event)
 				return &event, nil
 			}
 		}
 	}
+	log.Info("Did not find auto-scale event")
 	return nil, err
 }
 
