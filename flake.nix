@@ -34,6 +34,8 @@
         };
         eike = pkgs.mkShellNoCC {
           buildInputs = devshellPkgs;
+          ## this is the naespace the operator runs in when doing "make run"
+          RELEASE_NAMESPACE = "ci-renku-4088";
           shellHook = ''
             export FLAKE_ROOT="$(git rev-parse --show-toplevel)"
             export KUBECONFIG=~/.kube/config_azure

@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -328,8 +329,8 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	return stsReady && podReady
 }
 
-func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
-	msg := c.failureMessage(pod)
+func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod, client client.Client, ctx context.Context) (amaltheadevv1alpha1.State, string) {
+	msg := c.failureMessage(pod, cr, client, ctx)
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
 		return amaltheadevv1alpha1.NotReady, ""
@@ -344,7 +345,7 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	}
 }
 
-func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
+func (c ChildResourceUpdates) failureMessage(pod *v1.Pod, cr *amaltheadevv1alpha1.AmaltheaSession, client client.Client, ctx context.Context) string {
 	msg := podFailureReason(pod)
 	if msg != "" {
 		return msg
@@ -366,6 +367,42 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
 	msg = ingressFailureReason(c.Ingress.Manifest)
 	if msg != "" {
 		return msg
+	}
+
+	msg = eventsInferedFailure(cr, client, ctx)
+	if msg != "" {
+		return msg
+	}
+
+	return ""
+}
+
+func eventsInferedFailure(cr *amaltheadevv1alpha1.AmaltheaSession, client client.Client, ctx context.Context) string {
+	const failedScheduling = "FailedScheduling"
+	const scheduled = "Scheduled"
+	const triggeredScaleUp = "TriggeredScaleUp"
+	log := log.FromContext(ctx)
+	events, err := cr.GetPodEvents(ctx, client)
+	if err != nil {
+		return "Cannot get pod events"
+	}
+	if events == nil {
+		return ""
+	}
+	for _, v := range slices.Backward(events.Items) {
+		et := v.EventTime.Time
+		if et.IsZero() {
+			et = v.FirstTimestamp.Time
+		}
+		log.Info(fmt.Sprintf("Event[time=%s, reason=%s]", et, v.Reason))
+		if v.Reason == failedScheduling {
+			log.Info("Found a FailedScheduling event", "event", v)
+			return v.Message
+		}
+		if v.Reason == scheduled || v.Reason == triggeredScaleUp {
+			log.Info("Found a Scheduled or TriggeredScaleUp event", "event", v)
+			return ""
+		}
 	}
 	return ""
 }
@@ -460,35 +497,6 @@ func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.Amalthe
 	}
 }
 
-func findAutoscaleEvent(r *AmaltheaSessionReconciler,
-	ctx context.Context,
-	cr *amaltheadevv1alpha1.AmaltheaSession) (*v1.Event, error) {
-	log := log.FromContext(ctx)
-	events := v1.EventList{}
-	log.Info("Getting event list for searching for auto-scaled event")
-	err := r.Client.List(ctx,
-		&events,
-		client.MatchingFields{
-			"involvedObject.namespace": cr.ObjectMeta.Namespace,
-			"involvedObject.kind":      "Pod",
-			"reportingComponent":       "cluster-autoscaler",
-			"reason":                   "TriggeredScaleUp",
-		},
-	)
-	if err == nil {
-		log.Info("Got events", "events", events.Items)
-		for _, event := range events.Items {
-			// the involvedObject.name starts with the amalheasession.name
-			if strings.HasPrefix(event.InvolvedObject.Name, cr.ObjectMeta.Name) {
-				log.Info("Found auto-scale event", "event", event)
-				return &event, nil
-			}
-		}
-	}
-	log.Info("Did not find auto-scale event")
-	return nil, err
-}
-
 func (c ChildResourceUpdates) Status(
 	ctx context.Context,
 	r *AmaltheaSessionReconciler,
@@ -506,14 +514,7 @@ func (c ChildResourceUpdates) Status(
 
 	idle := false
 	idleSince := cr.Status.IdleSince
-	state, failMsg := c.State(cr, pod)
-
-	if state == amaltheadevv1alpha1.Failed {
-		autoscaleEvent, err := findAutoscaleEvent(r, ctx, cr)
-		if err == nil && autoscaleEvent != nil {
-			state = amaltheadevv1alpha1.NotReady //??? 🤔🤨
-		}
-	}
+	state, failMsg := c.State(cr, pod, r.Client, ctx)
 
 	if pod != nil {
 		oldEnough := false
