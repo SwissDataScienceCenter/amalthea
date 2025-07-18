@@ -409,9 +409,9 @@ func eventTimestamp(ev v1.Event) time.Time {
 	return t
 }
 
-// Finds all events where the pod of the given session is involved in.
-// It will be sorted by timestamp
-func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Client) (*v1.EventList, error) {
+// GetPodEvents finds all events where the pod of the given session is
+// involved in. It will be sorted by timestamp
+func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*v1.EventList, error) {
 	log := log.FromContext(ctx)
 	events := v1.EventList{}
 	podName := as.PodName()
@@ -425,7 +425,7 @@ func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Client) (*
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Cannot get pod events: %w", err)
 	} else {
 		sort.Slice(events.Items, func(i, j int) bool {
 			t1 := eventTimestamp(events.Items[i])

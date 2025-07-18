@@ -377,27 +377,28 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod, cr *amaltheadevv1alpha
 	return ""
 }
 
-func eventsInferedFailure(cr *amaltheadevv1alpha1.AmaltheaSession, client client.Client, ctx context.Context) string {
+// eventsInferedFailure looks into the events of the session pod to
+// figure out whether a failure exists. The events are looked at with
+// the latest first, if an event occurs that indicates a scale-up or a
+// scheduled reason, then it is considered non-failing. If the first
+// event encountered is a "FailedScheduling" reason, then it indicates
+// a failure.
+func eventsInferedFailure(cr *amaltheadevv1alpha1.AmaltheaSession, client client.Reader, ctx context.Context) string {
 	const failedScheduling = "FailedScheduling"
 	const scheduled = "Scheduled"
 	const triggeredScaleUp = "TriggeredScaleUp"
 	log := log.FromContext(ctx)
 	events, err := cr.GetPodEvents(ctx, client)
 	if err != nil {
-		return "Cannot get pod events"
+		return fmt.Sprintf("%v", err)
 	}
 	if events == nil {
 		return ""
 	}
 	for _, v := range slices.Backward(events.Items) {
-		et := v.EventTime.Time
-		if et.IsZero() {
-			et = v.FirstTimestamp.Time
-		}
-		log.Info(fmt.Sprintf("Event[time=%s, reason=%s]", et, v.Reason))
 		if v.Reason == failedScheduling {
 			log.Info("Found a FailedScheduling event", "event", v)
-			return v.Message
+			return fmt.Sprintf("Failed scheduling: %s", v.Message)
 		}
 		if v.Reason == scheduled || v.Reason == triggeredScaleUp {
 			log.Info("Found a Scheduled or TriggeredScaleUp event", "event", v)
