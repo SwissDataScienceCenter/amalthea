@@ -3,12 +3,14 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	v1alpha "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type TestClient struct {
