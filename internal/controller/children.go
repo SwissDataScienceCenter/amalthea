@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -328,8 +329,8 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	return stsReady && podReady
 }
 
-func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
-	msg := c.failureMessage(pod)
+func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod, client client.Client, ctx context.Context) (amaltheadevv1alpha1.State, string) {
+	msg := c.failureMessage(pod, cr, client, ctx)
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
 		return amaltheadevv1alpha1.NotReady, ""
@@ -344,7 +345,7 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	}
 }
 
-func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
+func (c ChildResourceUpdates) failureMessage(pod *v1.Pod, cr *amaltheadevv1alpha1.AmaltheaSession, client client.Client, ctx context.Context) string {
 	msg := podFailureReason(pod)
 	if msg != "" {
 		return msg
@@ -366,6 +367,43 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
 	msg = ingressFailureReason(c.Ingress.Manifest)
 	if msg != "" {
 		return msg
+	}
+
+	msg = eventsInferedFailure(cr, client, ctx)
+	if msg != "" {
+		return msg
+	}
+
+	return ""
+}
+
+// eventsInferedFailure looks into the events of the session pod to
+// figure out whether a failure exists. The events are looked at with
+// the latest first, if an event occurs that indicates a scale-up or a
+// scheduled reason, then it is considered non-failing. If the first
+// event encountered is a "FailedScheduling" reason, then it indicates
+// a failure.
+func eventsInferedFailure(cr *amaltheadevv1alpha1.AmaltheaSession, client client.Reader, ctx context.Context) string {
+	const failedScheduling = "FailedScheduling"
+	const scheduled = "Scheduled"
+	const triggeredScaleUp = "TriggeredScaleUp"
+	log := log.FromContext(ctx)
+	events, err := cr.GetPodEvents(ctx, client)
+	if err != nil {
+		return fmt.Sprintf("%v", err)
+	}
+	if events == nil {
+		return ""
+	}
+	for _, v := range slices.Backward(events.Items) {
+		if v.Reason == failedScheduling {
+			log.Info("Found a FailedScheduling event", "event", v)
+			return fmt.Sprintf("Failed scheduling: %s", v.Message)
+		}
+		if v.Reason == scheduled || v.Reason == triggeredScaleUp {
+			log.Info("Found a Scheduled or TriggeredScaleUp event", "event", v)
+			return ""
+		}
 	}
 	return ""
 }
@@ -477,7 +515,7 @@ func (c ChildResourceUpdates) Status(
 
 	idle := false
 	idleSince := cr.Status.IdleSince
-	state, failMsg := c.State(cr, pod)
+	state, failMsg := c.State(cr, pod, r.Client, ctx)
 
 	if pod != nil {
 		oldEnough := false
