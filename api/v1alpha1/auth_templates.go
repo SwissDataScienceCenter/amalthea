@@ -43,7 +43,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: "/ping",
-				Port: intstr.FromInt32(oauth2ProxyPort),
+				Port: intstr.FromInt32(authenticatedPort),
 			},
 		}
 		oauth2ProxyContainer := v1.Container{
@@ -54,8 +54,8 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				RunAsNonRoot:             ptr.To(true),
 			},
 			Args: []string{
-				fmt.Sprintf("--upstream=%s", fmt.Sprintf("http://127.0.0.1:%d", authProxyPort)),
-				fmt.Sprintf("--http-address=:%d", oauth2ProxyPort),
+				fmt.Sprintf("--upstream=%s", fmt.Sprintf("http://127.0.0.1:%d", secondProxyPort)),
+				fmt.Sprintf("--http-address=:%d", authenticatedPort),
 				"--silence-ping-logging",
 				"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key,
 			},
@@ -84,6 +84,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				},
 			},
 		}
+		authContainer = as.get_rewrite_authn_proxy(secondProxyPort, AuthProxyMetaPort, as.Spec.Session.Port)
 
 		output.Containers = append(output.Containers, oauth2ProxyContainer)
 	} else if auth.Type == Token {
@@ -97,6 +98,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				},
 			},
 		})
+		authContainer = as.get_rewrite_authn_proxy(authenticatedPort, AuthProxyMetaPort, as.Spec.Session.Port)
 		authContainer.Args = []string{
 			"proxy",
 			"serve",
@@ -137,7 +139,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: "/ping",
-				Port: intstr.FromInt32(oauth2ProxyPort),
+				Port: intstr.FromInt32(authenticatedPort),
 			},
 		}
 		oauth2ProxyContainer := v1.Container{
@@ -190,9 +192,9 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				},
 			},
 		}
+		authContainer = as.get_rewrite_authn_proxy(secondProxyPort, AuthProxyMetaPort, as.Spec.Session.Port)
 		output.Containers = append(output.Containers, oauth2ProxyContainer)
 	}
-	authContainer = as.get_rewrite_authn_proxy(authProxyPort, AuthProxyMetaPort, as.Spec.Session.Port)
 	output.Containers = append(output.Containers, authContainer)
 	return output, nil
 }

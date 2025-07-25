@@ -32,9 +32,9 @@ const serviceMetaPortName string = prefix + "http-meta"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
-const authProxyPort int32 = 65535
+const authenticatedPort int32 = 65535
 const AuthProxyMetaPort int32 = 65534
-const oauth2ProxyPort int32 = 65533
+const secondProxyPort int32 = 65533
 
 var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
@@ -219,10 +219,7 @@ func (cr *AmaltheaSession) Service() v1.Service {
 	labels := labelsForAmaltheaSession(cr.Name)
 	targetPort := cr.Spec.Session.Port
 	if cr.Spec.Authentication != nil && cr.Spec.Authentication.Enabled {
-		targetPort = authProxyPort
-		if cr.Spec.Authentication.Type == Oidc || cr.Spec.Authentication.Type == OauthProxy {
-			targetPort = oauth2ProxyPort
-		}
+		targetPort = authenticatedPort
 	}
 
 	svc := v1.Service{
@@ -248,15 +245,6 @@ func (cr *AmaltheaSession) Service() v1.Service {
 		},
 	}
 	return svc
-}
-
-// The localhost path prefix URL leading straight to the session. It excludes the auth proxy and the ingress and
-// the host is always 127.0.0.1.
-func (cr *AmaltheaSession) localhostPathPrefixURL() *url.URL {
-	host := fmt.Sprintf("127.0.0.1:%d", cr.Spec.Session.Port)
-	path := cr.ingressPathPrefix()
-	output := url.URL{Host: host, Scheme: "http", Path: path}
-	return &output
 }
 
 // The path prefix for the session
@@ -599,7 +587,7 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		"authenticated_emails_file = \"/authorized_emails\"",
 		fmt.Sprintf("cookie_secret = \"%s\"", base64.URLEncoding.EncodeToString(cookieSecret)),
 	}
-	upstreamPort := authProxyPort
+	upstreamPort := secondProxyPort
 	upstreamConfig := map[string]any{
 		"upstreams": []map[string]any{
 			{
@@ -629,7 +617,7 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 			},
 		},
 		"server": map[string]string{
-			"bindAddress": fmt.Sprintf("0.0.0.0:%d", oauth2ProxyPort),
+			"bindAddress": fmt.Sprintf("0.0.0.0:%d", authenticatedPort),
 		},
 		"upstreamConfig": upstreamConfig,
 	}
