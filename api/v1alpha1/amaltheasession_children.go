@@ -220,6 +220,9 @@ func (cr *AmaltheaSession) Service() v1.Service {
 	targetPort := cr.Spec.Session.Port
 	if cr.Spec.Authentication != nil && cr.Spec.Authentication.Enabled {
 		targetPort = authProxyPort
+		if cr.Spec.Authentication.Type == Oidc || cr.Spec.Authentication.Type == OauthProxy {
+			targetPort = oauth2ProxyPort
+		}
 	}
 
 	svc := v1.Service{
@@ -596,7 +599,7 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		"authenticated_emails_file = \"/authorized_emails\"",
 		fmt.Sprintf("cookie_secret = \"%s\"", base64.URLEncoding.EncodeToString(cookieSecret)),
 	}
-	upstreamPort := as.Spec.Session.Port
+	upstreamPort := authProxyPort
 	upstreamConfig := map[string]any{
 		"upstreams": []map[string]any{
 			{
