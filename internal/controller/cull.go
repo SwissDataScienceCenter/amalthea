@@ -40,7 +40,7 @@ func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, a
 			return err
 		}
 		// then check whether we want to scale down the StatefulSet and do it
-		creationTimestamp := pod.ObjectMeta.GetCreationTimestamp()
+		creationTimestamp := pod.GetCreationTimestamp()
 		if needsScaleDown(creationTimestamp, status, culling) {
 			amaltheasession.Spec.Hibernated = true
 			err = r.Update(ctx, amaltheasession)

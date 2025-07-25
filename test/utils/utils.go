@@ -191,8 +191,8 @@ func LoadImageToKindClusterWithName(name string) error {
 // according to line breakers, and ignores the empty elements in it.
 func GetNonEmptyLines(output string) []string {
 	var res []string
-	elements := strings.Split(output, "\n")
-	for _, element := range elements {
+	elements := strings.SplitSeq(output, "\n")
+	for element := range elements {
 		if element != "" {
 			res = append(res, element)
 		}
@@ -207,7 +207,7 @@ func GetProjectDir() (string, error) {
 	if err != nil {
 		return wd, err
 	}
-	wd = strings.Replace(wd, "/test/e2e", "", -1)
+	wd = strings.ReplaceAll(wd, "/test/e2e", "")
 	return wd, nil
 }
 
@@ -404,7 +404,7 @@ func GetController(namespace string) (manager.Manager, error) {
 	field_ctx, cancel := context.WithTimeoutCause(
 		ctx,
 		30*time.Second,
-		errors.New("Timeout exceeded for setting up field indexers"),
+		errors.New("timeout exceeded for setting up field indexers"),
 	)
 	err = mgr.GetFieldIndexer().IndexField(
 		field_ctx,

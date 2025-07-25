@@ -184,7 +184,7 @@ func main() {
 	field_ctx, cancel := context.WithTimeoutCause(
 		ctx,
 		30*time.Second,
-		errors.New("Timeout exceeded for setting up field indexers"),
+		errors.New("timeout exceeded for setting up field indexers"),
 	)
 	err = mgr.GetFieldIndexer().IndexField(
 		field_ctx,
