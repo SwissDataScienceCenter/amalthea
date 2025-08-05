@@ -29,7 +29,8 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 
 	var authContainer v1.Container
 
-	if auth.Type == OauthProxy {
+	switch auth.Type {
+	case OauthProxy:
 		volName := fmt.Sprintf("%sproxy-configuration-secret", prefix)
 		output.Volumes = append(output.Volumes, v1.Volume{
 			Name: volName,
@@ -87,7 +88,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 		authContainer = as.get_rewrite_authn_proxy(secondProxyPort, AuthProxyMetaPort, as.Spec.Session.Port)
 
 		output.Containers = append(output.Containers, oauth2ProxyContainer)
-	} else if auth.Type == Token {
+	case Token:
 		volName := fmt.Sprintf("%sproxy-configuration-secret", prefix)
 		output.Volumes = append(output.Volumes, v1.Volume{
 			Name: volName,
@@ -114,7 +115,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 			},
 			volumeMounts...,
 		)
-	} else if auth.Type == Oidc {
+	case Oidc:
 		volNameFixedConfig := fmt.Sprintf("%s-fixed-proxy-configuration-secret", prefix)
 		volNameAuthorizedEmails := fmt.Sprintf("%s-authorized-emails-secret", prefix)
 		fixedConfigVol := v1.Volume{
@@ -194,6 +195,8 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 		}
 		authContainer = as.get_rewrite_authn_proxy(secondProxyPort, AuthProxyMetaPort, as.Spec.Session.Port)
 		output.Containers = append(output.Containers, oauth2ProxyContainer)
+	default:
+		return output, fmt.Errorf("unexpected authentication type %v when trying to template authentication containers", auth.Type)
 	}
 	output.Containers = append(output.Containers, authContainer)
 	return output, nil

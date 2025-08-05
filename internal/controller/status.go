@@ -90,7 +90,7 @@ func lastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error)
 		return time.Time{}, err
 	}
 	if resp.StatusCode != 200 {
-		return time.Time{}, fmt.Errorf("Couldn't get last request time due to status: %d", resp.StatusCode)
+		return time.Time{}, fmt.Errorf("couldn't get last request time due to status: %d", resp.StatusCode)
 	}
 
 	defer func() {

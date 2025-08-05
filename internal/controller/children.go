@@ -71,7 +71,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			// the object with the applied changes
 			desired, ok := any(c.Desired).(*networkingv1.Ingress)
 			if !ok {
-				return fmt.Errorf("Could not cast when reconciling")
+				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
 				log.Info("Creating an ingress")
@@ -101,7 +101,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
 			desired, ok := any(c.Desired).(*appsv1.StatefulSet)
 			if !ok {
-				return fmt.Errorf("Could not cast when reconciling")
+				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
 				log.Info("Creating a statefulset")
@@ -153,7 +153,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
 			desired, ok := any(c.Desired).(*v1.PersistentVolumeClaim)
 			if !ok {
-				return fmt.Errorf("Could not cast when reconciling")
+				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
 				log.Info("Creating a PVC")
@@ -186,7 +186,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
 			desired, ok := any(c.Desired).(*v1.Service)
 			if !ok {
-				return fmt.Errorf("Could not cast when reconciling")
+				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
 				log.Info("Creating a service")
@@ -220,7 +220,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
 			desired, ok := any(c.Desired).(*v1.Secret)
 			if !ok {
-				return fmt.Errorf("Could not cast when reconciling")
+				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
 				log.Info("Creating a secret")
@@ -248,7 +248,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 		})
 		return ChildResourceUpdate[T]{c.Current, res, err, nil}
 	default:
-		return ChildResourceUpdate[T]{Error: fmt.Errorf("Encountered an uknown child resource type")}
+		return ChildResourceUpdate[T]{Error: fmt.Errorf("encountered an uknown child resource type")}
 	}
 }
 
@@ -412,7 +412,7 @@ func Conditions(
 		case amaltheadevv1alpha1.AmaltheaSessionRoutingReady:
 			ingressExists := func() bool {
 				namespacedName := types.NamespacedName{Name: cr.Name, Namespace: cr.GetNamespace()}
-				err := r.Client.Get(ctx, namespacedName, &networkingv1.Ingress{})
+				err := r.Get(ctx, namespacedName, &networkingv1.Ingress{})
 				return err == nil
 			}
 			if cr.Spec.Ingress == nil && condition.Status == metav1.ConditionTrue {
@@ -495,11 +495,11 @@ func (c ChildResourceUpdates) Status(
 		}
 	} else {
 		events := v1.EventList{}
-		if err := r.Client.List(ctx,
+		if err := r.List(ctx,
 			&events,
 			client.MatchingFields{
-				"involvedObject.name":      cr.ObjectMeta.Name,
-				"involvedObject.namespace": cr.ObjectMeta.Namespace,
+				"involvedObject.name":      cr.Name,
+				"involvedObject.namespace": cr.Namespace,
 				"involvedObject.kind":      "StatefulSet",
 			},
 		); err == nil {

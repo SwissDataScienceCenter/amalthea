@@ -181,7 +181,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	if amaltheasession.NeedsDeletion() {
-		err = r.Client.Delete(ctx, amaltheasession)
+		err = r.Delete(ctx, amaltheasession)
 		log.Info("custom resource deleted")
 		return ctrl.Result{}, err
 	}
