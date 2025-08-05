@@ -40,11 +40,10 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				},
 			},
 		})
-		sessionURL := as.localhostPathPrefixURL().String()
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: "/ping",
-				Port: intstr.FromInt32(oauth2ProxyPort),
+				Port: intstr.FromInt32(authenticatedPort),
 			},
 		}
 		oauth2ProxyContainer := v1.Container{
@@ -55,8 +54,8 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				RunAsNonRoot:             ptr.To(true),
 			},
 			Args: []string{
-				fmt.Sprintf("--upstream=%s", sessionURL),
-				fmt.Sprintf("--http-address=:%d", oauth2ProxyPort),
+				fmt.Sprintf("--upstream=%s", fmt.Sprintf("http://127.0.0.1:%d", secondProxyPort)),
+				fmt.Sprintf("--http-address=:%d", authenticatedPort),
 				"--silence-ping-logging",
 				"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key,
 			},
@@ -85,7 +84,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				},
 			},
 		}
-		authContainer = as.get_rewrite_authn_proxy(authProxyPort, AuthProxyMetaPort, oauth2ProxyPort)
+		authContainer = as.get_rewrite_authn_proxy(secondProxyPort, AuthProxyMetaPort, as.Spec.Session.Port)
 
 		output.Containers = append(output.Containers, oauth2ProxyContainer)
 	} else if auth.Type == Token {
@@ -99,7 +98,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				},
 			},
 		})
-		authContainer = as.get_rewrite_authn_proxy(authProxyPort, AuthProxyMetaPort, as.Spec.Session.Port)
+		authContainer = as.get_rewrite_authn_proxy(authenticatedPort, AuthProxyMetaPort, as.Spec.Session.Port)
 		authContainer.Args = []string{
 			"proxy",
 			"serve",
@@ -140,7 +139,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 		probeHandler := v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: "/ping",
-				Port: intstr.FromInt32(oauth2ProxyPort),
+				Port: intstr.FromInt32(authenticatedPort),
 			},
 		}
 		oauth2ProxyContainer := v1.Container{
@@ -193,14 +192,14 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				},
 			},
 		}
-		authContainer = as.get_rewrite_authn_proxy(authProxyPort, AuthProxyMetaPort, oauth2ProxyPort)
+		authContainer = as.get_rewrite_authn_proxy(secondProxyPort, AuthProxyMetaPort, as.Spec.Session.Port)
 		output.Containers = append(output.Containers, oauth2ProxyContainer)
 	}
 	output.Containers = append(output.Containers, authContainer)
 	return output, nil
 }
 
-func (as *AmaltheaSession) get_rewrite_authn_proxy(listenPort int32, metaListenPort int32, oauth2proxyPort int32) v1.Container {
+func (as *AmaltheaSession) get_rewrite_authn_proxy(listenPort int32, metaListenPort int32, remotePort int32) v1.Container {
 	probeHandler := v1.ProbeHandler{
 		HTTPGet: &v1.HTTPGetAction{
 			Path: "/__amalthea__/health",
@@ -226,7 +225,7 @@ func (as *AmaltheaSession) get_rewrite_authn_proxy(listenPort int32, metaListenP
 			{Name: "AUTHPROXY_META_PORT", Value: fmt.Sprintf("%d", metaListenPort)},
 			// NOTE: The url for the remote has to not have a path at all, if it does, then the path
 			// in the url is appended to any path that is already there when the request comes in.
-			{Name: "AUTHPROXY_REMOTE", Value: fmt.Sprintf("http://127.0.0.1:%d", oauth2proxyPort)},
+			{Name: "AUTHPROXY_REMOTE", Value: fmt.Sprintf("http://127.0.0.1:%d", remotePort)},
 		},
 		ReadinessProbe: &v1.Probe{ProbeHandler: probeHandler},
 		LivenessProbe:  &v1.Probe{ProbeHandler: probeHandler},
