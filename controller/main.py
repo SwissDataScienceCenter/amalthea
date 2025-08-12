@@ -34,6 +34,12 @@ def register_jupyter_server_handlers(
 ) -> kopf.OperatorRegistry:
     logging.info("Populating regsitry")
     kopf.on.startup(registry=registry)(configure)
+    kopf.on.delete(
+        config.api_group,
+        config.api_version,
+        config.custom_resource_name,
+        registry=registry,
+    )(delete_fn)
     kopf.on.create(
         config.api_group,
         config.api_version,
@@ -43,12 +49,6 @@ def register_jupyter_server_handlers(
         backoff=config.KOPF_CREATE_BACKOFF,
         registry=registry,
     )(create_fn)
-    kopf.on.delete(
-        config.api_group,
-        config.api_version,
-        config.custom_resource_name,
-        registry=registry,
-    )(delete_fn)
     kopf.on.event(
         version=config.api_version,
         kind=config.custom_resource_name,
