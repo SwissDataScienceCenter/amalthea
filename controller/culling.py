@@ -4,6 +4,7 @@ import logging
 import requests
 from requests.exceptions import RequestException
 
+from controller.k8s_resources import get_urls
 from controller.utils import get_pod_metrics, parse_pod_metrics
 
 
@@ -43,7 +44,9 @@ def get_js_server_status(js_body):
     try:
         server_url = js_body["status"]["create_fn"]["fullServerURL"]
     except KeyError:
-        return None
+        server_url = get_urls(js_body)[1]
+        if server_url is None or len(server_url) == 0:
+            return None
 
     token = js_body["spec"]["auth"].get("token")
     payload = {} if not token else {"token": token}
