@@ -90,6 +90,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
     Watch the creation of jupyter server objects and create all
     the necessary k8s child resources which make the actual jupyter server.
     """
+    logging.info(f"Starting create_fn for resource {name}")
     api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     now = datetime.now(UTC).isoformat(timespec="seconds")
     try:
