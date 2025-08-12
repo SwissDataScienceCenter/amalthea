@@ -67,8 +67,10 @@ def create_namespaced_resource(namespace, body):
     Create a k8s resource given the namespace and the full resource object.
     """
     api = get_api(body["apiVersion"], body["kind"])
-    return api.create(namespace=namespace, body=body)
-
+    logging.info(f"Got the api for {body['kind']} for {body['metadata']['name']}")
+    res = api.create(namespace=namespace, body=body)
+    logging.info(f"Created resource {body['kind']} for {body['metadata']['name']}")
+    return res
 
 def configure(logger, settings, **_):
     """
@@ -136,7 +138,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
             labels=get_labels(name, uid, labels, child_key=child_key),
         )
         kopf.adopt(child_spec)
-        logging.info(f"create_fn: created namespaced resource for for {child_key} for {name}")
+        logging.info(f"create_fn: created namespaced resource for {child_key} for {name}")
         children_uids[child_key] = create_namespaced_resource(namespace=namespace, body=child_spec).metadata.uid
     
     output = {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
