@@ -44,7 +44,7 @@ def get_js_server_status(js_body):
     try:
         server_url = js_body["status"]["create_fn"]["fullServerURL"]
     except KeyError:
-        server_url = get_urls(js_body)[1]
+        server_url = get_urls(js_body["spec"])[1]
         if server_url is None or len(server_url) == 0:
             return None
 

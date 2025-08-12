@@ -241,7 +241,7 @@ class ServerStatus:
         hibernated = server.get("spec", {}).get("jupyterServer", {}).get("hibernated", False)
         server_url=server.get("status", {}).get("create_fn", {}).get("fullServerURL")
         if server_url is None or len(server_url) == 0:
-            server_url = get_urls(server)[1]
+            server_url = get_urls(server["spec"])[1]
         return cls(
             init_statuses=init_container_statuses,
             statuses=container_statuses,
