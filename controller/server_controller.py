@@ -93,6 +93,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
     logging.info(f"Starting create_fn for resource {name}")
     api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     now = datetime.now(UTC).isoformat(timespec="seconds")
+    logging.info(f"create_fn: got api for resource {name}")
     try:
         api.patch(
             namespace=namespace,
@@ -112,6 +113,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
         )
     except NotFoundError:
         pass
+    logging.info(f"create_fn: attempted patch for {name}")
 
     children_specs = get_children_specs(name, spec, logger)
 
@@ -122,6 +124,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
         children_specs["statefulset"]["spec"]["template"],
         labels=get_labels(name, uid, labels, is_main_pod=True),
     )
+    logging.info(f"create_fn: got child specs for {name}")
 
     # Add the labels to all child resources and create them in the cluster
     children_uids = {}
@@ -133,10 +136,12 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
             labels=get_labels(name, uid, labels, child_key=child_key),
         )
         kopf.adopt(child_spec)
-
+        logging.info(f"create_fn: created namespaced resource for for {child_key} for {name}")
         children_uids[child_key] = create_namespaced_resource(namespace=namespace, body=child_spec).metadata.uid
-
-    return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
+    
+    output = {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
+    logging.info(f"create_fn: completed for {name}")
+    return output
 
 
 def delete_fn(labels, body, namespace, name, **_):
