@@ -67,8 +67,10 @@ def create_namespaced_resource(namespace, body):
     Create a k8s resource given the namespace and the full resource object.
     """
     api = get_api(body["apiVersion"], body["kind"])
-    return api.create(namespace=namespace, body=body)
-
+    logging.info(f"Got the api for {body['kind']} for {body['metadata']['name']}")
+    res = api.create(namespace=namespace, body=body)
+    logging.info(f"Created resource {body['kind']} for {body['metadata']['name']}")
+    return res
 
 def configure(logger, settings, **_):
     """
@@ -90,8 +92,10 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
     Watch the creation of jupyter server objects and create all
     the necessary k8s child resources which make the actual jupyter server.
     """
+    logging.info(f"Starting create_fn for resource {name}")
     api = get_api(config.api_version, config.custom_resource_name, config.api_group)
     now = datetime.now(UTC).isoformat(timespec="seconds")
+    logging.info(f"create_fn: got api for resource {name}")
     try:
         api.patch(
             namespace=namespace,
@@ -111,6 +115,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
         )
     except NotFoundError:
         pass
+    logging.info(f"create_fn: attempted patch for {name}")
 
     children_specs = get_children_specs(name, spec, logger)
 
@@ -121,6 +126,7 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
         children_specs["statefulset"]["spec"]["template"],
         labels=get_labels(name, uid, labels, is_main_pod=True),
     )
+    logging.info(f"create_fn: got child specs for {name}")
 
     # Add the labels to all child resources and create them in the cluster
     children_uids = {}
@@ -132,13 +138,14 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
             labels=get_labels(name, uid, labels, child_key=child_key),
         )
         kopf.adopt(child_spec)
-
+        logging.info(f"create_fn: created namespaced resource for {child_key} for {name}")
         children_uids[child_key] = create_namespaced_resource(namespace=namespace, body=child_spec).metadata.uid
+    
+    output = {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
+    logging.info(f"create_fn: completed for {name}")
+    return output
 
-    return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 
-
-@kopf.on.delete(config.api_group, config.api_version, config.custom_resource_name)
 def delete_fn(labels, body, namespace, name, **_):
     """
     The jupyter server has been deleted.
