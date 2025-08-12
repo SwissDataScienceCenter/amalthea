@@ -288,8 +288,6 @@ class ServerStatus:
         ) or (self.events.get("statefulset", {}).get("message") == config.QUOTA_EXCEEDED_MESSAGE)
 
     def server_url_is_eventually_responsive(self, timeout_seconds: int = 5) -> bool:
-        if self.server_url is None:
-            return False
         start = datetime.now()
         while True:
             try:
