@@ -138,7 +138,6 @@ def create_fn(labels, logger, name, namespace, spec, uid, body, **_):
     return {"createdResources": children_uids, "fullServerURL": get_urls(spec)[1]}
 
 
-@kopf.on.delete(config.api_group, config.api_version, config.custom_resource_name)
 def delete_fn(labels, body, namespace, name, **_):
     """
     The jupyter server has been deleted.
