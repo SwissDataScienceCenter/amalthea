@@ -71,7 +71,7 @@ def get_js_server_status(js_body):
         # }
         res = res.json()
     except JSONDecodeError as err:
-        logging.warning(f"Could not parse js server status {res.text} for {url}, because: {err}")
+        logging.warning(f"Could not parse js server status {res.text[:10]} for {url}, because: {err}")
         return None
 
     if isinstance(res, dict):
