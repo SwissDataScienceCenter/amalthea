@@ -419,13 +419,13 @@ func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*
 	err := c.List(ctx,
 		&events,
 		client.MatchingFields{
-			"involvedObject.namespace": as.ObjectMeta.Namespace,
+			"involvedObject.namespace": as.Namespace,
 			"involvedObject.kind":      "Pod",
 			"involvedObject.name":      podName,
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("Cannot get pod events: %w", err)
+		return nil, fmt.Errorf("cannot get pod events: %w", err)
 	} else {
 		sort.Slice(events.Items, func(i, j int) bool {
 			t1 := eventTimestamp(events.Items[i])
