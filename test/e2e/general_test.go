@@ -386,14 +386,10 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			By("Checking if the custom resource was successfully created")
 			Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
 			By("Eventually the status should be failed and contain the error")
-			Consistently(func(g Gomega) {
-				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
-				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.NotReady))
-			}, "30s").WithContext(ctx).Should(Succeed())
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
-				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.NotReady))
-				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("the session cannot be scheduled due to"))
+				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.Failed))
+				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("Failed scheduling:"))
 				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("didn't match Pod's node affinity/selector"))
 			}).WithContext(ctx).WithTimeout(time.Minute * 3).Should(Succeed())
 		})
