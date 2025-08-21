@@ -545,4 +545,7 @@ type TunnelSpec struct {
 	// SecretName is the name of the Kubernetes Secret where the dynamically generated WSTUNNEL_SECRET
 	// will be stored and retrieved from by Amalthea for tunnel authentication.
 	SecretName string `json:"secretName,omitempty"`
+  // +optional
+  // Container specifies the container definition for the WebSocket tunnel.
+  Container *v1.Container `json:"container,omitempty"`
 }
