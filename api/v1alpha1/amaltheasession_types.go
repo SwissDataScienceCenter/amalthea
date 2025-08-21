@@ -177,6 +177,10 @@ type Session struct {
 	// +kubebuilder:default:={}
 	// The readiness probe to use on the session container
 	ReadinessProbe ReadinessProbe `json:"readinessProbe,omitempty"`
+	// +optional
+	// +kubebuilder:default:={}
+	// Configuration for a WebSocket tunnel, enabled by Amalthea for direct connectivity.
+	Tunnel *TunnelSpec `json:"tunnel,omitempty"`
 }
 
 type Ingress struct {
@@ -525,4 +529,20 @@ type ReadinessProbe struct {
 	// +optional
 	// The type of readiness probe
 	Type ReadinessProbeType `json:"type,omitempty"`
+}
+
+// TunnelSpec defines the configuration for a WebSocket tunnel within the session.
+type TunnelSpec struct {
+	// +kubebuilder:default:=false
+	// Enabled indicates whether the WebSocket tunnel feature should be active for the session.
+	Enabled bool `json:"enabled"`
+	// +kubebuilder:default:=5050
+	// +kubebuilder:validation:Minimum:=1024
+	// +kubebuilder:validation:Maximum:=65535
+	// Port is the internal TCP port on the session pod where the wstunnel server will listen.
+	Port int32 `json:"port,omitempty"`
+	// +optional
+	// SecretName is the name of the Kubernetes Secret where the dynamically generated WSTUNNEL_SECRET
+	// will be stored and retrieved from by Amalthea for tunnel authentication.
+	SecretName string `json:"secretName,omitempty"`
 }

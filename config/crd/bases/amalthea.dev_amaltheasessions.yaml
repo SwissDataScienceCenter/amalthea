@@ -6358,6 +6358,32 @@ spec:
                       Will strip the url path defined in URLPath above from all requests that reach the session.
                       This is useful for session frontends like Rstudio which cannot run on any path other than `/`
                     type: boolean
+                  tunnel:
+                    default: {}
+                    description: Configuration for a WebSocket tunnel, enabled by
+                      Amalthea for direct connectivity.
+                    properties:
+                      enabled:
+                        default: false
+                        description: Enabled indicates whether the WebSocket tunnel
+                          feature should be active for the session.
+                        type: boolean
+                      port:
+                        default: 5050
+                        description: Port is the internal TCP port on the session
+                          pod where the wstunnel server will listen.
+                        format: int32
+                        maximum: 65535
+                        minimum: 1024
+                        type: integer
+                      secretName:
+                        description: |-
+                          SecretName is the name of the Kubernetes Secret where the dynamically generated WSTUNNEL_SECRET
+                          will be stored and retrieved from by Amalthea for tunnel authentication.
+                        type: string
+                    required:
+                    - enabled
+                    type: object
                   urlPath:
                     default: /
                     description: |-
