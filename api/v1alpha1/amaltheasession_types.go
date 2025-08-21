@@ -33,7 +33,7 @@ import (
 type AmaltheaSessionSpec struct {
 	// +kubebuilder:default:="local"
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="location is immutable"
-	SessionLocation SessionLocation `json:"location"`
+	SessionLocation SessionLocation `json:"location,omitempty"`
 
 	// Specification for the main session container that the user will access and use
 	Session Session `json:"session"`
