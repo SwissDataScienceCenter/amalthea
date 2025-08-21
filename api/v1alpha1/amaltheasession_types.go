@@ -31,6 +31,10 @@ import (
 
 // AmaltheaSessionSpec defines the desired state of AmaltheaSession
 type AmaltheaSessionSpec struct {
+	// +kubebuilder:default:="local"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="location is immutable"
+	SessionLocation SessionLocation `json:"location"`
+
 	// Specification for the main session container that the user will access and use
 	Session Session `json:"session"`
 
@@ -536,3 +540,9 @@ type ReadinessProbe struct {
 	// The type of readiness probe
 	Type ReadinessProbeType `json:"type,omitempty"`
 }
+
+// +kubebuilder:validation:Enum={local,remote}
+type SessionLocation string
+
+const Local SessionLocation = "local"
+const Remote ReconcileStrategy = "remote"
