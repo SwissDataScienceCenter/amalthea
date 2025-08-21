@@ -42,6 +42,7 @@
         chartpress
         poetry
         azure-cli
+        kubernetes-helm
       ];
     in {
       formatter = pkgs.alejandra;
