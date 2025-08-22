@@ -28,9 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"flag"
-	"path/filepath"
-
 	. "github.com/onsi/ginkgo/v2" //nolint:golint,revive
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
@@ -38,8 +35,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -321,20 +316,8 @@ func GetK8sClient(ctx context.Context, namespace string) (client.Client, error) 
 	if err != nil {
 		return nil, err
 	}
-	var kubeconfig *string
-	testFlags := flag.NewFlagSet("", flag.PanicOnError)
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = testFlags.String(
-			"kubeconfig",
-			filepath.Join(home, ".kube", "config"),
-			"(optional) absolute path to the kubeconfig file",
-		)
-	} else {
-		kubeconfig = testFlags.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	}
-	flag.Parse()
 
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	config, err := ctrl.GetConfig()
 	if err != nil {
 		return nil, err
 	}

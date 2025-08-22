@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // NOTE: changing these constant values will result in breaking changes or restarts in existing sessions when a new operator is released
@@ -388,13 +390,50 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
 	pod := v1.Pod{}
-	podName := fmt.Sprintf("%s-0", cr.Name)
+	podName := cr.PodName()
 	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
 	err := clnt.Get(ctx, key, &pod)
 	if err != nil {
 		return nil, err
 	}
 	return &pod, err
+}
+
+// FirstTimestamp maybe null or eventTime is null… then it is
+// available, but defaulted to their "zero" values…
+func eventTimestamp(ev v1.Event) time.Time {
+	t := ev.EventTime.Time
+	if t.IsZero() {
+		t = ev.FirstTimestamp.Time
+	}
+	return t
+}
+
+// GetPodEvents finds all events where the pod of the given session is
+// involved in. It will be sorted by timestamp
+func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*v1.EventList, error) {
+	log := log.FromContext(ctx)
+	events := v1.EventList{}
+	podName := as.PodName()
+	log.Info("Getting event list for pod", "pod", podName)
+	err := c.List(ctx,
+		&events,
+		client.MatchingFields{
+			"involvedObject.namespace": as.Namespace,
+			"involvedObject.kind":      "Pod",
+			"involvedObject.name":      podName,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get pod events: %w", err)
+	} else {
+		sort.Slice(events.Items, func(i, j int) bool {
+			t1 := eventTimestamp(events.Items[i])
+			t2 := eventTimestamp(events.Items[j])
+			return t1.Before(t2)
+		})
+		return &events, nil
+	}
 }
 
 // Returns the list of all the secrets used in this CR
