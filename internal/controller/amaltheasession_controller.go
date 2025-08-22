@@ -48,9 +48,9 @@ type AmaltheaSessionReconciler struct {
 // finalizers
 const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
 
-// +kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions/finalizers,verbs=update
+// +kubebuilder:rbac:groups=amalthea.dev,resources=hpcamaltheasessions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=amalthea.dev,resources=hpcamaltheasessions/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=amalthea.dev,resources=hpcamaltheasessions/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=list;watch;delete;create;patch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch

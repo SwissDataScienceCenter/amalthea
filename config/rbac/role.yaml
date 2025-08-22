@@ -7,7 +7,7 @@ rules:
 - apiGroups:
   - amalthea.dev
   resources:
-  - amaltheasessions
+  - hpcamaltheasessions
   verbs:
   - create
   - delete
@@ -19,13 +19,13 @@ rules:
 - apiGroups:
   - amalthea.dev
   resources:
-  - amaltheasessions/finalizers
+  - hpcamaltheasessions/finalizers
   verbs:
   - update
 - apiGroups:
   - amalthea.dev
   resources:
-  - amaltheasessions/status
+  - hpcamaltheasessions/status
   verbs:
   - get
   - patch
