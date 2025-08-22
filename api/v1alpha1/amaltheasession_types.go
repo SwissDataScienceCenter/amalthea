@@ -404,6 +404,10 @@ type AmaltheaSessionStatus struct {
 	IdleSince metav1.Time `json:"idleSince,omitempty"`
 	// +kubebuilder:validation:Format:=date-time
 	FailingSince metav1.Time `json:"failingSince,omitempty"`
+
+	// +kubebuilder:validation:format:=date-time
+	FailedSchedulingSince metav1.Time `json:"failedSchedulingSince,omitempty"`
+
 	// +kubebuilder:validation:Format:=date-time
 	HibernatedSince metav1.Time `json:"hibernatedSince,omitempty"`
 	// If the state is failed then the message will contain information about what went wrong, otherwise it is empty

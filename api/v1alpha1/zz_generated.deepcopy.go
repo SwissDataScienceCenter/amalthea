@@ -200,6 +200,7 @@ func (in *AmaltheaSessionStatus) DeepCopyInto(out *AmaltheaSessionStatus) {
 	out.InitContainerCounts = in.InitContainerCounts
 	in.IdleSince.DeepCopyInto(&out.IdleSince)
 	in.FailingSince.DeepCopyInto(&out.FailingSince)
+	in.FailedSchedulingsince.DeepCopyInto(&out.FailedSchedulingsince)
 	in.HibernatedSince.DeepCopyInto(&out.HibernatedSince)
 }
 
