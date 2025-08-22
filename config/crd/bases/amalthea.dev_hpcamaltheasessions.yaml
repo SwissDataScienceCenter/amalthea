@@ -11,6 +11,8 @@ spec:
     kind: HpcAmaltheaSession
     listKind: HpcAmaltheaSessionList
     plural: hpcamaltheasessions
+    shortNames:
+    - hams
     singular: hpcamaltheasession
   scope: Namespaced
   versions:
