@@ -58,7 +58,7 @@ type ChildResourceUpdates struct {
 // https://github.com/kubernetes-sigs/metrics-server/blob/9ebbad973db2a54193712c4d9292bbe3eaa849dc/pkg/storage/pod.go#L31
 const freshContainerMinimalAge = 15 * time.Second
 
-func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
+func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.HpcAmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
 	log := log.FromContext(ctx)
 	if c.Current == nil {
 		return ChildResourceUpdate[T]{}
@@ -252,7 +252,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 	}
 }
 
-func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResources, error) {
+func NewChildResources(cr *amaltheadevv1alpha1.HpcAmaltheaSession) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredService := cr.Service()
@@ -289,7 +289,7 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResources,
 	return output, nil
 }
 
-func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResourceUpdates, error) {
+func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.HpcAmaltheaSession) (ChildResourceUpdates, error) {
 	output := ChildResourceUpdates{
 		StatefulSet: c.StatefulSet.Reconcile(ctx, clnt, cr),
 		PVC:         c.PVC.Reconcile(ctx, clnt, cr),
@@ -328,7 +328,7 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	return stsReady && podReady
 }
 
-func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
+func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.HpcAmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
 	msg := c.failureMessage(pod)
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
@@ -386,7 +386,7 @@ func Conditions(
 	state amaltheadevv1alpha1.State,
 	ctx context.Context,
 	r *AmaltheaSessionReconciler,
-	cr *amaltheadevv1alpha1.AmaltheaSession,
+	cr *amaltheadevv1alpha1.HpcAmaltheaSession,
 ) []amaltheadevv1alpha1.AmaltheaSessionCondition {
 	conditions := cr.Status.Conditions
 	if len(conditions) == 0 {
@@ -463,7 +463,7 @@ func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.Amalthe
 func (c ChildResourceUpdates) Status(
 	ctx context.Context,
 	r *AmaltheaSessionReconciler,
-	cr *amaltheadevv1alpha1.AmaltheaSession,
+	cr *amaltheadevv1alpha1.HpcAmaltheaSession,
 ) amaltheadevv1alpha1.AmaltheaSessionStatus {
 	log := log.FromContext(ctx)
 

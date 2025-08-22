@@ -54,7 +54,7 @@ func podIsReady(pod *v1.Pod) bool {
 	return initCounts.Ok() && counts.Ok() && phaseOk
 }
 
-func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *amaltheadevv1alpha1.AmaltheaSession) (v1.ResourceList, error) {
+func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *amaltheadevv1alpha1.HpcAmaltheaSession) (v1.ResourceList, error) {
 	podName := fmt.Sprintf("%s-0", cr.Name)
 	podMetricses, err := clnt.PodMetricses(cr.Namespace).List(
 		ctx,
@@ -82,7 +82,7 @@ func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *am
 	return nil, fmt.Errorf("could not find the metrics for the session container %s", amaltheadevv1alpha1.SessionContainerName)
 }
 
-func lastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error) {
+func lastRequestTime(cr *amaltheadevv1alpha1.HpcAmaltheaSession) (time.Time, error) {
 	url := fmt.Sprintf("http://%s:%d/request_stats", cr.Service().Name, amaltheadevv1alpha1.AuthProxyMetaPort)
 
 	resp, err := http.Get(url)
@@ -110,7 +110,7 @@ func lastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error)
 func getIdleState(
 	ctx context.Context,
 	r *AmaltheaSessionReconciler,
-	cr *amaltheadevv1alpha1.AmaltheaSession,
+	cr *amaltheadevv1alpha1.HpcAmaltheaSession,
 ) (metav1.Time, bool) {
 	log := log.FromContext(ctx)
 	if cr == nil {
