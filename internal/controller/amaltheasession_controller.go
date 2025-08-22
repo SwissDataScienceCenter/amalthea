@@ -72,7 +72,7 @@ const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
 func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	amaltheasession := &amaltheadevv1alpha1.AmaltheaSession{}
+	amaltheasession := &amaltheadevv1alpha1.HpcAmaltheaSession{}
 	err := r.Get(ctx, req.NamespacedName, amaltheasession)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -200,7 +200,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return ctrl.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
 }
 
-func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession) error {
+func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amaltheadevv1alpha1.HpcAmaltheaSession) error {
 	adoptedSecrets := cr.AdoptedSecrets()
 	if len(adoptedSecrets.Items) == 0 {
 		log := log.FromContext(ctx)
@@ -224,7 +224,7 @@ func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amalt
 // SetupWithManager sets up the controller with the Manager.
 func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&amaltheadevv1alpha1.AmaltheaSession{}).
+		For(&amaltheadevv1alpha1.HpcAmaltheaSession{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.Service{}).
 		Owns(&networkingv1.Ingress{}).
