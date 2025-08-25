@@ -5988,6 +5988,11 @@ spec:
                 type: array
               location:
                 default: local
+                description: |-
+                  Specifies whether the process running the user's session is local or remote.
+                  - A local session runs as a container in the same pod as where the AmaltheaSession is defined and running.
+                  - A remote session runs as a remote process on an external compute resource.
+                    The remote process is controlled by the "session_controller (TBC)" container in the session pod.
                 enum:
                 - local
                 - remote
