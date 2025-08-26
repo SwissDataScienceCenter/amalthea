@@ -331,17 +331,21 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			}).WithContext(ctx).WithTimeout(time.Minute * 3).Should(Succeed())
 		})
 
-		It("should fail when it's not schedulable due to insufficient CPU + no autoscaling events", func(ctx SpecContext) {
+		It("should not fail when it is not schedulable due to ", func(ctx SpecContext) {
 			amaltheasession.Spec.Session.Resources = corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{"cpu": resource.MustParse("10000")},
 			}
 			By("Checking if the custom resource was successfully created")
 			Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
 			By("Eventually the status should be failed and contain the error")
+			Consistently(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.NotReady))
+			}, "30s").WithContext(ctx).Should(Succeed())
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
-				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.Failed))
-				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("Failed scheduling:"))
+				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.NotReady))
+				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("the session cannot be scheduled due to"))
 				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("Insufficient cpu"))
 			}).WithContext(ctx).WithTimeout(time.Minute * 3).Should(Succeed())
 		})
@@ -386,10 +390,14 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			By("Checking if the custom resource was successfully created")
 			Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
 			By("Eventually the status should be failed and contain the error")
+			Consistently(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
+				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.NotReady))
+			}, "30s").WithContext(ctx).Should(Succeed())
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, typeNamespacedName, amaltheasession)).To(Succeed())
-				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.Failed))
-				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("Failed scheduling:"))
+				g.Expect(amaltheasession.Status.State).To(Equal(amaltheadevv1alpha1.NotReady))
+				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("the session cannot be scheduled due to"))
 				g.Expect(amaltheasession.Status.Error).To(ContainSubstring("didn't match Pod's node affinity/selector"))
 			}).WithContext(ctx).WithTimeout(time.Minute * 3).Should(Succeed())
 		})
