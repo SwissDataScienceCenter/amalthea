@@ -331,8 +331,8 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	return stsReady && podReady
 }
 
-func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod, client client.Client, ctx context.Context) (amaltheadevv1alpha1.State, string) {
-	msg := c.failureMessage(pod, cr, ctx)
+func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
+	msg := c.failureMessage(pod)
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
 		return amaltheadevv1alpha1.NotReady, ""
@@ -347,7 +347,7 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	}
 }
 
-func (c ChildResourceUpdates) failureMessage(pod *v1.Pod, cr *amaltheadevv1alpha1.AmaltheaSession, ctx context.Context) string {
+func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
 	msg := podFailureReason(pod)
 	if msg != "" {
 		return msg
@@ -415,7 +415,7 @@ func EventsInferedState(cr *amaltheadevv1alpha1.AmaltheaSession, client client.R
 			if cr.Status.FailedSchedulingSince.IsZero() {
 				return EisrInitiallyFailed, nil
 			} else if time.Since(cr.Status.FailedSchedulingSince.Time) >= maxWaitForClearFailedScheduling {
-				return EisrFinallyFailed, fmt.Errorf("Failed scheduling: %s", v.Message)
+				return EisrFinallyFailed, fmt.Errorf("failed scheduling: %s", v.Message)
 			} else {
 				return EisrTemporaryFailed, nil
 			}
@@ -536,10 +536,10 @@ func (c ChildResourceUpdates) Status(
 	idle := false
 	idleSince := cr.Status.IdleSince
 	failedSchedulingSince := cr.Status.FailedSchedulingSince
-	state, failMsg := c.State(cr, pod, r.Client, ctx)
+	state, failMsg := c.State(cr, pod)
 
 	if state == amaltheadevv1alpha1.NotReady {
-		var zero time.Time // helper to explicitely reset to the "zero" value
+		var zero time.Time // helper to explicitly reset to the "zero" value
 		result, err := EventsInferedState(cr, r.Client, ctx)
 		switch result {
 		case EisrFinallyFailed:

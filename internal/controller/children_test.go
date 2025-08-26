@@ -113,7 +113,7 @@ func TestEventsInferredStateWhereFailedSchedulingTimeoutExceeded(t *testing.T) {
 	assert.False(t, session.Status.FailedSchedulingSince.IsZero())
 	result, err := EventsInferedState(&session, client, context.TODO())
 	assert.Equal(t, EisrFinallyFailed, result)
-	assert.Contains(t, err.Error(), "Failed scheduling:")
+	assert.Contains(t, err.Error(), "failed scheduling:")
 }
 
 func TestEventsInferredStateWhereScheduled(t *testing.T) {
