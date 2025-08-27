@@ -59,7 +59,7 @@ type ChildResourceUpdates struct {
 // https://github.com/kubernetes-sigs/metrics-server/blob/9ebbad973db2a54193712c4d9292bbe3eaa849dc/pkg/storage/pod.go#L31
 const freshContainerMinimalAge = 15 * time.Second
 
-const maxWaitForClearFailedScheduling = 2 * time.Minute
+const maxWaitForClearFailedScheduling = 90 * time.Second
 
 func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
 	log := log.FromContext(ctx)
@@ -411,17 +411,23 @@ func EventsInferedState(cr *amaltheadevv1alpha1.AmaltheaSession, client client.R
 	}
 	for _, v := range slices.Backward(events.Items) {
 		if v.Reason == failedScheduling {
-			log.Info("Found a FailedScheduling event", "event", v)
+			var waitedTime time.Duration
+			if !cr.Status.FailedSchedulingSince.IsZero() {
+				waitedTime = time.Since(cr.Status.FailedSchedulingSince.Time)
+			}
 			if cr.Status.FailedSchedulingSince.IsZero() {
+				log.Info("Found FailedScheduling event, initially failing", "event", v.Message)
 				return EisrInitiallyFailed, nil
-			} else if time.Since(cr.Status.FailedSchedulingSince.Time) >= maxWaitForClearFailedScheduling {
+			} else if waitedTime >= maxWaitForClearFailedScheduling {
+				log.Info("Found FailedScheduling event, finally failing", "waited", waitedTime)
 				return EisrFinallyFailed, fmt.Errorf("failed scheduling: %s", v.Message)
 			} else {
+				log.Info("Found FailedScheduling event, temporary failing", "event", v.Message, "waiting", waitedTime)
 				return EisrTemporaryFailed, nil
 			}
 		}
 		if v.Reason == scheduled || v.Reason == triggeredScaleUp {
-			log.Info("Found a Scheduled or TriggeredScaleUp event", "event", v)
+			log.Info("Found a Scheduled or TriggeredScaleUp event", "event", v.Message)
 			return EisrAutoScheduling, nil
 		}
 	}
@@ -545,7 +551,6 @@ func (c ChildResourceUpdates) Status(
 		case EisrFinallyFailed:
 			state = amaltheadevv1alpha1.Failed
 			failMsg = err.Error()
-			failedSchedulingSince = metav1.NewTime(zero)
 		case EisrInitiallyFailed:
 			failedSchedulingSince = metav1.NewTime(time.Now())
 		case EisrAutoScheduling:
