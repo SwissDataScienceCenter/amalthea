@@ -11,7 +11,7 @@ controllerManager:
           - ALL
     image:
       repository: renku/amalthea-sessions
-      tag: 0.20.1-0.dev.git.334.hb960f7f
+      tag: latest
     resources:
       limits:
         cpu: 500m
@@ -44,4 +44,4 @@ rcloneStorageClass: csi-rclone-secret-annotation
 sidecars:
   image:
     repository: renku/sidecars
-    tag: 0.20.1-0.dev.git.334.hb960f7f
+    tag: latest
