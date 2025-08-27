@@ -76,9 +76,9 @@ func (a *FirecrestClientCredentialsAuth) refreshAccessToken() (token string, err
 }
 
 // Response keys
-// "access_token"
-// "expires_in"
-// "refresh_expires_in"
-// "token_type"
-// "not-before-policy"
-// "scope"
+// "access_token" string
+// "expires_in" int
+// "refresh_expires_in" // will not use
+// "token_type" // will not use
+// "not-before-policy" // will not use
+// "scope" // will not use
