@@ -107,7 +107,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	echo "{{- end }}" >> $(HELM_CRD_TEMPLATE)
 
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen go-generate ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: fmt
@@ -139,6 +139,12 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 firecrest-apispec:
 	curl -L https://eth-cscs.github.io/firecrest-v2/openapi/openapi-$(FIRECREST_API_VERSION).yaml -o internal/remote/firecrest/openapi_spec_original.yaml
 	sed -e "s/type: 'null'/{ type: object, nullable: true }/g" internal/remote/firecrest/openapi_spec_original.yaml > internal/remote/firecrest/openapi_spec_downgraded.yaml
+
+.PHONY: go-generate
+go-generate: internal/remote/firecrest/firecrest_gen.go
+
+internal/remote/firecrest/firecrest_gen.go: internal/remote/firecrest/openapi_spec_downgraded.yaml
+	go generate internal/remote/firecrest/firecrest.go
 
 FIRECREST_API_VERSION ?= 2.3.1
 

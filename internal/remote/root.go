@@ -17,8 +17,7 @@ limitations under the License.
 package remote
 
 import (
-	"log"
-
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/server"
 	"github.com/spf13/cobra"
 )
 
@@ -36,20 +35,20 @@ func Command() (*cobra.Command, error) {
 	}
 
 	cmd.Flags().StringVar(&api, apiFlag, "firecrest", "the type of remote API used by the controller")
-	err := cmd.MarkFlagRequired(apiFlag)
-	if err != nil {
-		return nil, err
-	}
+	// err := cmd.MarkFlagRequired(apiFlag)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	cmd.Flags().StringVar(&apiURLStr, apiURLFlag, "", "the remote API URL")
-	err = cmd.MarkFlagRequired(apiURLFlag)
-	if err != nil {
-		return nil, err
-	}
+	// err = cmd.MarkFlagRequired(apiURLFlag)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return cmd, nil
 }
 
 func run(cmd *cobra.Command, args []string) {
-	log.Fatal("Not implemented yet")
+	server.Start()
 }
