@@ -22,11 +22,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const apiFlag = "api"
+const apiURLFlag = "api-url"
+
+var api string
+var apiURLStr string
+
 func Command() (*cobra.Command, error) {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Runs the remote session controller",
 		Run:   run,
+	}
+
+	cmd.Flags().StringVar(&api, apiFlag, "firecrest", "the type of remote API used by the controller")
+	err := cmd.MarkFlagRequired(apiFlag)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd.Flags().StringVar(&apiURLStr, apiURLFlag, "", "the remote API URL")
+	err = cmd.MarkFlagRequired(apiURLFlag)
+	if err != nil {
+		return nil, err
 	}
 
 	return cmd, nil
