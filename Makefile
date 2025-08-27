@@ -135,6 +135,13 @@ lint: golangci-lint ## Run golangci-lint linter & yamllint
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
+.PHONY: firecrest-apispec
+firecrest-apispec:
+	curl -L https://eth-cscs.github.io/firecrest-v2/openapi/openapi-$(FIRECREST_API_VERSION).yaml -o internal/remote/firecrest/openapi_spec_original.yaml
+	sed -e "s/type: 'null'/{ type: object, nullable: true }/g" internal/remote/firecrest/openapi_spec_original.yaml > internal/remote/firecrest/openapi_spec_downgraded.yaml
+
+FIRECREST_API_VERSION ?= 2.3.1
+
 ##@ Build
 
 .PHONY: build
