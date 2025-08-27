@@ -412,7 +412,7 @@ type AmaltheaSessionStatus struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:shortName=ams;amss
+// +kubebuilder:resource:shortName=hams
 // +kubebuilder:subresource:status
 
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=`.status.state`,description="The overall status of the session."
@@ -420,8 +420,8 @@ type AmaltheaSessionStatus struct {
 // +kubebuilder:printcolumn:name="Total",type="string",JSONPath=`.status.containerCounts.total`,description="The total numeber of containers in the session, disregarding init containers."
 // +kubebuilder:printcolumn:name="Idle",type="boolean",JSONPath=`.status.idle`,description="Whether the session is idle or not."
 // +kubebuilder:printcolumn:name="URL",type="string",JSONPath=`.status.url`,description="The URL where the session can be accessed."
-// AmaltheaSession is the Schema for the amaltheasessions API
-type AmaltheaSession struct {
+// HpcAmaltheaSession is the Schema for the amaltheasessions API
+type HpcAmaltheaSession struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
@@ -432,11 +432,11 @@ type AmaltheaSession struct {
 
 // +kubebuilder:object:root=true
 
-// AmaltheaSessionList contains a list of AmaltheaSession
-type AmaltheaSessionList struct {
+// HpcAmaltheaSessionList contains a list of AmaltheaSession
+type HpcAmaltheaSessionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AmaltheaSession `json:"items"`
+	Items           []HpcAmaltheaSession `json:"items"`
 }
 
 type AmaltheaSessionConditionType string
@@ -458,10 +458,10 @@ type AmaltheaSessionCondition struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&AmaltheaSession{}, &AmaltheaSessionList{})
+	SchemeBuilder.Register(&HpcAmaltheaSession{}, &HpcAmaltheaSessionList{})
 }
 
-func (a *AmaltheaSession) GetURLString() string {
+func (a *HpcAmaltheaSession) GetURLString() string {
 	sessionURL := a.GetURL()
 	if sessionURL == nil {
 		return "None"
@@ -469,7 +469,7 @@ func (a *AmaltheaSession) GetURLString() string {
 	return sessionURL.String()
 }
 
-func (a *AmaltheaSession) GetURL() *url.URL {
+func (a *HpcAmaltheaSession) GetURL() *url.URL {
 	if a.Spec.Ingress == nil || a.Spec.Ingress.Host == "" {
 		return nil
 	}
@@ -491,7 +491,7 @@ func (a *AmaltheaSession) GetURL() *url.URL {
 	return &sessionURL
 }
 
-func (a *AmaltheaSession) GetHealthcheckURL() *url.URL {
+func (a *HpcAmaltheaSession) GetHealthcheckURL() *url.URL {
 	healthcheckURL := a.GetURL()
 	if healthcheckURL != nil {
 		return healthcheckURL
