@@ -545,7 +545,6 @@ func (c ChildResourceUpdates) Status(
 	state, failMsg := c.State(cr, pod)
 
 	if state == amaltheadevv1alpha1.NotReady {
-		var zero time.Time // helper to explicitly reset to the "zero" value
 		result, err := EventsInferedState(cr, r.Client, ctx)
 		switch result {
 		case EisrFinallyFailed:
@@ -555,7 +554,7 @@ func (c ChildResourceUpdates) Status(
 			failedSchedulingSince = metav1.NewTime(time.Now())
 		case EisrAutoScheduling:
 			// reset the failedSchedulingSince when a scheduling/trigger-scaleup event occurs
-			failedSchedulingSince = metav1.NewTime(zero)
+			failedSchedulingSince = metav1.Time{}
 		default:
 		}
 	}
