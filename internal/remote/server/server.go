@@ -19,38 +19,51 @@ package server
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"time"
 
-	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest"
-	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest/auth"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	glog "github.com/labstack/gommon/log"
 )
 
 func Start() {
-	server, err := newServer()
+	// Logging setup
+	slog.SetDefault(jsonLogger)
+
+	cfg, err := config.GetConfig()
 	if err != nil {
-		log.Fatalln("failed to create server: ", err)
+		slog.Error("failed to load configuration", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("loaded configuration", "config", cfg)
+	err = cfg.Validate()
+	if err != nil {
+		slog.Error("invalid configuration", "error", err)
+		os.Exit(1)
 	}
 
-	// TODO: configure
-	var port = 8080
-	address := fmt.Sprintf(":%d", port)
+	server, err := newServer()
+	if err != nil {
+		slog.Error("failed to create server", "error", err)
+		os.Exit(1)
+	}
+
+	address := fmt.Sprintf(":%d", cfg.ServerPort)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	// Start server
 	go func() {
 		if err := server.Start(address); err != nil && err != http.ErrServerClosed {
-			server.Logger.Fatal("shutting down the server")
+			slog.Error("shutting down the server gracefully failed", "error", err)
+			os.Exit(1)
 		}
 	}()
+	slog.Info(fmt.Sprintf("http server started on %s", address))
 
 	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 60 seconds.
 	<-ctx.Done()
@@ -58,40 +71,46 @@ func Start() {
 	defer cancel()
 	// TODO: Other cleanup actions here
 	if err := server.Shutdown(ctx); err != nil {
-		server.Logger.Fatal(err)
+		slog.Error("shutting down the server gracefully failed", "error", err)
+		os.Exit(1)
 	}
 }
+
+var logLevel *slog.LevelVar = new(slog.LevelVar)
+var jsonLogger *slog.Logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 
 func newServer() (server *echo.Echo, err error) {
 	e := echo.New()
 
+	e.HideBanner = true
+	e.HidePort = true
+
 	e.Use(middleware.Recover())
-	e.Logger.SetLevel(glog.DEBUG)
 
-	firecrestAPIURL, err := url.Parse("https://api.cscs.ch/hpc/firecrest/v2/")
-	if err != nil {
-		return nil, err
-	}
-	clientID := os.Getenv("FIRECREST_CLIENT_ID")
-	clientSecret := os.Getenv("FIRECREST_CLIENT_SECRET")
-	firecrestAuth, err := auth.NewFirecrestClientCredentialsAuth("https://auth.cscs.ch/auth/realms/firecrest-clients/protocol/openid-connect/token", clientID, clientSecret)
-	if err != nil {
-		return nil, err
-	}
-	firecrestClient, err := firecrest.NewFirecrestClient(firecrestAPIURL, firecrest.WithAuth(firecrestAuth))
-	if err != nil {
-		return nil, err
-	}
-	controller, err := firecrest.NewFirecrestRemoteSessionController(firecrestClient, "eiger")
-	if err != nil {
-		return nil, err
-	}
+	// firecrestAPIURL, err := url.Parse("https://api.cscs.ch/hpc/firecrest/v2/")
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// clientID := os.Getenv("FIRECREST_CLIENT_ID")
+	// clientSecret := os.Getenv("FIRECREST_CLIENT_SECRET")
+	// firecrestAuth, err := auth.NewFirecrestClientCredentialsAuth("https://auth.cscs.ch/auth/realms/firecrest-clients/protocol/openid-connect/token", clientID, clientSecret)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// firecrestClient, err := firecrest.NewFirecrestClient(firecrestAPIURL, firecrest.WithAuth(firecrestAuth))
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// controller, err := firecrest.NewFirecrestRemoteSessionController(firecrestClient, "eiger")
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	fmt.Println("running system check...")
-	err = controller.CheckSystemAccess(context.Background())
-	if err != nil {
-		return nil, err
-	}
+	// fmt.Println("running system check...")
+	// err = controller.CheckSystemAccess(context.Background())
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	e.GET("/", func(c echo.Context) error {
 		return c.String(http.StatusOK, "Remote session controller: OK")
