@@ -86,7 +86,7 @@ func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *am
 	return nil, fmt.Errorf("could not find the metrics for the session container %s", amaltheadevv1alpha1.SessionContainerName)
 }
 
-func lastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error) {
+func getLastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error) {
 	url := fmt.Sprintf("http://%s:%d/request_stats", cr.Service().Name, amaltheadevv1alpha1.AuthProxyMetaPort)
 
 	resp, err := http.Get(url)
@@ -145,12 +145,11 @@ func getIdleState(
 	}
 
 	requestIdle := Unknown
-	rt, err := lastRequestTime(cr)
+	lastRequesTime, err := getLastRequestTime(cr)
 	if err != nil {
 		log.Info("Request time check returned an error when checking idleness", "error", err)
 	} else {
-		rtAge := time.Now().Sub(rt)
-		if rtAge >= lastRequestAgeThreshold {
+		if time.Since(lastRequesTime) >= lastRequestAgeThreshold {
 			requestIdle = Idle
 		} else {
 			requestIdle = NotIdle
@@ -178,7 +177,7 @@ func getIdleState(
 		idleSince = metav1.Time{}
 	}
 
-	log.Info("session idle check", "idle", idle, "session", cr.Name, "cpuUsage", cpuUsage, "cpuUsageThreshold", cpuUsageIdlenessThreshold, "lastRequestTime", rt, "lastRequestAgeThreshold", lastRequestAgeThreshold)
+	log.Info("session idle check", "idle", idle, "session", cr.Name, "cpuUsage", cpuUsage, "cpuUsageThreshold", cpuUsageIdlenessThreshold, "lastRequestTime", lastRequesTime, "lastRequestAgeThreshold", lastRequestAgeThreshold)
 
 	return idleSince, idle
 }
