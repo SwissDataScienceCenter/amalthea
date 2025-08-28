@@ -46,7 +46,27 @@ func NewFirecrestRemoteSessionController(client *FirecrestClient, systemName str
 	return c, nil
 }
 
+func (c *FirecrestRemoteSessionController) CheckSystemAccess(ctx context.Context) error {
+	res, err := c.client.GetSystemsStatusSystemsGetWithResponse(ctx)
+	if err != nil {
+		return err
+	}
+	if res.JSON200 == nil {
+		return fmt.Errorf("empty response")
+	}
+	for _, sys := range res.JSON200.Systems {
+		if sys.Name == c.systemName {
+			return nil
+		}
+	}
+	return fmt.Errorf("system '%s' not found", c.systemName)
+}
+
 func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state controller.RemoteSessionState, err error) {
+	if c.jobID == "" {
+		return controller.NotReady, nil
+	}
+
 	res, err := c.client.GetJobComputeSystemNameJobsJobIdGetWithResponse(ctx, c.systemName, c.jobID)
 	if err != nil {
 		return controller.Failed, err

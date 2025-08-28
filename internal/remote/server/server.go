@@ -21,10 +21,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"time"
 
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest/auth"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	glog "github.com/labstack/gommon/log"
@@ -64,6 +67,31 @@ func newServer() (server *echo.Echo, err error) {
 
 	e.Use(middleware.Recover())
 	e.Logger.SetLevel(glog.DEBUG)
+
+	firecrestAPIURL, err := url.Parse("https://api.cscs.ch/hpc/firecrest/v2/")
+	if err != nil {
+		return nil, err
+	}
+	clientID := os.Getenv("FIRECREST_CLIENT_ID")
+	clientSecret := os.Getenv("FIRECREST_CLIENT_SECRET")
+	firecrestAuth, err := auth.NewFirecrestClientCredentialsAuth("https://auth.cscs.ch/auth/realms/firecrest-clients/protocol/openid-connect/token", clientID, clientSecret)
+	if err != nil {
+		return nil, err
+	}
+	firecrestClient, err := firecrest.NewFirecrestClient(firecrestAPIURL, firecrest.WithAuth(firecrestAuth))
+	if err != nil {
+		return nil, err
+	}
+	controller, err := firecrest.NewFirecrestRemoteSessionController(firecrestClient, "eiger")
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("running system check...")
+	err = controller.CheckSystemAccess(context.Background())
+	if err != nil {
+		return nil, err
+	}
 
 	e.GET("/", func(c echo.Context) error {
 		return c.String(http.StatusOK, "Remote session controller: OK")
