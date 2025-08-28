@@ -2,6 +2,8 @@
 FROM golang:1.24 AS builder
 ARG TARGETOS
 ARG TARGETARCH
+ARG WSTUNNEL_VERSION="10.4.4"
+ARG WSTUNNEL_PLATFORM="linux_amd64"
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -10,6 +12,11 @@ COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
+
+# Download and extract wstunnel
+RUN curl -L https://github.com/erebe/wstunnel/releases/download/v${WSTUNNEL_VERSION}/wstunnel_${WSTUNNEL_VERSION}_${WSTUNNEL_PLATFORM}.tar.gz -o /tmp/wstunnel.tar.gz && \
+    tar -xzf /tmp/wstunnel.tar.gz -C /usr/local/bin/ && \
+    chmod +x /usr/local/bin/wstunnel
 
 # Copy the go source
 COPY cmd/ cmd/
@@ -27,6 +34,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o si
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
+COPY --from=builder /usr/local/bin/wstunnel /usr/local/bin/wstunnel
 COPY --from=builder /workspace/sidecars .
 USER 65532:65532
 
