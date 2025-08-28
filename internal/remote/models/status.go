@@ -1,4 +1,4 @@
-package controller
+package models
 
 // Represents the state of the remote session
 type RemoteSessionState string

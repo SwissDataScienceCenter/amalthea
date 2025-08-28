@@ -16,13 +16,40 @@ limitations under the License.
 
 package controller
 
-import "context"
+import (
+	"net/url"
 
-type RemoteSessionController struct {
-}
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest/auth"
+)
 
-type RemoteSessionControllerInterface interface {
-	Status(ctx context.Context)
-	Start(ctx context.Context)
-	Stop(ctx context.Context)
+// type RemoteSessionController struct {
+// }
+
+// type RemoteSessionControllerInterface interface {
+// 	Status(ctx context.Context)
+// 	Start(ctx context.Context)
+// 	Stop(ctx context.Context)
+// }
+
+// TODO: support different types of remote session controller
+func NewRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c *firecrest.FirecrestRemoteSessionController, err error) {
+	firecrestAuth, err := auth.NewFirecrestClientCredentialsAuth(cfg.FirecrestAuthTokenURI, string(cfg.FirecrestClientID), string(cfg.FirecrestClientSecret))
+	if err != nil {
+		return nil, err
+	}
+	firecrestAPIURL, err := url.Parse(cfg.FirecrestAPIURL)
+	if err != nil {
+		return nil, err
+	}
+	firecrestClient, err := firecrest.NewFirecrestClient(firecrestAPIURL, firecrest.WithAuth(firecrestAuth))
+	if err != nil {
+		return nil, err
+	}
+	controller, err := firecrest.NewFirecrestRemoteSessionController(firecrestClient, "eiger")
+	if err != nil {
+		return nil, err
+	}
+	return controller, nil
 }
