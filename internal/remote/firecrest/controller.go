@@ -62,7 +62,11 @@ func (c *FirecrestRemoteSessionController) CheckSystemAccess(ctx context.Context
 	return fmt.Errorf("system '%s' not found", c.systemName)
 }
 
+// Status returns the status of the remote session
 func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state models.RemoteSessionState, err error) {
+	// TODO: implement a status updater in the background and just return the current value here
+	// TODO: e.g. query the FirecREST API every minute
+
 	if c.jobID == "" {
 		return models.NotReady, nil
 	}
@@ -71,7 +75,7 @@ func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state mo
 	if err != nil {
 		return models.Failed, err
 	}
-	if res.StatusCode() != 200 {
+	if res.JSON200 == nil {
 		message := ""
 		if res.JSON4XX != nil {
 			message = res.JSON4XX.Message
@@ -96,4 +100,45 @@ func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state mo
 		return models.Failed, err
 	}
 	return state, nil
+}
+
+// Start sets up and starts the remote session using the FirecREST API
+func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
+	if c.jobID != "" {
+		return fmt.Errorf("a remote job is already running: %s", c.jobID)
+	}
+
+	// start by checking whether we can access the requested system
+	if err := c.CheckSystemAccess(ctx); err != nil {
+		return err
+	}
+
+	return fmt.Errorf("not yet implemented")
+}
+
+// Stop stops the remote session using the FirecREST API
+func (c *FirecrestRemoteSessionController) Stop(ctx context.Context) error {
+	// The remote job was never submitted, nothing to do
+	if c.jobID == "" {
+		return nil
+	}
+
+	res, err := c.client.DeleteJobCancelComputeSystemNameJobsJobIdDeleteWithResponse(ctx, c.systemName, c.jobID)
+	if err != nil {
+		return err
+	}
+	if res.StatusCode() < 200 || res.StatusCode() >= 300 {
+		message := ""
+		if res.JSON4XX != nil {
+			message = res.JSON4XX.Message
+		} else if res.JSON5XX != nil {
+			message = res.JSON5XX.Message
+		}
+		if message != "" {
+			return fmt.Errorf("could not cancel job: %s", message)
+		}
+		return fmt.Errorf("could not cancel job: HTTP %d", res.StatusCode())
+	}
+
+	return nil
 }
