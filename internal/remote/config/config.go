@@ -47,8 +47,8 @@ func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
 	v.SetConfigType("env")
 	v.AutomaticEnv()
 
-	v.SetDefault("firecrest_api_url", nil)
-	v.SetDefault("firecrest_auth_token_uri", nil)
+	v.SetDefault("firecrest_api_url", "")
+	v.SetDefault("firecrest_auth_token_uri", "")
 	v.SetDefault("firecrest_client_id", "")
 	v.SetDefault("firecrest_client_secret", "")
 	v.SetDefault("server_port", RemoteSessionControllerPort)

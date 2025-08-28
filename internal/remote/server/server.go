@@ -28,6 +28,7 @@ import (
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/controller"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -73,13 +74,28 @@ func Start() {
 	}()
 	slog.Info(fmt.Sprintf("http server started on %s", address))
 
+	// Start the remote session
+	// TODO: should the 15-minute timeout be configurable?
+	startCtx, startCancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	err = controller.Start(startCtx)
+	startCancel()
+	if err != nil {
+		slog.Error("could not start session", "error", err)
+		os.Exit(1)
+	}
+
 	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 60 seconds.
 	<-ctx.Done()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	// TODO: Other cleanup actions here
+	if err := controller.Stop(ctx); err != nil {
+		slog.Error("cancelling the remote job failed", "error", err)
+		if err := server.Shutdown(ctx); err != nil {
+			slog.Error("shutting down the server gracefully failed", "error", err)
+			os.Exit(1)
+		}
+	}
 	if err := server.Shutdown(ctx); err != nil {
-		// TODO: controller.Stop()
 		slog.Error("shutting down the server gracefully failed", "error", err)
 		os.Exit(1)
 	}
@@ -113,8 +129,30 @@ func newServer(controller *firecrest.FirecrestRemoteSessionController) (server *
 
 	// Readiness endpoint
 	e.GET("/ready", func(c echo.Context) error {
-		return c.NoContent(http.StatusOK)
+		status, err := controller.Status(c.Request().Context())
+		if err == nil && status == models.Running {
+			return c.NoContent(http.StatusOK)
+		}
+		return c.NoContent(http.StatusServiceUnavailable)
 	})
 
+	// Status endpoint
+	e.GET("/status", func(c echo.Context) error {
+		status, err := controller.Status(c.Request().Context())
+		if err == nil && status == models.Running {
+			return c.JSON(http.StatusOK, statusResponse{
+				Status: status,
+			})
+		}
+		return c.JSON(http.StatusServiceUnavailable, statusResponse{
+			Status: status,
+			Error:  err,
+		})
+	})
 	return e, nil
+}
+
+type statusResponse struct {
+	Status models.RemoteSessionState `json:"status"`
+	Error  error                     `json:"error,omitempty"`
 }
