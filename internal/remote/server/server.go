@@ -26,6 +26,8 @@ import (
 	"time"
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/controller"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -46,7 +48,13 @@ func Start() {
 		os.Exit(1)
 	}
 
-	server, err := newServer()
+	controller, err := controller.NewRemoteSessionController(cfg)
+	if err != nil {
+		slog.Error("failed to create controller", "error", err)
+		os.Exit(1)
+	}
+
+	server, err := newServer(controller)
 	if err != nil {
 		slog.Error("failed to create server", "error", err)
 		os.Exit(1)
@@ -71,6 +79,7 @@ func Start() {
 	defer cancel()
 	// TODO: Other cleanup actions here
 	if err := server.Shutdown(ctx); err != nil {
+		// TODO: controller.Stop()
 		slog.Error("shutting down the server gracefully failed", "error", err)
 		os.Exit(1)
 	}
@@ -79,32 +88,13 @@ func Start() {
 var logLevel *slog.LevelVar = new(slog.LevelVar)
 var jsonLogger *slog.Logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 
-func newServer() (server *echo.Echo, err error) {
+func newServer(controller *firecrest.FirecrestRemoteSessionController) (server *echo.Echo, err error) {
 	e := echo.New()
 
 	e.HideBanner = true
 	e.HidePort = true
 
 	e.Use(middleware.Recover())
-
-	// firecrestAPIURL, err := url.Parse("https://api.cscs.ch/hpc/firecrest/v2/")
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// clientID := os.Getenv("FIRECREST_CLIENT_ID")
-	// clientSecret := os.Getenv("FIRECREST_CLIENT_SECRET")
-	// firecrestAuth, err := auth.NewFirecrestClientCredentialsAuth("https://auth.cscs.ch/auth/realms/firecrest-clients/protocol/openid-connect/token", clientID, clientSecret)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// firecrestClient, err := firecrest.NewFirecrestClient(firecrestAPIURL, firecrest.WithAuth(firecrestAuth))
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// controller, err := firecrest.NewFirecrestRemoteSessionController(firecrestClient, "eiger")
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	// fmt.Println("running system check...")
 	// err = controller.CheckSystemAccess(context.Background())
