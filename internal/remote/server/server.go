@@ -112,12 +112,6 @@ func newServer(controller *firecrest.FirecrestRemoteSessionController) (server *
 
 	e.Use(middleware.Recover())
 
-	// fmt.Println("running system check...")
-	// err = controller.CheckSystemAccess(context.Background())
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	e.GET("/", func(c echo.Context) error {
 		return c.String(http.StatusOK, "Remote session controller: OK")
 	})

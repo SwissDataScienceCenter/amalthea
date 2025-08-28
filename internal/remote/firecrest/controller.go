@@ -18,6 +18,7 @@ package firecrest
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
@@ -67,6 +68,8 @@ func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state mo
 	// TODO: implement a status updater in the background and just return the current value here
 	// TODO: e.g. query the FirecREST API every minute
 
+	// TODO: also implement checking the http interface of the remote session through the tunnel
+
 	if c.jobID == "" {
 		return models.NotReady, nil
 	}
@@ -113,6 +116,25 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		return err
 	}
 
+	userInfo, err := c.getUserInfo(ctx)
+	if err != nil {
+		return err
+	}
+	userName := userInfo.User.Name
+	if userName == "" {
+		return fmt.Errorf("could not get user name")
+	}
+
+	// slog.Info("session script", "script", sessionScript)
+	// jobRequest := PostJobSubmitRequest{
+	// 	Job: JobDescriptionModel{
+	// 	Script: sessionScript,
+	// WorkingDirectory string `json:"working_directory"`
+	// 	}
+	// }
+
+	// c.client.PostJobSubmitComputeSystemNameJobsPostWithResponse()
+
 	return fmt.Errorf("not yet implemented")
 }
 
@@ -142,3 +164,26 @@ func (c *FirecrestRemoteSessionController) Stop(ctx context.Context) error {
 
 	return nil
 }
+
+func (c *FirecrestRemoteSessionController) getUserInfo(ctx context.Context) (userInfo UserInfoResponse, err error) {
+	res, err := c.client.GetUserinfoStatusSystemNameUserinfoGetWithResponse(ctx, c.systemName)
+	if err != nil {
+		return UserInfoResponse{}, err
+	}
+	if res.JSON200 == nil {
+		message := ""
+		if res.JSON4XX != nil {
+			message = res.JSON4XX.Message
+		} else if res.JSON5XX != nil {
+			message = res.JSON5XX.Message
+		}
+		if message != "" {
+			return UserInfoResponse{}, fmt.Errorf("could not get user info: %s", message)
+		}
+		return UserInfoResponse{}, fmt.Errorf("could not get user info: HTTP %d", res.StatusCode())
+	}
+	return *res.JSON200, nil
+}
+
+//go:embed session_script.sh
+var sessionScript string
