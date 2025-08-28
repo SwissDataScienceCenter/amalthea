@@ -20,6 +20,7 @@ import (
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/authproxy"
 	"github.com/SwissDataScienceCenter/amalthea/internal/cloner"
+	"github.com/SwissDataScienceCenter/amalthea/internal/tunnel"
 	"github.com/spf13/cobra"
 )
 
@@ -48,15 +49,24 @@ func buildCommands() *cobra.Command {
 		Use:   "cloner clone",
 		Short: "Cloning utilities",
 	}
+	tunnelRoot := &cobra.Command{
+		Use:   "tunnel listen",
+		Short: "Open an inbound tunnel",
+	}
+
 	rootCmd.AddCommand(versionCmd)
 	authCmd, err := authproxy.Command()
 	cobra.CheckErr(err)
 	clonerCmd, err := cloner.Command()
 	cobra.CheckErr(err)
+	tunnelCmd, err := tunnel.Command()
+	cobra.CheckErr(err)
 	proxyRoot.AddCommand(authCmd)
 	clonerRoot.AddCommand(clonerCmd)
+	tunnelRoot.AddCommand(tunnelCmd)
 	rootCmd.AddCommand(proxyRoot)
 	rootCmd.AddCommand(clonerRoot)
+	rootCmd.AddCommand(tunnelRoot)
 	return rootCmd
 }
 
