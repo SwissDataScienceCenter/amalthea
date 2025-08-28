@@ -3,47 +3,65 @@
 package firecrest
 
 import (
-	"context"
-	"fmt"
+	"net/http"
+	"net/url"
 
-	"github.com/SwissDataScienceCenter/amalthea/internal/remote/controller"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest/auth"
 )
 
-type FirecrestRemoteSessionController struct {
-	client *ClientWithResponses
-
-	jobID      string
-	systemName string
+type FirecrestClient struct {
+	ClientWithResponses
+	auth                auth.FirecrestAuth
+	httpClient          *http.Client
+	extraRequestEditors []RequestEditorFn
 }
 
-func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state controller.RemoteSessionState, err error) {
-	res, err := c.client.GetJobComputeSystemNameJobsJobIdGetWithResponse(ctx, c.systemName, c.jobID)
+func NewFirecrestClient(apiURL *url.URL, options ...FirecrestClientOption) (fc *FirecrestClient, err error) {
+	fc = &FirecrestClient{}
+	for _, opt := range options {
+		if err := opt(fc); err != nil {
+			return nil, err
+		}
+	}
+	// Create httpClient, if not already present
+	if fc.httpClient == nil {
+		fc.httpClient = http.DefaultClient
+	}
+	// Create client
+	clientOpts := []ClientOption{WithHTTPClient(fc.httpClient)}
+	for _, fn := range fc.extraRequestEditors {
+		clientOpts = append(clientOpts, WithRequestEditorFn(fn))
+	}
+	if fc.auth != nil {
+		clientOpts = append(clientOpts, WithRequestEditorFn(RequestEditorFn(fc.auth.RequestEditor())))
+	}
+	client, err := NewClientWithResponses(apiURL.String(), clientOpts...)
 	if err != nil {
-		return controller.Failed, err
+		return nil, err
 	}
-	if res.StatusCode() != 200 {
-		message := ""
-		if res.JSON4XX != nil {
-			message = res.JSON4XX.Message
-		} else if res.JSON5XX != nil {
-			message = res.JSON5XX.Message
-		}
-		if message != "" {
-			return controller.Failed, fmt.Errorf("could not get job: %s", message)
-		}
-		return controller.Failed, fmt.Errorf("could not get job: HTTP %d", res.StatusCode())
-	}
+	fc.ClientInterface = client
+	return fc, nil
+}
 
-	jobs, err := res.JSON200.Jobs.AsGetJobResponseJobs0()
-	if err != nil {
-		return controller.Failed, fmt.Errorf("could not parse job response: %w", err)
+type FirecrestClientOption func(*FirecrestClient) error
+
+func WithAuth(auth auth.FirecrestAuth) FirecrestClientOption {
+	return func(fc *FirecrestClient) error {
+		fc.auth = auth
+		return nil
 	}
-	if len(jobs) < 1 {
-		return controller.Failed, fmt.Errorf("empty job response")
+}
+
+func WithHttpClient(httpClient *http.Client) FirecrestClientOption {
+	return func(fc *FirecrestClient) error {
+		fc.httpClient = httpClient
+		return nil
 	}
-	state, err = GetRemoteSessionState(jobs[0].Status.State)
-	if err != nil {
-		return controller.Failed, err
+}
+
+func WithExtraRequestEditors(editors ...RequestEditorFn) FirecrestClientOption {
+	return func(fc *FirecrestClient) error {
+		fc.extraRequestEditors = append(fc.extraRequestEditors, editors...)
+		return nil
 	}
-	return state, nil
 }
