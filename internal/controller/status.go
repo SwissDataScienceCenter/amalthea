@@ -16,7 +16,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+// If the cpu usage of the session is less than this then the session is considered idle
 var cpuUsageIdlenessThreshold resource.Quantity = *resource.NewMilliQuantity(300, resource.DecimalSI)
+
+// If the last request performed in the user session is older than this the session is considered idle
+const lastRequestAgeThreshold time.Duration = time.Minute * 30
 
 // countainerCounts provides from the total and completed/fully running containers in a pod.
 // The output is a tuple with the init container counts followed by the regular container counts.
@@ -82,7 +86,7 @@ func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *am
 	return nil, fmt.Errorf("could not find the metrics for the session container %s", amaltheadevv1alpha1.SessionContainerName)
 }
 
-func lastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error) {
+func getLastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error) {
 	url := fmt.Sprintf("http://%s:%d/request_stats", cr.Service().Name, amaltheadevv1alpha1.AuthProxyMetaPort)
 
 	resp, err := http.Get(url)
@@ -107,6 +111,14 @@ func lastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error)
 	return req_stats.LastRequestTime, nil
 }
 
+type IdleDecision int
+
+// The values are setup in a way so that max(x, y, z) where x, y, z are
+// one of the values below will give the final decision.
+const Unknown IdleDecision = 0
+const Idle IdleDecision = 1
+const NotIdle IdleDecision = 2
+
 func getIdleState(
 	ctx context.Context,
 	r *AmaltheaSessionReconciler,
@@ -117,41 +129,49 @@ func getIdleState(
 		return metav1.Time{}, false
 	}
 	idleSince := cr.Status.IdleSince
-	idle := false
 
+	cpuIdle := Unknown
+	var cpuUsage *resource.Quantity
 	metrics, err := metrics(ctx, r.MetricsClient, cr)
 	if err != nil {
-		log.Info("Metrics returned error", "error", err)
-		return metav1.Time{}, false
+		log.Info("Metrics returned error when checking idleness", "error", err)
+	} else {
+		cpuUsage = metrics.Cpu()
+	}
+	if cpuUsage != nil {
+		if cpuUsage.Cmp(cpuUsageIdlenessThreshold) == -1 {
+			cpuIdle = Idle
+		} else {
+			cpuIdle = NotIdle
+		}
 	}
 
-	cpuUsage := metrics.Cpu()
-	if cpuUsage != nil && cpuUsage.Cmp(cpuUsageIdlenessThreshold) == -1 {
-		if cr.Status.IdleSince.IsZero() {
-			log.Info(
-				"the session was found to be idle",
-				"cpu usage milicores",
-				cpuUsage.MilliValue(),
-				"idle threshold milicores",
-				cpuUsageIdlenessThreshold.MilliValue(),
-			)
+	requestIdle := Unknown
+	lastRequesTime, err := getLastRequestTime(cr)
+	if err != nil {
+		log.Info("Request time check returned an error when checking idleness", "error", err)
+	} else {
+		if time.Since(lastRequesTime) >= lastRequestAgeThreshold {
+			requestIdle = Idle
+		} else {
+			requestIdle = NotIdle
 		}
+	}
+
+	idle := false
+	// If the decision is Unknown or there is at least 1 NotIdle then we keep the final status not idle.
+	// If there is 2 Idle or an Unknown and an Idle then the status is Idle.
+	decision := max(cpuIdle, requestIdle)
+	if decision == Idle {
 		idle = true
-		// check last request time before setting session to idle
-		rt, err := lastRequestTime(cr)
-		if err == nil && (idleSince.IsZero() || idleSince.Time.Before(rt)) {
-			log.Info("the last request to the session happened after the session became idle, skipping marking as idle")
-			idleSince = metav1.NewTime(rt)
-		} else if err != nil {
-			// note, if there was an error getting the time, we continue as normal
-			log.Info("Couldn't get last request time from proxy", "err", err)
-		}
 	}
-
 	if idle && idleSince.IsZero() {
 		idleSince = metav1.NewTime(time.Now())
 	} else if !idle && !idleSince.IsZero() {
 		idleSince = metav1.Time{}
 	}
+
+	log.Info("session idle check", "idle", idle, "session", cr.Name, "cpuUsage", cpuUsage, "cpuUsageThreshold", cpuUsageIdlenessThreshold, "lastRequestTime", lastRequesTime, "lastRequestAgeThreshold", lastRequestAgeThreshold)
+
 	return idleSince, idle
 }
