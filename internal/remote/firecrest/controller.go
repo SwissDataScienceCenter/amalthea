@@ -28,6 +28,11 @@ import (
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
 )
 
+// The script submitted to start a new remote session.
+//
+//go:embed session_script.sh
+var sessionScript string
+
 type FirecrestRemoteSessionController struct {
 	client *FirecrestClient
 
@@ -103,9 +108,8 @@ func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state mo
 		}
 		return models.Failed, fmt.Errorf("could not get job: HTTP %d", res.StatusCode())
 	}
-
 	if res.JSON200.Jobs == nil {
-		return models.Failed, fmt.Errorf("could not parse job response: %w", err)
+		return models.Failed, fmt.Errorf("invalid job status response")
 	}
 	jobs := *res.JSON200.Jobs
 	if len(jobs) < 1 {
@@ -164,25 +168,30 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	slog.Info("determined session path", "sessionPath", sessionPath)
 
 	// Setup secrets
-	// secretsPath := path.Join(sessionPath, "secrets")
+	secretsPath := path.Join(sessionPath, "secrets")
+	err = c.mkdir(ctx, secretsPath, true /*createParents*/)
+	if err != nil {
+		return err
+	}
+	// Makes sure that only the session owner can read session files
+	err = c.chmod(ctx, sessionPath, "700")
+	if err != nil {
+		return err
+	}
 
-	// client.mkdir(
-	//     system_name=system_name,
-	//     path=secrets_path.as_posix(),
-	//     create_parents=True,
-	// )
+	job := JobDescriptionModel{
+		Script:           &sessionScript,
+		WorkingDirectory: sessionPath,
+	}
+	jobID, err := c.submitJob(ctx, job)
+	if err != nil {
+		return err
+	}
+	c.jobID = jobID
 
-	// slog.Info("session script", "script", sessionScript)
-	// jobRequest := PostJobSubmitRequest{
-	// 	Job: JobDescriptionModel{
-	// 	Script: sessionScript,
-	// WorkingDirectory string `json:"working_directory"`
-	// 	}
-	// }
+	slog.Info("submitted job", "jobID", c.jobID)
 
-	// c.client.PostJobSubmitComputeSystemNameJobsPostWithResponse()
-
-	return fmt.Errorf("not yet implemented")
+	return nil
 }
 
 // Stop stops the remote session using the FirecREST API
@@ -232,17 +241,76 @@ func (c *FirecrestRemoteSessionController) getUserInfo(ctx context.Context) (use
 	return *res.JSON200, nil
 }
 
-// func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path string, createParents bool) error {
-// 	body := PostMakeDirRequest{
-// 		Parent:     createParents,
-// 		SourcePath: path,
-// 	}
-// 	res, err := c.client.PostMkdirFilesystemSystemNameOpsMkdirPostWithResponse(ctx, c.systemName, body)
-// 	if err != nil {
-// 		return  err
-// 	}
-// 	res.JSON201
-// }
+func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path string, createParents bool) error {
+	body := PostMakeDirRequest{
+		Parent:     &createParents,
+		SourcePath: &path,
+	}
+	res, err := c.client.PostMkdirFilesystemSystemNameOpsMkdirPostWithResponse(ctx, c.systemName, body)
+	if err != nil {
+		return err
+	}
+	if res.JSON201 == nil {
+		message := ""
+		if res.JSON4XX != nil {
+			message = res.JSON4XX.Message
+		} else if res.JSON5XX != nil {
+			message = res.JSON5XX.Message
+		}
+		if message != "" {
+			return fmt.Errorf("could run mkdir: %s", message)
+		}
+		return fmt.Errorf("could run mkdir: HTTP %d", res.StatusCode())
+	}
+	return nil
+}
 
-//go:embed session_script.sh
-var sessionScript string
+func (c *FirecrestRemoteSessionController) chmod(ctx context.Context, path string, mode string) error {
+	body := PutFileChmodRequest{
+		Mode:       mode,
+		SourcePath: &path,
+	}
+	res, err := c.client.PutChmodFilesystemSystemNameOpsChmodPutWithResponse(ctx, c.systemName, body)
+	if err != nil {
+		return err
+	}
+	if res.JSON200 == nil {
+		message := ""
+		if res.JSON4XX != nil {
+			message = res.JSON4XX.Message
+		} else if res.JSON5XX != nil {
+			message = res.JSON5XX.Message
+		}
+		if message != "" {
+			return fmt.Errorf("could run mkdir: %s", message)
+		}
+		return fmt.Errorf("could run mkdir: HTTP %d", res.StatusCode())
+	}
+	return nil
+}
+
+func (c *FirecrestRemoteSessionController) submitJob(ctx context.Context, job JobDescriptionModel) (jobId string, err error) {
+	body := PostJobSubmitRequest{
+		Job: job,
+	}
+	res, err := c.client.PostJobSubmitComputeSystemNameJobsPostWithResponse(ctx, c.systemName, body)
+	if err != nil {
+		return "", err
+	}
+	if res.JSON201 == nil {
+		message := ""
+		if res.JSON4XX != nil {
+			message = res.JSON4XX.Message
+		} else if res.JSON5XX != nil {
+			message = res.JSON5XX.Message
+		}
+		if message != "" {
+			return "", fmt.Errorf("could run mkdir: %s", message)
+		}
+		return "", fmt.Errorf("could run mkdir: HTTP %d", res.StatusCode())
+	}
+	if res.JSON201.JobId == nil {
+		return "", fmt.Errorf("invalid job submission response")
+	}
+	return fmt.Sprintf("%d", *res.JSON201.JobId), nil
+}
