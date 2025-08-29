@@ -404,6 +404,10 @@ type AmaltheaSessionStatus struct {
 	IdleSince metav1.Time `json:"idleSince,omitempty"`
 	// +kubebuilder:validation:Format:=date-time
 	FailingSince metav1.Time `json:"failingSince,omitempty"`
+
+	// +kubebuilder:validation:format:=date-time
+	FailedSchedulingSince metav1.Time `json:"failedSchedulingSince,omitempty"`
+
 	// +kubebuilder:validation:Format:=date-time
 	HibernatedSince metav1.Time `json:"hibernatedSince,omitempty"`
 	// If the state is failed then the message will contain information about what went wrong, otherwise it is empty
@@ -504,6 +508,12 @@ func (a *AmaltheaSession) GetHealthcheckURL() *url.URL {
 		Path:   a.Spec.Session.URLPath,
 	}
 	return healthcheckURL
+}
+
+// Return the name of the pod associated to the session.
+// There will be always only one pod, so the `-0` suffix is used.
+func (as *AmaltheaSession) PodName() string {
+	return fmt.Sprintf("%s-0", as.Name)
 }
 
 // +kubebuilder:validation:Enum={never,always,whenFailedOrHibernated}
