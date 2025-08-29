@@ -524,6 +524,36 @@ func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.Amalthe
 	}
 }
 
+func checkEventsInferedState(ctx context.Context,
+	r *AmaltheaSessionReconciler,
+	cr *amaltheadevv1alpha1.AmaltheaSession, currentState amaltheadevv1alpha1.State) (metav1.Time, amaltheadevv1alpha1.State, error) {
+
+	failedSchedulingSince := cr.Status.FailedSchedulingSince
+	var err error
+	nextState := currentState
+	if currentState == amaltheadevv1alpha1.NotReady {
+		log := log.FromContext(ctx)
+		var result EventsInferedStateResult
+		result, err = EventsInferedState(ctx, cr, r.Client)
+		switch result {
+		case EisrFinallyFailed:
+			nextState = amaltheadevv1alpha1.Failed
+
+		case EisrInitiallyFailed:
+			failedSchedulingSince = metav1.NewTime(time.Now())
+
+		case EisrAutoScheduling:
+			// reset the failedSchedulingSince when a scheduling/trigger-scaleup event occurs
+			failedSchedulingSince = metav1.Time{}
+		default:
+			if err != nil {
+				log.Error(err, "Error obtaining state from pod events")
+			}
+		}
+	}
+	return failedSchedulingSince, nextState, err
+}
+
 func (c ChildResourceUpdates) Status(
 	ctx context.Context,
 	r *AmaltheaSessionReconciler,
@@ -541,25 +571,12 @@ func (c ChildResourceUpdates) Status(
 
 	idle := false
 	idleSince := cr.Status.IdleSince
-	failedSchedulingSince := cr.Status.FailedSchedulingSince
 	state, failMsg := c.State(cr, pod)
 
-	if state == amaltheadevv1alpha1.NotReady {
-		result, err := EventsInferedState(ctx, cr, r.Client)
-		switch result {
-		case EisrFinallyFailed:
-			state = amaltheadevv1alpha1.Failed
-			failMsg = err.Error()
-		case EisrInitiallyFailed:
-			failedSchedulingSince = metav1.NewTime(time.Now())
-		case EisrAutoScheduling:
-			// reset the failedSchedulingSince when a scheduling/trigger-scaleup event occurs
-			failedSchedulingSince = metav1.Time{}
-		default:
-			if err != nil {
-				log.Error(err, "Error obtaining state from pod events")
-			}
-		}
+	failedSchedulingSince, nextState, err := checkEventsInferedState(ctx, r, cr, state)
+	state = nextState
+	if err != nil {
+		failMsg = err.Error()
 	}
 
 	if pod != nil {
