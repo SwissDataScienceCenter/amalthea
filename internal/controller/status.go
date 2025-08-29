@@ -111,11 +111,13 @@ func getLastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, err
 	return req_stats.LastRequestTime, nil
 }
 
-type IdleDecision string
+type IdleDecision int
 
-const Idle IdleDecision = "idle"
-const NotIdle IdleDecision = "not idle"
-const Unknown IdleDecision = "unknown"
+// The values are setup in a way so that max(x, y, z) where x, y, z are
+// one of the values below will give the final decision.
+const Unknown IdleDecision = 0
+const Idle IdleDecision = 1
+const NotIdle IdleDecision = 2
 
 func getIdleState(
 	ctx context.Context,
@@ -157,19 +159,11 @@ func getIdleState(
 	}
 
 	idle := false
-	switch {
-	case cpuIdle == Idle && requestIdle == Unknown:
+	// If the decision is Unknown or there is at least 1 NotIdle then we keep the final status not idle.
+	// If there is 2 Idle or an Unknown and an Idle then the status is Idle.
+	decision := max(cpuIdle, requestIdle)
+	if decision == Idle {
 		idle = true
-	case cpuIdle == Unknown && requestIdle == Idle:
-		idle = true
-	case cpuIdle == Idle && requestIdle == Idle:
-		idle = true
-	case cpuIdle == NotIdle && requestIdle == Idle:
-		// NOTE: As long as 1 criteria shows up as NotIdle then the whole session is deemed to be not idle
-		idle = false
-	case cpuIdle == Idle && requestIdle == NotIdle:
-		// NOTE: As long as 1 criteria shows up as NotIdle then the whole session is deemed to be not idle
-		idle = false
 	}
 	if idle && idleSince.IsZero() {
 		idleSince = metav1.NewTime(time.Now())
