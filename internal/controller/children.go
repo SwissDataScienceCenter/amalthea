@@ -374,14 +374,14 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
 	return ""
 }
 
-type EventsInferedStateResult = int
+type EventsInferedStateResult string
 
 const (
-	EisrNone            = -1
-	EisrInitiallyFailed = 0
-	EisrTemporaryFailed = 1
-	EisrFinallyFailed   = 2
-	EisrAutoScheduling  = 3
+	EisrNone            EventsInferedStateResult = "None"
+	EisrInitiallyFailed EventsInferedStateResult = "Initially Failed"
+	EisrTemporaryFailed EventsInferedStateResult = "Temporary Failed"
+	EisrFinallyFailed   EventsInferedStateResult = "Finally Failed"
+	EisrAutoScheduling  EventsInferedStateResult = "Auto Scheduling"
 )
 
 // eventsInferedFailure looks into the events of the session pod to
@@ -397,7 +397,7 @@ const (
 // - finally failed: if the latest event is FailedScheduling and this has been seen for a while exceeding maximum wait time
 // - auto scheduling: if an TriggeredScaleUp events has been found as the last event
 // - none of the above
-func EventsInferedState(cr *amaltheadevv1alpha1.AmaltheaSession, client client.Reader, ctx context.Context) (EventsInferedStateResult, error) {
+func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, client client.Reader) (EventsInferedStateResult, error) {
 	const failedScheduling = "FailedScheduling"
 	const scheduled = "Scheduled"
 	const triggeredScaleUp = "TriggeredScaleUp"
@@ -545,7 +545,7 @@ func (c ChildResourceUpdates) Status(
 	state, failMsg := c.State(cr, pod)
 
 	if state == amaltheadevv1alpha1.NotReady {
-		result, err := EventsInferedState(cr, r.Client, ctx)
+		result, err := EventsInferedState(ctx, cr, r.Client)
 		switch result {
 		case EisrFinallyFailed:
 			state = amaltheadevv1alpha1.Failed
@@ -556,6 +556,9 @@ func (c ChildResourceUpdates) Status(
 			// reset the failedSchedulingSince when a scheduling/trigger-scaleup event occurs
 			failedSchedulingSince = metav1.Time{}
 		default:
+			if err != nil {
+				log.Error(err, "Error obtaining state from pod events")
+			}
 		}
 	}
 
