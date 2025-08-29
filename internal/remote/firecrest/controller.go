@@ -104,10 +104,10 @@ func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state mo
 		return models.Failed, fmt.Errorf("could not get job: HTTP %d", res.StatusCode())
 	}
 
-	jobs, err := res.JSON200.Jobs.AsGetJobResponseJobs0()
-	if err != nil {
+	if res.JSON200.Jobs == nil {
 		return models.Failed, fmt.Errorf("could not parse job response: %w", err)
 	}
+	jobs := *res.JSON200.Jobs
 	if len(jobs) < 1 {
 		return models.Failed, fmt.Errorf("empty job response")
 	}
