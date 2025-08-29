@@ -133,8 +133,8 @@ IMAGE_SQSH="${SESSION_DIR}/session-image.sqsh"
 # fi
 
 # Install rclone
-# rclone=$(install_rclone)
-# echo "rclone: ${rclone}"
+rclone=$(install_rclone)
+echo "rclone: ${rclone}"
 
 # Install wstunnel
 # wstunnel=$(install_wstunnel)

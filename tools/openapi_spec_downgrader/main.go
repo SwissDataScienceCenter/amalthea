@@ -20,11 +20,6 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	// log.Println(doc)
-	// log.Println("keys:")
-	// for key := range doc {
-	// 	log.Printf("  - %s\n", key)
-	// }
 
 	transformed, err := transformNode(doc)
 	if err != nil {
