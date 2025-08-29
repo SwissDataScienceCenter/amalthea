@@ -20,6 +20,10 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"log/slog"
+	"os"
+	"path"
+	"strings"
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
 )
@@ -47,20 +51,29 @@ func NewFirecrestRemoteSessionController(client *FirecrestClient, systemName str
 	return c, nil
 }
 
-func (c *FirecrestRemoteSessionController) CheckSystemAccess(ctx context.Context) error {
+func (c *FirecrestRemoteSessionController) GetCurrentSystem(ctx context.Context) (system HPCCluster, err error) {
 	res, err := c.client.GetSystemsStatusSystemsGetWithResponse(ctx)
 	if err != nil {
-		return err
+		return HPCCluster{}, err
 	}
 	if res.JSON200 == nil {
-		return fmt.Errorf("empty response")
+		message := ""
+		if res.JSON4XX != nil {
+			message = res.JSON4XX.Message
+		} else if res.JSON5XX != nil {
+			message = res.JSON5XX.Message
+		}
+		if message != "" {
+			return HPCCluster{}, fmt.Errorf("could not get job: %s", message)
+		}
+		return HPCCluster{}, fmt.Errorf("could not get job: HTTP %d", res.StatusCode())
 	}
 	for _, sys := range res.JSON200.Systems {
 		if sys.Name == c.systemName {
-			return nil
+			return sys, nil
 		}
 	}
-	return fmt.Errorf("system '%s' not found", c.systemName)
+	return HPCCluster{}, fmt.Errorf("system '%s' not found", c.systemName)
 }
 
 // Status returns the status of the remote session
@@ -112,7 +125,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 
 	// start by checking whether we can access the requested system
-	if err := c.CheckSystemAccess(ctx); err != nil {
+	system, err := c.GetCurrentSystem(ctx)
+	if err != nil {
 		return err
 	}
 
@@ -124,6 +138,39 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	if userName == "" {
 		return fmt.Errorf("could not get user name")
 	}
+	slog.Info("got username", "username", userName)
+
+	var scratch *FileSystem
+	if system.FileSystems != nil {
+		for _, fs := range *system.FileSystems {
+			if fs.DataType == Scratch {
+				scratch = &fs
+			}
+		}
+	}
+	if scratch == nil {
+		return fmt.Errorf("could not find scratch file system on '%s'", c.systemName)
+	}
+
+	renkuBaseURLPath := strings.TrimSuffix(os.Getenv("RENKU_BASE_URL_PATH"), "/")
+	if renkuBaseURLPath == "" {
+		renkuBaseURLPath = "dev-session"
+		slog.Warn("RENKU_BASE_URL_PATH is not defined", "defaultValue", renkuBaseURLPath)
+	}
+
+	scratchPathRenku := path.Join(scratch.Path, userName, "renku")
+	sessionPath := path.Join(scratchPathRenku, renkuBaseURLPath)
+
+	slog.Info("determined session path", "sessionPath", sessionPath)
+
+	// Setup secrets
+	// secretsPath := path.Join(sessionPath, "secrets")
+
+	// client.mkdir(
+	//     system_name=system_name,
+	//     path=secrets_path.as_posix(),
+	//     create_parents=True,
+	// )
 
 	// slog.Info("session script", "script", sessionScript)
 	// jobRequest := PostJobSubmitRequest{
@@ -184,6 +231,18 @@ func (c *FirecrestRemoteSessionController) getUserInfo(ctx context.Context) (use
 	}
 	return *res.JSON200, nil
 }
+
+// func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path string, createParents bool) error {
+// 	body := PostMakeDirRequest{
+// 		Parent:     createParents,
+// 		SourcePath: path,
+// 	}
+// 	res, err := c.client.PostMkdirFilesystemSystemNameOpsMkdirPostWithResponse(ctx, c.systemName, body)
+// 	if err != nil {
+// 		return  err
+// 	}
+// 	res.JSON201
+// }
 
 //go:embed session_script.sh
 var sessionScript string
