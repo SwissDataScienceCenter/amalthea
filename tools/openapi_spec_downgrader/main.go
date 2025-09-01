@@ -5,22 +5,60 @@ import (
 	"log"
 	"os"
 
-	"gopkg.in/yaml.v3"
+	"github.com/oasdiff/yaml"
+	"github.com/spf13/cobra"
+)
+
+const (
+	inputFlag       = "in"
+	inputFlagShort  = "i"
+	outputFlag      = "out"
+	outputFlagShort = "o"
 )
 
 func main() {
-	in := "/workspaces/amalthea/internal/remote/firecrest/openapi_spec_original.yaml"
-	out := "/workspaces/amalthea/internal/remote/firecrest/openapi_spec_test.yaml"
-	contents, err := os.ReadFile(in)
+	cmd, err := command()
+	cobra.CheckErr(err)
+	cobra.CheckErr(cmd.Execute())
+}
+
+var (
+	input  string
+	output string
+)
+
+func command() (*cobra.Command, error) {
+	rootCmd := &cobra.Command{
+		Short: "OpenAPI spec downgrader",
+		Long:  "Utility which converts an OpenAPI spec version 3.1.x into a file compatible with version 3.0.x.",
+		Run:   run,
+	}
+	rootCmd.Flags().StringVarP(&input, inputFlag, inputFlagShort, "", "input file")
+	err := rootCmd.MarkFlagRequired(inputFlag)
+	if err != nil {
+		return nil, err
+	}
+	rootCmd.Flags().StringVarP(&output, outputFlag, outputFlagShort, "", "output file")
+	err = rootCmd.MarkFlagRequired(outputFlag)
+	if err != nil {
+		return nil, err
+	}
+	return rootCmd, nil
+}
+
+func run(cmd *cobra.Command, args []string) {
+	// Read and parse the input file
+	contents, err := os.ReadFile(input)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	doc := map[string]any{}
-	err = yaml.Unmarshal(contents, doc)
+	err = yaml.Unmarshal(contents, &doc)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
+	// Transform the document and render as YAML
 	transformed, err := transformNode(doc)
 	if err != nil {
 		log.Fatalln(err)
@@ -30,11 +68,8 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	err = os.Remove(out)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	err = os.WriteFile(out, newContents, 0644)
+	// Write the results to the output file
+	err = os.WriteFile(output, newContents, 0644)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -95,7 +130,6 @@ func transformArray(in []any) (out []any, err error) {
 			out = append(out, t)
 		}
 	}
-	// log.Printf("hasTypeNull: %t\n", hasTypeNull)
 	if hasTypeNull {
 		for idx := range out {
 			t, err := makeNullable(out[idx])
