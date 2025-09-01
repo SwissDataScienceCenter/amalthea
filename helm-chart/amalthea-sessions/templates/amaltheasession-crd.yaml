@@ -6458,6 +6458,9 @@ spec:
                 description: If the state is failed then the message will contain
                   information about what went wrong, otherwise it is empty
                 type: string
+              failedSchedulingSince:
+                format: date-time
+                type: string
               failingSince:
                 format: date-time
                 type: string
