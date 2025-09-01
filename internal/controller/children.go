@@ -397,7 +397,7 @@ const (
 // - finally failed: if the latest event is FailedScheduling and this has been seen for a while exceeding maximum wait time
 // - auto scheduling: if an TriggeredScaleUp events has been found as the last event
 // - none of the above
-func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, client client.Reader) (EventsInferedStateResult, error) {
+func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.HpcAmaltheaSession, client client.Reader) (EventsInferedStateResult, error) {
 	const failedScheduling = "FailedScheduling"
 	const scheduled = "Scheduled"
 	const triggeredScaleUp = "TriggeredScaleUp"
@@ -526,7 +526,7 @@ func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.Amalthe
 
 func checkEventsInferedState(ctx context.Context,
 	r *AmaltheaSessionReconciler,
-	cr *amaltheadevv1alpha1.AmaltheaSession, currentState amaltheadevv1alpha1.State) (metav1.Time, amaltheadevv1alpha1.State, error) {
+	cr *amaltheadevv1alpha1.HpcAmaltheaSession, currentState amaltheadevv1alpha1.State) (metav1.Time, amaltheadevv1alpha1.State, error) {
 
 	failedSchedulingSince := cr.Status.FailedSchedulingSince
 	var err error

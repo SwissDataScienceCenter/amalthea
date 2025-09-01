@@ -411,7 +411,7 @@ func eventTimestamp(ev v1.Event) time.Time {
 
 // GetPodEvents finds all events where the pod of the given session is
 // involved in. It will be sorted by timestamp
-func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*v1.EventList, error) {
+func (as *HpcAmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*v1.EventList, error) {
 	log := log.FromContext(ctx)
 	events := v1.EventList{}
 	podName := as.PodName()

@@ -512,7 +512,7 @@ func (a *HpcAmaltheaSession) GetHealthcheckURL() *url.URL {
 
 // Return the name of the pod associated to the session.
 // There will be always only one pod, so the `-0` suffix is used.
-func (as *AmaltheaSession) PodName() string {
+func (as *HpcAmaltheaSession) PodName() string {
 	return fmt.Sprintf("%s-0", as.Name)
 }
 
