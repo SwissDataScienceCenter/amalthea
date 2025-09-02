@@ -21,10 +21,11 @@ import (
 	"fmt"
 	"net/url"
 
+	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/spf13/viper"
 )
 
-const RemoteSessionControllerPort int32 = 65532
+// const RemoteSessionControllerPort int32 = 65532
 
 type RemoteSessionControllerConfig struct {
 	// NOTE: this config struct only support using the FirecREST API for now
@@ -69,7 +70,7 @@ func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
 	v.SetDefault("renku_client_id", "")
 	v.SetDefault("renku_client_secret", "")
 
-	v.SetDefault("server_port", RemoteSessionControllerPort)
+	v.SetDefault("server_port", amaltheadevv1alpha1.RemoteSessionControllerPort)
 
 	if err := v.Unmarshal(&cfg); err != nil {
 		return RemoteSessionControllerConfig{}, err
