@@ -124,6 +124,10 @@ func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state mo
 
 // Start sets up and starts the remote session using the FirecREST API
 func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
+	// TODO: handle start when the pod was deleted:
+	// TODO: 1. we should save the job ID on disk, on the session PVC
+	// TODO: 2. try to load the currently running job ID from disk
+
 	if c.jobID != "" {
 		return fmt.Errorf("a remote job is already running: %s", c.jobID)
 	}
