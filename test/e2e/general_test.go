@@ -59,7 +59,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 	AfterAll(func(ctx SpecContext) {
 		By("deleting all resources")
 		Expect(
-			k8sClient.DeleteAllOf(ctx, &amaltheadevv1alpha1.AmaltheaSession{}, client.InNamespace(namespace)),
+			k8sClient.DeleteAllOf(ctx, &amaltheadevv1alpha1.HpcAmaltheaSession{}, client.InNamespace(namespace)),
 		).To(Succeed())
 		By("stopping controller")
 		stopController()
@@ -72,7 +72,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 	Context("using reconcile strategies", func() {
 		var resourceName string
 		var typeNamespacedName types.NamespacedName
-		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
+		var amaltheasession *amaltheadevv1alpha1.HpcAmaltheaSession
 
 		BeforeEach(func(ctx SpecContext) {
 			By("creating the custom resource for the Kind AmaltheaSession")
@@ -81,7 +81,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 				Name:      resourceName,
 				Namespace: namespace,
 			}
-			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
+			amaltheasession = &amaltheadevv1alpha1.HpcAmaltheaSession{
 				ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
 				Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
 					Session: amaltheadevv1alpha1.Session{
@@ -95,7 +95,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
 			By("Checking if the custom resource was successfully created")
 			Eventually(func() error {
-				found := &amaltheadevv1alpha1.AmaltheaSession{}
+				found := &amaltheadevv1alpha1.HpcAmaltheaSession{}
 				return k8sClient.Get(ctx, typeNamespacedName, found)
 			}, time.Minute, time.Second).WithContext(ctx).Should(Succeed())
 			By("Checking if the session is running")
@@ -205,12 +205,12 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 					g.Expect(sessionPod.Spec.Containers[0].Resources.Requests.Memory()).ShouldNot(Equal(&newMemory))
 				}, "30s").WithContext(ctx).Should(Succeed())
 				By("Hibernating the session")
-				patched = &amaltheadevv1alpha1.AmaltheaSession{}
+				patched = &amaltheadevv1alpha1.HpcAmaltheaSession{}
 				Expect(k8sClient.Get(ctx, typeNamespacedName, patched)).To(Succeed())
 				patched.Spec.Hibernated = true
 				Expect(k8sClient.Update(ctx, patched)).To(Succeed())
 				By("Resuming the session we should see the new changes")
-				patched = &amaltheadevv1alpha1.AmaltheaSession{}
+				patched = &amaltheadevv1alpha1.HpcAmaltheaSession{}
 				Expect(k8sClient.Get(ctx, typeNamespacedName, patched)).To(Succeed())
 				patched.Spec.Hibernated = false
 				Expect(k8sClient.Update(ctx, patched)).To(Succeed())
@@ -227,7 +227,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 	Context("When the session is failing", func() {
 		var resourceName string
 		var typeNamespacedName types.NamespacedName
-		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
+		var amaltheasession *amaltheadevv1alpha1.HpcAmaltheaSession
 		var quota *corev1.ResourceQuota
 		var prioClass *schedv1.PriorityClass
 
@@ -238,7 +238,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 				Name:      resourceName,
 				Namespace: namespace,
 			}
-			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
+			amaltheasession = &amaltheadevv1alpha1.HpcAmaltheaSession{
 				ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
 				Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
 					Session: amaltheadevv1alpha1.Session{
