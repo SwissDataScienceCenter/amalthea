@@ -35,10 +35,16 @@ import (
 
 // TODO: support different types of remote session controller
 func NewRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c *firecrest.FirecrestRemoteSessionController, err error) {
-	firecrestAuth, err := auth.NewFirecrestClientCredentialsAuth(cfg.FirecrestAuthTokenURI, string(cfg.FirecrestClientID), string(cfg.FirecrestClientSecret))
+	// firecrestAuth, err := auth.NewFirecrestClientCredentialsAuth(cfg.FirecrestAuthTokenURI, string(cfg.FirecrestClientID), string(cfg.FirecrestClientSecret))
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	firecrestAuth, err := auth.NewRenkuAuth(cfg.FirecrestAuthTokenURI, cfg.RenkuAccessToken, cfg.RenkuRefreshToken, cfg.RenkuTokenURI, cfg.RenkuClientID, cfg.RenkuClientSecret)
 	if err != nil {
 		return nil, err
 	}
+
 	firecrestAPIURL, err := url.Parse(cfg.FirecrestAPIURL)
 	if err != nil {
 		return nil, err

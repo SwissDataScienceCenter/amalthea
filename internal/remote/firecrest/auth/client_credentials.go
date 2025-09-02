@@ -18,13 +18,8 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"net/http"
-	"net/url"
-	"strings"
 	"sync"
 	"time"
 )
@@ -50,6 +45,9 @@ type FirecrestClientCredentialsAuth struct {
 	// httpClient is the HTTP client used to obtain access tokens
 	httpClient *http.Client
 }
+
+// Check that FirecrestClientCredentialsAuth satisfies the FirecrestAuth interface
+var _ FirecrestAuth = (*FirecrestClientCredentialsAuth)(nil)
 
 func NewFirecrestClientCredentialsAuth(tokenURI, clientID, clientSecret string, options ...FirecrestClientCredentialsAuthOption) (auth *FirecrestClientCredentialsAuth, err error) {
 	auth = &FirecrestClientCredentialsAuth{
@@ -138,55 +136,12 @@ func (a *FirecrestClientCredentialsAuth) refreshAccessToken() error {
 	ctx, cancel := context.WithTimeoutCause(context.Background(), 30*time.Second, fmt.Errorf("authentication request timed out"))
 	defer cancel()
 
-	result, err := getNewAccessToken(ctx, a.httpClient, a.tokenURI, a.clientID, a.clientSecret)
+	result, err := requestNewAccessToken(ctx, a.httpClient, a.tokenURI, "client_credentials", a.clientID, a.clientSecret, "")
 	if err != nil {
 		return err
 	}
 
 	a.accessToken = result.AccessToken
-	a.accessTokenExpiresAt = time.Now().Add(time.Second * time.Duration(result.ExpiresIn))
+	a.accessTokenExpiresAt = result.ExpiresAt
 	return nil
-}
-
-func getNewAccessToken(ctx context.Context, httpClient *http.Client, tokenURI, clientID, clientSecret string) (result tokenResponse, err error) {
-	postData := url.Values{}
-	postData.Set("grant_type", "client_credentials")
-	postData.Set("client_id", clientID)
-	postData.Set("client_secret", clientSecret)
-	body := strings.NewReader(postData.Encode())
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURI, body)
-	if err != nil {
-		return tokenResponse{}, err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return tokenResponse{}, err
-	}
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return tokenResponse{}, fmt.Errorf("token request failed: %s", res.Status)
-	}
-	return parseTokenResponse(res)
-}
-
-type tokenResponse struct {
-	AccessToken string `json:"access_token"`
-	ExpiresIn   int    `json:"expires_in"`
-}
-
-func parseTokenResponse(res *http.Response) (result tokenResponse, err error) {
-	bodyBytes, err := io.ReadAll(res.Body)
-	defer func() {
-		err := res.Body.Close()
-		if err != nil {
-			log.Default().Printf("Warning: error while closing request body: %s", err.Error())
-		}
-	}()
-	if err != nil {
-		return tokenResponse{}, err
-	}
-	if err := json.Unmarshal(bodyBytes, &result); err != nil {
-		return tokenResponse{}, err
-	}
-	return result, nil
 }

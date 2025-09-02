@@ -31,12 +31,20 @@ type RemoteSessionControllerConfig struct {
 
 	// The URL of the FirecREST API
 	FirecrestAPIURL string `mapstructure:"firecrest_api_url"`
+
 	// The URI of the authentication endpoint for the FirecREST API
 	FirecrestAuthTokenURI string `mapstructure:"firecrest_auth_token_uri"`
 	// The client ID for the FirecREST API
 	FirecrestClientID RedactedString `mapstructure:"firecrest_client_id"`
 	// The client secret for the FirecREST API
 	FirecrestClientSecret RedactedString `mapstructure:"firecrest_client_secret"`
+
+	// Fields for the renku auth
+	RenkuAccessToken  string `mapstructure:"renku_access_token"`
+	RenkuRefreshToken string `mapstructure:"renku_refresh_token"`
+	RenkuTokenURI     string `mapstructure:"renku_auth_token_uri"`
+	RenkuClientID     string `mapstructure:"renku_client_id"`
+	RenkuClientSecret string `mapstructure:"renku_client_secret"`
 
 	// The port the server will listen to
 	ServerPort int `mapstructure:"server_port"`
@@ -48,9 +56,19 @@ func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
 	v.AutomaticEnv()
 
 	v.SetDefault("firecrest_api_url", "")
+
+	// Auth - Client credentials grant
 	v.SetDefault("firecrest_auth_token_uri", "")
 	v.SetDefault("firecrest_client_id", "")
 	v.SetDefault("firecrest_client_secret", "")
+
+	// Auth - Renku auth
+	v.SetDefault("renku_access_token", "")
+	v.SetDefault("renku_refresh_token", "")
+	v.SetDefault("renku_auth_token_uri", "")
+	v.SetDefault("renku_client_id", "")
+	v.SetDefault("renku_client_secret", "")
+
 	v.SetDefault("server_port", RemoteSessionControllerPort)
 
 	if err := v.Unmarshal(&cfg); err != nil {
@@ -66,17 +84,19 @@ func (cfg *RemoteSessionControllerConfig) Validate() error {
 	if _, err := url.Parse(cfg.FirecrestAPIURL); err != nil {
 		return fmt.Errorf("FirecrestAPIURL is not valid: %w", err)
 	}
-	if cfg.FirecrestAuthTokenURI == "" {
-		return fmt.Errorf("FirecrestAuthTokenURI is not defined")
-	}
-	if _, err := url.Parse(cfg.FirecrestAuthTokenURI); err != nil {
-		return fmt.Errorf("FirecrestAuthTokenURI is not valid: %w", err)
-	}
-	if cfg.FirecrestClientID == "" {
-		return fmt.Errorf("FirecrestClientID is not defined")
-	}
-	if cfg.FirecrestClientSecret == "" {
-		return fmt.Errorf("FirecrestClientSecret is not defined")
-	}
+
+	// if cfg.FirecrestAuthTokenURI == "" {
+	// 	return fmt.Errorf("FirecrestAuthTokenURI is not defined")
+	// }
+	// if _, err := url.Parse(cfg.FirecrestAuthTokenURI); err != nil {
+	// 	return fmt.Errorf("FirecrestAuthTokenURI is not valid: %w", err)
+	// }
+	// if cfg.FirecrestClientID == "" {
+	// 	return fmt.Errorf("FirecrestClientID is not defined")
+	// }
+	// if cfg.FirecrestClientSecret == "" {
+	// 	return fmt.Errorf("FirecrestClientSecret is not defined")
+	// }
+
 	return nil
 }
