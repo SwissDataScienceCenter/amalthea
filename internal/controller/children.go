@@ -61,7 +61,7 @@ const freshContainerMinimalAge = 15 * time.Second
 
 const maxWaitForClearFailedScheduling = 90 * time.Second
 
-func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
+func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.HpcAmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
 	log := log.FromContext(ctx)
 	if c.Current == nil {
 		return ChildResourceUpdate[T]{}
@@ -255,7 +255,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 	}
 }
 
-func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResources, error) {
+func NewChildResources(cr *amaltheadevv1alpha1.HpcAmaltheaSession) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredService := cr.Service()
@@ -292,7 +292,7 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResources,
 	return output, nil
 }
 
-func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) (ChildResourceUpdates, error) {
+func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.HpcAmaltheaSession) (ChildResourceUpdates, error) {
 	output := ChildResourceUpdates{
 		StatefulSet: c.StatefulSet.Reconcile(ctx, clnt, cr),
 		PVC:         c.PVC.Reconcile(ctx, clnt, cr),
@@ -331,7 +331,7 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	return stsReady && podReady
 }
 
-func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
+func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.HpcAmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
 	msg := c.failureMessage(pod)
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
@@ -397,7 +397,7 @@ const (
 // - finally failed: if the latest event is FailedScheduling and this has been seen for a while exceeding maximum wait time
 // - auto scheduling: if an TriggeredScaleUp events has been found as the last event
 // - none of the above
-func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, client client.Reader) (EventsInferedStateResult, error) {
+func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.HpcAmaltheaSession, client client.Reader) (EventsInferedStateResult, error) {
 	const failedScheduling = "FailedScheduling"
 	const scheduled = "Scheduled"
 	const triggeredScaleUp = "TriggeredScaleUp"
@@ -450,7 +450,7 @@ func Conditions(
 	state amaltheadevv1alpha1.State,
 	ctx context.Context,
 	r *AmaltheaSessionReconciler,
-	cr *amaltheadevv1alpha1.AmaltheaSession,
+	cr *amaltheadevv1alpha1.HpcAmaltheaSession,
 ) []amaltheadevv1alpha1.AmaltheaSessionCondition {
 	conditions := cr.Status.Conditions
 	if len(conditions) == 0 {
@@ -526,7 +526,7 @@ func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.Amalthe
 
 func checkEventsInferedState(ctx context.Context,
 	r *AmaltheaSessionReconciler,
-	cr *amaltheadevv1alpha1.AmaltheaSession, currentState amaltheadevv1alpha1.State) (metav1.Time, amaltheadevv1alpha1.State, error) {
+	cr *amaltheadevv1alpha1.HpcAmaltheaSession, currentState amaltheadevv1alpha1.State) (metav1.Time, amaltheadevv1alpha1.State, error) {
 
 	failedSchedulingSince := cr.Status.FailedSchedulingSince
 	var err error
@@ -557,7 +557,7 @@ func checkEventsInferedState(ctx context.Context,
 func (c ChildResourceUpdates) Status(
 	ctx context.Context,
 	r *AmaltheaSessionReconciler,
-	cr *amaltheadevv1alpha1.AmaltheaSession,
+	cr *amaltheadevv1alpha1.HpcAmaltheaSession,
 ) amaltheadevv1alpha1.AmaltheaSessionStatus {
 	log := log.FromContext(ctx)
 
