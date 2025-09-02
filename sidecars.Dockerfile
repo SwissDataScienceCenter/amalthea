@@ -3,7 +3,6 @@ FROM golang:1.24 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG WSTUNNEL_VERSION="10.4.4"
-ARG WSTUNNEL_PLATFORM="linux_amd64"
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -14,7 +13,7 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Download and extract wstunnel
-RUN curl -L https://github.com/erebe/wstunnel/releases/download/v${WSTUNNEL_VERSION}/wstunnel_${WSTUNNEL_VERSION}_${WSTUNNEL_PLATFORM}.tar.gz -o /tmp/wstunnel.tar.gz && \
+RUN curl -L https://github.com/erebe/wstunnel/releases/download/v${WSTUNNEL_VERSION}/wstunnel_${WSTUNNEL_VERSION}_${TARGETOS}_${TARGETARCH}.tar.gz -o /tmp/wstunnel.tar.gz && \
     tar -xzf /tmp/wstunnel.tar.gz -C /usr/local/bin/ && \
     chmod +x /usr/local/bin/wstunnel
 
