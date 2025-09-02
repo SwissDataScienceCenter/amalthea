@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
 	"time"
 
@@ -146,11 +145,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	log.Info("spec", "cr", amaltheasession)
 
-	if amaltheasession.Spec.SessionLocation != amaltheadevv1alpha1.Local {
-		err = fmt.Errorf("session location %s is not yet supported", amaltheasession.Spec.SessionLocation)
-		log.Error(err, "Not implemented error.")
-		return ctrl.Result{}, err
-	}
+	// TODO: handle session location "remote"
 
 	children, err := NewChildResources(amaltheasession)
 	if err != nil {
