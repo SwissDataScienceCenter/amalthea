@@ -712,6 +712,15 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 		Value: fmt.Sprintf("%d", RemoteSessionControllerPort),
 	})
 
+	if session.RemoteSecretRef != nil {
+		sessionContainer.EnvFrom = append(sessionContainer.EnvFrom, v1.EnvFromSource{
+			// This secret contains the configuration for the remote session controller
+			SecretRef: &v1.SecretEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: session.RemoteSecretRef.Name},
+			},
+		})
+	}
+
 	sessionContainer.LivenessProbe = &v1.Probe{
 		ProbeHandler: v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
