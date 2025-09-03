@@ -164,6 +164,10 @@ func (cr *HpcAmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 			},
 		},
 	}
+	// Set the termination grace period for remote sessions to 60 seconds
+	if cr.Spec.SessionLocation == Remote {
+		sts.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(60))
+	}
 	return sts, nil
 }
 
