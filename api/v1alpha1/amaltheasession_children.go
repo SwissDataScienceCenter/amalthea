@@ -696,7 +696,7 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 		},
 		Args: []string{
 			"remote-session-controller",
-			"serve",
+			"run",
 		},
 		// TODO: Properly configure env vars
 		Env: session.Env,
