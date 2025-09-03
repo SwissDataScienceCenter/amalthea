@@ -719,7 +719,6 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 				Path: "/live",
 			},
 		},
-		SuccessThreshold:    3,
 		PeriodSeconds:       1,
 		InitialDelaySeconds: 10,
 	}
