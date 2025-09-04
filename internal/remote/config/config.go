@@ -41,11 +41,11 @@ type RemoteSessionControllerConfig struct {
 	FirecrestClientSecret RedactedString `mapstructure:"firecrest_client_secret"`
 
 	// Fields for the renku auth
-	RenkuAccessToken  string `mapstructure:"renku_access_token"`
-	RenkuRefreshToken string `mapstructure:"renku_refresh_token"`
-	RenkuTokenURI     string `mapstructure:"renku_auth_token_uri"`
-	RenkuClientID     string `mapstructure:"renku_client_id"`
-	RenkuClientSecret string `mapstructure:"renku_client_secret"`
+	RenkuAccessToken  RedactedString `mapstructure:"renku_access_token"`
+	RenkuRefreshToken RedactedString `mapstructure:"renku_refresh_token"`
+	RenkuTokenURI     string         `mapstructure:"renku_auth_token_uri"`
+	RenkuClientID     string         `mapstructure:"renku_client_id"`
+	RenkuClientSecret RedactedString `mapstructure:"renku_client_secret"`
 
 	// The port the server will listen to
 	ServerPort int `mapstructure:"server_port"`

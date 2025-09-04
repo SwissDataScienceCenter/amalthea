@@ -202,9 +202,11 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 func (c *FirecrestRemoteSessionController) Stop(ctx context.Context) error {
 	// The remote job was never submitted, nothing to do
 	if c.jobID == "" {
+		slog.Info("no job to cancel")
 		return nil
 	}
 
+	slog.Info("cancelling job", "jobID", c.jobID)
 	res, err := c.client.DeleteJobCancelComputeSystemNameJobsJobIdDeleteWithResponse(ctx, c.systemName, c.jobID)
 	if err != nil {
 		return err
