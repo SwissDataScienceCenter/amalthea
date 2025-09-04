@@ -192,8 +192,14 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 	// TODO: upload user secrets into secretsPath
 
-	// TODO: setup env vars
 	env := map[string]string{}
+	// Copy the REMOTE_SESSION environment variables
+	for _, environ := range os.Environ() {
+		key, val, _ := strings.Cut(environ, "=")
+		if strings.HasPrefix(key, "REMOTE_SESSION") {
+			env[key] = val
+		}
+	}
 	// Copy RENKU environment variables
 	for _, environ := range os.Environ() {
 		key, val, _ := strings.Cut(environ, "=")
@@ -314,9 +320,9 @@ func (c *FirecrestRemoteSessionController) uploadFile(ctx context.Context, direc
 			message = res.JSON5XX.Message
 		}
 		if message != "" {
-			return fmt.Errorf("could run mkdir: %s", message)
+			return fmt.Errorf("could run uploadFile: %s", message)
 		}
-		return fmt.Errorf("could run mkdir: HTTP %d", res.StatusCode())
+		return fmt.Errorf("could run uploadFile: HTTP %d", res.StatusCode())
 	}
 	return nil
 }
@@ -362,9 +368,9 @@ func (c *FirecrestRemoteSessionController) chmod(ctx context.Context, path strin
 			message = res.JSON5XX.Message
 		}
 		if message != "" {
-			return fmt.Errorf("could run mkdir: %s", message)
+			return fmt.Errorf("could run chmod: %s", message)
 		}
-		return fmt.Errorf("could run mkdir: HTTP %d", res.StatusCode())
+		return fmt.Errorf("could run chmod: HTTP %d", res.StatusCode())
 	}
 	return nil
 }
@@ -385,9 +391,9 @@ func (c *FirecrestRemoteSessionController) submitJob(ctx context.Context, job Jo
 			message = res.JSON5XX.Message
 		}
 		if message != "" {
-			return "", fmt.Errorf("could run mkdir: %s", message)
+			return "", fmt.Errorf("could run submitJob: %s", message)
 		}
-		return "", fmt.Errorf("could run mkdir: HTTP %d", res.StatusCode())
+		return "", fmt.Errorf("could run submitJob: HTTP %d", res.StatusCode())
 	}
 	if res.JSON201.JobId == nil {
 		return "", fmt.Errorf("invalid job submission response")
