@@ -778,11 +778,15 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 		TerminationMessagePolicy: v1.TerminationMessageReadFile,
 	}
 
+	// TODO: make this actually work!!!
+	enrootDomain, enrootImage, _ := strings.Cut(cr.Spec.Session.Image, "/")
+	enrootImage = enrootDomain + "#" + enrootImage
+
 	sessionContainer.Env = append(
 		sessionContainer.Env,
 		v1.EnvVar{
 			Name:  "REMOTE_SESSION_IMAGE",
-			Value: cr.Spec.Session.Image,
+			Value: enrootImage,
 		},
 		v1.EnvVar{
 			Name:  "SERVER_PORT",
