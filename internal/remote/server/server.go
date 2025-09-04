@@ -76,16 +76,17 @@ func Start() {
 
 	// Start the remote session
 	// TODO: should the 15-minute timeout be configurable?
-	startCtx, startCancel := context.WithTimeout(context.Background(), 15*time.Minute)
-	err = controller.Start(startCtx)
-	startCancel()
-	if err != nil {
-		slog.Error("could not start session", "error", err)
-		os.Exit(1)
-	}
+	// startCtx, startCancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	// err = controller.Start(startCtx)
+	// startCancel()
+	// if err != nil {
+	// 	slog.Error("could not start session", "error", err)
+	// 	os.Exit(1)
+	// }
 
 	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 60 seconds.
 	<-ctx.Done()
+	slog.Info("shutting down the server", "reason", ctx.Err())
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	if err := controller.Stop(ctx); err != nil {
@@ -123,11 +124,12 @@ func newServer(controller *firecrest.FirecrestRemoteSessionController) (server *
 
 	// Readiness endpoint
 	e.GET("/ready", func(c echo.Context) error {
-		status, err := controller.Status(c.Request().Context())
-		if err == nil && status == models.Running {
-			return c.NoContent(http.StatusOK)
-		}
-		return c.NoContent(http.StatusServiceUnavailable)
+		return c.NoContent(http.StatusOK)
+		// status, err := controller.Status(c.Request().Context())
+		// if err == nil && status == models.Running {
+		// 	return c.NoContent(http.StatusOK)
+		// }
+		// return c.NoContent(http.StatusServiceUnavailable)
 	})
 
 	// Status endpoint

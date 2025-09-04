@@ -40,7 +40,14 @@ func NewRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c *fi
 	// 	return nil, err
 	// }
 
-	firecrestAuth, err := auth.NewRenkuAuth(cfg.FirecrestAuthTokenURI, cfg.RenkuAccessToken, cfg.RenkuRefreshToken, cfg.RenkuTokenURI, cfg.RenkuClientID, cfg.RenkuClientSecret)
+	firecrestAuth, err := auth.NewRenkuAuth(
+		cfg.FirecrestAuthTokenURI,
+		string(cfg.RenkuAccessToken),
+		string(cfg.RenkuRefreshToken),
+		cfg.RenkuTokenURI,
+		cfg.RenkuClientID,
+		string(cfg.RenkuClientSecret),
+	)
 	if err != nil {
 		return nil, err
 	}
