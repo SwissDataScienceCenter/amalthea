@@ -603,8 +603,23 @@ func (as *HpcAmaltheaSession) Secret() v1.Secret {
 			Labels:    labels,
 		},
 	}
+	// Secret used to secure the tunnel for remote sessions
+	tunnelSecret := ""
+	if as.Spec.SessionLocation == Remote {
+		var err error
+		tunnelSecret, err = makeTunnelSecret(16)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	if as.Spec.Authentication == nil || as.Spec.Authentication.Type != Oidc {
 		// In this case we do not need anything in the secret - we just return an empty one
+		if tunnelSecret != "" {
+			secret.StringData = map[string]string{
+				"WSTUNNEL_SECRET": tunnelSecret,
+			}
+		}
 		return secret
 	}
 
@@ -666,20 +681,11 @@ func (as *HpcAmaltheaSession) Secret() v1.Secret {
 		panic(err)
 	}
 
-	// Secret used to secure the tunnel for remote sessions
-	tunnelSecret := ""
-	if as.Spec.SessionLocation == Remote {
-		tunnelSecret, err = makeTunnelSecret(16)
-		if err != nil {
-			panic(err)
-		}
-	}
-
 	secret.StringData = map[string]string{
 		"oauth2-proxy-alpha-config.yaml": string(newConfigStr),
 		"oauth2-proxy-config.yaml":       strings.Join(oldConfigLines, "\n"),
 	}
-	if as.Spec.SessionLocation == Remote {
+	if tunnelSecret != "" {
 		secret.StringData["WSTUNNEL_SECRET"] = tunnelSecret
 	}
 	return secret
