@@ -25,6 +25,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -240,7 +241,7 @@ func serve(cmd *cobra.Command, args []string) {
 
 	e.Logger.Infof("Starting proxy for remote: %s, cookie key: %s, token of length %d", remoteURL.String(), cookieKey, len(token))
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	// Start server
 	go func() {
