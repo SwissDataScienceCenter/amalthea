@@ -12,7 +12,7 @@ set -e -o pipefail
 #     rclone="$(install_rclone)"
 #.    "$rclone" version
 function install_rclone() {
-    RENKU_DIR="${HOME}/.renku/$(uname -m)"
+    RENKU_DIR="${HOME}/renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
     RCLONE_VERSION="1.70.2"
     RCLONE_PKG="${RENKU_PKG}/rclone/v${RCLONE_VERSION}"
@@ -66,7 +66,7 @@ function install_rclone() {
 #     wstunnel="$(install_wstunnel)"
 #.    "$wstunnel" --version
 function install_wstunnel() {
-    RENKU_DIR="${HOME}/.renku/$(uname -m)"
+    RENKU_DIR="${HOME}/renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
     WSTUNNEL_VERSION="10.4.3"
     WSTUNNEL_PKG="${RENKU_PKG}/wstunnel/v${WSTUNNEL_VERSION}"
@@ -140,8 +140,8 @@ rclone=$(install_rclone)
 echo "rclone: ${rclone}"
 
 # Install wstunnel
-# wstunnel=$(install_wstunnel)
-# echo "wstunnel: ${wstunnel}"
+wstunnel=$(install_wstunnel)
+echo "wstunnel: ${wstunnel}"
 
 # Create the environment.toml file to run the session
 EDF_FILE="${SESSION_DIR}/environment.toml"
@@ -163,7 +163,7 @@ export RENKU_WORKING_DIR="${SESSION_WORK_DIR}"
 export RENKU_SESSION_IP="127.0.0.1"
 
 # Load the wstunnel secret
-# export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
+export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
 
 env | grep "RENKU" || true
 
@@ -183,26 +183,22 @@ EOF
 "${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
 
 # echo "Starting tunnel..."
-# GIT_PROXY_PORT="${GIT_PROXY_PORT:-8080}"
-# # For tunnel service at root (/)
-# # echo "wstunnel client -R tcp://0.0.0.0:${WSTUNNEL_SESSION_PORT}:localhost:${RENKU_SESSION_PORT} -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT} wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT} -P <SECRET> --tls-verify-certificate &"
-# # "${wstunnel}" client -R "tcp://0.0.0.0:${WSTUNNEL_SESSION_PORT}:localhost:${RENKU_SESSION_PORT}" -L "tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT}" "wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT}" -P "${WSTUNNEL_SECRET}" --tls-verify-certificate &
-# # For tunnel service at a prefix path (e.g. /sessions/session-id/wstunnel)
-# WSTUNNEL_PATH_PREFIX="${WSTUNNEL_PATH_PREFIX:-sessions/my-session/wstunnel}"
-# echo "wstunnel client \
-#   -R tcp://0.0.0.0:${WSTUNNEL_SESSION_PORT}:localhost:${RENKU_SESSION_PORT} \
-#   -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT} \
-#   wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT} \
-#   -P ${WSTUNNEL_PATH_PREFIX} \
-#   -H Authorization: Bearer <SECRET> \
-#   --tls-verify-certificate &"
-# "${wstunnel}" client \
-#   -R "tcp://0.0.0.0:${WSTUNNEL_SESSION_PORT}:localhost:${RENKU_SESSION_PORT}" \
-#   -L "tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT}" \
-#   "wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT}" \
-#   -P "${WSTUNNEL_PATH_PREFIX}" \
-#   -H "Authorization: Bearer ${WSTUNNEL_SECRET}" \
-#   --tls-verify-certificate &
+GIT_PROXY_PORT="${GIT_PROXY_PORT:-65480}"
+WSTUNNEL_PATH_PREFIX="${WSTUNNEL_PATH_PREFIX:-sessions/my-session/wstunnel}"
+echo "wstunnel client \
+  -R tcp://0.0.0.0:${RENKU_SESSION_PORT}:localhost:${RENKU_SESSION_PORT} \
+  -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT} \
+  wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT} \
+  -P ${WSTUNNEL_PATH_PREFIX} \
+  -H Authorization: Bearer <SECRET> \
+  --tls-verify-certificate &"
+"${wstunnel}" client \
+  -R "tcp://0.0.0.0:${RENKU_SESSION_PORT}:localhost:${RENKU_SESSION_PORT}" \
+  -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT} \
+  "wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT}" \
+  -P "${WSTUNNEL_PATH_PREFIX}" \
+  -H "Authorization: Bearer ${WSTUNNEL_SECRET}" \
+  --tls-verify-certificate &
 
 # echo "Setting up example git repository..."
 # echo "Waiting for tunnel..."

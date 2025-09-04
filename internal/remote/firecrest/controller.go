@@ -17,10 +17,14 @@ limitations under the License.
 package firecrest
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"fmt"
+	"io"
 	"log/slog"
+	"mime/multipart"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -172,8 +176,41 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	wstunnel_secret := os.Getenv("WSTUNNEL_SECRET")
+	if wstunnel_secret != "" {
+		c.uploadFile(ctx, secretsPath, "wstunnel_secret", []byte(wstunnel_secret))
+	}
+	// TODO: upload user secrets into secretsPath
 
+	// TODO: setup env vars
+	env := map[string]string{}
+	// Copy RENKU environment variables
+	for _, environ := range os.Environ() {
+		key, val, _ := strings.Cut(environ, "=")
+		if strings.HasPrefix(key, "RENKU") {
+			env[key] = val
+		}
+	}
+	// Setup WSTUNNEL environment variables
+	renkuBaseURLStr := os.Getenv("RENKU_BASE_URL")
+	if renkuBaseURLStr != "" {
+		renkuBaseURL, err := url.Parse(renkuBaseURLStr)
+		if err != nil {
+			return err
+		}
+		env["WSTUNNEL_SERVICE_ADDRESS"] = renkuBaseURL.Hostname()
+		env["WSTUNNEL_SERVICE_PORT"] = fmt.Sprintf("%d", 443)      // wss port (same as https)
+		env["WSTUNNEL_PATH_PREFIX"] = renkuBaseURLPath + "/tunnel" // session path with tunnel
+	}
+	// TODO: GIT_PROXY_PORT
+
+	jobEnv := JobDescriptionModel_Env{}
+	err = jobEnv.FromJobDescriptionModelEnv0(env)
+	if err != nil {
+		return err
+	}
 	job := JobDescriptionModel{
+		Env:              &jobEnv,
 		Script:           &sessionScript,
 		WorkingDirectory: sessionPath,
 	}
@@ -225,6 +262,43 @@ func (c *FirecrestRemoteSessionController) getUserInfo(ctx context.Context) (use
 		return UserInfoResponse{}, fmt.Errorf("could not get user info: HTTP %d", res.StatusCode())
 	}
 	return *res.JSON200, nil
+}
+
+func (c *FirecrestRemoteSessionController) uploadFile(ctx context.Context, directory, filename string, contents []byte) error {
+	params := PostUploadFilesystemSystemNameOpsUploadPostParams{
+		Path: directory,
+	}
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(part, bytes.NewReader(contents))
+	if err != nil {
+		return err
+	}
+	err = writer.Close()
+	if err != nil {
+		return err
+	}
+	res, err := c.client.PostUploadFilesystemSystemNameOpsUploadPostWithBodyWithResponse(ctx, c.systemName, &params, writer.FormDataContentType(), body)
+	if err != nil {
+		return err
+	}
+	if res.StatusCode() != 204 {
+		message := ""
+		if res.JSON4XX != nil {
+			message = res.JSON4XX.Message
+		} else if res.JSON5XX != nil {
+			message = res.JSON5XX.Message
+		}
+		if message != "" {
+			return fmt.Errorf("could run mkdir: %s", message)
+		}
+		return fmt.Errorf("could run mkdir: HTTP %d", res.StatusCode())
+	}
+	return nil
 }
 
 func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path string, createParents bool) error {

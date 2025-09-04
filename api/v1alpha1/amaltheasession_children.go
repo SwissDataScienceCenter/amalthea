@@ -298,7 +298,7 @@ func (cr *HpcAmaltheaSession) Ingress() *networkingv1.Ingress {
 	if cr.Spec.SessionLocation == Remote {
 		mainRule := &ing.Spec.Rules[0]
 		mainRule.HTTP.Paths = append(mainRule.HTTP.Paths, networkingv1.HTTPIngressPath{
-			Path:     cr.ingressPathPrefix() + "tunnel/",
+			Path:     cr.ingressPathPrefix() + "tunnel",
 			PathType: ptr.To(networkingv1.PathTypePrefix),
 			Backend: networkingv1.IngressBackend{
 				Service: &networkingv1.IngressServiceBackend{
@@ -778,10 +778,22 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 		TerminationMessagePolicy: v1.TerminationMessageReadFile,
 	}
 
-	sessionContainer.Env = append(sessionContainer.Env, v1.EnvVar{
-		Name:  "SERVER_PORT",
-		Value: fmt.Sprintf("%d", RemoteSessionControllerPort),
-	})
+	sessionContainer.Env = append(
+		sessionContainer.Env,
+		v1.EnvVar{
+			Name:  "SERVER_PORT",
+			Value: fmt.Sprintf("%d", RemoteSessionControllerPort),
+		},
+		v1.EnvVar{
+			Name: "WSTUNNEL_SECRET",
+			ValueFrom: ptr.To(v1.EnvVarSource{
+				SecretKeyRef: ptr.To(v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
+					Key:                  "WSTUNNEL_SECRET",
+				}),
+			}),
+		},
+	)
 
 	if session.RemoteSecretRef != nil {
 		sessionContainer.EnvFrom = append(sessionContainer.EnvFrom, v1.EnvFromSource{
@@ -855,7 +867,6 @@ func (cr *HpcAmaltheaSession) tunnelContainer() v1.Container {
 				// With cpu limits you get throttled when you go over the request always, even with spare capacity
 			},
 		},
-		// VolumeMounts:             volumeMounts,
 		// TODO: probes?
 	}
 
