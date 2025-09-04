@@ -781,6 +781,10 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 	sessionContainer.Env = append(
 		sessionContainer.Env,
 		v1.EnvVar{
+			Name:  "REMOTE_SESSION_IMAGE",
+			Value: cr.Spec.Session.Image,
+		},
+		v1.EnvVar{
 			Name:  "SERVER_PORT",
 			Value: fmt.Sprintf("%d", RemoteSessionControllerPort),
 		},
