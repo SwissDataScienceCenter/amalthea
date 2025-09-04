@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"sort"
@@ -34,10 +35,13 @@ const serviceMetaPortName string = prefix + "http-meta"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
+const tunnelContainerName string = "tunnel"
+const tunnelServiceName string = prefix + "tunnel-http"
 const authenticatedPort int32 = 65535
 const AuthProxyMetaPort int32 = 65534
 const secondProxyPort int32 = 65533
 const RemoteSessionControllerPort int32 = 65532
+const TunnelPort int32 = 65531
 
 var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
@@ -122,6 +126,9 @@ func (cr *HpcAmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 	}
 	containers = append(containers, sessionContainer)
 	containers = append(containers, auth.Containers...)
+	if cr.Spec.SessionLocation == Remote {
+		containers = append(containers, cr.tunnelContainer())
+	}
 	containers = append(containers, cr.Spec.ExtraContainers...)
 	volumes = append(volumes, auth.Volumes...)
 
@@ -198,7 +205,14 @@ func (cr *HpcAmaltheaSession) Service() v1.Service {
 					Name:       serviceMetaPortName,
 					Port:       AuthProxyMetaPort,
 					TargetPort: intstr.FromInt32(AuthProxyMetaPort),
-				}},
+				},
+				{
+					Protocol:   v1.ProtocolTCP,
+					Name:       tunnelServiceName,
+					Port:       TunnelPort,
+					TargetPort: intstr.FromInt32(TunnelPort),
+				},
+			},
 		},
 	}
 	return svc
@@ -278,6 +292,23 @@ func (cr *HpcAmaltheaSession) Ingress() *networkingv1.Ingress {
 			Hosts:      []string{ingress.Host},
 			SecretName: ingress.TLSSecret.Name,
 		}}
+	}
+
+	// Add rule for /tunnel -> tunnel container
+	if cr.Spec.SessionLocation == Remote {
+		mainRule := &ing.Spec.Rules[0]
+		mainRule.HTTP.Paths = append(mainRule.HTTP.Paths, networkingv1.HTTPIngressPath{
+			Path:     cr.ingressPathPrefix() + "tunnel/",
+			PathType: ptr.To(networkingv1.PathTypePrefix),
+			Backend: networkingv1.IngressBackend{
+				Service: &networkingv1.IngressServiceBackend{
+					Name: cr.Name,
+					Port: networkingv1.ServiceBackendPort{
+						Name: tunnelServiceName,
+					},
+				},
+			},
+		})
 	}
 
 	return ing
@@ -562,6 +593,7 @@ func (as *HpcAmaltheaSession) InternalSecretName() string {
 // a format acceptable to oauth2proxy. With the 'oidc' method we do not have to expose
 // the oauth2proxy configuration API in the format of the secret we expect from users.
 // We define our own API - specific only to OIDC and limited strictly to fields we need.
+// TODO: describe wstunnel secret for remote sessions
 func (as *HpcAmaltheaSession) Secret() v1.Secret {
 	labels := labelsForAmaltheaSession(as.Name)
 	secret := v1.Secret{
@@ -634,11 +666,31 @@ func (as *HpcAmaltheaSession) Secret() v1.Secret {
 		panic(err)
 	}
 
+	// Secret used to secure the tunnel for remote sessions
+	tunnelSecret := ""
+	if as.Spec.SessionLocation == Remote {
+		tunnelSecret, err = makeTunnelSecret(16)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	secret.StringData = map[string]string{
 		"oauth2-proxy-alpha-config.yaml": string(newConfigStr),
 		"oauth2-proxy-config.yaml":       strings.Join(oldConfigLines, "\n"),
 	}
+	if as.Spec.SessionLocation == Remote {
+		secret.StringData["WSTUNNEL_SECRET"] = tunnelSecret
+	}
 	return secret
+}
+
+func makeTunnelSecret(length int) (string, error) {
+	b := make([]byte, length)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 // sessionContainer returns the main session container
@@ -757,4 +809,49 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 	}
 
 	return sessionContainer
+}
+
+// tunnelContainer returns the tunnel container for remote sessions
+func (cr *HpcAmaltheaSession) tunnelContainer() v1.Container {
+	tunnelContainer := v1.Container{
+		Image: sidecarsImage,
+		Name:  tunnelContainerName,
+		SecurityContext: &v1.SecurityContext{
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsNonRoot:             ptr.To(true),
+		},
+		Args: []string{
+			"tunnel",
+			"listen",
+		},
+		Env: []v1.EnvVar{
+			{Name: "WSTUNNEL_PORT", Value: fmt.Sprintf("%d", TunnelPort)},
+			{
+				Name: "WSTUNNEL_SECRET",
+				ValueFrom: ptr.To(v1.EnvVarSource{
+					SecretKeyRef: ptr.To(v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
+						Key:                  "WSTUNNEL_SECRET",
+					}),
+				}),
+			},
+		},
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				"memory": resource.MustParse("16Mi"),
+				"cpu":    resource.MustParse("20m"),
+			},
+			Limits: v1.ResourceList{
+				"memory": resource.MustParse("32Mi"),
+				// NOTE: Cpu limit not set on purpose
+				// Without cpu limit if there is spare you can go over the request
+				// If there is no spare cpu then all things get throttled relative to their request
+				// With cpu limits you get throttled when you go over the request always, even with spare capacity
+			},
+		},
+		// VolumeMounts:             volumeMounts,
+		// TODO: probes?
+	}
+
+	return tunnelContainer
 }
