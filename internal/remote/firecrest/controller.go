@@ -62,12 +62,7 @@ func (c *FirecrestRemoteSessionController) GetCurrentSystem(ctx context.Context)
 		return HPCCluster{}, err
 	}
 	if res.JSON200 == nil {
-		message := ""
-		if res.JSON4XX != nil {
-			message = res.JSON4XX.Message
-		} else if res.JSON5XX != nil {
-			message = res.JSON5XX.Message
-		}
+		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
 			return HPCCluster{}, fmt.Errorf("could not get job: %s", message)
 		}
@@ -97,12 +92,7 @@ func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state mo
 		return models.Failed, err
 	}
 	if res.JSON200 == nil {
-		message := ""
-		if res.JSON4XX != nil {
-			message = res.JSON4XX.Message
-		} else if res.JSON5XX != nil {
-			message = res.JSON5XX.Message
-		}
+		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
 			return models.Failed, fmt.Errorf("could not get job: %s", message)
 		}
@@ -212,12 +202,7 @@ func (c *FirecrestRemoteSessionController) Stop(ctx context.Context) error {
 		return err
 	}
 	if res.StatusCode() < 200 || res.StatusCode() >= 300 {
-		message := ""
-		if res.JSON4XX != nil {
-			message = res.JSON4XX.Message
-		} else if res.JSON5XX != nil {
-			message = res.JSON5XX.Message
-		}
+		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
 			return fmt.Errorf("could not cancel job: %s", message)
 		}
@@ -233,12 +218,7 @@ func (c *FirecrestRemoteSessionController) getUserInfo(ctx context.Context) (use
 		return UserInfoResponse{}, err
 	}
 	if res.JSON200 == nil {
-		message := ""
-		if res.JSON4XX != nil {
-			message = res.JSON4XX.Message
-		} else if res.JSON5XX != nil {
-			message = res.JSON5XX.Message
-		}
+		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
 			return UserInfoResponse{}, fmt.Errorf("could not get user info: %s", message)
 		}
@@ -257,12 +237,7 @@ func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path strin
 		return err
 	}
 	if res.JSON201 == nil {
-		message := ""
-		if res.JSON4XX != nil {
-			message = res.JSON4XX.Message
-		} else if res.JSON5XX != nil {
-			message = res.JSON5XX.Message
-		}
+		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
 			return fmt.Errorf("could run mkdir: %s", message)
 		}
@@ -281,12 +256,7 @@ func (c *FirecrestRemoteSessionController) chmod(ctx context.Context, path strin
 		return err
 	}
 	if res.JSON200 == nil {
-		message := ""
-		if res.JSON4XX != nil {
-			message = res.JSON4XX.Message
-		} else if res.JSON5XX != nil {
-			message = res.JSON5XX.Message
-		}
+		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
 			return fmt.Errorf("could run mkdir: %s", message)
 		}
@@ -304,12 +274,7 @@ func (c *FirecrestRemoteSessionController) submitJob(ctx context.Context, job Jo
 		return "", err
 	}
 	if res.JSON201 == nil {
-		message := ""
-		if res.JSON4XX != nil {
-			message = res.JSON4XX.Message
-		} else if res.JSON5XX != nil {
-			message = res.JSON5XX.Message
-		}
+		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
 			return "", fmt.Errorf("could run mkdir: %s", message)
 		}
@@ -319,4 +284,14 @@ func (c *FirecrestRemoteSessionController) submitJob(ctx context.Context, job Jo
 		return "", fmt.Errorf("invalid job submission response")
 	}
 	return fmt.Sprintf("%d", *res.JSON201.JobId), nil
+}
+
+func getErrorMessage(json4XX, json5XX *ApiResponseError) (message string) {
+	message = ""
+	if json4XX != nil {
+		message = json4XX.Message
+	} else if json5XX != nil {
+		message = json5XX.Message
+	}
+	return message
 }
