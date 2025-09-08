@@ -111,7 +111,10 @@ function install_wstunnel() {
     echo "${WSTUNNEL_BIN}"
 }
 
-REMOTE_SESSION_IMAGE="${REMOTE_SESSION_IMAGE:-harbor.renkulab.io#renku-environments/renku-build:renku-01jy0y22543brs0fw8mkvdxh6p}"
+if [ -z "${REMOTE_SESSION_IMAGE}" ]; then
+    echo "REMOTE_SESSION_IMAGE is not set, aborting!"
+    exit 1
+fi
 
 env | grep "REMOTE_SESSION" || true
 
