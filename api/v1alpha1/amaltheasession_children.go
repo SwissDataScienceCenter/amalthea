@@ -414,6 +414,15 @@ func (cr *HpcAmaltheaSession) AdoptedSecrets() v1.SecretList {
 		})
 	}
 
+	if cr.Spec.Session.RemoteSecretRef != nil && cr.Spec.Session.RemoteSecretRef.isAdopted() {
+		secrets.Items = append(secrets.Items, v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cr.Namespace,
+				Name:      cr.Spec.Session.RemoteSecretRef.Name,
+			},
+		})
+	}
+
 	for _, pv := range cr.Spec.DataSources {
 		if pv.SecretRef.isAdopted() {
 			secrets.Items = append(secrets.Items, v1.Secret{
