@@ -210,6 +210,9 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 	// TODO: GIT_PROXY_PORT
 
+	// TODO: upload session script
+	// TODO: maybe the session script should be a template: pass account, partition, log files, etc.
+
 	jobEnv := JobDescriptionModel_Env{}
 	err = jobEnv.FromJobDescriptionModelEnv0(env)
 	if err != nil {

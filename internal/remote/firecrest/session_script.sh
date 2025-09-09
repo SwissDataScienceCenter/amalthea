@@ -8,9 +8,8 @@ set -e -o pipefail
 # Installs rclone
 #
 # Usage:
-#.    source install_rclone.sh
 #     rclone="$(install_rclone)"
-#.    "$rclone" version
+#     "$rclone" version
 function install_rclone() {
     RENKU_DIR="${HOME}/renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
@@ -62,9 +61,8 @@ function install_rclone() {
 # Installs wstunnel
 #
 # Usage:
-#.    source install_wstunnel.sh
 #     wstunnel="$(install_wstunnel)"
-#.    "$wstunnel" --version
+#     "$wstunnel" --version
 function install_wstunnel() {
     RENKU_DIR="${HOME}/renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
@@ -115,8 +113,6 @@ if [ -z "${REMOTE_SESSION_IMAGE}" ]; then
     echo "REMOTE_SESSION_IMAGE is not set, aborting!"
     exit 1
 fi
-
-env | grep "REMOTE_SESSION" || true
 
 SESSION_DIR="$(pwd)"
 SESSION_WORK_DIR="${SESSION_DIR}/work"
