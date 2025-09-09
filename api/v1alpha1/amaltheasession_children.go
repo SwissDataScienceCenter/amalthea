@@ -214,7 +214,7 @@ func (cr *HpcAmaltheaSession) Service() v1.Service {
 			Protocol:   v1.ProtocolTCP,
 			Name:       tunnelServiceName,
 			Port:       TunnelPort,
-			TargetPort: intstr.FromInt32(TunnelPort),
+			TargetPort: intstr.FromString(tunnelServiceName),
 		})
 	}
 	return svc
@@ -778,6 +778,12 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 		VolumeMounts:             volumeMounts,
 		TerminationMessagePath:   "/dev/termination-log",
 		TerminationMessagePolicy: v1.TerminationMessageReadFile,
+		Ports: []v1.ContainerPort{
+			{
+				Name:          servicePortName,
+				ContainerPort: RemoteSessionControllerPort,
+			},
+		},
 	}
 
 	// TODO: make this actually work!!!
@@ -877,7 +883,23 @@ func (cr *HpcAmaltheaSession) tunnelContainer() v1.Container {
 				// With cpu limits you get throttled when you go over the request always, even with spare capacity
 			},
 		},
-		// TODO: probes?
+		Ports: []v1.ContainerPort{
+			{
+				Name:          tunnelServiceName,
+				ContainerPort: TunnelPort,
+			},
+		},
+		// TODO: implement an HTTP probe on the tunnel command
+		ReadinessProbe: &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.FromInt32(TunnelPort),
+				},
+			},
+			SuccessThreshold:    3,
+			PeriodSeconds:       1,
+			InitialDelaySeconds: 5,
+		},
 	}
 
 	return tunnelContainer
