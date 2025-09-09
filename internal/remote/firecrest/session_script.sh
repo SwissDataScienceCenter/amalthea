@@ -117,11 +117,13 @@ fi
 SESSION_DIR="$(pwd)"
 SESSION_WORK_DIR="${SESSION_DIR}/work"
 SECRETS_DIR="${SESSION_DIR}/secrets"
+LOGS_DIR="${SESSION_DIR}/logs"
 echo "SESSION_DIR: ${SESSION_DIR}"
 echo "SESSION_WORK_DIR: ${SESSION_WORK_DIR}"
 
 mkdir -p "${SESSION_WORK_DIR}"
 mkdir -p "${SECRETS_DIR}"
+mkdir -p "${LOGS_DIR}"
 
 # TODO: make a sqsh file from the container image
 IMAGE_SQSH="${SESSION_DIR}/session-image.sqsh"
@@ -194,7 +196,7 @@ echo "wstunnel client \
   "wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT}" \
   -P "${WSTUNNEL_PATH_PREFIX}" \
   -H "Authorization: Bearer ${WSTUNNEL_SECRET}" \
-  --tls-verify-certificate &
+  --tls-verify-certificate 2>&1 >"${LOGS_DIR}/wstunnel.logs" &
 
 # echo "Setting up example git repository..."
 # echo "Waiting for tunnel..."
