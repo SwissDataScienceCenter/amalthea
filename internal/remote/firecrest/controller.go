@@ -28,6 +28,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
 )
@@ -42,13 +43,22 @@ type FirecrestRemoteSessionController struct {
 
 	jobID      string
 	systemName string
+
+	// currentStatus the current session status
+	currentStatus models.RemoteSessionState
+	// currentStatusError the current session status error if any
+	currentStatusError error
+	// statusTicker a ticker which is used to update the session status in the background
+	statusTicker *time.Ticker
 }
 
 func NewFirecrestRemoteSessionController(client *FirecrestClient, systemName string) (c *FirecrestRemoteSessionController, err error) {
 	c = &FirecrestRemoteSessionController{
-		client:     client,
-		jobID:      "",
-		systemName: systemName,
+		client:        client,
+		jobID:         "",
+		systemName:    systemName,
+		currentStatus: models.NotReady,
+		statusTicker:  time.NewTicker(time.Minute),
 	}
 	// Validate controller
 	if c.client == nil {
@@ -82,38 +92,7 @@ func (c *FirecrestRemoteSessionController) GetCurrentSystem(ctx context.Context)
 
 // Status returns the status of the remote session
 func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state models.RemoteSessionState, err error) {
-	// TODO: implement a status updater in the background and just return the current value here
-	// TODO: e.g. query the FirecREST API every minute
-
-	// TODO: also implement checking the http interface of the remote session through the tunnel
-
-	if c.jobID == "" {
-		return models.NotReady, nil
-	}
-
-	res, err := c.client.GetJobComputeSystemNameJobsJobIdGetWithResponse(ctx, c.systemName, c.jobID)
-	if err != nil {
-		return models.Failed, err
-	}
-	if res.JSON200 == nil {
-		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
-		if message != "" {
-			return models.Failed, fmt.Errorf("could not get job: %s", message)
-		}
-		return models.Failed, fmt.Errorf("could not get job: HTTP %d", res.StatusCode())
-	}
-	if res.JSON200.Jobs == nil {
-		return models.Failed, fmt.Errorf("invalid job status response")
-	}
-	jobs := *res.JSON200.Jobs
-	if len(jobs) < 1 {
-		return models.Failed, fmt.Errorf("empty job response")
-	}
-	state, err = GetRemoteSessionState(jobs[0].Status.State)
-	if err != nil {
-		return models.Failed, err
-	}
-	return state, nil
+	return c.currentStatus, c.currentStatusError
 }
 
 // Start sets up and starts the remote session using the FirecREST API
@@ -121,6 +100,9 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	// TODO: handle start when the pod was deleted:
 	// TODO: 1. we should save the job ID on disk, on the session PVC
 	// TODO: 2. try to load the currently running job ID from disk
+
+	// Start a go routine to update the session status
+	go c.periodicSessionStatus()
 
 	if c.jobID != "" {
 		return fmt.Errorf("a remote job is already running: %s", c.jobID)
@@ -377,4 +359,54 @@ func getErrorMessage(json4XX, json5XX *ApiResponseError) (message string) {
 		message = json5XX.Message
 	}
 	return message
+}
+
+// periodicSessionStatus sets up periodic refresh of the session status
+func (c *FirecrestRemoteSessionController) periodicSessionStatus() {
+	for {
+		<-c.statusTicker.C
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		state, err := c.getCurrentStatus(ctx)
+		c.currentStatus = state
+		c.currentStatusError = err
+		if err == nil {
+			slog.Info("current session status", "status", state)
+		} else {
+			slog.Error("getCurrentStatus failed", "status", state, "error", err)
+		}
+		cancel()
+	}
+}
+
+// getCurrentStatus updates the status of the remote session
+func (c *FirecrestRemoteSessionController) getCurrentStatus(ctx context.Context) (state models.RemoteSessionState, err error) {
+	// TODO: also implement checking the http interface of the remote session through the tunnel
+
+	if c.jobID == "" {
+		return models.NotReady, nil
+	}
+
+	res, err := c.client.GetJobComputeSystemNameJobsJobIdGetWithResponse(ctx, c.systemName, c.jobID)
+	if err != nil {
+		return models.Failed, err
+	}
+	if res.JSON200 == nil {
+		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
+		if message != "" {
+			return models.Failed, fmt.Errorf("could not get job: %s", message)
+		}
+		return models.Failed, fmt.Errorf("could not get job: HTTP %d", res.StatusCode())
+	}
+	if res.JSON200.Jobs == nil {
+		return models.Failed, fmt.Errorf("invalid job status response")
+	}
+	jobs := *res.JSON200.Jobs
+	if len(jobs) < 1 {
+		return models.Failed, fmt.Errorf("empty job response")
+	}
+	state, err = GetRemoteSessionState(jobs[0].Status.State)
+	if err != nil {
+		return models.Failed, err
+	}
+	return state, nil
 }
