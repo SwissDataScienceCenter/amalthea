@@ -24,34 +24,12 @@ import (
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest/auth"
 )
 
-// type RemoteSessionController struct {
-// }
-
-// type RemoteSessionControllerInterface interface {
-// 	Status(ctx context.Context)
-// 	Start(ctx context.Context)
-// 	Stop(ctx context.Context)
-// }
-
 // TODO: support different types of remote session controller
 func NewRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c *firecrest.FirecrestRemoteSessionController, err error) {
-	// firecrestAuth, err := auth.NewFirecrestClientCredentialsAuth(cfg.FirecrestAuthTokenURI, string(cfg.FirecrestClientID), string(cfg.FirecrestClientSecret))
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	firecrestAuth, err := auth.NewRenkuAuth(
-		cfg.FirecrestAuthTokenURI,
-		string(cfg.RenkuAccessToken),
-		string(cfg.RenkuRefreshToken),
-		cfg.RenkuTokenURI,
-		cfg.RenkuClientID,
-		string(cfg.RenkuClientSecret),
-	)
+	firecrestAuth, err := auth.NewFirecrestAuth(cfg.FirecrestAuthConfig)
 	if err != nil {
 		return nil, err
 	}
-
 	firecrestAPIURL, err := url.Parse(cfg.FirecrestAPIURL)
 	if err != nil {
 		return nil, err

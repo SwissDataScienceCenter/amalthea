@@ -18,21 +18,24 @@ limitations under the License.
 package remote
 
 import (
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/server"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
-
-const apiFlag = "api"
-const apiURLFlag = "api-url"
-
-var api string
-var apiURLStr string
 
 func Command() (*cobra.Command, error) {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Runs the remote session controller",
 		Run:   run,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return viper.BindPFlags(cmd.Flags())
+		},
+	}
+	err := config.SetFlags(cmd)
+	if err != nil {
+		return nil, err
 	}
 	return cmd, nil
 }

@@ -23,9 +23,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 
+	"github.com/SwissDataScienceCenter/amalthea/internal/common"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/controller"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest"
@@ -56,15 +56,11 @@ func Start() {
 		os.Exit(1)
 	}
 
-	server, err := newServer(controller)
-	if err != nil {
-		slog.Error("failed to create server", "error", err)
-		os.Exit(1)
-	}
+	server := newServer(controller)
 
 	address := fmt.Sprintf(":%d", cfg.ServerPort)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), common.InterruptSignals...)
 	defer stop()
 	// Start server
 	go func() {
@@ -106,7 +102,7 @@ func Start() {
 var logLevel *slog.LevelVar = new(slog.LevelVar)
 var jsonLogger *slog.Logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 
-func newServer(controller *firecrest.FirecrestRemoteSessionController) (server *echo.Echo, err error) {
+func newServer(controller *firecrest.FirecrestRemoteSessionController) (server *echo.Echo) {
 	e := echo.New()
 
 	e.HideBanner = true
@@ -145,7 +141,8 @@ func newServer(controller *firecrest.FirecrestRemoteSessionController) (server *
 			Error:  err,
 		})
 	})
-	return e, nil
+
+	return e
 }
 
 type statusResponse struct {

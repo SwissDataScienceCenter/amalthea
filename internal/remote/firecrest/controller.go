@@ -163,7 +163,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 
 	// Setup secrets
 	secretsPath := path.Join(sessionPath, "secrets")
-	err = c.mkdir(ctx, secretsPath, true /*createParents*/)
+	err = c.mkdir(ctx, secretsPath, true /* createParents */)
 	if err != nil {
 		return err
 	}

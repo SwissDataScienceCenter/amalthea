@@ -63,7 +63,7 @@ type RenkuAuth struct {
 // Check that RenkuAuth satisfies the FirecrestAuth interface
 var _ FirecrestAuth = (*RenkuAuth)(nil)
 
-func NewRenkuAuth(firecrestTokenURI, renkuAccessToken, renkuRefreshToken, renkuTokenURI, renkuClientID, renkuClientSecret string) (auth *RenkuAuth, err error) {
+func newRenkuAuth(firecrestTokenURI, renkuAccessToken, renkuRefreshToken, renkuTokenURI, renkuClientID, renkuClientSecret string, options ...RenkuAuthOption) (auth *RenkuAuth, err error) {
 	auth = &RenkuAuth{
 		firecrestTokenURI:         firecrestTokenURI,
 		renkuAccessToken:          renkuAccessToken,
@@ -76,6 +76,11 @@ func NewRenkuAuth(firecrestTokenURI, renkuAccessToken, renkuRefreshToken, renkuT
 		accessToken:               "",
 		accessTokenExpiresAt:      time.Time{},
 		accessTokenLock:           &sync.RWMutex{},
+	}
+	for _, opt := range options {
+		if err := opt(auth); err != nil {
+			return nil, err
+		}
 	}
 	// Validate auth
 	if firecrestTokenURI == "" {
@@ -99,6 +104,9 @@ func NewRenkuAuth(firecrestTokenURI, renkuAccessToken, renkuRefreshToken, renkuT
 	}
 	return auth, nil
 }
+
+// RenkuAuthOption allows setting options
+type RenkuAuthOption func(*RenkuAuth) error
 
 // RequestEditor returns a request editor which injects a valid access token
 // for FirecREST API requests.
