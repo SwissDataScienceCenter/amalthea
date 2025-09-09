@@ -160,7 +160,10 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 	wstunnel_secret := os.Getenv("WSTUNNEL_SECRET")
 	if wstunnel_secret != "" {
-		c.uploadFile(ctx, secretsPath, "wstunnel_secret", []byte(wstunnel_secret))
+		err = c.uploadFile(ctx, secretsPath, "wstunnel_secret", []byte(wstunnel_secret))
+		if err != nil {
+			return err
+		}
 	}
 	// TODO: upload user secrets into secretsPath
 

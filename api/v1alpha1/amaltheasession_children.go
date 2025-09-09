@@ -206,14 +206,16 @@ func (cr *HpcAmaltheaSession) Service() v1.Service {
 					Port:       AuthProxyMetaPort,
 					TargetPort: intstr.FromInt32(AuthProxyMetaPort),
 				},
-				{
-					Protocol:   v1.ProtocolTCP,
-					Name:       tunnelServiceName,
-					Port:       TunnelPort,
-					TargetPort: intstr.FromInt32(TunnelPort),
-				},
 			},
 		},
+	}
+	if cr.Spec.SessionLocation == Remote {
+		svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
+			Protocol:   v1.ProtocolTCP,
+			Name:       tunnelServiceName,
+			Port:       TunnelPort,
+			TargetPort: intstr.FromInt32(TunnelPort),
+		})
 	}
 	return svc
 }
