@@ -66,7 +66,7 @@ function install_rclone() {
 function install_wstunnel() {
     RENKU_DIR="${HOME}/renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
-    WSTUNNEL_VERSION="10.4.3"
+    WSTUNNEL_VERSION="10.4.4"
     WSTUNNEL_PKG="${RENKU_PKG}/wstunnel/v${WSTUNNEL_VERSION}"
     WSTUNNEL_BIN="${WSTUNNEL_PKG}/wstunnel"
 
