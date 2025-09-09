@@ -83,13 +83,6 @@ func newFirecrestClientCredentialsAuth(tokenURI, clientID, clientSecret string, 
 // FirecrestClientCredentialsAuthOption allows setting options
 type FirecrestClientCredentialsAuthOption func(*FirecrestClientCredentialsAuth) error
 
-// func WithHttpClient(client *http.Client) FirecrestClientCredentialsAuthOption {
-// 	return func(a *FirecrestClientCredentialsAuth) error {
-// 		a.httpClient = client
-// 		return nil
-// 	}
-// }
-
 // RequestEditor returns a request editor which injects a valid access token
 // for FirecREST API requests.
 func (a *FirecrestClientCredentialsAuth) RequestEditor() RequestEditorFn {
