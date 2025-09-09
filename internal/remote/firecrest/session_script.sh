@@ -125,14 +125,6 @@ mkdir -p "${SESSION_WORK_DIR}"
 mkdir -p "${SECRETS_DIR}"
 mkdir -p "${LOGS_DIR}"
 
-# TODO: make a sqsh file from the container image
-IMAGE_SQSH="${SESSION_DIR}/session-image.sqsh"
-# if [ -f "${IMAGE_SQSH}" ]; then
-#     echo "existing image file"
-# else
-#     enroot import -x mount -o "${IMAGE_SQSH}" "docker://${SESSION_IMAGE}"
-# fi
-
 # Install rclone
 rclone=$(install_rclone)
 echo "rclone: ${rclone}"
