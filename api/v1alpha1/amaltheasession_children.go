@@ -872,11 +872,11 @@ func (cr *HpcAmaltheaSession) tunnelContainer() v1.Container {
 		},
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"memory": resource.MustParse("16Mi"),
-				"cpu":    resource.MustParse("20m"),
+				"memory": resource.MustParse("64Mi"),
+				"cpu":    resource.MustParse("100m"),
 			},
 			Limits: v1.ResourceList{
-				"memory": resource.MustParse("32Mi"),
+				"memory": resource.MustParse("128Mi"),
 				// NOTE: Cpu limit not set on purpose
 				// Without cpu limit if there is spare you can go over the request
 				// If there is no spare cpu then all things get throttled relative to their request
