@@ -160,17 +160,17 @@ env | grep "RENKU" || true
 echo "TODO: setup git repositories..."
 echo "TODO: setup rclone mounts..."
 
-echo "Setting up example rclone mount..."
-fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
-rm -rf "${SESSION_WORK_DIR}/era5"
-mkdir -p "${SESSION_WORK_DIR}/era5"
-RCLONE_CONFIG="${SESSION_DIR}/rclone.conf"
-cat <<EOF >"${RCLONE_CONFIG}"
-[era5]
-type = doi
-doi = 10.5281/zenodo.3831980
-EOF
-"${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
+# echo "Setting up example rclone mount..."
+# fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
+# rm -rf "${SESSION_WORK_DIR}/era5"
+# mkdir -p "${SESSION_WORK_DIR}/era5"
+# RCLONE_CONFIG="${SESSION_DIR}/rclone.conf"
+# cat <<EOF >"${RCLONE_CONFIG}"
+# [era5]
+# type = doi
+# doi = 10.5281/zenodo.3831980
+# EOF
+# "${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
 
 # echo "Starting tunnel..."
 GIT_PROXY_PORT="${GIT_PROXY_PORT:-65480}"
