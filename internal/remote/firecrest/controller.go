@@ -178,7 +178,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	slog.Info("gitRepositories", "gitRepositories", gitRepositories)
+	slog.Info("collected git repositories", "gitRepositories", gitRepositories)
 	for repo := range gitRepositories {
 		repoGitDirPath := path.Join(sessionPath, "work", repo, ".git")
 		err = c.mkdir(ctx, repoGitDirPath, true /* createParents */)
@@ -305,8 +305,8 @@ func (c *FirecrestRemoteSessionController) collectGitRepositories(ctx context.Co
 			line := scanner.Text()
 			line = strings.TrimSpace(line)
 			res := branchRegExp.FindStringSubmatch(line)
-			if res != nil && len(res) > 0 {
-				gitBranch = res[0]
+			if len(res) > 1 {
+				gitBranch = res[1]
 			}
 			if gitBranch != "" {
 				break
