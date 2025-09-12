@@ -178,7 +178,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("gitRepositories: %+v\n", gitRepositories)
+	slog.Info("gitRepositories", "gitRepositories", gitRepositories)
 	for repo := range gitRepositories {
 		repoGitDirPath := path.Join(sessionPath, "work", repo, ".git")
 		err = c.mkdir(ctx, repoGitDirPath, true /* createParents */)
@@ -278,8 +278,8 @@ func (c *FirecrestRemoteSessionController) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (c *FirecrestRemoteSessionController) collectGitRepositories(ctx context.Context, workDir string) (gitRepositories map[string]*gitRepository, err error) {
-	gitRepositories = map[string]*gitRepository{}
+func (c *FirecrestRemoteSessionController) collectGitRepositories(ctx context.Context, workDir string) (gitRepositories map[string]gitRepository, err error) {
+	gitRepositories = map[string]gitRepository{}
 
 	entries, err := os.ReadDir(workDir)
 	if err != nil {
@@ -296,7 +296,7 @@ func (c *FirecrestRemoteSessionController) collectGitRepositories(ctx context.Co
 		if err != nil {
 			continue
 		}
-		gitRepositories[entry.Name()] = &gitRepository{
+		gitRepository := gitRepository{
 			ConfigPath: gitConfigPath,
 		}
 		scanner := bufio.NewScanner(gitConfigFile)
@@ -304,18 +304,21 @@ func (c *FirecrestRemoteSessionController) collectGitRepositories(ctx context.Co
 		for scanner.Scan() {
 			line := scanner.Text()
 			line = strings.TrimSpace(line)
-			gitBranch = branchRegExp.FindString(line)
+			res := branchRegExp.FindStringSubmatch(line)
+			if res != nil && len(res) > 0 {
+				gitBranch = res[0]
+			}
 			if gitBranch != "" {
 				break
 			}
 		}
 		if err := scanner.Err(); err != nil {
-			fmt.Printf("error while reading %s: %s\n", gitConfigPath, err.Error())
-			continue
+			slog.Warn(fmt.Sprintf("error while reading %s", gitConfigPath), "error", err)
 		}
 		if gitBranch != "" {
-			gitRepositories[entry.Name()].Branch = gitBranch
+			gitRepository.Branch = gitBranch
 		}
+		gitRepositories[entry.Name()] = gitRepository
 		gitConfigFile.Close()
 	}
 	return gitRepositories, nil
