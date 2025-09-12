@@ -208,7 +208,7 @@ echo "wstunnel client \
 echo "Waiting for git proxy..."
 git_proxy_ready="0"
 for i in $(seq 1 10); do
-    curl -sSL --fail -o /dev/null "http://localhost:${GIT_PROXY_HEALTH_PORT}/healthzz" 2>/dev/null
+    curl -sSL --fail -o /dev/null "http://localhost:${GIT_PROXY_HEALTH_PORT}/health" 2>/dev/null
     ready="$(echo $?)"
     if [ "${ready}" == "0" ]; then
         git_proxy_ready="1"
