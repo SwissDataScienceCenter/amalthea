@@ -41,7 +41,7 @@ import (
 //go:embed session_script.sh
 var sessionScript string
 
-var branchRegExp = regexp.MustCompile("^[[]branch \"(.)+\"]")
+var branchRegExp = regexp.MustCompile("^[[]branch \"(.+)\"]")
 
 type FirecrestRemoteSessionController struct {
 	client *FirecrestClient
