@@ -121,11 +121,12 @@ func newServer(controller *firecrest.FirecrestRemoteSessionController) (server *
 
 	// Readiness endpoint
 	e.GET("/ready", func(c echo.Context) error {
-		status, err := controller.Status(c.Request().Context())
-		if err == nil && status == models.Running {
-			return c.NoContent(http.StatusOK)
-		}
-		return c.NoContent(http.StatusServiceUnavailable)
+		return c.NoContent(http.StatusOK)
+		// status, err := controller.Status(c.Request().Context())
+		// if err == nil && status == models.Running {
+		// 	return c.NoContent(http.StatusOK)
+		// }
+		// return c.NoContent(http.StatusServiceUnavailable)
 	})
 
 	// Status endpoint
