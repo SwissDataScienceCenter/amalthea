@@ -235,8 +235,10 @@ for line in "${GIT_REPOSITORIES[@]}"; do
     cd "${RENKU_WORKING_DIR}/${repo}"
     git init
     git fetch
-    git checkout "${branch}"
-    git pull
+    if [ -n "${branch}" ]; then
+        git checkout "${branch}"
+        git pull
+    fi
 done
 cd "${cwd}"
 

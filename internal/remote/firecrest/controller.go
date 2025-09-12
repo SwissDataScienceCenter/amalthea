@@ -17,6 +17,7 @@ limitations under the License.
 package firecrest
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	_ "embed"
@@ -27,6 +28,8 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -37,6 +40,8 @@ import (
 //
 //go:embed session_script.sh
 var sessionScript string
+
+var branchRegExp = regexp.MustCompile("^[[]branch \"(.)+\"]")
 
 type FirecrestRemoteSessionController struct {
 	client *FirecrestClient
@@ -167,6 +172,29 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 	// TODO: upload user secrets into secretsPath
 
+	// Setup git repositories
+	renkuWorkDir := os.Getenv("RENKU_WORKING_DIR")
+	gitRepositories, err := c.collectGitRepositories(ctx, renkuWorkDir)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("gitRepositories: %+v\n", gitRepositories)
+	for repo := range gitRepositories {
+		repoGitDirPath := path.Join(sessionPath, "work", repo, ".git")
+		err = c.mkdir(ctx, repoGitDirPath, true /* createParents */)
+		if err != nil {
+			return err
+		}
+		gitConfigContents, err := os.ReadFile(gitRepositories[repo].ConfigPath)
+		if err != nil {
+			return err
+		}
+		err = c.uploadFile(ctx, repoGitDirPath, "config", gitConfigContents)
+		if err != nil {
+			return err
+		}
+	}
+
 	env := map[string]string{}
 	// Copy the REMOTE_SESSION environment variables
 	for _, environ := range os.Environ() {
@@ -193,6 +221,13 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		env["WSTUNNEL_SERVICE_PORT"] = fmt.Sprintf("%d", 443)      // wss port (same as https)
 		env["WSTUNNEL_PATH_PREFIX"] = renkuBaseURLPath + "/tunnel" // session path with tunnel
 	}
+	// Setup environment variables for git repositories
+	repos := []string{}
+	for repo := range gitRepositories {
+		repos = append(repos, fmt.Sprintf("%s\t%s", repo, gitRepositories[repo].Branch))
+	}
+	env["GIT_REPOSITORIES"] = strings.Join(repos, "\n")
+
 	// TODO: GIT_PROXY_PORT
 
 	// TODO: upload session script
@@ -241,6 +276,54 @@ func (c *FirecrestRemoteSessionController) Stop(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (c *FirecrestRemoteSessionController) collectGitRepositories(ctx context.Context, workDir string) (gitRepositories map[string]*gitRepository, err error) {
+	gitRepositories = map[string]*gitRepository{}
+
+	entries, err := os.ReadDir(workDir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		fullPath := filepath.Join(workDir, entry.Name())
+		gitConfigPath := filepath.Join(fullPath, ".git", "config")
+		gitConfigFile, err := os.Open(gitConfigPath)
+		if err != nil {
+			continue
+		}
+		gitRepositories[entry.Name()] = &gitRepository{
+			ConfigPath: gitConfigPath,
+		}
+		scanner := bufio.NewScanner(gitConfigFile)
+		gitBranch := ""
+		for scanner.Scan() {
+			line := scanner.Text()
+			line = strings.TrimSpace(line)
+			gitBranch = branchRegExp.FindString(line)
+			if gitBranch != "" {
+				break
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			fmt.Printf("error while reading %s: %s\n", gitConfigPath, err.Error())
+			continue
+		}
+		if gitBranch != "" {
+			gitRepositories[entry.Name()].Branch = gitBranch
+		}
+		gitConfigFile.Close()
+	}
+	return gitRepositories, nil
+}
+
+type gitRepository struct {
+	Branch     string
+	ConfigPath string
 }
 
 func (c *FirecrestRemoteSessionController) getUserInfo(ctx context.Context) (userInfo UserInfoResponse, err error) {
