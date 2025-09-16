@@ -145,6 +145,9 @@ mounts = [
 ]
 
 workdir = "${SESSION_WORK_DIR}"
+
+[annotations]
+com.hooks.cxi.enabled = "false"
 EOF
 
 export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
