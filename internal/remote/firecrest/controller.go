@@ -17,7 +17,6 @@ limitations under the License.
 package firecrest
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	_ "embed"
@@ -28,7 +27,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -172,28 +170,28 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 	// TODO: upload user secrets into secretsPath
 
-	// Setup git repositories
-	renkuWorkDir := os.Getenv("RENKU_WORKING_DIR")
-	gitRepositories, err := c.collectGitRepositories(ctx, renkuWorkDir)
-	if err != nil {
-		return err
-	}
-	slog.Info("collected git repositories", "gitRepositories", gitRepositories)
-	for repo := range gitRepositories {
-		repoGitDirPath := path.Join(sessionPath, "work", repo, ".git")
-		err = c.mkdir(ctx, repoGitDirPath, true /* createParents */)
-		if err != nil {
-			return err
-		}
-		gitConfigContents, err := os.ReadFile(gitRepositories[repo].ConfigPath)
-		if err != nil {
-			return err
-		}
-		err = c.uploadFile(ctx, repoGitDirPath, "config", gitConfigContents)
-		if err != nil {
-			return err
-		}
-	}
+	// // Setup git repositories
+	// renkuWorkDir := os.Getenv("RENKU_WORKING_DIR")
+	// gitRepositories, err := c.collectGitRepositories(ctx, renkuWorkDir)
+	// if err != nil {
+	// 	return err
+	// }
+	// slog.Info("collected git repositories", "gitRepositories", gitRepositories)
+	// for repo := range gitRepositories {
+	// 	repoGitDirPath := path.Join(sessionPath, "work", repo, ".git")
+	// 	err = c.mkdir(ctx, repoGitDirPath, true /* createParents */)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	gitConfigContents, err := os.ReadFile(gitRepositories[repo].ConfigPath)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	err = c.uploadFile(ctx, repoGitDirPath, "config", gitConfigContents)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	env := map[string]string{}
 	// Copy the REMOTE_SESSION environment variables
@@ -222,11 +220,11 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		env["WSTUNNEL_PATH_PREFIX"] = renkuBaseURLPath + "/tunnel" // session path with tunnel
 	}
 	// Setup environment variables for git repositories
-	repos := []string{}
-	for repo := range gitRepositories {
-		repos = append(repos, fmt.Sprintf("%s\t%s", repo, gitRepositories[repo].Branch))
-	}
-	env["GIT_REPOSITORIES"] = strings.Join(repos, "\n")
+	// repos := []string{}
+	// for repo := range gitRepositories {
+	// 	repos = append(repos, fmt.Sprintf("%s\t%s", repo, gitRepositories[repo].Branch))
+	// }
+	// env["GIT_REPOSITORIES"] = strings.Join(repos, "\n")
 
 	// TODO: GIT_PROXY_PORT
 
@@ -278,56 +276,56 @@ func (c *FirecrestRemoteSessionController) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (c *FirecrestRemoteSessionController) collectGitRepositories(ctx context.Context, workDir string) (gitRepositories map[string]gitRepository, err error) {
-	gitRepositories = map[string]gitRepository{}
+// func (c *FirecrestRemoteSessionController) collectGitRepositories(ctx context.Context, workDir string) (gitRepositories map[string]gitRepository, err error) {
+// 	gitRepositories = map[string]gitRepository{}
 
-	entries, err := os.ReadDir(workDir)
-	if err != nil {
-		return nil, err
-	}
+// 	entries, err := os.ReadDir(workDir)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		fullPath := filepath.Join(workDir, entry.Name())
-		gitConfigPath := filepath.Join(fullPath, ".git", "config")
-		gitConfigFile, err := os.Open(gitConfigPath)
-		if err != nil {
-			continue
-		}
-		gitRepository := gitRepository{
-			ConfigPath: gitConfigPath,
-		}
-		scanner := bufio.NewScanner(gitConfigFile)
-		gitBranch := ""
-		for scanner.Scan() {
-			line := scanner.Text()
-			line = strings.TrimSpace(line)
-			res := branchRegExp.FindStringSubmatch(line)
-			if len(res) > 1 {
-				gitBranch = res[1]
-			}
-			if gitBranch != "" {
-				break
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			slog.Warn(fmt.Sprintf("error while reading %s", gitConfigPath), "error", err)
-		}
-		if gitBranch != "" {
-			gitRepository.Branch = gitBranch
-		}
-		gitRepositories[entry.Name()] = gitRepository
-		gitConfigFile.Close()
-	}
-	return gitRepositories, nil
-}
+// 	for _, entry := range entries {
+// 		if !entry.IsDir() {
+// 			continue
+// 		}
+// 		fullPath := filepath.Join(workDir, entry.Name())
+// 		gitConfigPath := filepath.Join(fullPath, ".git", "config")
+// 		gitConfigFile, err := os.Open(gitConfigPath)
+// 		if err != nil {
+// 			continue
+// 		}
+// 		gitRepository := gitRepository{
+// 			ConfigPath: gitConfigPath,
+// 		}
+// 		scanner := bufio.NewScanner(gitConfigFile)
+// 		gitBranch := ""
+// 		for scanner.Scan() {
+// 			line := scanner.Text()
+// 			line = strings.TrimSpace(line)
+// 			res := branchRegExp.FindStringSubmatch(line)
+// 			if len(res) > 1 {
+// 				gitBranch = res[1]
+// 			}
+// 			if gitBranch != "" {
+// 				break
+// 			}
+// 		}
+// 		if err := scanner.Err(); err != nil {
+// 			slog.Warn(fmt.Sprintf("error while reading %s", gitConfigPath), "error", err)
+// 		}
+// 		if gitBranch != "" {
+// 			gitRepository.Branch = gitBranch
+// 		}
+// 		gitRepositories[entry.Name()] = gitRepository
+// 		gitConfigFile.Close()
+// 	}
+// 	return gitRepositories, nil
+// }
 
-type gitRepository struct {
-	Branch     string
-	ConfigPath string
-}
+// type gitRepository struct {
+// 	Branch     string
+// 	ConfigPath string
+// }
 
 func (c *FirecrestRemoteSessionController) getUserInfo(ctx context.Context) (userInfo UserInfoResponse, err error) {
 	res, err := c.client.GetUserinfoStatusSystemNameUserinfoGetWithResponse(ctx, c.systemName)
