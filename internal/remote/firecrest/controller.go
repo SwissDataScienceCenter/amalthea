@@ -227,8 +227,9 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		repos = append(repos, fmt.Sprintf("%s\t%s", repo, gitRepositories[repo].Branch))
 	}
 	env["GIT_REPOSITORIES"] = strings.Join(repos, "\n")
-
-	// TODO: GIT_PROXY_PORT
+	// NOTE: we assume that the git proxy port is 65480 (default from the renku helm chart)
+	env["GIT_PROXY_PORT"] = fmt.Sprintf("%d", 65480)        // git proxy port
+	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
 	// TODO: upload session script
 	// TODO: maybe the session script should be a template: pass account, partition, log files, etc.
