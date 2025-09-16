@@ -589,13 +589,17 @@ func (as *HpcAmaltheaSession) InternalSecretName() string {
 	return fmt.Sprintf("%s---internal", as.Name)
 }
 
-// The secret created by this method is populated with data only when the type of authentication is 'oidc'.
-// If the type of authentication is 'oauth2proxy', then it is expected that
-// the secret with OAuth configuration created by the creator of the AmaltheaSession CR will be in
-// a format acceptable to oauth2proxy. With the 'oidc' method we do not have to expose
-// the oauth2proxy configuration API in the format of the secret we expect from users.
-// We define our own API - specific only to OIDC and limited strictly to fields we need.
-// TODO: describe wstunnel secret for remote sessions
+// The secret created by this method may contain secrets for two purposes:
+//  1. If the type of authentication is 'oidc' then the secret with OAuth
+//     configuration created by the creator of the AmaltheaSession CR will be in
+//     a format acceptable to oauth2proxy. With the 'oidc' method we do not have to expose
+//     the oauth2proxy configuration API in the format of the secret we expect from users.
+//     We define our own API - specific only to OIDC and limited strictly to fields we need.
+//  2. If the session location is 'remote' then the secret is populated with a value used
+//     to authenticate remote tunnel connections
+//
+// The secret will contain either, both or none of these configurations depending
+// on the configuration of the Amalthea session.
 func (as *HpcAmaltheaSession) Secret() v1.Secret {
 	labels := labelsForAmaltheaSession(as.Name)
 	secret := v1.Secret{
@@ -616,7 +620,8 @@ func (as *HpcAmaltheaSession) Secret() v1.Secret {
 	}
 
 	if as.Spec.Authentication == nil || as.Spec.Authentication.Type != Oidc {
-		// In this case we do not need anything in the secret - we just return an empty one
+		// In this case we do not need the 'oidc' configuration in the secret,
+		// we just return an empty one, or one populated with the tunnel secret.
 		if tunnelSecret != "" {
 			secret.StringData = map[string]string{
 				"WSTUNNEL_SECRET": tunnelSecret,
@@ -786,7 +791,8 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 		},
 	}
 
-	// TODO: make this actually work!!!
+	// TODO: add a safe method to transfor a stanard docker image reference to one
+	// TODO: suitable for enroot.
 	enrootDomain, enrootImage, _ := strings.Cut(cr.Spec.Session.Image, "/")
 	enrootImage = enrootDomain + "#" + enrootImage
 
