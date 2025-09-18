@@ -34,7 +34,7 @@ func (c TestClient) List(ctx context.Context, list client.ObjectList, opts ...cl
 
 func TestGetPodEventsNoEvents(t *testing.T) {
 	client := TestClient{}
-	session := AmaltheaSession{}
+	session := HpcAmaltheaSession{}
 	res, err := session.GetPodEvents(context.TODO(), client)
 	assert.Nil(t, err)
 	assert.Equal(t, *res, v1.EventList{})
@@ -45,7 +45,7 @@ func TestGetPodEventsWithError(t *testing.T) {
 	client := TestClient{
 		listError: &err,
 	}
-	session := AmaltheaSession{}
+	session := HpcAmaltheaSession{}
 	_, err = session.GetPodEvents(context.TODO(), client)
 	assert.NotNil(t, err)
 }
@@ -59,7 +59,7 @@ func TestGetPodEventsSorted(t *testing.T) {
 	client := TestClient{
 		listResult: &v1.EventList{Items: events},
 	}
-	session := AmaltheaSession{}
+	session := HpcAmaltheaSession{}
 	res, err := session.GetPodEvents(context.TODO(), client)
 	assert.Nil(t, err)
 	assert.Equal(t, res.Items, []v1.Event{ev3, ev2, ev1})
