@@ -165,9 +165,10 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		renkuBaseURLPath = "dev-session"
 		slog.Warn("RENKU_BASE_URL_PATH is not defined", "defaultValue", renkuBaseURLPath)
 	}
+	renkuBaseURLPath = strings.TrimPrefix(renkuBaseURLPath, "/sessions")
 
 	scratchPathRenku := path.Join(scratch.Path, userName, "renku")
-	sessionPath := path.Join(scratchPathRenku, renkuProjectPath, renkuBaseURLPath)
+	sessionPath := path.Join(scratchPathRenku, "sessions", renkuProjectPath, renkuBaseURLPath)
 
 	slog.Info("determined session path", "sessionPath", sessionPath)
 
@@ -259,8 +260,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
 	// Upload the session script
-	// TODO: maybe the session script should be a template: pass account, partition, log files, etc.
-	err = c.uploadFile(ctx, sessionPath, "session_script.sh", []byte(sessionScript))
+	sessionScriptFinal := c.addSbatchDirectivesToScript(sessionScript)
+	err = c.uploadFile(ctx, sessionPath, "session_script.sh", []byte(sessionScriptFinal))
 	if err != nil {
 		return err
 	}
@@ -530,4 +531,21 @@ func (c *FirecrestRemoteSessionController) getCurrentStatus(ctx context.Context)
 		return models.Failed, err
 	}
 	return state, nil
+}
+
+func (c *FirecrestRemoteSessionController) addSbatchDirectivesToScript(sessionScript string) string {
+	directives := []string{
+		"#SBATCH --nodes=1",
+		"#SBATCH --ntasks-per-node=1",
+	}
+	if c.partition != "" {
+		directives = append(directives, fmt.Sprintf("#SBATCH --partition=%s", c.partition))
+	}
+	// The slurm account can be set by the user as an environment variable
+	slurmAccount := os.Getenv("RENKU_ENV_SLURM_ACCOUNT")
+	if slurmAccount != "" {
+		directives = append(directives, fmt.Sprintf("#SBATCH --account=%s", slurmAccount))
+	}
+	directivesStr := strings.Join(directives, "\n")
+	return strings.Replace(sessionScript, "#{{SBATCH_DIRECTIVES}}", directivesStr, 1)
 }
