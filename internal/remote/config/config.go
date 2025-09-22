@@ -27,6 +27,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+const RemoteSessionControllerPrefix = "RSC"
+
 const (
 	firecrestAPIURLFlag = "firecrest-api-url"
 	serverPortFlag      = "server-port"
@@ -109,10 +111,10 @@ func (cfg *RemoteSessionControllerConfig) Validate() error {
 	return nil
 }
 
-// Converts a flag into its environment variable version
+// Converts a flag into its environment variable version, with the "RSC" prefix.
 //
-// Example: my-flag -> MY_FLAG
+// Example: my-flag -> RSC_MY_FLAG
 func AsEnvVarFlag(flag string) string {
-	withUnderscores := strings.ReplaceAll(flag, "-", "_")
+	withUnderscores := strings.ReplaceAll(RemoteSessionControllerPrefix+"_"+flag, "-", "_")
 	return strings.ToUpper(withUnderscores)
 }
