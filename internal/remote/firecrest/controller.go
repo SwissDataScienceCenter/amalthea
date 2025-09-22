@@ -165,10 +165,9 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		renkuBaseURLPath = "dev-session"
 		slog.Warn("RENKU_BASE_URL_PATH is not defined", "defaultValue", renkuBaseURLPath)
 	}
-	renkuBaseURLPath = strings.TrimPrefix(renkuBaseURLPath, "/sessions")
 
 	scratchPathRenku := path.Join(scratch.Path, userName, "renku")
-	sessionPath := path.Join(scratchPathRenku, "sessions", renkuProjectPath, renkuBaseURLPath)
+	sessionPath := path.Join(scratchPathRenku, "sessions", renkuProjectPath, strings.TrimPrefix(renkuBaseURLPath, "/sessions"))
 
 	slog.Info("determined session path", "sessionPath", sessionPath)
 
