@@ -85,6 +85,7 @@ func SetFlags(cmd *cobra.Command) error {
 func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
 	cfg.FirecrestAPIURL = viper.GetString(firecrestAPIURLFlag)
 	cfg.ServerPort = viper.GetInt32(serverPortFlag)
+	cfg.FakeStart = viper.GetBool(fakeStartFlag)
 
 	firecrestAuthConfig, err := GetAuthConfig()
 	if err != nil {
