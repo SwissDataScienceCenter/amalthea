@@ -30,6 +30,7 @@ import (
 const (
 	firecrestAPIURLFlag = "firecrest-api-url"
 	serverPortFlag      = "server-port"
+	fakeStartFlag       = "fake-start"
 )
 
 type RemoteSessionControllerConfig struct {
@@ -62,6 +63,14 @@ func SetFlags(cmd *cobra.Command) error {
 		return err
 	}
 	if err := viper.BindEnv(serverPortFlag, AsEnvVarFlag(serverPortFlag)); err != nil {
+		return err
+	}
+
+	cmd.Flags().Bool(fakeStartFlag, false, "will not start the session if set")
+	if err := viper.BindPFlag(fakeStartFlag, cmd.Flags().Lookup(fakeStartFlag)); err != nil {
+		return err
+	}
+	if err := viper.BindEnv(fakeStartFlag, AsEnvVarFlag(fakeStartFlag)); err != nil {
 		return err
 	}
 
