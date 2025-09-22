@@ -55,15 +55,19 @@ type FirecrestRemoteSessionController struct {
 	currentStatusError error
 	// statusTicker a ticker which is used to update the session status in the background
 	statusTicker *time.Ticker
+
+	// fakeStart if true, do not start the remote session and print debug information
+	fakeStart bool
 }
 
-func NewFirecrestRemoteSessionController(client *FirecrestClient, systemName string) (c *FirecrestRemoteSessionController, err error) {
+func NewFirecrestRemoteSessionController(client *FirecrestClient, systemName string, fakeStart bool) (c *FirecrestRemoteSessionController, err error) {
 	c = &FirecrestRemoteSessionController{
 		client:        client,
 		jobID:         "",
 		systemName:    systemName,
 		currentStatus: models.NotReady,
 		statusTicker:  time.NewTicker(time.Minute),
+		fakeStart:     fakeStart,
 	}
 	// Validate controller
 	if c.client == nil {

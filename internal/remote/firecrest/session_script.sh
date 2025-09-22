@@ -136,7 +136,6 @@ echo "wstunnel: ${wstunnel}"
 # Create the environment.toml file to run the session
 EDF_FILE="${SESSION_DIR}/environment.toml"
 cat <<EOF >"${EDF_FILE}"
-# image = "${IMAGE_SQSH}"
 image = "${REMOTE_SESSION_IMAGE}"
 
 mounts = [
@@ -158,9 +157,6 @@ export RENKU_SESSION_IP="127.0.0.1"
 # Load the wstunnel secret
 export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
 
-env | grep "RENKU" || true
-
-echo "TODO: setup git repositories..."
 echo "TODO: setup rclone mounts..."
 
 # echo "Setting up example rclone mount..."
@@ -195,18 +191,6 @@ echo "wstunnel client \
   -P "${WSTUNNEL_PATH_PREFIX}" \
   -H "Authorization: Bearer ${WSTUNNEL_SECRET}" \
   --tls-verify-certificate 2>&1 >"${LOGS_DIR}/wstunnel.logs" &
-
-# echo "Setting up example git repository..."
-# echo "Waiting for tunnel..."
-# # TODO: implement a faster check for the git proxy
-# sleep 5
-# cwd="$(pwd)"
-# cd "${RENKU_WORKING_DIR}/python-simple-conda"
-# git init
-# git fetch
-# git checkout main
-# git pull
-# cd "${cwd}"
 
 if [ -n "${GIT_REPOSITORIES}" ]; then
     echo "Waiting for git proxy..."
@@ -251,7 +235,7 @@ fi
 
 exit_script() {
     echo "Cleaning up session..."
-    fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
+    # fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
 }
 
 echo "Starting session..."

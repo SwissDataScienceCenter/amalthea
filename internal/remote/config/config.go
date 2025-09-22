@@ -43,6 +43,9 @@ type RemoteSessionControllerConfig struct {
 
 	// The port the server will listen to
 	ServerPort int32
+
+	// FakeStart if true, do not start the remote session and print debug information
+	FakeStart bool
 }
 
 func SetFlags(cmd *cobra.Command) error {
