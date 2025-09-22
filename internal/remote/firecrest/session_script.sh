@@ -71,7 +71,7 @@ function install_wstunnel() {
     arch="$(uname -m)"
     if [ "${arch}" = "aarch64" ]; then
         WSTUNNEL_VERSION_FORCED="10.1.10"
-        echo "Warning: using wstunnel v${WSTUNNEL_VERSION_FORCED} instead of ${WSTUNNEL_VERSION}"
+        >&2 echo "Warning: using wstunnel v${WSTUNNEL_VERSION_FORCED} instead of ${WSTUNNEL_VERSION}"
         WSTUNNEL_VERSION="${WSTUNNEL_VERSION_FORCED}"
     fi
 
