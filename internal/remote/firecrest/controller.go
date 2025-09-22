@@ -110,6 +110,13 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	// TODO: 1. we should save the job ID on disk, on the session PVC
 	// TODO: 2. try to load the currently running job ID from disk
 
+	// do not do anything if `fakeStart` is true
+	if c.fakeStart {
+		c.jobID = "fake-job-id"
+		slog.Info("fake start", "jobID", c.jobID, "env", os.Environ())
+		return nil
+	}
+
 	// Start a go routine to update the session status
 	go c.periodicSessionStatus()
 
