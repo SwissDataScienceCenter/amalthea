@@ -174,7 +174,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	wstunnel_secret := os.Getenv("WSTUNNEL_SECRET")
+	// TODO: get wstunnel_secret as a config value
+	wstunnel_secret := os.Getenv("RSC_WSTUNNEL_SECRET")
 	if wstunnel_secret != "" {
 		err = c.uploadFile(ctx, secretsPath, "wstunnel_secret", []byte(wstunnel_secret))
 		if err != nil {
@@ -207,6 +208,14 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 
 	env := map[string]string{}
+	// Copy the environment variables defined by the user
+	for _, environ := range os.Environ() {
+		key, val, _ := strings.Cut(environ, "=")
+		if strings.HasPrefix(key, "RENKU_ENV_") {
+			key = strings.TrimPrefix("RENKU_ENV_", key)
+			env[key] = val
+		}
+	}
 	// Copy the REMOTE_SESSION environment variables
 	for _, environ := range os.Environ() {
 		key, val, _ := strings.Cut(environ, "=")
@@ -217,7 +226,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	// Copy RENKU environment variables
 	for _, environ := range os.Environ() {
 		key, val, _ := strings.Cut(environ, "=")
-		if strings.HasPrefix(key, "RENKU") {
+		if strings.HasPrefix(key, "RENKU") && !strings.HasPrefix(key, "RENKU_ENV_") {
 			env[key] = val
 		}
 	}
