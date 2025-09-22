@@ -11,7 +11,7 @@ set -e -o pipefail
 #     rclone="$(install_rclone)"
 #     "$rclone" version
 function install_rclone() {
-    RENKU_DIR="${HOME}/renku/$(uname -m)"
+    RENKU_DIR="${HOME}/.renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
     RCLONE_VERSION="1.70.2"
     RCLONE_PKG="${RENKU_PKG}/rclone/v${RCLONE_VERSION}"
@@ -64,7 +64,7 @@ function install_rclone() {
 #     wstunnel="$(install_wstunnel)"
 #     "$wstunnel" --version
 function install_wstunnel() {
-    RENKU_DIR="${HOME}/renku/$(uname -m)"
+    RENKU_DIR="${HOME}/.renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
     WSTUNNEL_VERSION="10.4.4"
     WSTUNNEL_PKG="${RENKU_PKG}/wstunnel/v${WSTUNNEL_VERSION}"

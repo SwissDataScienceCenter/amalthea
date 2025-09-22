@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
+	"k8s.io/utils/ptr"
 )
 
 // The script submitted to start a new remote session.
@@ -48,6 +49,7 @@ type FirecrestRemoteSessionController struct {
 
 	jobID      string
 	systemName string
+	partition  string
 
 	// currentStatus the current session status
 	currentStatus models.RemoteSessionState
@@ -60,11 +62,12 @@ type FirecrestRemoteSessionController struct {
 	fakeStart bool
 }
 
-func NewFirecrestRemoteSessionController(client *FirecrestClient, systemName string, fakeStart bool) (c *FirecrestRemoteSessionController, err error) {
+func NewFirecrestRemoteSessionController(client *FirecrestClient, systemName, partition string, fakeStart bool) (c *FirecrestRemoteSessionController, err error) {
 	c = &FirecrestRemoteSessionController{
 		client:        client,
 		jobID:         "",
 		systemName:    systemName,
+		partition:     partition,
 		currentStatus: models.NotReady,
 		statusTicker:  time.NewTicker(time.Minute),
 		fakeStart:     fakeStart,
@@ -152,6 +155,11 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		return fmt.Errorf("could not find scratch file system on '%s'", c.systemName)
 	}
 
+	renkuProjectPath := strings.TrimSuffix(os.Getenv("RENKU_PROJECT_PATH"), "/")
+	if renkuProjectPath == "" {
+		renkuProjectPath = "dev-project"
+		slog.Warn("RENKU_PROJECT_PATH is not defined", "defaultValue", renkuProjectPath)
+	}
 	renkuBaseURLPath := strings.TrimSuffix(os.Getenv("RENKU_BASE_URL_PATH"), "/")
 	if renkuBaseURLPath == "" {
 		renkuBaseURLPath = "dev-session"
@@ -159,7 +167,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 
 	scratchPathRenku := path.Join(scratch.Path, userName, "renku")
-	sessionPath := path.Join(scratchPathRenku, renkuBaseURLPath)
+	sessionPath := path.Join(scratchPathRenku, renkuProjectPath, renkuBaseURLPath)
 
 	slog.Info("determined session path", "sessionPath", sessionPath)
 
@@ -211,9 +219,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	// Copy the environment variables defined by the user
 	for _, environ := range os.Environ() {
 		key, val, _ := strings.Cut(environ, "=")
-		if strings.HasPrefix(key, "RENKU_ENV_") {
-			key = strings.TrimPrefix("RENKU_ENV_", key)
-			env[key] = val
+		if newKey, isRenkuEnv := strings.CutPrefix(key, "RENKU_ENV_"); isRenkuEnv {
+			env[newKey] = val
 		}
 	}
 	// Copy the REMOTE_SESSION environment variables
@@ -251,8 +258,12 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	env["GIT_PROXY_PORT"] = fmt.Sprintf("%d", 65480)        // git proxy port
 	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
-	// TODO: upload session script
+	// Upload the session script
 	// TODO: maybe the session script should be a template: pass account, partition, log files, etc.
+	err = c.uploadFile(ctx, sessionPath, "session_script.sh", []byte(sessionScript))
+	if err != nil {
+		return err
+	}
 
 	jobEnv := JobDescriptionModel_Env{}
 	err = jobEnv.FromJobDescriptionModelEnv0(env)
@@ -261,7 +272,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 	job := JobDescriptionModel{
 		Env:              &jobEnv,
-		Script:           &sessionScript,
+		ScriptPath:       ptr.To(path.Join(sessionPath, "session_script.sh")),
 		WorkingDirectory: sessionPath,
 	}
 	jobID, err := c.submitJob(ctx, job)

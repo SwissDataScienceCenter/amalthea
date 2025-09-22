@@ -30,9 +30,11 @@ import (
 const RemoteSessionControllerPrefix = "RSC"
 
 const (
-	firecrestAPIURLFlag = "firecrest-api-url"
-	serverPortFlag      = "server-port"
-	fakeStartFlag       = "fake-start"
+	firecrestAPIURLFlag     = "firecrest-api-url"
+	firecrestSystemNameFlag = "firecrest-system-name"
+	firecrestPartitionFlag  = "firecrest-partition"
+	serverPortFlag          = "server-port"
+	fakeStartFlag           = "fake-start"
 )
 
 type RemoteSessionControllerConfig struct {
@@ -40,6 +42,10 @@ type RemoteSessionControllerConfig struct {
 
 	// The URL of the FirecREST API
 	FirecrestAPIURL string
+	// The system name for FirecREST
+	FirecrestSystemName string
+	// The partition to use for FirecREST (SLURM option)
+	FirecrestPartition string
 
 	// The configuration used to authenticate with the FirecREST API
 	FirecrestAuthConfig FirecrestAuthConfig
@@ -57,6 +63,22 @@ func SetFlags(cmd *cobra.Command) error {
 		return err
 	}
 	if err := viper.BindEnv(firecrestAPIURLFlag, AsEnvVarFlag(firecrestAPIURLFlag)); err != nil {
+		return err
+	}
+
+	cmd.Flags().String(firecrestSystemNameFlag, "", "system name for FirecREST")
+	if err := viper.BindPFlag(firecrestSystemNameFlag, cmd.Flags().Lookup(firecrestSystemNameFlag)); err != nil {
+		return err
+	}
+	if err := viper.BindEnv(firecrestSystemNameFlag, AsEnvVarFlag(firecrestSystemNameFlag)); err != nil {
+		return err
+	}
+
+	cmd.Flags().String(firecrestPartitionFlag, "", "partition to use for FirecREST (SLURM option)")
+	if err := viper.BindPFlag(firecrestPartitionFlag, cmd.Flags().Lookup(firecrestPartitionFlag)); err != nil {
+		return err
+	}
+	if err := viper.BindEnv(firecrestPartitionFlag, AsEnvVarFlag(firecrestPartitionFlag)); err != nil {
 		return err
 	}
 
@@ -86,6 +108,8 @@ func SetFlags(cmd *cobra.Command) error {
 
 func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
 	cfg.FirecrestAPIURL = viper.GetString(firecrestAPIURLFlag)
+	cfg.FirecrestSystemName = viper.GetString(firecrestSystemNameFlag)
+	cfg.FirecrestPartition = viper.GetString(firecrestPartitionFlag)
 	cfg.ServerPort = viper.GetInt32(serverPortFlag)
 	cfg.FakeStart = viper.GetBool(fakeStartFlag)
 
@@ -104,6 +128,9 @@ func (cfg *RemoteSessionControllerConfig) Validate() error {
 	}
 	if _, err := url.Parse(cfg.FirecrestAPIURL); err != nil {
 		return fmt.Errorf("firecrestAPIURL is not valid: %w", err)
+	}
+	if cfg.FirecrestSystemName == "" {
+		return fmt.Errorf("firecrestSystemName is not defined")
 	}
 	if err := cfg.FirecrestAuthConfig.Validate(); err != nil {
 		return err

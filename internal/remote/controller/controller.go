@@ -38,7 +38,7 @@ func NewRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c *fi
 	if err != nil {
 		return nil, err
 	}
-	controller, err := firecrest.NewFirecrestRemoteSessionController(firecrestClient, "eiger", cfg.FakeStart)
+	controller, err := firecrest.NewFirecrestRemoteSessionController(firecrestClient, cfg.FirecrestSystemName, cfg.FirecrestPartition, cfg.FakeStart)
 	if err != nil {
 		return nil, err
 	}
