@@ -147,7 +147,7 @@ func (a *RenkuAuth) GetAccessToken() (token string, err error) {
 	return a.accessToken, nil
 }
 
-func (a *RenkuAuth) refreshAccessToken() error {
+func (a *RenkuAuth) refreshAccessToken(ctx context.Context) error {
 	renkuAccessToken, err := a.getRenkuAccessToken()
 	if err != nil {
 		return err
@@ -156,7 +156,7 @@ func (a *RenkuAuth) refreshAccessToken() error {
 	a.accessTokenLock.Lock()
 	defer a.accessTokenLock.Unlock()
 
-	ctx, cancel := context.WithTimeoutCause(context.Background(), 30*time.Second, fmt.Errorf("authentication request timed out"))
+	ctx, cancel := context.WithTimeoutCause(ctx, 30*time.Second, fmt.Errorf("authentication request timed out"))
 	defer cancel()
 
 	result, err := requestNewAccessTokenFromRenku(ctx, a.httpClient, a.firecrestTokenURI, renkuAccessToken)
