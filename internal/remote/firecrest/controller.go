@@ -276,9 +276,9 @@ func (c *FirecrestRemoteSessionController) submitJob(ctx context.Context, job Jo
 	if res.JSON201 == nil {
 		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
-			return "", fmt.Errorf("could run mkdir: %s", message)
+			return "", fmt.Errorf("could not submit job: %s", message)
 		}
-		return "", fmt.Errorf("could run mkdir: HTTP %d", res.StatusCode())
+		return "", fmt.Errorf("could submit job: HTTP %d", res.StatusCode())
 	}
 	if res.JSON201.JobId == nil {
 		return "", fmt.Errorf("invalid job submission response")
