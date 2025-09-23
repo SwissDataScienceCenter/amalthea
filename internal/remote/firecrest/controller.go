@@ -258,9 +258,9 @@ func (c *FirecrestRemoteSessionController) chmod(ctx context.Context, path strin
 	if res.JSON200 == nil {
 		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
-			return fmt.Errorf("could run mkdir: %s", message)
+			return fmt.Errorf("could run chmod: %s", message)
 		}
-		return fmt.Errorf("could run mkdir: HTTP %d", res.StatusCode())
+		return fmt.Errorf("could run chmod: HTTP %d", res.StatusCode())
 	}
 	return nil
 }
