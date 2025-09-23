@@ -73,7 +73,7 @@ func Start() {
 
 	// Start the remote session
 	// TODO: should the 15-minute timeout be configurable?
-	startCtx, startCancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	startCtx, startCancel := context.WithTimeout(ctx, 15*time.Minute)
 	err = controller.Start(startCtx)
 	startCancel()
 	if err != nil {

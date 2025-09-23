@@ -8,9 +8,8 @@ set -e -o pipefail
 # Installs rclone
 #
 # Usage:
-#.    source install_rclone.sh
 #     rclone="$(install_rclone)"
-#.    "$rclone" version
+#     "$rclone" version
 function install_rclone() {
     RENKU_DIR="${HOME}/.renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
@@ -62,9 +61,8 @@ function install_rclone() {
 # Installs wstunnel
 #
 # Usage:
-#.    source install_wstunnel.sh
 #     wstunnel="$(install_wstunnel)"
-#.    "$wstunnel" --version
+#     "$wstunnel" --version
 function install_wstunnel() {
     RENKU_DIR="${HOME}/.renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
@@ -127,17 +125,11 @@ echo "SESSION_WORK_DIR: ${SESSION_WORK_DIR}"
 mkdir -p "${SESSION_WORK_DIR}"
 mkdir -p "${SECRETS_DIR}"
 
-# TODO: make a sqsh file from the container image
 IMAGE_SQSH="${SESSION_DIR}/session-image.sqsh"
-# if [ -f "${IMAGE_SQSH}" ]; then
-#     echo "existing image file"
-# else
-#     enroot import -x mount -o "${IMAGE_SQSH}" "docker://${SESSION_IMAGE}"
-# fi
 
 # Install rclone
-rclone=$(install_rclone)
-echo "rclone: ${rclone}"
+# rclone=$(install_rclone)
+# echo "rclone: ${rclone}"
 
 # Install wstunnel
 # wstunnel=$(install_wstunnel)
@@ -146,7 +138,6 @@ echo "rclone: ${rclone}"
 # Create the environment.toml file to run the session
 EDF_FILE="${SESSION_DIR}/environment.toml"
 cat <<EOF >"${EDF_FILE}"
-# image = "${IMAGE_SQSH}"
 image = "${REMOTE_SESSION_IMAGE}"
 
 mounts = [
@@ -165,22 +156,20 @@ export RENKU_SESSION_IP="127.0.0.1"
 # Load the wstunnel secret
 # export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
 
-env | grep "RENKU" || true
-
 echo "TODO: setup git repositories..."
 echo "TODO: setup rclone mounts..."
 
-echo "Setting up example rclone mount..."
-fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
-rm -rf "${SESSION_WORK_DIR}/era5"
-mkdir -p "${SESSION_WORK_DIR}/era5"
-RCLONE_CONFIG="${SESSION_DIR}/rclone.conf"
-cat <<EOF >"${RCLONE_CONFIG}"
-[era5]
-type = doi
-doi = 10.5281/zenodo.3831980
-EOF
-"${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
+# echo "Setting up example rclone mount..."
+# fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
+# rm -rf "${SESSION_WORK_DIR}/era5"
+# mkdir -p "${SESSION_WORK_DIR}/era5"
+# RCLONE_CONFIG="${SESSION_DIR}/rclone.conf"
+# cat <<EOF >"${RCLONE_CONFIG}"
+# [era5]
+# type = doi
+# doi = 10.5281/zenodo.3831980
+# EOF
+# "${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
 
 # echo "Starting tunnel..."
 # GIT_PROXY_PORT="${GIT_PROXY_PORT:-8080}"
@@ -218,7 +207,7 @@ EOF
 
 exit_script() {
     echo "Cleaning up session..."
-    fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
+    # fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
 }
 
 echo "Starting session..."

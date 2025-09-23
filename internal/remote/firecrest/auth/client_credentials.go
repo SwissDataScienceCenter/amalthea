@@ -83,13 +83,6 @@ func newFirecrestClientCredentialsAuth(tokenURI, clientID, clientSecret string, 
 // FirecrestClientCredentialsAuthOption allows setting options
 type FirecrestClientCredentialsAuthOption func(*FirecrestClientCredentialsAuth) error
 
-// func WithHttpClient(client *http.Client) FirecrestClientCredentialsAuthOption {
-// 	return func(a *FirecrestClientCredentialsAuth) error {
-// 		a.httpClient = client
-// 		return nil
-// 	}
-// }
-
 // RequestEditor returns a request editor which injects a valid access token
 // for FirecREST API requests.
 func (a *FirecrestClientCredentialsAuth) RequestEditor() RequestEditorFn {
@@ -97,7 +90,7 @@ func (a *FirecrestClientCredentialsAuth) RequestEditor() RequestEditorFn {
 		if req.Header.Get("Authorization") != "" {
 			return nil
 		}
-		token, err := a.GetAccessToken()
+		token, err := a.GetAccessToken(ctx)
 		if err != nil {
 			return err
 		}
@@ -106,7 +99,7 @@ func (a *FirecrestClientCredentialsAuth) RequestEditor() RequestEditorFn {
 	}
 }
 
-func (a *FirecrestClientCredentialsAuth) GetAccessToken() (token string, err error) {
+func (a *FirecrestClientCredentialsAuth) GetAccessToken(ctx context.Context) (token string, err error) {
 	a.accessTokenLock.RLock()
 	token = a.accessToken
 	expiresAt := a.accessTokenExpiresAt
@@ -121,7 +114,7 @@ func (a *FirecrestClientCredentialsAuth) GetAccessToken() (token string, err err
 	}
 
 	// Refresh the token
-	if err := a.refreshAccessToken(); err != nil {
+	if err := a.refreshAccessToken(ctx); err != nil {
 		return token, err
 	}
 	a.accessTokenLock.RLock()
@@ -129,14 +122,15 @@ func (a *FirecrestClientCredentialsAuth) GetAccessToken() (token string, err err
 	return a.accessToken, nil
 }
 
-func (a *FirecrestClientCredentialsAuth) refreshAccessToken() error {
+func (a *FirecrestClientCredentialsAuth) refreshAccessToken(ctx context.Context) error {
 	a.accessTokenLock.Lock()
 	defer a.accessTokenLock.Unlock()
 
-	ctx, cancel := context.WithTimeoutCause(context.Background(), 30*time.Second, fmt.Errorf("authentication request timed out"))
+	// NOTE: we do not let the refresh request be cancelled by the caller
+	refreshCtx, cancel := context.WithTimeoutCause(context.WithoutCancel(ctx), 30*time.Second, fmt.Errorf("authentication request timed out"))
 	defer cancel()
 
-	result, err := requestNewAccessToken(ctx, a.httpClient, a.tokenURI, "client_credentials", a.clientID, a.clientSecret, "")
+	result, err := requestNewAccessToken(refreshCtx, a.httpClient, a.tokenURI, "client_credentials", a.clientID, a.clientSecret, "")
 	if err != nil {
 		return err
 	}

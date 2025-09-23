@@ -188,7 +188,9 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the remote session using the FirecREST API
+// Stop stops the remote session using the FirecREST API.
+//
+// The caller needs to make sure Stop is not called before Start has returned.
 func (c *FirecrestRemoteSessionController) Stop(ctx context.Context) error {
 	// The remote job was never submitted, nothing to do
 	if c.jobID == "" {

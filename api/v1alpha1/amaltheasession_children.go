@@ -643,63 +643,72 @@ func (as *HpcAmaltheaSession) Secret() v1.Secret {
 
 // sessionContainer returns the main session container
 func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1.Container {
-	session := cr.Spec.Session
 	if cr.Spec.SessionLocation == Local {
-		// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
-		// in the CR can point to either the session container or another container.
-		sessionContainer := v1.Container{
-			Image:                    session.Image,
-			Name:                     SessionContainerName,
-			ImagePullPolicy:          cr.Spec.Session.ImagePullPolicy,
-			Args:                     session.Args,
-			Command:                  session.Command,
-			Env:                      session.Env,
-			Resources:                session.Resources,
-			VolumeMounts:             volumeMounts,
-			TerminationMessagePath:   "/dev/termination-log",
-			TerminationMessagePolicy: v1.TerminationMessageReadFile,
-		}
-		// Assign a readiness probe to the session container
-		switch cr.Spec.Session.ReadinessProbe.Type {
-		case HTTP:
-			sessionContainer.ReadinessProbe = &v1.Probe{
-				ProbeHandler: v1.ProbeHandler{
-					HTTPGet: &v1.HTTPGetAction{
-						Port: intstr.FromInt32(cr.Spec.Session.Port),
-						Path: cr.Spec.Session.URLPath,
-					},
-				},
-				SuccessThreshold:    5,
-				PeriodSeconds:       5,
-				InitialDelaySeconds: 10,
-			}
-		case TCP:
-			sessionContainer.ReadinessProbe = &v1.Probe{
-				ProbeHandler: v1.ProbeHandler{
-					TCPSocket: &v1.TCPSocketAction{
-						Port: intstr.FromInt32(cr.Spec.Session.Port),
-					},
-				},
-				SuccessThreshold:    5,
-				PeriodSeconds:       5,
-				InitialDelaySeconds: 10,
-			}
-		}
-		// Assign security context
-		securityContext := &v1.SecurityContext{
-			RunAsNonRoot: ptr.To(true),
-			RunAsUser:    ptr.To(session.RunAsUser),
-			RunAsGroup:   ptr.To(session.RunAsGroup),
-		}
-		if session.RunAsUser == 0 {
-			securityContext.RunAsNonRoot = ptr.To(false)
-		}
-		sessionContainer.SecurityContext = securityContext
-
-		return sessionContainer
+		return cr.sessionContainerLocal(volumeMounts)
 	}
-
 	// cr.Spec.SessionLocation == Remote
+	return cr.sessionContainerRemote(volumeMounts)
+}
+
+// sessionContainer returns the main session container
+func (cr *HpcAmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount) v1.Container {
+	session := cr.Spec.Session
+	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
+	// in the CR can point to either the session container or another container.
+	sessionContainer := v1.Container{
+		Image:                    session.Image,
+		Name:                     SessionContainerName,
+		ImagePullPolicy:          cr.Spec.Session.ImagePullPolicy,
+		Args:                     session.Args,
+		Command:                  session.Command,
+		Env:                      session.Env,
+		Resources:                session.Resources,
+		VolumeMounts:             volumeMounts,
+		TerminationMessagePath:   "/dev/termination-log",
+		TerminationMessagePolicy: v1.TerminationMessageReadFile,
+	}
+	// Assign a readiness probe to the session container
+	switch cr.Spec.Session.ReadinessProbe.Type {
+	case HTTP:
+		sessionContainer.ReadinessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					Port: intstr.FromInt32(cr.Spec.Session.Port),
+					Path: cr.Spec.Session.URLPath,
+				},
+			},
+			SuccessThreshold:    5,
+			PeriodSeconds:       5,
+			InitialDelaySeconds: 10,
+		}
+	case TCP:
+		sessionContainer.ReadinessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.FromInt32(cr.Spec.Session.Port),
+				},
+			},
+			SuccessThreshold:    5,
+			PeriodSeconds:       5,
+			InitialDelaySeconds: 10,
+		}
+	}
+	// Assign security context
+	securityContext := &v1.SecurityContext{
+		RunAsNonRoot: ptr.To(true),
+		RunAsUser:    ptr.To(session.RunAsUser),
+		RunAsGroup:   ptr.To(session.RunAsGroup),
+	}
+	if session.RunAsUser == 0 {
+		securityContext.RunAsNonRoot = ptr.To(false)
+	}
+	sessionContainer.SecurityContext = securityContext
+
+	return sessionContainer
+}
+
+func (cr *HpcAmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount) v1.Container {
+	session := cr.Spec.Session
 	sessionContainer := v1.Container{
 		Image: sidecarsImage,
 		Name:  SessionContainerName,
