@@ -88,10 +88,6 @@ func Start() {
 	defer cancel()
 	if err := controller.Stop(ctx); err != nil {
 		slog.Error("cancelling the remote job failed", "error", err)
-		if err := server.Shutdown(ctx); err != nil {
-			slog.Error("shutting down the server gracefully failed", "error", err)
-			os.Exit(1)
-		}
 	}
 	if err := server.Shutdown(ctx); err != nil {
 		slog.Error("shutting down the server gracefully failed", "error", err)
