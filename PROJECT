@@ -16,7 +16,7 @@ resources:
     namespaced: true
   controller: true
   group: amalthea.dev
-  kind: AmaltheaSession
+  kind: HpcAmaltheaSession
   path: github.com/SwissDataScienceCenter/amalthea/api/v1alpha1
   version: v1alpha1
 version: "3"

@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/SwissDataScienceCenter/amalthea/internal/common"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -240,7 +240,7 @@ func serve(cmd *cobra.Command, args []string) {
 
 	e.Logger.Infof("Starting proxy for remote: %s, cookie key: %s, token of length %d", remoteURL.String(), cookieKey, len(token))
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), common.InterruptSignals...)
 	defer stop()
 	// Start server
 	go func() {
