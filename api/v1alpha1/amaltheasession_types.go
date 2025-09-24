@@ -185,6 +185,12 @@ type Session struct {
 	// +kubebuilder:default:={}
 	// The readiness probe to use on the session container
 	ReadinessProbe ReadinessProbe `json:"readinessProbe,omitempty"`
+	// The secret containing the configuration needed to start a remote session.
+	// This field should be populated only when the session location is set to "remote".
+	// This secret will be loaded into environment variables passed to the remote
+	// session controller.
+	// See: [internal/remote/config.Config] for a list of configuration options.
+	RemoteSecretRef *SessionSecretRef `json:"remoteSecretRef,omitempty"`
 }
 
 type Ingress struct {

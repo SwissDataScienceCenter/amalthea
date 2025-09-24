@@ -6268,6 +6268,30 @@ spec:
                         - http
                         type: string
                     type: object
+                  remoteSecretRef:
+                    description: |-
+                      The secret containing the configuration needed to start a remote session.
+                      This field should be populated only when the session location is set to "remote".
+                      This secret will be loaded into environment variables passed to the remote
+                      session controller.
+                      See: [internal/remote/config.Config] for a list of configuration options.
+                    properties:
+                      adopt:
+                        description: If the secret is adopted then the operator will
+                          delete the secret when the custom resource that uses it
+                          is deleted.
+                        type: boolean
+                      key:
+                        description: |-
+                          The key is optional because it may not be relevant depending on where or how the secret is used.
+                          For example, for authentication see the `secretRef` field in `spec.authentication`
+                          for more details.
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - name
+                    type: object
                   resources:
                     description: Resource requirements and limits in the same format
                       as a Pod in Kubernetes
