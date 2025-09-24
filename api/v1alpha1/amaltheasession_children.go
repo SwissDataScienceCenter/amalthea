@@ -37,6 +37,7 @@ const shmVolumeName string = prefix + "dev-shm"
 const authenticatedPort int32 = 65535
 const AuthProxyMetaPort int32 = 65534
 const secondProxyPort int32 = 65533
+const RemoteSessionControllerPort int32 = 65532
 
 var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
@@ -94,7 +95,6 @@ func (cr *HpcAmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 		replicas = 0
 	}
 
-	session := cr.Spec.Session
 	volumes := []v1.Volume{}
 	volumeMounts := []v1.VolumeMount{}
 	initContainers := []v1.Container{}
@@ -113,57 +113,8 @@ func (cr *HpcAmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 	initContainers = append(initContainers, cloneInit.Containers...)
 	initContainers = append(initContainers, cr.Spec.ExtraInitContainers...)
 
-	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
-	// in the CR can point to either the session container or another container.
-	sessionContainer := v1.Container{
-		Image:                    session.Image,
-		Name:                     SessionContainerName,
-		ImagePullPolicy:          cr.Spec.Session.ImagePullPolicy,
-		Args:                     session.Args,
-		Command:                  session.Command,
-		Env:                      session.Env,
-		Resources:                session.Resources,
-		VolumeMounts:             volumeMounts,
-		TerminationMessagePath:   "/dev/termination-log",
-		TerminationMessagePolicy: v1.TerminationMessageReadFile,
-	}
-
-	// Assign a readiness probe to the session container
-	switch cr.Spec.Session.ReadinessProbe.Type {
-	case HTTP:
-		sessionContainer.ReadinessProbe = &v1.Probe{
-			ProbeHandler: v1.ProbeHandler{
-				HTTPGet: &v1.HTTPGetAction{
-					Port: intstr.FromInt32(cr.Spec.Session.Port),
-					Path: cr.Spec.Session.URLPath,
-				},
-			},
-			SuccessThreshold:    5,
-			PeriodSeconds:       5,
-			InitialDelaySeconds: 10,
-		}
-	case TCP:
-		sessionContainer.ReadinessProbe = &v1.Probe{
-			ProbeHandler: v1.ProbeHandler{
-				TCPSocket: &v1.TCPSocketAction{
-					Port: intstr.FromInt32(cr.Spec.Session.Port),
-				},
-			},
-			SuccessThreshold:    5,
-			PeriodSeconds:       5,
-			InitialDelaySeconds: 10,
-		}
-	}
-
-	securityContext := &v1.SecurityContext{
-		RunAsNonRoot: ptr.To(true),
-		RunAsUser:    ptr.To(session.RunAsUser),
-		RunAsGroup:   ptr.To(session.RunAsGroup),
-	}
-	if session.RunAsUser == 0 {
-		securityContext.RunAsNonRoot = ptr.To(false)
-	}
-	sessionContainer.SecurityContext = securityContext
+	// Create the main session container
+	sessionContainer := cr.sessionContainer(volumeMounts)
 
 	auth, err := cr.auth()
 	if err != nil {
@@ -212,6 +163,10 @@ func (cr *HpcAmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 				},
 			},
 		},
+	}
+	// Set the termination grace period for remote sessions to 60 seconds
+	if cr.Spec.SessionLocation == Remote {
+		sts.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(60))
 	}
 	return sts, nil
 }
@@ -459,6 +414,15 @@ func (cr *HpcAmaltheaSession) AdoptedSecrets() v1.SecretList {
 		})
 	}
 
+	if cr.Spec.Session.RemoteSecretRef != nil && cr.Spec.Session.RemoteSecretRef.isAdopted() {
+		secrets.Items = append(secrets.Items, v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cr.Namespace,
+				Name:      cr.Spec.Session.RemoteSecretRef.Name,
+			},
+		})
+	}
+
 	for _, pv := range cr.Spec.DataSources {
 		if pv.SecretRef.isAdopted() {
 			secrets.Items = append(secrets.Items, v1.Secret{
@@ -506,6 +470,11 @@ func (cr *HpcAmaltheaSession) AdoptedSecrets() v1.SecretList {
 // Assuming that the csi-rclone driver from https://github.com/SwissDataScienceCenter/csi-rclone
 // is installed, this will generate PVCs for the data sources that have the rclone type.
 func (as *HpcAmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
+	// TODO: Configure this for remote sessions
+	if as.Spec.SessionLocation == Remote {
+		return []v1.PersistentVolumeClaim{}, []v1.Volume{}, []v1.VolumeMount{}
+	}
+
 	pvcs := []v1.PersistentVolumeClaim{}
 	vols := []v1.Volume{}
 	volMounts := []v1.VolumeMount{}
@@ -670,4 +639,131 @@ func (as *HpcAmaltheaSession) Secret() v1.Secret {
 		"oauth2-proxy-config.yaml":       strings.Join(oldConfigLines, "\n"),
 	}
 	return secret
+}
+
+// sessionContainer returns the main session container
+func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1.Container {
+	if cr.Spec.SessionLocation == Local {
+		return cr.sessionContainerLocal(volumeMounts)
+	}
+	// cr.Spec.SessionLocation == Remote
+	return cr.sessionContainerRemote(volumeMounts)
+}
+
+// sessionContainer returns the main session container
+func (cr *HpcAmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount) v1.Container {
+	session := cr.Spec.Session
+	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
+	// in the CR can point to either the session container or another container.
+	sessionContainer := v1.Container{
+		Image:                    session.Image,
+		Name:                     SessionContainerName,
+		ImagePullPolicy:          cr.Spec.Session.ImagePullPolicy,
+		Args:                     session.Args,
+		Command:                  session.Command,
+		Env:                      session.Env,
+		Resources:                session.Resources,
+		VolumeMounts:             volumeMounts,
+		TerminationMessagePath:   "/dev/termination-log",
+		TerminationMessagePolicy: v1.TerminationMessageReadFile,
+	}
+	// Assign a readiness probe to the session container
+	switch cr.Spec.Session.ReadinessProbe.Type {
+	case HTTP:
+		sessionContainer.ReadinessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					Port: intstr.FromInt32(cr.Spec.Session.Port),
+					Path: cr.Spec.Session.URLPath,
+				},
+			},
+			SuccessThreshold:    5,
+			PeriodSeconds:       5,
+			InitialDelaySeconds: 10,
+		}
+	case TCP:
+		sessionContainer.ReadinessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.FromInt32(cr.Spec.Session.Port),
+				},
+			},
+			SuccessThreshold:    5,
+			PeriodSeconds:       5,
+			InitialDelaySeconds: 10,
+		}
+	}
+	// Assign security context
+	securityContext := &v1.SecurityContext{
+		RunAsNonRoot: ptr.To(true),
+		RunAsUser:    ptr.To(session.RunAsUser),
+		RunAsGroup:   ptr.To(session.RunAsGroup),
+	}
+	if session.RunAsUser == 0 {
+		securityContext.RunAsNonRoot = ptr.To(false)
+	}
+	sessionContainer.SecurityContext = securityContext
+
+	return sessionContainer
+}
+
+func (cr *HpcAmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount) v1.Container {
+	session := cr.Spec.Session
+	sessionContainer := v1.Container{
+		Image: sidecarsImage,
+		Name:  SessionContainerName,
+		SecurityContext: &v1.SecurityContext{
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsNonRoot:             ptr.To(true),
+		},
+		Args: []string{
+			"remote-session-controller",
+			"run",
+		},
+		// TODO: Properly configure env vars
+		Env: session.Env,
+		// TODO: Set fixed resources here
+		Resources:                session.Resources,
+		VolumeMounts:             volumeMounts,
+		TerminationMessagePath:   "/dev/termination-log",
+		TerminationMessagePolicy: v1.TerminationMessageReadFile,
+	}
+
+	sessionContainer.Env = append(sessionContainer.Env, v1.EnvVar{
+		Name:  "SERVER_PORT",
+		Value: fmt.Sprintf("%d", RemoteSessionControllerPort),
+	})
+
+	if session.RemoteSecretRef != nil {
+		sessionContainer.EnvFrom = append(sessionContainer.EnvFrom, v1.EnvFromSource{
+			// This secret contains the configuration for the remote session controller
+			SecretRef: &v1.SecretEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: session.RemoteSecretRef.Name},
+			},
+		})
+	}
+
+	sessionContainer.LivenessProbe = &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Port: intstr.FromInt32(RemoteSessionControllerPort),
+				Path: "/live",
+			},
+		},
+		PeriodSeconds:       1,
+		InitialDelaySeconds: 10,
+	}
+	sessionContainer.ReadinessProbe = &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Port: intstr.FromInt32(RemoteSessionControllerPort),
+				Path: "/ready",
+			},
+		},
+		SuccessThreshold:    5,
+		PeriodSeconds:       5,
+		InitialDelaySeconds: 10,
+	}
+
+	return sessionContainer
 }
