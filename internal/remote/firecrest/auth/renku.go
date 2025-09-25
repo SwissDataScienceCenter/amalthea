@@ -115,7 +115,7 @@ func (a *RenkuAuth) RequestEditor() RequestEditorFn {
 		if req.Header.Get("Authorization") != "" {
 			return nil
 		}
-		token, err := a.GetAccessToken()
+		token, err := a.GetAccessToken(ctx)
 		if err != nil {
 			return err
 		}
@@ -124,7 +124,7 @@ func (a *RenkuAuth) RequestEditor() RequestEditorFn {
 	}
 }
 
-func (a *RenkuAuth) GetAccessToken() (token string, err error) {
+func (a *RenkuAuth) GetAccessToken(ctx context.Context) (token string, err error) {
 	a.accessTokenLock.RLock()
 	token = a.accessToken
 	expiresAt := a.accessTokenExpiresAt
@@ -139,7 +139,7 @@ func (a *RenkuAuth) GetAccessToken() (token string, err error) {
 	}
 
 	// Refresh the token
-	if err := a.refreshAccessToken(); err != nil {
+	if err := a.refreshAccessToken(ctx); err != nil {
 		return token, err
 	}
 	a.accessTokenLock.RLock()
@@ -147,8 +147,8 @@ func (a *RenkuAuth) GetAccessToken() (token string, err error) {
 	return a.accessToken, nil
 }
 
-func (a *RenkuAuth) refreshAccessToken() error {
-	renkuAccessToken, err := a.getRenkuAccessToken()
+func (a *RenkuAuth) refreshAccessToken(ctx context.Context) error {
+	renkuAccessToken, err := a.getRenkuAccessToken(ctx)
 	if err != nil {
 		return err
 	}
@@ -156,10 +156,10 @@ func (a *RenkuAuth) refreshAccessToken() error {
 	a.accessTokenLock.Lock()
 	defer a.accessTokenLock.Unlock()
 
-	ctx, cancel := context.WithTimeoutCause(context.Background(), 30*time.Second, fmt.Errorf("authentication request timed out"))
+	childCtx, cancel := context.WithTimeoutCause(ctx, 30*time.Second, fmt.Errorf("authentication request timed out"))
 	defer cancel()
 
-	result, err := requestNewAccessTokenFromRenku(ctx, a.httpClient, a.firecrestTokenURI, renkuAccessToken)
+	result, err := requestNewAccessTokenFromRenku(childCtx, a.httpClient, a.firecrestTokenURI, renkuAccessToken)
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func requestNewAccessTokenFromRenku(ctx context.Context, httpClient *http.Client
 	}, nil
 }
 
-func (a *RenkuAuth) getRenkuAccessToken() (token string, err error) {
+func (a *RenkuAuth) getRenkuAccessToken(ctx context.Context) (token string, err error) {
 	a.renkuAccessTokenLock.RLock()
 	token = a.renkuAccessToken
 	expiresAt := a.renkuAccessTokenExpiresAt
@@ -212,7 +212,7 @@ func (a *RenkuAuth) getRenkuAccessToken() (token string, err error) {
 	}
 
 	// Refresh the token
-	if err := a.refreshRenkuAccessToken(); err != nil {
+	if err := a.refreshRenkuAccessToken(ctx); err != nil {
 		return token, err
 	}
 	a.renkuAccessTokenLock.RLock()
@@ -220,14 +220,15 @@ func (a *RenkuAuth) getRenkuAccessToken() (token string, err error) {
 	return a.renkuAccessToken, nil
 }
 
-func (a *RenkuAuth) refreshRenkuAccessToken() error {
+func (a *RenkuAuth) refreshRenkuAccessToken(ctx context.Context) error {
 	a.renkuAccessTokenLock.Lock()
 	defer a.renkuAccessTokenLock.Unlock()
 
-	ctx, cancel := context.WithTimeoutCause(context.Background(), 30*time.Second, fmt.Errorf("authentication request timed out"))
+	// NOTE: we do not let the refresh request be cancelled by the caller
+	refreshCtx, cancel := context.WithTimeoutCause(context.WithoutCancel(ctx), 30*time.Second, fmt.Errorf("authentication request timed out"))
 	defer cancel()
 
-	result, err := requestNewAccessToken(ctx, a.httpClient, a.renkuTokenURI, "refresh_token", a.renkuClientID, a.renkuClientSecret, a.renkuRefreshToken)
+	result, err := requestNewAccessToken(refreshCtx, a.httpClient, a.renkuTokenURI, "refresh_token", a.renkuClientID, a.renkuClientSecret, a.renkuRefreshToken)
 	if err != nil {
 		return err
 	}

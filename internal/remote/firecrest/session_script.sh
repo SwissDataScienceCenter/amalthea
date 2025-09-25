@@ -11,7 +11,7 @@ set -e -o pipefail
 #     rclone="$(install_rclone)"
 #     "$rclone" version
 function install_rclone() {
-    RENKU_DIR="${HOME}/renku/$(uname -m)"
+    RENKU_DIR="${HOME}/.renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
     RCLONE_VERSION="1.70.2"
     RCLONE_PKG="${RENKU_PKG}/rclone/v${RCLONE_VERSION}"
@@ -64,7 +64,7 @@ function install_rclone() {
 #     wstunnel="$(install_wstunnel)"
 #     "$wstunnel" --version
 function install_wstunnel() {
-    RENKU_DIR="${HOME}/renku/$(uname -m)"
+    RENKU_DIR="${HOME}/.renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
     WSTUNNEL_VERSION="10.4.4"
     WSTUNNEL_PKG="${RENKU_PKG}/wstunnel/v${WSTUNNEL_VERSION}"
@@ -125,9 +125,9 @@ mkdir -p "${SESSION_WORK_DIR}"
 mkdir -p "${SECRETS_DIR}"
 mkdir -p "${LOGS_DIR}"
 
-# Install rclone
-rclone=$(install_rclone)
-echo "rclone: ${rclone}"
+# # Install rclone
+# rclone=$(install_rclone)
+# echo "rclone: ${rclone}"
 
 # Install wstunnel
 wstunnel=$(install_wstunnel)
@@ -136,7 +136,6 @@ echo "wstunnel: ${wstunnel}"
 # Create the environment.toml file to run the session
 EDF_FILE="${SESSION_DIR}/environment.toml"
 cat <<EOF >"${EDF_FILE}"
-# image = "${IMAGE_SQSH}"
 image = "${REMOTE_SESSION_IMAGE}"
 
 mounts = [
@@ -154,8 +153,6 @@ export RENKU_SESSION_IP="127.0.0.1"
 
 # Load the wstunnel secret
 export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
-
-env | grep "RENKU" || true
 
 echo "TODO: setup git repositories..."
 echo "TODO: setup rclone mounts..."
@@ -203,7 +200,7 @@ echo "wstunnel client \
 
 exit_script() {
     echo "Cleaning up session..."
-    fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
+    # fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
 }
 
 echo "Starting session..."

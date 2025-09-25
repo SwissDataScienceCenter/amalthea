@@ -224,7 +224,9 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the remote session using the FirecREST API
+// Stop stops the remote session using the FirecREST API.
+//
+// The caller needs to make sure Stop is not called before Start has returned.
 func (c *FirecrestRemoteSessionController) Stop(ctx context.Context) error {
 	// The remote job was never submitted, nothing to do
 	if c.jobID == "" {
@@ -293,9 +295,9 @@ func (c *FirecrestRemoteSessionController) uploadFile(ctx context.Context, direc
 			message = res.JSON5XX.Message
 		}
 		if message != "" {
-			return fmt.Errorf("could run uploadFile: %s", message)
+			return fmt.Errorf("could not run uploadFile: %s", message)
 		}
-		return fmt.Errorf("could run uploadFile: HTTP %d", res.StatusCode())
+		return fmt.Errorf("could not run uploadFile: HTTP %d", res.StatusCode())
 	}
 	return nil
 }
@@ -312,9 +314,9 @@ func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path strin
 	if res.JSON201 == nil {
 		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
-			return fmt.Errorf("could run mkdir: %s", message)
+			return fmt.Errorf("could not run mkdir: %s", message)
 		}
-		return fmt.Errorf("could run mkdir: HTTP %d", res.StatusCode())
+		return fmt.Errorf("could run not mkdir: HTTP %d", res.StatusCode())
 	}
 	return nil
 }
@@ -331,9 +333,9 @@ func (c *FirecrestRemoteSessionController) chmod(ctx context.Context, path strin
 	if res.JSON200 == nil {
 		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
-			return fmt.Errorf("could run chmod: %s", message)
+			return fmt.Errorf("could not run chmod: %s", message)
 		}
-		return fmt.Errorf("could run chmod: HTTP %d", res.StatusCode())
+		return fmt.Errorf("could not run chmod: HTTP %d", res.StatusCode())
 	}
 	return nil
 }
@@ -349,9 +351,9 @@ func (c *FirecrestRemoteSessionController) submitJob(ctx context.Context, job Jo
 	if res.JSON201 == nil {
 		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
-			return "", fmt.Errorf("could run submitJob: %s", message)
+			return "", fmt.Errorf("could not submit job: %s", message)
 		}
-		return "", fmt.Errorf("could run submitJob: HTTP %d", res.StatusCode())
+		return "", fmt.Errorf("could not submit job: HTTP %d", res.StatusCode())
 	}
 	if res.JSON201.JobId == nil {
 		return "", fmt.Errorf("invalid job submission response")
