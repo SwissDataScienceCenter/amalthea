@@ -803,11 +803,11 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 			Value: enrootImage,
 		},
 		v1.EnvVar{
-			Name:  "SERVER_PORT",
+			Name:  "RSC_SERVER_PORT",
 			Value: fmt.Sprintf("%d", RemoteSessionControllerPort),
 		},
 		v1.EnvVar{
-			Name: "WSTUNNEL_SECRET",
+			Name: "RSC_WSTUNNEL_SECRET",
 			ValueFrom: ptr.To(v1.EnvVarSource{
 				SecretKeyRef: ptr.To(v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
