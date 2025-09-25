@@ -115,6 +115,10 @@ type AmaltheaSessionSpec struct {
 	// +optional
 	// The name of the service account that should be used for the session Pod
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
+	// +optional
+	// Template for the fields that should be added to all children (and their children if applicable).
+	Template Template `json:"template,omitzero"`
 }
 
 type Session struct {
@@ -535,4 +539,13 @@ type ReadinessProbe struct {
 	// +optional
 	// The type of readiness probe
 	Type ReadinessProbeType `json:"type,omitempty"`
+}
+
+type Template struct {
+	Metadata TemplateMetadata `json:"metadata,omitzero"`
+}
+
+type TemplateMetadata struct {
+	Annotations map[string]string `json:"annotations,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
 }
