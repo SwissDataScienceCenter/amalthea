@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SwissDataScienceCenter/amalthea/internal/utils"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -800,10 +801,11 @@ func (cr *HpcAmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMou
 		},
 	}
 
-	// TODO: add a safe method to transfor a standard docker image reference to one
-	// TODO: suitable for enroot.
-	enrootDomain, enrootImage, _ := strings.Cut(cr.Spec.Session.Image, "/")
-	enrootImage = enrootDomain + "#" + enrootImage
+	enrootImage, err := utils.EnrootImageFormat(cr.Spec.Session.Image)
+	if err != nil {
+		// TODO: How can we log and report this?
+		enrootImage = cr.Spec.Session.Image
+	}
 
 	sessionContainer.Env = append(
 		sessionContainer.Env,
