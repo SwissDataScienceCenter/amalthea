@@ -19,6 +19,9 @@ import (
 	"github.com/distribution/reference"
 )
 
+// EnrootImageFormat transforms the input dockerImage into a string suitable for enroot.
+//
+// See: https://docs.cscs.ch/software/container-engine/run/#pulling-images-manually
 func EnrootImageFormat(dockerImage string) (enrootImage string, err error) {
 	named, err := reference.ParseDockerRef(dockerImage)
 	if err != nil {
