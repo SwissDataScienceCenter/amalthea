@@ -38,6 +38,7 @@ const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
 const tunnelContainerName string = "tunnel"
 const tunnelServiceName string = prefix + "tunnel"
+const TunnelIngressPathSuffix string = "__amalthea__/tunnel"
 const authenticatedPort int32 = 65535
 const AuthProxyMetaPort int32 = 65534
 const secondProxyPort int32 = 65533
@@ -297,11 +298,11 @@ func (cr *HpcAmaltheaSession) Ingress() *networkingv1.Ingress {
 		}}
 	}
 
-	// Add rule for /tunnel -> tunnel container
+	// Add rule for __amalthea__/tunnel -> tunnel container
 	if cr.Spec.SessionLocation == Remote {
 		mainRule := &ing.Spec.Rules[0]
 		mainRule.HTTP.Paths = append(mainRule.HTTP.Paths, networkingv1.HTTPIngressPath{
-			Path:     cr.ingressPathPrefix() + "tunnel",
+			Path:     cr.ingressPathPrefix() + TunnelIngressPathSuffix,
 			PathType: ptr.To(networkingv1.PathTypePrefix),
 			Backend: networkingv1.IngressBackend{
 				Service: &networkingv1.IngressServiceBackend{
@@ -870,6 +871,9 @@ func (cr *HpcAmaltheaSession) tunnelContainer() v1.Container {
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
 			RunAsNonRoot:             ptr.To(true),
+			Capabilities: &v1.Capabilities{
+				Drop: []v1.Capability{"ALL"},
+			},
 		},
 		Args: []string{
 			"tunnel",

@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
 )
 
@@ -101,20 +102,24 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	// TODO: 1. we should save the job ID on disk, on the session PVC
 	// TODO: 2. try to load the currently running job ID from disk
 
+	// TODO: should the 15-minute timeout be configurable?
+	startCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer cancel()
+
 	// Start a go routine to update the session status
-	go c.periodicSessionStatus()
+	go c.periodicSessionStatus(ctx)
 
 	if c.jobID != "" {
 		return fmt.Errorf("a remote job is already running: %s", c.jobID)
 	}
 
 	// start by checking whether we can access the requested system
-	system, err := c.GetCurrentSystem(ctx)
+	system, err := c.GetCurrentSystem(startCtx)
 	if err != nil {
 		return err
 	}
 
-	userInfo, err := c.getUserInfo(ctx)
+	userInfo, err := c.getUserInfo(startCtx)
 	if err != nil {
 		return err
 	}
@@ -149,18 +154,18 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 
 	// Setup secrets
 	secretsPath := path.Join(sessionPath, "secrets")
-	err = c.mkdir(ctx, secretsPath, true /* createParents */)
+	err = c.mkdir(startCtx, secretsPath, true /* createParents */)
 	if err != nil {
 		return err
 	}
 	// Makes sure that only the session owner can read session files
-	err = c.chmod(ctx, sessionPath, "700")
+	err = c.chmod(startCtx, sessionPath, "700")
 	if err != nil {
 		return err
 	}
 	wstunnel_secret := os.Getenv("WSTUNNEL_SECRET")
 	if wstunnel_secret != "" {
-		err = c.uploadFile(ctx, secretsPath, "wstunnel_secret", []byte(wstunnel_secret))
+		err = c.uploadFile(startCtx, secretsPath, "wstunnel_secret", []byte(wstunnel_secret))
 		if err != nil {
 			return err
 		}
@@ -192,8 +197,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 			return err
 		}
 		env["WSTUNNEL_SERVICE_ADDRESS"] = renkuBaseURL.Hostname()
-		env["WSTUNNEL_SERVICE_PORT"] = fmt.Sprintf("%d", 443)      // wss port (same as https)
-		env["WSTUNNEL_PATH_PREFIX"] = renkuBaseURLPath + "/tunnel" // session path with tunnel
+		env["WSTUNNEL_SERVICE_PORT"] = fmt.Sprintf("%d", 443)                                   // wss port (same as https)
+		env["WSTUNNEL_PATH_PREFIX"] = renkuBaseURLPath + "/" + v1alpha1.TunnelIngressPathSuffix // session path with tunnel
 	}
 	// TODO: setup env vars for git repositories
 
@@ -210,7 +215,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		Script:           &sessionScript,
 		WorkingDirectory: sessionPath,
 	}
-	jobID, err := c.submitJob(ctx, job)
+	jobID, err := c.submitJob(startCtx, job)
 	if err != nil {
 		return err
 	}
@@ -369,19 +374,25 @@ func getErrorMessage(json4XX, json5XX *ApiResponseError) (message string) {
 }
 
 // periodicSessionStatus sets up periodic refresh of the session status
-func (c *FirecrestRemoteSessionController) periodicSessionStatus() {
+func (c *FirecrestRemoteSessionController) periodicSessionStatus(ctx context.Context) {
 	for {
-		<-c.statusTicker.C
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		state, err := c.getCurrentStatus(ctx)
-		c.currentStatus = state
-		c.currentStatusError = err
-		if err == nil {
-			slog.Info("current session status", "status", state)
-		} else {
-			slog.Error("getCurrentStatus failed", "status", state, "error", err)
+		select {
+		case <-ctx.Done():
+			return
+		case <-c.statusTicker.C:
+			func() {
+				childCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+				state, err := c.getCurrentStatus(childCtx)
+				c.currentStatus = state
+				c.currentStatusError = err
+				if err == nil {
+					slog.Info("current session status", "status", state)
+				} else {
+					slog.Error("getCurrentStatus failed", "status", state, "error", err)
+				}
+			}()
 		}
-		cancel()
 	}
 }
 
