@@ -126,6 +126,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 .PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
 test-e2e:
 	go test ./test/e2e/ -v -ginkgo.v
+	$(MAKE) chartpress-cleanup
 	
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
@@ -314,6 +315,10 @@ list-chartpress-images:
 	@chartpress --list-images
 	@rm chartpress.yaml
 	@mv chartpress.backup.yaml chartpress.yaml
+
+.PHONY: chartpress-cleanup
+chartpress-cleanup:
+	@chartpress --tag 0.1.0 --no-build
 
 .PHONY: opm
 OPM = $(LOCALBIN)/opm
