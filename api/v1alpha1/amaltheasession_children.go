@@ -768,7 +768,7 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 	// Prepend "RENKU_ENV_" to the user-defined environment variables
 	env := make([]v1.EnvVar, 0, len(session.Env))
 	for i, item := range session.Env {
-		env[i] = *item.DeepCopy()
+		env = append(env, *item.DeepCopy())
 		if strings.HasPrefix(env[i].Name, "RENKU_") || strings.HasPrefix(env[i].Name, "RSC_") {
 			continue
 		}
