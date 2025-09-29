@@ -72,10 +72,7 @@ func Start() {
 	slog.Info(fmt.Sprintf("http server started on %s", address))
 
 	// Start the remote session
-	// TODO: should the 15-minute timeout be configurable?
-	startCtx, startCancel := context.WithTimeout(ctx, 15*time.Minute)
-	err = controller.Start(startCtx)
-	startCancel()
+	err = controller.Start(ctx)
 	if err != nil {
 		slog.Error("could not start session", "error", err)
 		os.Exit(1)
@@ -117,11 +114,7 @@ func newServer(controller *firecrest.FirecrestRemoteSessionController) (server *
 
 	// Readiness endpoint
 	e.GET("/ready", func(c echo.Context) error {
-		status, err := controller.Status(c.Request().Context())
-		if err == nil && status == models.Running {
-			return c.NoContent(http.StatusOK)
-		}
-		return c.NoContent(http.StatusServiceUnavailable)
+		return c.NoContent(http.StatusOK)
 	})
 
 	// Status endpoint
