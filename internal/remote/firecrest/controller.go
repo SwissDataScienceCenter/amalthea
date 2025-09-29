@@ -219,7 +219,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	// Copy the environment variables defined by the user
 	for _, environ := range os.Environ() {
 		key, val, _ := strings.Cut(environ, "=")
-		if newKey, isRenkuEnv := strings.CutPrefix(key, "RENKU_ENV_"); isRenkuEnv {
+		if newKey, isRenkuEnv := strings.CutPrefix(key, "USER_ENV_"); isRenkuEnv {
 			env[newKey] = val
 		}
 	}
@@ -233,7 +233,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	// Copy RENKU environment variables
 	for _, environ := range os.Environ() {
 		key, val, _ := strings.Cut(environ, "=")
-		if strings.HasPrefix(key, "RENKU") && !strings.HasPrefix(key, "RENKU_ENV_") {
+		if strings.HasPrefix(key, "RENKU") {
 			env[key] = val
 		}
 	}

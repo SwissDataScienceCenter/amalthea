@@ -765,6 +765,15 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 	}
 
 	// cr.Spec.SessionLocation == Remote
+	// Prepend "RENKU_ENV_" to the user-defined environment variables
+	env := make([]v1.EnvVar, 0, len(session.Env))
+	for i, item := range session.Env {
+		env[i] = *item.DeepCopy()
+		if strings.HasPrefix(env[i].Name, "RENKU_") || strings.HasPrefix(env[i].Name, "RSC_") {
+			continue
+		}
+		env[i].Name = fmt.Sprintf("USER_ENV_%s", env[i].Name)
+	}
 	sessionContainer := v1.Container{
 		Image: sidecarsImage,
 		Name:  SessionContainerName,
@@ -776,10 +785,20 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 			"remote-session-controller",
 			"run",
 		},
-		// TODO: Properly configure env vars
-		Env: session.Env,
-		// TODO: Set fixed resources here
-		Resources:                session.Resources,
+		Env: env,
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				"memory": resource.MustParse("64Mi"),
+				"cpu":    resource.MustParse("100m"),
+			},
+			Limits: v1.ResourceList{
+				"memory": resource.MustParse("128Mi"),
+				// NOTE: Cpu limit not set on purpose
+				// Without cpu limit if there is spare you can go over the request
+				// If there is no spare cpu then all things get throttled relative to their request
+				// With cpu limits you get throttled when you go over the request always, even with spare capacity
+			},
+		},
 		VolumeMounts:             volumeMounts,
 		TerminationMessagePath:   "/dev/termination-log",
 		TerminationMessagePolicy: v1.TerminationMessageReadFile,
