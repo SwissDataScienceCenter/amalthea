@@ -403,7 +403,7 @@ func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path strin
 		if message != "" {
 			return fmt.Errorf("could not run mkdir: %s", message)
 		}
-		return fmt.Errorf("could not run not mkdir: HTTP %d", res.StatusCode())
+		return fmt.Errorf("could not run mkdir: HTTP %d", res.StatusCode())
 	}
 	return nil
 }
