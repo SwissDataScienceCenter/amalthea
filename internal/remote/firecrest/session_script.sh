@@ -135,7 +135,7 @@ echo "wstunnel: ${wstunnel}"
 
 # Ensure NVIDIA_VISIBLE_DEVICES is set to void 
 # so that cuda enabled images work on eiger
-if !(nvidia-smi 2>&1 >/dev/null);then
+if !(nvidia-smi 2>&1 >/dev/null); then
     export NVIDIA_VISIBLE_DEVICES=void
 fi
 
