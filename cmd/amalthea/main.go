@@ -177,9 +177,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if clusterType == amaltheadevv1alpha1.OpenShift {
-		setupLog.Info("running in an OpenShift cluster")
-	}
+	setupLog.Info("cluster type detected", "type", clusterType)
 
 	err = (&controller.AmaltheaSessionReconciler{
 		Client:        mgr.GetClient(),
