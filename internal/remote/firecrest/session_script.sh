@@ -130,9 +130,9 @@ mkdir -p "${SESSION_WORK_DIR}"
 mkdir -p "${SECRETS_DIR}"
 mkdir -p "${LOGS_DIR}"
 
-# Install rclone
-rclone=$(install_rclone)
-echo "rclone: ${rclone}"
+# # Install rclone
+# rclone=$(install_rclone)
+# echo "rclone: ${rclone}"
 
 # Install wstunnel
 wstunnel=$(install_wstunnel)

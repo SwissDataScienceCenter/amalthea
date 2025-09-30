@@ -33,6 +33,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
 	"k8s.io/utils/ptr"
 )
@@ -42,7 +43,7 @@ import (
 //go:embed session_script.sh
 var sessionScript string
 
-var branchRegExp = regexp.MustCompile("^[[]branch \"(.+)\"]")
+var branchRegExp = regexp.MustCompile("[[]branch \"(.+)\"]")
 
 type FirecrestRemoteSessionController struct {
 	client *FirecrestClient
@@ -120,20 +121,24 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		return nil
 	}
 
+	// TODO: should the 15-minute timeout be configurable?
+	startCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer cancel()
+
 	// Start a go routine to update the session status
-	go c.periodicSessionStatus()
+	go c.periodicSessionStatus(ctx)
 
 	if c.jobID != "" {
 		return fmt.Errorf("a remote job is already running: %s", c.jobID)
 	}
 
 	// start by checking whether we can access the requested system
-	system, err := c.GetCurrentSystem(ctx)
+	system, err := c.GetCurrentSystem(startCtx)
 	if err != nil {
 		return err
 	}
 
-	userInfo, err := c.getUserInfo(ctx)
+	userInfo, err := c.getUserInfo(startCtx)
 	if err != nil {
 		return err
 	}
@@ -173,19 +178,19 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 
 	// Setup secrets
 	secretsPath := path.Join(sessionPath, "secrets")
-	err = c.mkdir(ctx, secretsPath, true /* createParents */)
+	err = c.mkdir(startCtx, secretsPath, true /* createParents */)
 	if err != nil {
 		return err
 	}
 	// Makes sure that only the session owner can read session files
-	err = c.chmod(ctx, sessionPath, "700")
+	err = c.chmod(startCtx, sessionPath, "700")
 	if err != nil {
 		return err
 	}
 	// TODO: get wstunnel_secret as a config value
 	wstunnel_secret := os.Getenv("RSC_WSTUNNEL_SECRET")
 	if wstunnel_secret != "" {
-		err = c.uploadFile(ctx, secretsPath, "wstunnel_secret", []byte(wstunnel_secret))
+		err = c.uploadFile(startCtx, secretsPath, "wstunnel_secret", []byte(wstunnel_secret))
 		if err != nil {
 			return err
 		}
@@ -194,14 +199,14 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 
 	// Setup git repositories
 	renkuWorkDir := os.Getenv("RENKU_WORKING_DIR")
-	gitRepositories, err := c.collectGitRepositories(ctx, renkuWorkDir)
+	gitRepositories, err := c.collectGitRepositories(startCtx, renkuWorkDir)
 	if err != nil {
 		return err
 	}
 	slog.Info("collected git repositories", "gitRepositories", gitRepositories)
 	for repo := range gitRepositories {
 		repoGitDirPath := path.Join(sessionPath, "work", repo, ".git")
-		err = c.mkdir(ctx, repoGitDirPath, true /* createParents */)
+		err = c.mkdir(startCtx, repoGitDirPath, true /* createParents */)
 		if err != nil {
 			return err
 		}
@@ -209,7 +214,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		err = c.uploadFile(ctx, repoGitDirPath, "config", gitConfigContents)
+		err = c.uploadFile(startCtx, repoGitDirPath, "config", gitConfigContents)
 		if err != nil {
 			return err
 		}
@@ -245,8 +250,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 			return err
 		}
 		env["WSTUNNEL_SERVICE_ADDRESS"] = renkuBaseURL.Hostname()
-		env["WSTUNNEL_SERVICE_PORT"] = fmt.Sprintf("%d", 443)      // wss port (same as https)
-		env["WSTUNNEL_PATH_PREFIX"] = renkuBaseURLPath + "/tunnel" // session path with tunnel
+		env["WSTUNNEL_SERVICE_PORT"] = fmt.Sprintf("%d", 443)                                   // wss port (same as https)
+		env["WSTUNNEL_PATH_PREFIX"] = renkuBaseURLPath + "/" + v1alpha1.TunnelIngressPathSuffix // session path with tunnel
 	}
 	// Setup environment variables for git repositories
 	repos := []string{}
@@ -275,7 +280,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		ScriptPath:       ptr.To(path.Join(sessionPath, "session_script.sh")),
 		WorkingDirectory: sessionPath,
 	}
-	jobID, err := c.submitJob(ctx, job)
+	jobID, err := c.submitJob(startCtx, job)
 	if err != nil {
 		return err
 	}
@@ -286,7 +291,9 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the remote session using the FirecREST API
+// Stop stops the remote session using the FirecREST API.
+//
+// The caller needs to make sure Stop is not called before Start has returned.
 func (c *FirecrestRemoteSessionController) Stop(ctx context.Context) error {
 	// The remote job was never submitted, nothing to do
 	if c.jobID == "" {
@@ -406,9 +413,9 @@ func (c *FirecrestRemoteSessionController) uploadFile(ctx context.Context, direc
 			message = res.JSON5XX.Message
 		}
 		if message != "" {
-			return fmt.Errorf("could run uploadFile: %s", message)
+			return fmt.Errorf("could not run uploadFile: %s", message)
 		}
-		return fmt.Errorf("could run uploadFile: HTTP %d", res.StatusCode())
+		return fmt.Errorf("could not run uploadFile: HTTP %d", res.StatusCode())
 	}
 	return nil
 }
@@ -425,9 +432,9 @@ func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path strin
 	if res.JSON201 == nil {
 		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
-			return fmt.Errorf("could run mkdir: %s", message)
+			return fmt.Errorf("could not run mkdir: %s", message)
 		}
-		return fmt.Errorf("could run mkdir: HTTP %d", res.StatusCode())
+		return fmt.Errorf("could not run mkdir: HTTP %d", res.StatusCode())
 	}
 	return nil
 }
@@ -444,9 +451,9 @@ func (c *FirecrestRemoteSessionController) chmod(ctx context.Context, path strin
 	if res.JSON200 == nil {
 		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
-			return fmt.Errorf("could run chmod: %s", message)
+			return fmt.Errorf("could not run chmod: %s", message)
 		}
-		return fmt.Errorf("could run chmod: HTTP %d", res.StatusCode())
+		return fmt.Errorf("could not run chmod: HTTP %d", res.StatusCode())
 	}
 	return nil
 }
@@ -462,9 +469,9 @@ func (c *FirecrestRemoteSessionController) submitJob(ctx context.Context, job Jo
 	if res.JSON201 == nil {
 		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
 		if message != "" {
-			return "", fmt.Errorf("could run submitJob: %s", message)
+			return "", fmt.Errorf("could not submit job: %s", message)
 		}
-		return "", fmt.Errorf("could run submitJob: HTTP %d", res.StatusCode())
+		return "", fmt.Errorf("could not submit job: HTTP %d", res.StatusCode())
 	}
 	if res.JSON201.JobId == nil {
 		return "", fmt.Errorf("invalid job submission response")
@@ -483,19 +490,25 @@ func getErrorMessage(json4XX, json5XX *ApiResponseError) (message string) {
 }
 
 // periodicSessionStatus sets up periodic refresh of the session status
-func (c *FirecrestRemoteSessionController) periodicSessionStatus() {
+func (c *FirecrestRemoteSessionController) periodicSessionStatus(ctx context.Context) {
 	for {
-		<-c.statusTicker.C
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		state, err := c.getCurrentStatus(ctx)
-		c.currentStatus = state
-		c.currentStatusError = err
-		if err == nil {
-			slog.Info("current session status", "status", state)
-		} else {
-			slog.Error("getCurrentStatus failed", "status", state, "error", err)
+		select {
+		case <-ctx.Done():
+			return
+		case <-c.statusTicker.C:
+			func() {
+				childCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+				state, err := c.getCurrentStatus(childCtx)
+				c.currentStatus = state
+				c.currentStatusError = err
+				if err == nil {
+					slog.Info("current session status", "status", state)
+				} else {
+					slog.Error("getCurrentStatus failed", "status", state, "error", err)
+				}
+			}()
 		}
-		cancel()
 	}
 }
 

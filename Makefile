@@ -318,7 +318,7 @@ list-chartpress-images:
 
 .PHONY: chartpress-cleanup
 chartpress-cleanup:
-	@chartpress --tag 0.1.0 --no-build
+	@chartpress --reset
 
 .PHONY: opm
 OPM = $(LOCALBIN)/opm

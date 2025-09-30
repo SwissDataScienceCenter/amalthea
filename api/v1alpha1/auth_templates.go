@@ -9,7 +9,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-const authproxyImage string = "bitnami/oauth2-proxy:7.6.0"
+const authproxyImage string = "harbor.renkulab.io/bitnami-mirror/oauth2-proxy:7.6.0"
 
 func (as *HpcAmaltheaSession) auth() (manifests, error) {
 	output := manifests{}
