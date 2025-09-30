@@ -21,10 +21,11 @@ jobs:
           push: never
           skipContainerUserIdUpdate: false
       - name: Generate CRD documentation
-        uses: SwissDataScienceCenter/renku-actions/generate-crd-docs@v1.17.0
         env:
           RESOURCES: ./manifests/crd.yaml
           OUTPUT: ./docs/crd.md
+        run: |
+          go tool crdoc --resources ${RESOURCES} --output ${OUTPUT}
       - name: Create pull request
         uses: peter-evans/create-pull-request@v3
         env:
