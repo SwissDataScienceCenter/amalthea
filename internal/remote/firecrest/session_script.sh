@@ -133,6 +133,12 @@ mkdir -p "${LOGS_DIR}"
 wstunnel=$(install_wstunnel)
 echo "wstunnel: ${wstunnel}"
 
+# Ensure NVIDIA_VISIBLE_DEVICES is set to void 
+# so that cuda enabled images work on eiger
+if !(nvidia-smi 2>&1 >/dev/null);then
+    export NVIDIA_VISIBLE_DEVICES=void
+fi
+
 # Create the environment.toml file to run the session
 EDF_FILE="${SESSION_DIR}/environment.toml"
 cat <<EOF >"${EDF_FILE}"
