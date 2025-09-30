@@ -152,7 +152,7 @@ spec:
         
         {% if oidc["enabled"] %}
         - name: oauth2-proxy
-          image: "bitnami/oauth2-proxy:7.4.0"
+          image: "harbor.renkulab.io/bitnami-mirror/oauth2-proxy:7.6.0"
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
