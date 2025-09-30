@@ -43,7 +43,7 @@ type AmaltheaSessionReconciler struct {
 	client.Client
 	Scheme        *runtime.Scheme
 	MetricsClient metricsv1beta1.PodMetricsesGetter
-	ClusterType   amaltheadevv1alpha1.K8sVariant
+	ClusterType   amaltheadevv1alpha1.ClusterType
 }
 
 // finalizers

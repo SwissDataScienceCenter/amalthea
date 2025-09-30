@@ -15,7 +15,7 @@ import (
 func TestDetectPlatformBasedOnAvailableAPIGroups(t *testing.T) {
 	for _, tt := range []struct {
 		apiGroupList *metav1.APIGroupList
-		expected     K8sVariant
+		expected     ClusterType
 	}{
 		{
 			&metav1.APIGroupList{},

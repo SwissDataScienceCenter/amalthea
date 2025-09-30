@@ -5,13 +5,13 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type K8sVariant string
+type ClusterType string
 
-const Kubernetes K8sVariant = "kubernetes"
-const OpenShift K8sVariant = "openshift"
-const UnknownVariant K8sVariant = "unknown"
+const Kubernetes ClusterType = "kubernetes"
+const OpenShift ClusterType = "openshift"
+const UnknownVariant ClusterType = "unknown"
 
-func DetectClusterType(config *rest.Config) (K8sVariant, error) {
+func DetectClusterType(config *rest.Config) (ClusterType, error) {
 	dcl, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
 		return UnknownVariant, err
