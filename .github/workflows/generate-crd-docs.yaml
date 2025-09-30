@@ -2,8 +2,8 @@ name: Autogenerate the manifests and documentation for the CRD
 
 on:
   push:
-    # branches:
-    #   - main
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -33,8 +33,7 @@ jobs:
         with:
           commit-message: "chore: update rendered manifests and CRD docs"
           delete-branch: true
-          # title: Update rendered manifests and CRD docs
-          title: "[test pr] Update rendered manifests and CRD docs"
+          title: Update rendered manifests and CRD docs
           author: "Renku Bot <renku@datascience.ch>"
           committer: "Renku Bot <renku@datascience.ch>"
           branch: renkubot/update-manifests-docs-
