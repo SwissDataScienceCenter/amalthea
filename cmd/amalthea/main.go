@@ -26,9 +26,7 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
-	"k8s.io/client-go/discovery"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/client-go/rest"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -59,29 +57,6 @@ func init() {
 
 	utilruntime.Must(amaltheadevv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
-}
-
-func isOpenShift(config *rest.Config) bool {
-	dcl, err := discovery.NewDiscoveryClientForConfig(config)
-	if err != nil {
-		setupLog.Error(err, "failed to create discovery client")
-		os.Exit(1)
-	}
-
-	apiList, err := dcl.ServerGroups()
-	if err != nil {
-		setupLog.Error(err, "failed to get server groups")
-		os.Exit(1)
-	}
-
-	apiGroups := apiList.Groups
-	for i := range apiGroups {
-		if apiGroups[i].Name == "project.openshift.io" {
-			return true
-		}
-	}
-
-	return false
 }
 
 func main() {
@@ -195,8 +170,14 @@ func main() {
 
 	metricsClient := metricsv.NewForConfigOrDie(config).MetricsV1beta1()
 
-	isOpenShift := isOpenShift(config)
-	if isOpenShift {
+	clusterType, err := amaltheadevv1alpha1.DetectClusterType(config)
+
+	if err != nil {
+		setupLog.Error(err, "failed to do cluster detection")
+		os.Exit(1)
+	}
+
+	if clusterType == amaltheadevv1alpha1.OpenShift {
 		setupLog.Info("running in an OpenShift cluster")
 	}
 
@@ -204,7 +185,7 @@ func main() {
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
 		MetricsClient: metricsClient,
-		IsOpenShift:   isOpenShift,
+		ClusterType:   clusterType,
 	}).SetupWithManager(mgr)
 
 	if err != nil {

@@ -43,7 +43,7 @@ type AmaltheaSessionReconciler struct {
 	client.Client
 	Scheme        *runtime.Scheme
 	MetricsClient metricsv1beta1.PodMetricsesGetter
-	IsOpenShift   bool
+	ClusterType   amaltheadevv1alpha1.K8sVariant
 }
 
 // finalizers
@@ -146,7 +146,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	log.Info("spec", "cr", amaltheasession)
 
-	children, err := NewChildResources(amaltheasession, r.IsOpenShift)
+	children, err := NewChildResources(amaltheasession, r.ClusterType)
 	if err != nil {
 		log.Error(
 			err,

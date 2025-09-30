@@ -87,7 +87,7 @@ func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 }
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
-func (cr *AmaltheaSession) StatefulSet(isOpenShift bool) (appsv1.StatefulSet, error) {
+func (cr *AmaltheaSession) StatefulSet(clusterType K8sVariant) (appsv1.StatefulSet, error) {
 	labels := labelsForAmaltheaSession(cr.Name)
 	replicas := int32(1)
 	if cr.Spec.Hibernated {
@@ -194,7 +194,7 @@ func (cr *AmaltheaSession) StatefulSet(isOpenShift bool) (appsv1.StatefulSet, er
 		ImagePullSecrets:             imagePullSecrets,
 	}
 
-	if isOpenShift {
+	if clusterType == OpenShift {
 		pod.DeprecatedServiceAccount = pod.ServiceAccountName
 	}
 

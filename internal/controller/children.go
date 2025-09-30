@@ -255,12 +255,12 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 	}
 }
 
-func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, isOpenShift bool) (ChildResources, error) {
+func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, clusterType amaltheadevv1alpha1.K8sVariant) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredService := cr.Service()
 	desiredPVC := cr.PVC()
-	desiredStatefulSet, err := cr.StatefulSet(isOpenShift)
+	desiredStatefulSet, err := cr.StatefulSet(clusterType)
 	if err != nil {
 		return ChildResources{}, err
 	}
