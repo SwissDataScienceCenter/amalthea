@@ -43,6 +43,7 @@ type AmaltheaSessionReconciler struct {
 	client.Client
 	Scheme        *runtime.Scheme
 	MetricsClient metricsv1beta1.PodMetricsesGetter
+	ClusterType   amaltheadevv1alpha1.ClusterType
 }
 
 // finalizers
@@ -147,7 +148,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// TODO: handle session location "remote"
 
-	children, err := NewChildResources(amaltheasession)
+	children, err := NewChildResources(amaltheasession, r.ClusterType)
 	if err != nil {
 		log.Error(
 			err,
@@ -159,6 +160,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		)
 		return ctrl.Result{}, err
 	}
+
 	updates, err := children.Reconcile(ctx, r.Client, amaltheasession)
 	if err != nil {
 		log.Error(err, "Failed when reconciling children")

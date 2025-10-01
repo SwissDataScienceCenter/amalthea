@@ -94,7 +94,7 @@ func (cr *HpcAmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 }
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
-func (cr *HpcAmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
+func (cr *HpcAmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.StatefulSet, error) {
 	labels := labelsForAmaltheaSession(cr.Name)
 	replicas := int32(1)
 	if cr.Spec.Hibernated {
@@ -139,6 +139,25 @@ func (cr *HpcAmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 		imagePullSecrets = append(imagePullSecrets, v1.LocalObjectReference{Name: sec.Name})
 	}
 
+	pod := v1.PodSpec{
+		ServiceAccountName:           cr.Spec.ServiceAccountName,
+		EnableServiceLinks:           ptr.To(false),
+		AutomountServiceAccountToken: ptr.To(false),
+		SecurityContext:              &v1.PodSecurityContext{FSGroup: &cr.Spec.Session.RunAsGroup},
+		Containers:                   containers,
+		InitContainers:               initContainers,
+		Volumes:                      volumes,
+		Tolerations:                  cr.Spec.Tolerations,
+		NodeSelector:                 cr.Spec.NodeSelector,
+		Affinity:                     cr.Spec.Affinity,
+		PriorityClassName:            cr.Spec.PriorityClassName,
+		ImagePullSecrets:             imagePullSecrets,
+	}
+
+	if clusterType == OpenShift {
+		pod.DeprecatedServiceAccount = pod.ServiceAccountName
+	}
+
 	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Name,
@@ -156,20 +175,7 @@ func (cr *HpcAmaltheaSession) StatefulSet() (appsv1.StatefulSet, error) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
-				Spec: v1.PodSpec{
-					ServiceAccountName:           cr.Spec.ServiceAccountName,
-					EnableServiceLinks:           ptr.To(false),
-					AutomountServiceAccountToken: ptr.To(false),
-					SecurityContext:              &v1.PodSecurityContext{FSGroup: &cr.Spec.Session.RunAsGroup},
-					Containers:                   containers,
-					InitContainers:               initContainers,
-					Volumes:                      volumes,
-					Tolerations:                  cr.Spec.Tolerations,
-					NodeSelector:                 cr.Spec.NodeSelector,
-					Affinity:                     cr.Spec.Affinity,
-					PriorityClassName:            cr.Spec.PriorityClassName,
-					ImagePullSecrets:             imagePullSecrets,
-				},
+				Spec: pod,
 			},
 		},
 	}
