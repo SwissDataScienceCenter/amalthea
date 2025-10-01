@@ -280,6 +280,11 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		ScriptPath:       ptr.To(path.Join(sessionPath, "session_script.sh")),
 		WorkingDirectory: sessionPath,
 	}
+	// The slurm account can be set by the user as an environment variable
+	slurmAccount := os.Getenv("USER_ENV_SLURM_ACCOUNT")
+	if slurmAccount != "" {
+		job.Account = &slurmAccount
+	}
 	jobID, err := c.submitJob(startCtx, job)
 	if err != nil {
 		return err
@@ -554,7 +559,7 @@ func (c *FirecrestRemoteSessionController) addSbatchDirectivesToScript(sessionSc
 		directives = append(directives, fmt.Sprintf("#SBATCH --partition=%s", c.partition))
 	}
 	// The slurm account can be set by the user as an environment variable
-	slurmAccount := os.Getenv("RENKU_ENV_SLURM_ACCOUNT")
+	slurmAccount := os.Getenv("USER_ENV_SLURM_ACCOUNT")
 	if slurmAccount != "" {
 		directives = append(directives, fmt.Sprintf("#SBATCH --account=%s", slurmAccount))
 	}
