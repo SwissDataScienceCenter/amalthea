@@ -64,7 +64,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 	Context("When reconciling a resource", func() {
 		var resourceName string
 		var typeNamespacedName types.NamespacedName
-		var amaltheasession *amaltheadevv1alpha1.HpcAmaltheaSession
+		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
 
 		BeforeEach(func(ctx SpecContext) {
 			By("creating the custom resource for the Kind AmaltheaSession")
@@ -73,12 +73,12 @@ var _ = Describe("AmaltheaSession Controller", func() {
 				Name:      resourceName,
 				Namespace: namespace,
 			}
-			amaltheasession = &amaltheadevv1alpha1.HpcAmaltheaSession{
+			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
 				ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
 			}
 			err := k8sClient.Get(ctx, typeNamespacedName, amaltheasession)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &amaltheadevv1alpha1.HpcAmaltheaSession{
+				resource := &amaltheadevv1alpha1.AmaltheaSession{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: namespace,
@@ -118,7 +118,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 	Context("When reconciling a resource without ingress", func() {
 		var resourceName string
 		var typeNamespacedName types.NamespacedName
-		var amaltheasession *amaltheadevv1alpha1.HpcAmaltheaSession
+		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
 
 		BeforeEach(func(ctx SpecContext) {
 			By("creating the custom resource for the Kind AmaltheaSession")
@@ -127,12 +127,12 @@ var _ = Describe("AmaltheaSession Controller", func() {
 				Name:      resourceName,
 				Namespace: namespace,
 			}
-			amaltheasession = &amaltheadevv1alpha1.HpcAmaltheaSession{
+			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
 				ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
 			}
 			err := k8sClient.Get(ctx, typeNamespacedName, amaltheasession)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &amaltheadevv1alpha1.HpcAmaltheaSession{
+				resource := &amaltheadevv1alpha1.AmaltheaSession{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: namespace,
@@ -150,7 +150,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 
 		AfterEach(func(ctx SpecContext) {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &amaltheadevv1alpha1.HpcAmaltheaSession{}
+			resource := &amaltheadevv1alpha1.AmaltheaSession{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -175,7 +175,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 		var secretName string
 		var typeNamespacedName types.NamespacedName
 		var secretNamespacedName types.NamespacedName
-		var amaltheasession *amaltheadevv1alpha1.HpcAmaltheaSession
+		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
 		var secret *corev1.Secret
 
 		BeforeEach(func(ctx SpecContext) {
@@ -185,7 +185,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 				Name:      resourceName,
 				Namespace: namespace,
 			}
-			amaltheasession = &amaltheadevv1alpha1.HpcAmaltheaSession{
+			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
 				ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
 			}
 			secretNamespacedName = types.NamespacedName{
@@ -195,7 +195,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 			secret = &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: secretName, Namespace: secretNamespacedName.Namespace}}
 			tlsSecretName := secretName
 
-			amaltheasession = &amaltheadevv1alpha1.HpcAmaltheaSession{
+			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
@@ -245,7 +245,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 				})
 				Expect(err).NotTo(HaveOccurred())
 
-				actual := amaltheadevv1alpha1.HpcAmaltheaSession{
+				actual := amaltheadevv1alpha1.AmaltheaSession{
 					ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
 				}
 				Expect(k8sClient.Get(ctx, typeNamespacedName, &actual)).To(Succeed())
@@ -275,7 +275,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 	Context("Handling SHM", func() {
 		var resourceName string
 		var typeNamespacedName types.NamespacedName
-		var amaltheasession *amaltheadevv1alpha1.HpcAmaltheaSession
+		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
 		const shmSize = "1Mi"
 
 		BeforeEach(func(ctx SpecContext) {
@@ -284,7 +284,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 				Name:      resourceName,
 				Namespace: namespace,
 			}
-			amaltheasession = &amaltheadevv1alpha1.HpcAmaltheaSession{
+			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
@@ -300,7 +300,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 
 		AfterEach(func(ctx SpecContext) {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &amaltheadevv1alpha1.HpcAmaltheaSession{
+			resource := &amaltheadevv1alpha1.AmaltheaSession{
 				ObjectMeta: metav1.ObjectMeta{Name: typeNamespacedName.Name, Namespace: typeNamespacedName.Namespace},
 			}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
@@ -347,7 +347,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 	Context("When testing hibernation", func() {
 		var resourceName string
 		var typeNamespacedName types.NamespacedName
-		var amaltheasession *amaltheadevv1alpha1.HpcAmaltheaSession
+		var amaltheasession *amaltheadevv1alpha1.AmaltheaSession
 
 		BeforeEach(func(ctx SpecContext) {
 			By("creating the custom resource for the Kind AmaltheaSession")
@@ -356,7 +356,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 				Name:      resourceName,
 				Namespace: namespace,
 			}
-			amaltheasession = &amaltheadevv1alpha1.HpcAmaltheaSession{
+			amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
@@ -404,7 +404,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() error {
-				found := &amaltheadevv1alpha1.HpcAmaltheaSession{}
+				found := &amaltheadevv1alpha1.AmaltheaSession{}
 				return k8sClient.Get(ctx, typeNamespacedName, found)
 			}, time.Minute, time.Second).WithContext(ctx).Should(Succeed())
 
@@ -415,7 +415,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Marking the session as hibernated")
-			actual := amaltheadevv1alpha1.HpcAmaltheaSession{}
+			actual := amaltheadevv1alpha1.AmaltheaSession{}
 			Expect(k8sClient.Get(ctx, typeNamespacedName, &actual)).To(Succeed())
 
 			actual.Spec.Hibernated = true
@@ -428,7 +428,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 				})
 				Expect(err).NotTo(HaveOccurred())
 
-				found := &amaltheadevv1alpha1.HpcAmaltheaSession{}
+				found := &amaltheadevv1alpha1.AmaltheaSession{}
 				err := k8sClient.Get(ctx, typeNamespacedName, found)
 				return errors.IsNotFound(err)
 			}, time.Minute, time.Second).WithContext(ctx).Should(BeTrue())

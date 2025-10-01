@@ -27,7 +27,7 @@ import (
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 )
 
-func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, amaltheasession *amaltheadevv1alpha1.HpcAmaltheaSession) error {
+func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, amaltheasession *amaltheadevv1alpha1.AmaltheaSession) error {
 	culling := amaltheasession.Spec.Culling
 	status := amaltheasession.Status
 	log := log.FromContext(ctx)

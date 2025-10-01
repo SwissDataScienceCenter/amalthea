@@ -4,16 +4,17 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.1
-  name: hpcamaltheasessions.amalthea.dev
+  name: amaltheasessions.amalthea.dev
 spec:
   group: amalthea.dev
   names:
-    kind: HpcAmaltheaSession
-    listKind: HpcAmaltheaSessionList
-    plural: hpcamaltheasessions
+    kind: AmaltheaSession
+    listKind: AmaltheaSessionList
+    plural: amaltheasessions
     shortNames:
-    - hams
-    singular: hpcamaltheasession
+    - ams
+    - amss
+    singular: amaltheasession
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -42,7 +43,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: HpcAmaltheaSession is the Schema for the amaltheasessions API
+        description: AmaltheaSession is the Schema for the amaltheasessions API
         properties:
           apiVersion:
             description: |-
