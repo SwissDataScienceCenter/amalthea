@@ -329,7 +329,7 @@ func GetK8sClient(ctx context.Context, namespace string) (client.Client, error) 
 			Client: client.Options{
 				Cache: &client.CacheOptions{
 					DisableFor: []client.Object{
-						&amaltheadevv1alpha1.HpcAmaltheaSession{},
+						&amaltheadevv1alpha1.AmaltheaSession{},
 						&corev1.Pod{},
 						&corev1.Event{},
 					},

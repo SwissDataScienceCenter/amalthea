@@ -51,7 +51,7 @@ var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
 
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
-func (cr *HpcAmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
+func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 	pvc := cr.PVC()
 	volumes := []v1.Volume{
 		{
@@ -94,7 +94,7 @@ func (cr *HpcAmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 }
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
-func (cr *HpcAmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.StatefulSet, error) {
+func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.StatefulSet, error) {
 	labels := labelsForAmaltheaSession(cr.Name)
 	replicas := int32(1)
 	if cr.Spec.Hibernated {
@@ -187,7 +187,7 @@ func (cr *HpcAmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.State
 }
 
 // Service returns a AmaltheaSession Service object
-func (cr *HpcAmaltheaSession) Service() v1.Service {
+func (cr *AmaltheaSession) Service() v1.Service {
 	labels := labelsForAmaltheaSession(cr.Name)
 	targetPort := cr.Spec.Session.Port
 	if cr.Spec.Authentication != nil && cr.Spec.Authentication.Enabled {
@@ -229,7 +229,7 @@ func (cr *HpcAmaltheaSession) Service() v1.Service {
 }
 
 // The path prefix for the session
-func (cr *HpcAmaltheaSession) urlPath() string {
+func (cr *AmaltheaSession) urlPath() string {
 	path := cr.Spec.Session.URLPath
 	// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
 	// and does not proxy subpaths
@@ -240,7 +240,7 @@ func (cr *HpcAmaltheaSession) urlPath() string {
 }
 
 // The path prefix from the ingress spec for the session
-func (cr *HpcAmaltheaSession) ingressPathPrefix() string {
+func (cr *AmaltheaSession) ingressPathPrefix() string {
 	if cr.Spec.Ingress == nil {
 		return "/"
 	}
@@ -254,7 +254,7 @@ func (cr *HpcAmaltheaSession) ingressPathPrefix() string {
 }
 
 // Ingress returns a AmaltheaSession Ingress object
-func (cr *HpcAmaltheaSession) Ingress() *networkingv1.Ingress {
+func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 	labels := labelsForAmaltheaSession(cr.Name)
 
 	ingress := cr.Spec.Ingress
@@ -325,7 +325,7 @@ func (cr *HpcAmaltheaSession) Ingress() *networkingv1.Ingress {
 }
 
 // PVC returned the desired specification for a persistent volume claim
-func (cr *HpcAmaltheaSession) PVC() v1.PersistentVolumeClaim {
+func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
 	labels := labelsForAmaltheaSession(cr.Name)
 	requests := v1.ResourceList{"storage": resource.MustParse("1Gi")}
 	if cr.Spec.Session.Storage.Size != nil {
@@ -377,14 +377,14 @@ func NewConditions() []AmaltheaSessionCondition {
 	}
 }
 
-func (cr *HpcAmaltheaSession) NeedsDeletion() bool {
+func (cr *AmaltheaSession) NeedsDeletion() bool {
 	hibernatedDuration := time.Since(cr.Status.HibernatedSince.Time)
 	durationIsZero := cr.Spec.Culling.MaxHibernatedDuration == metav1.Duration{}
 	return cr.Status.State == Hibernated && !durationIsZero &&
 		hibernatedDuration > cr.Spec.Culling.MaxHibernatedDuration.Duration
 }
 
-func (cr *HpcAmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
+func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
 	pod := v1.Pod{}
 	podName := cr.PodName()
 	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
@@ -407,7 +407,7 @@ func eventTimestamp(ev v1.Event) time.Time {
 
 // GetPodEvents finds all events where the pod of the given session is
 // involved in. It will be sorted by timestamp
-func (as *HpcAmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*v1.EventList, error) {
+func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*v1.EventList, error) {
 	log := log.FromContext(ctx)
 	events := v1.EventList{}
 	podName := as.PodName()
@@ -433,7 +433,7 @@ func (as *HpcAmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader)
 }
 
 // Returns the list of all the secrets used in this CR
-func (cr *HpcAmaltheaSession) AdoptedSecrets() v1.SecretList {
+func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 	secrets := v1.SecretList{}
 
 	if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecret.isAdopted() {
@@ -510,7 +510,7 @@ func (cr *HpcAmaltheaSession) AdoptedSecrets() v1.SecretList {
 
 // Assuming that the csi-rclone driver from https://github.com/SwissDataScienceCenter/csi-rclone
 // is installed, this will generate PVCs for the data sources that have the rclone type.
-func (as *HpcAmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
+func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
 	// TODO: Configure this for remote sessions
 	if as.Spec.SessionLocation == Remote {
 		return []v1.PersistentVolumeClaim{}, []v1.Volume{}, []v1.VolumeMount{}
@@ -593,7 +593,7 @@ func getSidecarsImage() string {
 // of the AmaltheaSession CR, as opposed to all other adopted secrets that
 // are not children of the AmaltheaSession CR and are created by the creator of each AmaltheaSession CR.
 // This secret is both created and deleted by Amalthea.
-func (as *HpcAmaltheaSession) InternalSecretName() string {
+func (as *AmaltheaSession) InternalSecretName() string {
 	return fmt.Sprintf("%s---internal", as.Name)
 }
 
@@ -608,7 +608,7 @@ func (as *HpcAmaltheaSession) InternalSecretName() string {
 //
 // The secret will contain either, both or none of these configurations depending
 // on the configuration of the Amalthea session.
-func (as *HpcAmaltheaSession) Secret() v1.Secret {
+func (as *AmaltheaSession) Secret() v1.Secret {
 	labels := labelsForAmaltheaSession(as.Name)
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

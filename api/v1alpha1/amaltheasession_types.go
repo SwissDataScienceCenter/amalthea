@@ -430,7 +430,7 @@ type AmaltheaSessionStatus struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:shortName=hams
+// +kubebuilder:resource:shortName=ams;amss
 // +kubebuilder:subresource:status
 
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=`.status.state`,description="The overall status of the session."
@@ -438,8 +438,8 @@ type AmaltheaSessionStatus struct {
 // +kubebuilder:printcolumn:name="Total",type="string",JSONPath=`.status.containerCounts.total`,description="The total numeber of containers in the session, disregarding init containers."
 // +kubebuilder:printcolumn:name="Idle",type="boolean",JSONPath=`.status.idle`,description="Whether the session is idle or not."
 // +kubebuilder:printcolumn:name="URL",type="string",JSONPath=`.status.url`,description="The URL where the session can be accessed."
-// HpcAmaltheaSession is the Schema for the amaltheasessions API
-type HpcAmaltheaSession struct {
+// AmaltheaSession is the Schema for the amaltheasessions API
+type AmaltheaSession struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
@@ -450,11 +450,11 @@ type HpcAmaltheaSession struct {
 
 // +kubebuilder:object:root=true
 
-// HpcAmaltheaSessionList contains a list of AmaltheaSession
-type HpcAmaltheaSessionList struct {
+// AmaltheaSessionList contains a list of AmaltheaSession
+type AmaltheaSessionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []HpcAmaltheaSession `json:"items"`
+	Items           []AmaltheaSession `json:"items"`
 }
 
 type AmaltheaSessionConditionType string
@@ -476,10 +476,10 @@ type AmaltheaSessionCondition struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&HpcAmaltheaSession{}, &HpcAmaltheaSessionList{})
+	SchemeBuilder.Register(&AmaltheaSession{}, &AmaltheaSessionList{})
 }
 
-func (a *HpcAmaltheaSession) GetURLString() string {
+func (a *AmaltheaSession) GetURLString() string {
 	sessionURL := a.GetURL()
 	if sessionURL == nil {
 		return "None"
@@ -487,7 +487,7 @@ func (a *HpcAmaltheaSession) GetURLString() string {
 	return sessionURL.String()
 }
 
-func (a *HpcAmaltheaSession) GetURL() *url.URL {
+func (a *AmaltheaSession) GetURL() *url.URL {
 	if a.Spec.Ingress == nil || a.Spec.Ingress.Host == "" {
 		return nil
 	}
@@ -509,7 +509,7 @@ func (a *HpcAmaltheaSession) GetURL() *url.URL {
 	return &sessionURL
 }
 
-func (a *HpcAmaltheaSession) GetHealthcheckURL() *url.URL {
+func (a *AmaltheaSession) GetHealthcheckURL() *url.URL {
 	healthcheckURL := a.GetURL()
 	if healthcheckURL != nil {
 		return healthcheckURL
@@ -526,7 +526,7 @@ func (a *HpcAmaltheaSession) GetHealthcheckURL() *url.URL {
 
 // Return the name of the pod associated to the session.
 // There will be always only one pod, so the `-0` suffix is used.
-func (as *HpcAmaltheaSession) PodName() string {
+func (as *AmaltheaSession) PodName() string {
 	return fmt.Sprintf("%s-0", as.Name)
 }
 

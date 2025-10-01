@@ -156,7 +156,7 @@ var _ = Describe("controller", Ordered, func() {
 
 			By("validating that the status of the custom resource created is updated or not")
 			getStatus := func() error {
-				cmd := exec.Command("kubectl", "get", "hpcamaltheasession",
+				cmd := exec.Command("kubectl", "get", "amaltheasession",
 					"test-amalthea-session", "-o", "jsonpath={.status.idle}",
 					"-n", session_namespace,
 				)

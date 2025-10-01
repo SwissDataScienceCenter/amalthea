@@ -1,5 +1,5 @@
 apiVersion: "amalthea.dev/v1alpha1"
-kind: "HpcAmaltheaSession"
+kind: "AmaltheaSession"
 metadata:
   name: test-amalthea-session
 spec:

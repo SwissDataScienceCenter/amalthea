@@ -34,14 +34,14 @@ var _ = Describe("controller", Ordered, func() {
 
 	AfterAll(func(ctx SpecContext) {
 		Expect(
-			k8sClient.DeleteAllOf(ctx, &amaltheadevv1alpha1.HpcAmaltheaSession{}, client.InNamespace(namespace)),
+			k8sClient.DeleteAllOf(ctx, &amaltheadevv1alpha1.AmaltheaSession{}, client.InNamespace(namespace)),
 		).To(Succeed())
 		Expect(utils.UninstallHelmChart(ctx, namespace, release)).To(Succeed())
 	})
 
 	Context("operator from helm chart", func() {
 		It("should run a simple session successfully", func(ctx SpecContext) {
-			session := amaltheadevv1alpha1.HpcAmaltheaSession{
+			session := amaltheadevv1alpha1.AmaltheaSession{
 				ObjectMeta: v1.ObjectMeta{Name: "test1", Namespace: namespace},
 				Spec: amaltheadevv1alpha1.AmaltheaSessionSpec{
 					Session: amaltheadevv1alpha1.Session{
