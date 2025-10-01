@@ -143,10 +143,6 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	log.Info("spec", "cr", amaltheasession)
-
-	// TODO: handle session location "remote"
-
 	children, err := NewChildResources(amaltheasession)
 	if err != nil {
 		log.Error(
