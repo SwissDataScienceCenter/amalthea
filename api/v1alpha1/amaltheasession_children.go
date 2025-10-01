@@ -715,7 +715,7 @@ func makeTunnelSecret(length int) (string, error) {
 }
 
 // sessionContainer returns the main session container
-func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1.Container {
+func (cr *AmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1.Container {
 	if cr.Spec.SessionLocation == Local {
 		return cr.sessionContainerLocal(volumeMounts)
 	}
@@ -724,7 +724,7 @@ func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1
 }
 
 // sessionContainer returns the main session container
-func (cr *HpcAmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount) v1.Container {
+func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount) v1.Container {
 	session := cr.Spec.Session
 	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
 	// in the CR can point to either the session container or another container.
@@ -780,7 +780,7 @@ func (cr *HpcAmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMoun
 	return sessionContainer
 }
 
-func (cr *HpcAmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount) v1.Container {
+func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount) v1.Container {
 	session := cr.Spec.Session
 	// Prepend "USER_ENV_" to the user-defined environment variables
 	env := make([]v1.EnvVar, 0, len(session.Env))
@@ -889,7 +889,7 @@ func (cr *HpcAmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMou
 }
 
 // tunnelContainer returns the tunnel container for remote sessions
-func (cr *HpcAmaltheaSession) tunnelContainer() v1.Container {
+func (cr *AmaltheaSession) tunnelContainer() v1.Container {
 	tunnelContainer := v1.Container{
 		Image: sidecarsImage,
 		Name:  tunnelContainerName,
