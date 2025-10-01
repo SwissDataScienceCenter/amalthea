@@ -170,10 +170,20 @@ func main() {
 
 	metricsClient := metricsv.NewForConfigOrDie(config).MetricsV1beta1()
 
+	clusterType, err := amaltheadevv1alpha1.DetectClusterType(config)
+
+	if err != nil {
+		setupLog.Error(err, "failed to do cluster detection")
+		os.Exit(1)
+	}
+
+	setupLog.Info("cluster type detected", "type", clusterType)
+
 	err = (&controller.AmaltheaSessionReconciler{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
 		MetricsClient: metricsClient,
+		ClusterType:   clusterType,
 	}).SetupWithManager(mgr)
 
 	if err != nil {
