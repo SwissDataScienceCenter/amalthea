@@ -332,6 +332,9 @@ func (c *FirecrestRemoteSessionController) collectGitRepositories(ctx context.Co
 	}
 
 	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if !entry.IsDir() {
 			continue
 		}
@@ -358,13 +361,15 @@ func (c *FirecrestRemoteSessionController) collectGitRepositories(ctx context.Co
 			}
 		}
 		if err := scanner.Err(); err != nil {
-			slog.Warn(fmt.Sprintf("error while reading %s", gitConfigPath), "error", err)
+			slog.Warn("error when reading a file", "file", gitConfigPath, "error", err)
 		}
 		if gitBranch != "" {
 			gitRepository.Branch = gitBranch
 		}
 		gitRepositories[entry.Name()] = gitRepository
-		gitConfigFile.Close()
+		if err := gitConfigFile.Close(); err != nil {
+			slog.Warn("error when closing a file", "file", gitConfigPath, "error", err)
+		}
 	}
 	return gitRepositories, nil
 }
