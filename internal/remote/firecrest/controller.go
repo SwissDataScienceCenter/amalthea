@@ -265,6 +265,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 
 	// Upload the session script
 	sessionScriptFinal := c.addSbatchDirectivesToScript(sessionScript)
+	sessionScriptFinal = c.addSessionMountsToScript(sessionScriptFinal)
 	err = c.uploadFile(ctx, sessionPath, "session_script.sh", []byte(sessionScriptFinal))
 	if err != nil {
 		return err
@@ -565,4 +566,44 @@ func (c *FirecrestRemoteSessionController) addSbatchDirectivesToScript(sessionSc
 	}
 	directivesStr := strings.Join(directives, "\n")
 	return strings.Replace(sessionScript, "#{{SBATCH_DIRECTIVES}}", directivesStr, 1)
+}
+
+func (c *FirecrestRemoteSessionController) addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, secretsPath string) string {
+	if fileSystems == nil {
+		return strings.Replace(sessionScript, "#{{SBATCH_DIRECTIVES}}", "", 1)
+	}
+	// Collect file systems we want to mount
+	var scratch, project, home *FileSystem
+	for _, fs := range *fileSystems {
+		if fs.DataType == Scratch {
+			scratch = &fs
+		} else if fs.DataType == Store {
+			project = &fs
+		} else if fs.DataType == Users {
+			home = &fs
+		}
+	}
+
+	mounts := []string{}
+	if scratch != nil {
+		mounts = append(mounts, scratch.Path)
+	}
+	if project != nil {
+		mounts = append(mounts, project.Path)
+	}
+	// TODO: Try to mount home at its location (need to handle ~/.bashrc)
+	// TODO: Alternatively, copy the contents in the container
+	if home != nil {
+		mounts = append(mounts, fmt.Sprintf("%s:/home%s:ro"), home.Path, home.Path)
+	}
+
+	// Add the secrets mount
+	mounts = append(mounts, fmt.Sprintf("%s:/secrets:ro"), secretsPath)
+	// Add indentation
+	for i := range mounts {
+		mounts[i] = "    " + mounts[i]
+	}
+
+	mountsStr := fmt.Sprintf("mounts = [\n%s]", strings.Join(mounts, ",\n"))
+	return strings.Replace(sessionScript, "#{{SESSION_MOUNTS}}", mountsStr, 1)
 }

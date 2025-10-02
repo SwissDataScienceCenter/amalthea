@@ -143,10 +143,11 @@ EDF_FILE="${SESSION_DIR}/environment.toml"
 cat <<EOF >"${EDF_FILE}"
 image = "${REMOTE_SESSION_IMAGE}"
 
-mounts = [
-    "${SCRATCH}",
-    "${SECRETS_DIR}:/secrets:ro",
-]
+# mounts = [
+#     "${SCRATCH}",
+#     "${SECRETS_DIR}:/secrets:ro",
+# ]
+#{{SESSION_MOUNTS}}
 
 workdir = "${SESSION_WORK_DIR}"
 
