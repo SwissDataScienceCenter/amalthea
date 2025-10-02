@@ -599,11 +599,11 @@ func (c *FirecrestRemoteSessionController) addSessionMountsToScript(sessionScrip
 	// TODO: Try to mount home at its location (need to handle ~/.bashrc)
 	// TODO: Alternatively, copy the contents in the container
 	if home != nil {
-		mounts = append(mounts, fmt.Sprintf("%s:/home%s:ro"), home.Path, home.Path)
+		mounts = append(mounts, fmt.Sprintf("%s:/home%s:ro", home.Path, home.Path))
 	}
 
 	// Add the secrets mount
-	mounts = append(mounts, fmt.Sprintf("%s:/secrets:ro"), secretsPath)
+	mounts = append(mounts, fmt.Sprintf("%s:/secrets:ro", secretsPath))
 	// Add indentation
 	for i := range mounts {
 		mounts[i] = "    " + mounts[i]
