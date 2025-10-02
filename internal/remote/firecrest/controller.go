@@ -265,7 +265,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 
 	// Upload the session script
 	sessionScriptFinal := c.addSbatchDirectivesToScript(sessionScript)
-	sessionScriptFinal = c.addSessionMountsToScript(sessionScriptFinal)
+	sessionScriptFinal = c.addSessionMountsToScript(sessionScriptFinal, system.FileSystems, sessionPath)
 	err = c.uploadFile(ctx, sessionPath, "session_script.sh", []byte(sessionScriptFinal))
 	if err != nil {
 		return err
