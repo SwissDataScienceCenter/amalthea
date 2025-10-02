@@ -634,7 +634,7 @@ func (c *FirecrestRemoteSessionController) saveJobID() error {
 		return fmt.Errorf("cannot save, job ID is not defined")
 	}
 	saveDirPath := c.getSaveDirPath()
-	if err := os.MkdirAll(saveDirPath, 0644); err != nil {
+	if err := os.MkdirAll(saveDirPath, 0755); err != nil {
 		return err
 	}
 	savePath := c.getSavePath()
