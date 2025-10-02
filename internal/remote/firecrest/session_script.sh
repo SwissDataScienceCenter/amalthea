@@ -5,6 +5,9 @@
 
 set -e -o pipefail
 
+GIT_PROXY_WAIT_SLEEP_SECONDS=10
+GIT_PROXY_WAIT_RETRIES=10
+
 # Installs rclone
 #
 # Usage:
@@ -214,7 +217,7 @@ echo "wstunnel client \
 if [ -n "${GIT_REPOSITORIES}" ]; then
     echo "Waiting for git proxy..."
     git_proxy_ready="0"
-    for i in $(seq 1 10); do
+    for i in $(seq 1 "${GIT_PROXY_WAIT_RETRIES}"); do
         set +e
         curl -sSL --fail -o /dev/null "http://localhost:${GIT_PROXY_HEALTH_PORT}/health" 2>/dev/null
         ready="$(echo $?)"
@@ -223,8 +226,8 @@ if [ -n "${GIT_REPOSITORIES}" ]; then
             git_proxy_ready="1"
             break
         fi
-        echo "Git proxy not ready ${i}/10..."
-        sleep 10
+        echo "Git proxy not ready ${i}/${GIT_PROXY_WAIT_RETRIES}..."
+        sleep "${GIT_PROXY_WAIT_SLEEP_SECONDS}"
     done
     if [ "${git_proxy_ready}" == "0" ]; then
         echo "Git proxy not ready, aborting"
