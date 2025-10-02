@@ -113,9 +113,9 @@ func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state mo
 //
 //nolint:gocyclo // TODO: can we break down session start?
 func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
-	// TODO: handle start when the pod was deleted:
-	// TODO: 1. we should save the job ID on disk, on the session PVC
-	// TODO: 2. try to load the currently running job ID from disk
+	// Start a go routine to update the session status
+	go c.periodicSessionStatus(ctx)
+
 	if err := c.recoverJobID(); err != nil {
 		return err
 	}
@@ -134,9 +134,6 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	// TODO: should the 15-minute timeout be configurable?
 	startCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
-
-	// Start a go routine to update the session status
-	go c.periodicSessionStatus(ctx)
 
 	if c.jobID != "" {
 		return fmt.Errorf("a remote job is already running: %s", c.jobID)
