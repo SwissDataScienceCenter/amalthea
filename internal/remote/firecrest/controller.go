@@ -265,7 +265,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 
 	// Upload the session script
 	sessionScriptFinal := c.addSbatchDirectivesToScript(sessionScript)
-	sessionScriptFinal = c.addSessionMountsToScript(sessionScriptFinal, system.FileSystems, sessionPath)
+	sessionScriptFinal = c.addSessionMountsToScript(sessionScriptFinal, system.FileSystems, secretsPath)
 	err = c.uploadFile(ctx, sessionPath, "session_script.sh", []byte(sessionScriptFinal))
 	if err != nil {
 		return err
@@ -580,11 +580,12 @@ func (c *FirecrestRemoteSessionController) addSessionMountsToScript(sessionScrip
 	// Collect file systems we want to mount
 	var scratch, project, home *FileSystem
 	for _, fs := range *fileSystems {
-		if fs.DataType == Scratch {
+		switch fs.DataType {
+		case Scratch:
 			scratch = &fs
-		} else if fs.DataType == Store {
+		case Store:
 			project = &fs
-		} else if fs.DataType == Users {
+		case Users:
 			home = &fs
 		}
 	}
@@ -604,11 +605,11 @@ func (c *FirecrestRemoteSessionController) addSessionMountsToScript(sessionScrip
 
 	// Add the secrets mount
 	mounts = append(mounts, fmt.Sprintf("%s:/secrets:ro", secretsPath))
-	// Add indentation
+	// Format mount list
 	for i := range mounts {
-		mounts[i] = "    " + mounts[i]
+		mounts[i] = fmt.Sprintf("    \"%s\",", mounts[i])
 	}
 
-	mountsStr := fmt.Sprintf("mounts = [\n%s]", strings.Join(mounts, ",\n"))
+	mountsStr := fmt.Sprintf("mounts = [\n%s\n]", strings.Join(mounts, "\n"))
 	return strings.Replace(sessionScript, "#{{SESSION_MOUNTS}}", mountsStr, 1)
 }
