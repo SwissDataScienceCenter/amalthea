@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -115,6 +116,13 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	// TODO: handle start when the pod was deleted:
 	// TODO: 1. we should save the job ID on disk, on the session PVC
 	// TODO: 2. try to load the currently running job ID from disk
+	if err := c.recoverJobID(); err != nil {
+		return err
+	}
+	// We recovered an existing job ID, do nothing
+	if c.jobID != "" {
+		return nil
+	}
 
 	// do not do anything if `fakeStart` is true
 	if c.fakeStart {
@@ -295,6 +303,11 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	c.jobID = jobID
 
 	slog.Info("submitted job", "jobID", c.jobID)
+
+	// Save the job ID for recovery
+	if err := c.saveJobID(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -614,4 +627,57 @@ func (c *FirecrestRemoteSessionController) addSessionMountsToScript(sessionScrip
 
 	mountsStr := fmt.Sprintf("mounts = [\n%s\n]", strings.Join(mounts, "\n"))
 	return strings.Replace(sessionScript, "#{{SESSION_MOUNTS}}", mountsStr, 1)
+}
+
+func (c *FirecrestRemoteSessionController) saveJobID() error {
+	if c.jobID == "" {
+		return fmt.Errorf("cannot save, job ID is not defined")
+	}
+	saveDirPath := c.getSaveDirPath()
+	if err := os.MkdirAll(saveDirPath, 0644); err != nil {
+		return err
+	}
+	savePath := c.getSavePath()
+
+	state := savedState{
+		JobID: c.jobID,
+	}
+	contents, err := json.Marshal(state)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(savePath, contents, 0644)
+}
+
+func (c *FirecrestRemoteSessionController) recoverJobID() error {
+	contents, err := os.ReadFile(c.getSavePath())
+	if err != nil {
+		return nil
+	}
+
+	var state savedState
+	if err := json.Unmarshal(contents, &state); err != nil {
+		return err
+	}
+
+	if state.JobID != "" {
+		c.jobID = state.JobID
+		slog.Info("recovered job ID", "jobID", c.jobID)
+	}
+	return nil
+}
+
+type savedState struct {
+	JobID string `json:"job_id"`
+}
+
+func (c *FirecrestRemoteSessionController) getSaveDirPath() string {
+	renkuMountDir := os.Getenv("RENKU_MOUNT_DIR")
+	return path.Join(renkuMountDir, ".rsc")
+}
+
+func (c *FirecrestRemoteSessionController) getSavePath() string {
+
+	return path.Join(c.getSaveDirPath(), "state.json")
 }
