@@ -5,12 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/SwissDataScienceCenter/amalthea/internal/utils"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -34,9 +36,14 @@ const serviceMetaPortName string = prefix + "http-meta"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
+const tunnelContainerName string = "tunnel"
+const tunnelServiceName string = prefix + "tunnel"
+const TunnelIngressPathSuffix string = "__amalthea__/tunnel"
 const authenticatedPort int32 = 65535
 const AuthProxyMetaPort int32 = 65534
 const secondProxyPort int32 = 65533
+const RemoteSessionControllerPort int32 = 65532
+const TunnelPort int32 = 65531
 
 var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
@@ -44,7 +51,7 @@ var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
 
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
-func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
+func (cr *HpcAmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 	pvc := cr.PVC()
 	volumes := []v1.Volume{
 		{
@@ -87,14 +94,13 @@ func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 }
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
-func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.StatefulSet, error) {
+func (cr *HpcAmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.StatefulSet, error) {
 	labels := labelsForAmaltheaSession(cr.Name)
 	replicas := int32(1)
 	if cr.Spec.Hibernated {
 		replicas = 0
 	}
 
-	session := cr.Spec.Session
 	volumes := []v1.Volume{}
 	volumeMounts := []v1.VolumeMount{}
 	initContainers := []v1.Container{}
@@ -113,57 +119,8 @@ func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.Stateful
 	initContainers = append(initContainers, cloneInit.Containers...)
 	initContainers = append(initContainers, cr.Spec.ExtraInitContainers...)
 
-	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
-	// in the CR can point to either the session container or another container.
-	sessionContainer := v1.Container{
-		Image:                    session.Image,
-		Name:                     SessionContainerName,
-		ImagePullPolicy:          cr.Spec.Session.ImagePullPolicy,
-		Args:                     session.Args,
-		Command:                  session.Command,
-		Env:                      session.Env,
-		Resources:                session.Resources,
-		VolumeMounts:             volumeMounts,
-		TerminationMessagePath:   "/dev/termination-log",
-		TerminationMessagePolicy: v1.TerminationMessageReadFile,
-	}
-
-	// Assign a readiness probe to the session container
-	switch cr.Spec.Session.ReadinessProbe.Type {
-	case HTTP:
-		sessionContainer.ReadinessProbe = &v1.Probe{
-			ProbeHandler: v1.ProbeHandler{
-				HTTPGet: &v1.HTTPGetAction{
-					Port: intstr.FromInt32(cr.Spec.Session.Port),
-					Path: cr.Spec.Session.URLPath,
-				},
-			},
-			SuccessThreshold:    5,
-			PeriodSeconds:       5,
-			InitialDelaySeconds: 10,
-		}
-	case TCP:
-		sessionContainer.ReadinessProbe = &v1.Probe{
-			ProbeHandler: v1.ProbeHandler{
-				TCPSocket: &v1.TCPSocketAction{
-					Port: intstr.FromInt32(cr.Spec.Session.Port),
-				},
-			},
-			SuccessThreshold:    5,
-			PeriodSeconds:       5,
-			InitialDelaySeconds: 10,
-		}
-	}
-
-	securityContext := &v1.SecurityContext{
-		RunAsNonRoot: ptr.To(true),
-		RunAsUser:    ptr.To(session.RunAsUser),
-		RunAsGroup:   ptr.To(session.RunAsGroup),
-	}
-	if session.RunAsUser == 0 {
-		securityContext.RunAsNonRoot = ptr.To(false)
-	}
-	sessionContainer.SecurityContext = securityContext
+	// Create the main session container
+	sessionContainer := cr.sessionContainer(volumeMounts)
 
 	auth, err := cr.auth()
 	if err != nil {
@@ -171,6 +128,9 @@ func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.Stateful
 	}
 	containers = append(containers, sessionContainer)
 	containers = append(containers, auth.Containers...)
+	if cr.Spec.SessionLocation == Remote {
+		containers = append(containers, cr.tunnelContainer())
+	}
 	containers = append(containers, cr.Spec.ExtraContainers...)
 	volumes = append(volumes, auth.Volumes...)
 
@@ -219,11 +179,15 @@ func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.Stateful
 			},
 		},
 	}
+	// Set the termination grace period for remote sessions to 60 seconds
+	if cr.Spec.SessionLocation == Remote {
+		sts.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(60))
+	}
 	return sts, nil
 }
 
 // Service returns a AmaltheaSession Service object
-func (cr *AmaltheaSession) Service() v1.Service {
+func (cr *HpcAmaltheaSession) Service() v1.Service {
 	labels := labelsForAmaltheaSession(cr.Name)
 	targetPort := cr.Spec.Session.Port
 	if cr.Spec.Authentication != nil && cr.Spec.Authentication.Enabled {
@@ -249,14 +213,23 @@ func (cr *AmaltheaSession) Service() v1.Service {
 					Name:       serviceMetaPortName,
 					Port:       AuthProxyMetaPort,
 					TargetPort: intstr.FromInt32(AuthProxyMetaPort),
-				}},
+				},
+			},
 		},
+	}
+	if cr.Spec.SessionLocation == Remote {
+		svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
+			Protocol:   v1.ProtocolTCP,
+			Name:       tunnelServiceName,
+			Port:       TunnelPort,
+			TargetPort: intstr.FromString(tunnelServiceName),
+		})
 	}
 	return svc
 }
 
 // The path prefix for the session
-func (cr *AmaltheaSession) urlPath() string {
+func (cr *HpcAmaltheaSession) urlPath() string {
 	path := cr.Spec.Session.URLPath
 	// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
 	// and does not proxy subpaths
@@ -267,7 +240,7 @@ func (cr *AmaltheaSession) urlPath() string {
 }
 
 // The path prefix from the ingress spec for the session
-func (cr *AmaltheaSession) ingressPathPrefix() string {
+func (cr *HpcAmaltheaSession) ingressPathPrefix() string {
 	if cr.Spec.Ingress == nil {
 		return "/"
 	}
@@ -281,7 +254,7 @@ func (cr *AmaltheaSession) ingressPathPrefix() string {
 }
 
 // Ingress returns a AmaltheaSession Ingress object
-func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
+func (cr *HpcAmaltheaSession) Ingress() *networkingv1.Ingress {
 	labels := labelsForAmaltheaSession(cr.Name)
 
 	ingress := cr.Spec.Ingress
@@ -331,11 +304,28 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 		}}
 	}
 
+	// Add rule for __amalthea__/tunnel -> tunnel container
+	if cr.Spec.SessionLocation == Remote {
+		mainRule := &ing.Spec.Rules[0]
+		mainRule.HTTP.Paths = append(mainRule.HTTP.Paths, networkingv1.HTTPIngressPath{
+			Path:     cr.ingressPathPrefix() + TunnelIngressPathSuffix,
+			PathType: ptr.To(networkingv1.PathTypePrefix),
+			Backend: networkingv1.IngressBackend{
+				Service: &networkingv1.IngressServiceBackend{
+					Name: cr.Name,
+					Port: networkingv1.ServiceBackendPort{
+						Name: tunnelServiceName,
+					},
+				},
+			},
+		})
+	}
+
 	return ing
 }
 
 // PVC returned the desired specification for a persistent volume claim
-func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
+func (cr *HpcAmaltheaSession) PVC() v1.PersistentVolumeClaim {
 	labels := labelsForAmaltheaSession(cr.Name)
 	requests := v1.ResourceList{"storage": resource.MustParse("1Gi")}
 	if cr.Spec.Session.Storage.Size != nil {
@@ -387,14 +377,14 @@ func NewConditions() []AmaltheaSessionCondition {
 	}
 }
 
-func (cr *AmaltheaSession) NeedsDeletion() bool {
+func (cr *HpcAmaltheaSession) NeedsDeletion() bool {
 	hibernatedDuration := time.Since(cr.Status.HibernatedSince.Time)
 	durationIsZero := cr.Spec.Culling.MaxHibernatedDuration == metav1.Duration{}
 	return cr.Status.State == Hibernated && !durationIsZero &&
 		hibernatedDuration > cr.Spec.Culling.MaxHibernatedDuration.Duration
 }
 
-func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
+func (cr *HpcAmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
 	pod := v1.Pod{}
 	podName := cr.PodName()
 	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
@@ -417,7 +407,7 @@ func eventTimestamp(ev v1.Event) time.Time {
 
 // GetPodEvents finds all events where the pod of the given session is
 // involved in. It will be sorted by timestamp
-func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*v1.EventList, error) {
+func (as *HpcAmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*v1.EventList, error) {
 	log := log.FromContext(ctx)
 	events := v1.EventList{}
 	podName := as.PodName()
@@ -443,7 +433,7 @@ func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*
 }
 
 // Returns the list of all the secrets used in this CR
-func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
+func (cr *HpcAmaltheaSession) AdoptedSecrets() v1.SecretList {
 	secrets := v1.SecretList{}
 
 	if cr.Spec.Ingress != nil && cr.Spec.Ingress.TLSSecret.isAdopted() {
@@ -461,6 +451,15 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cr.Namespace,
 				Name:      auth.SecretRef.Name,
+			},
+		})
+	}
+
+	if cr.Spec.Session.RemoteSecretRef != nil && cr.Spec.Session.RemoteSecretRef.isAdopted() {
+		secrets.Items = append(secrets.Items, v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cr.Namespace,
+				Name:      cr.Spec.Session.RemoteSecretRef.Name,
 			},
 		})
 	}
@@ -511,7 +510,12 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 
 // Assuming that the csi-rclone driver from https://github.com/SwissDataScienceCenter/csi-rclone
 // is installed, this will generate PVCs for the data sources that have the rclone type.
-func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
+func (as *HpcAmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
+	// TODO: Configure this for remote sessions
+	if as.Spec.SessionLocation == Remote {
+		return []v1.PersistentVolumeClaim{}, []v1.Volume{}, []v1.VolumeMount{}
+	}
+
 	pvcs := []v1.PersistentVolumeClaim{}
 	vols := []v1.Volume{}
 	volMounts := []v1.VolumeMount{}
@@ -589,17 +593,22 @@ func getSidecarsImage() string {
 // of the AmaltheaSession CR, as opposed to all other adopted secrets that
 // are not children of the AmaltheaSession CR and are created by the creator of each AmaltheaSession CR.
 // This secret is both created and deleted by Amalthea.
-func (as *AmaltheaSession) InternalSecretName() string {
+func (as *HpcAmaltheaSession) InternalSecretName() string {
 	return fmt.Sprintf("%s---internal", as.Name)
 }
 
-// The secret created by this method is populated with data only when the type of authentication is 'oidc'.
-// If the type of authentication is 'oauth2proxy', then it is expected that
-// the secret with OAuth configuration created by the creator of the AmaltheaSession CR will be in
-// a format acceptable to oauth2proxy. With the 'oidc' method we do not have to expose
-// the oauth2proxy configuration API in the format of the secret we expect from users.
-// We define our own API - specific only to OIDC and limited strictly to fields we need.
-func (as *AmaltheaSession) Secret() v1.Secret {
+// The secret created by this method may contain secrets for two purposes:
+//  1. If the type of authentication is 'oidc' then the secret with OAuth
+//     configuration created by the creator of the AmaltheaSession CR will be in
+//     a format acceptable to oauth2proxy. With the 'oidc' method we do not have to expose
+//     the oauth2proxy configuration API in the format of the secret we expect from users.
+//     We define our own API - specific only to OIDC and limited strictly to fields we need.
+//  2. If the session location is 'remote' then the secret is populated with a value used
+//     to authenticate remote tunnel connections
+//
+// The secret will contain either, both or none of these configurations depending
+// on the configuration of the Amalthea session.
+func (as *HpcAmaltheaSession) Secret() v1.Secret {
 	labels := labelsForAmaltheaSession(as.Name)
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -608,8 +617,24 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 			Labels:    labels,
 		},
 	}
+	// Secret used to secure the tunnel for remote sessions
+	tunnelSecret := ""
+	if as.Spec.SessionLocation == Remote {
+		var err error
+		tunnelSecret, err = makeTunnelSecret(16)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	if as.Spec.Authentication == nil || as.Spec.Authentication.Type != Oidc {
-		// In this case we do not need anything in the secret - we just return an empty one
+		// In this case we do not need the 'oidc' configuration in the secret,
+		// we just return an empty one, or one populated with the tunnel secret.
+		if tunnelSecret != "" {
+			secret.StringData = map[string]string{
+				"WSTUNNEL_SECRET": tunnelSecret,
+			}
+		}
 		return secret
 	}
 
@@ -675,5 +700,234 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		"oauth2-proxy-alpha-config.yaml": string(newConfigStr),
 		"oauth2-proxy-config.yaml":       strings.Join(oldConfigLines, "\n"),
 	}
+	if tunnelSecret != "" {
+		secret.StringData["WSTUNNEL_SECRET"] = tunnelSecret
+	}
 	return secret
+}
+
+func makeTunnelSecret(length int) (string, error) {
+	b := make([]byte, length)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// sessionContainer returns the main session container
+func (cr *HpcAmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1.Container {
+	if cr.Spec.SessionLocation == Local {
+		return cr.sessionContainerLocal(volumeMounts)
+	}
+	// cr.Spec.SessionLocation == Remote
+	return cr.sessionContainerRemote(volumeMounts)
+}
+
+// sessionContainer returns the main session container
+func (cr *HpcAmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount) v1.Container {
+	session := cr.Spec.Session
+	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
+	// in the CR can point to either the session container or another container.
+	sessionContainer := v1.Container{
+		Image:                    session.Image,
+		Name:                     SessionContainerName,
+		ImagePullPolicy:          cr.Spec.Session.ImagePullPolicy,
+		Args:                     session.Args,
+		Command:                  session.Command,
+		Env:                      session.Env,
+		Resources:                session.Resources,
+		VolumeMounts:             volumeMounts,
+		TerminationMessagePath:   "/dev/termination-log",
+		TerminationMessagePolicy: v1.TerminationMessageReadFile,
+	}
+	// Assign a readiness probe to the session container
+	switch cr.Spec.Session.ReadinessProbe.Type {
+	case HTTP:
+		sessionContainer.ReadinessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					Port: intstr.FromInt32(cr.Spec.Session.Port),
+					Path: cr.Spec.Session.URLPath,
+				},
+			},
+			SuccessThreshold:    5,
+			PeriodSeconds:       5,
+			InitialDelaySeconds: 10,
+		}
+	case TCP:
+		sessionContainer.ReadinessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.FromInt32(cr.Spec.Session.Port),
+				},
+			},
+			SuccessThreshold:    5,
+			PeriodSeconds:       5,
+			InitialDelaySeconds: 10,
+		}
+	}
+	// Assign security context
+	securityContext := &v1.SecurityContext{
+		RunAsNonRoot: ptr.To(true),
+		RunAsUser:    ptr.To(session.RunAsUser),
+		RunAsGroup:   ptr.To(session.RunAsGroup),
+	}
+	if session.RunAsUser == 0 {
+		securityContext.RunAsNonRoot = ptr.To(false)
+	}
+	sessionContainer.SecurityContext = securityContext
+
+	return sessionContainer
+}
+
+func (cr *HpcAmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount) v1.Container {
+	session := cr.Spec.Session
+	sessionContainer := v1.Container{
+		Image: sidecarsImage,
+		Name:  SessionContainerName,
+		SecurityContext: &v1.SecurityContext{
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsNonRoot:             ptr.To(true),
+		},
+		Args: []string{
+			"remote-session-controller",
+			"run",
+		},
+		// TODO: Properly configure env vars
+		Env: session.Env,
+		// TODO: Set fixed resources here
+		Resources:                session.Resources,
+		VolumeMounts:             volumeMounts,
+		TerminationMessagePath:   "/dev/termination-log",
+		TerminationMessagePolicy: v1.TerminationMessageReadFile,
+		Ports: []v1.ContainerPort{
+			{
+				Name:          servicePortName,
+				ContainerPort: RemoteSessionControllerPort,
+			},
+		},
+	}
+
+	enrootImage, err := utils.EnrootImageFormat(cr.Spec.Session.Image)
+	if err != nil {
+		// TODO: How can we log and report this?
+		enrootImage = cr.Spec.Session.Image
+	}
+
+	sessionContainer.Env = append(
+		sessionContainer.Env,
+		v1.EnvVar{
+			Name:  "REMOTE_SESSION_IMAGE",
+			Value: enrootImage,
+		},
+		v1.EnvVar{
+			Name:  "SERVER_PORT",
+			Value: fmt.Sprintf("%d", RemoteSessionControllerPort),
+		},
+		v1.EnvVar{
+			Name: "WSTUNNEL_SECRET",
+			ValueFrom: ptr.To(v1.EnvVarSource{
+				SecretKeyRef: ptr.To(v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
+					Key:                  "WSTUNNEL_SECRET",
+				}),
+			}),
+		},
+	)
+
+	if session.RemoteSecretRef != nil {
+		sessionContainer.EnvFrom = append(sessionContainer.EnvFrom, v1.EnvFromSource{
+			// This secret contains the configuration for the remote session controller
+			SecretRef: &v1.SecretEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: session.RemoteSecretRef.Name},
+			},
+		})
+	}
+
+	sessionContainer.LivenessProbe = &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Port: intstr.FromInt32(RemoteSessionControllerPort),
+				Path: "/live",
+			},
+		},
+		PeriodSeconds:       1,
+		InitialDelaySeconds: 10,
+	}
+	sessionContainer.ReadinessProbe = &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Port: intstr.FromInt32(RemoteSessionControllerPort),
+				Path: "/ready",
+			},
+		},
+		SuccessThreshold:    5,
+		PeriodSeconds:       5,
+		InitialDelaySeconds: 10,
+	}
+
+	return sessionContainer
+}
+
+// tunnelContainer returns the tunnel container for remote sessions
+func (cr *HpcAmaltheaSession) tunnelContainer() v1.Container {
+	tunnelContainer := v1.Container{
+		Image: sidecarsImage,
+		Name:  tunnelContainerName,
+		SecurityContext: &v1.SecurityContext{
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsNonRoot:             ptr.To(true),
+			Capabilities: &v1.Capabilities{
+				Drop: []v1.Capability{"ALL"},
+			},
+		},
+		Args: []string{
+			"tunnel",
+			"listen",
+		},
+		Env: []v1.EnvVar{
+			{Name: "WSTUNNEL_PORT", Value: fmt.Sprintf("%d", TunnelPort)},
+			{
+				Name: "WSTUNNEL_SECRET",
+				ValueFrom: ptr.To(v1.EnvVarSource{
+					SecretKeyRef: ptr.To(v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
+						Key:                  "WSTUNNEL_SECRET",
+					}),
+				}),
+			},
+		},
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				"memory": resource.MustParse("64Mi"),
+				"cpu":    resource.MustParse("100m"),
+			},
+			Limits: v1.ResourceList{
+				"memory": resource.MustParse("128Mi"),
+				// NOTE: Cpu limit not set on purpose
+				// Without cpu limit if there is spare you can go over the request
+				// If there is no spare cpu then all things get throttled relative to their request
+				// With cpu limits you get throttled when you go over the request always, even with spare capacity
+			},
+		},
+		Ports: []v1.ContainerPort{
+			{
+				Name:          tunnelServiceName,
+				ContainerPort: TunnelPort,
+			},
+		},
+		// TODO: implement an HTTP probe on the tunnel command
+		ReadinessProbe: &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.FromInt32(TunnelPort),
+				},
+			},
+			SuccessThreshold:    3,
+			PeriodSeconds:       1,
+			InitialDelaySeconds: 5,
+		},
+	}
+
+	return tunnelContainer
 }
