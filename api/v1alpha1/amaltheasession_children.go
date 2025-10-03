@@ -782,6 +782,15 @@ func (cr *HpcAmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMoun
 
 func (cr *HpcAmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount) v1.Container {
 	session := cr.Spec.Session
+	// Prepend "USER_ENV_" to the user-defined environment variables
+	env := make([]v1.EnvVar, 0, len(session.Env))
+	for i, item := range session.Env {
+		env = append(env, *item.DeepCopy())
+		if strings.HasPrefix(env[i].Name, "RENKU_") || strings.HasPrefix(env[i].Name, "RSC_") {
+			continue
+		}
+		env[i].Name = fmt.Sprintf("USER_ENV_%s", env[i].Name)
+	}
 	sessionContainer := v1.Container{
 		Image: sidecarsImage,
 		Name:  SessionContainerName,
@@ -793,10 +802,20 @@ func (cr *HpcAmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMou
 			"remote-session-controller",
 			"run",
 		},
-		// TODO: Properly configure env vars
-		Env: session.Env,
-		// TODO: Set fixed resources here
-		Resources:                session.Resources,
+		Env: env,
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				"memory": resource.MustParse("64Mi"),
+				"cpu":    resource.MustParse("100m"),
+			},
+			Limits: v1.ResourceList{
+				"memory": resource.MustParse("128Mi"),
+				// NOTE: Cpu limit not set on purpose
+				// Without cpu limit if there is spare you can go over the request
+				// If there is no spare cpu then all things get throttled relative to their request
+				// With cpu limits you get throttled when you go over the request always, even with spare capacity
+			},
+		},
 		VolumeMounts:             volumeMounts,
 		TerminationMessagePath:   "/dev/termination-log",
 		TerminationMessagePolicy: v1.TerminationMessageReadFile,
@@ -821,11 +840,11 @@ func (cr *HpcAmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMou
 			Value: enrootImage,
 		},
 		v1.EnvVar{
-			Name:  "SERVER_PORT",
+			Name:  "RSC_SERVER_PORT",
 			Value: fmt.Sprintf("%d", RemoteSessionControllerPort),
 		},
 		v1.EnvVar{
-			Name: "WSTUNNEL_SECRET",
+			Name: "RSC_WSTUNNEL_SECRET",
 			ValueFrom: ptr.To(v1.EnvVarSource{
 				SecretKeyRef: ptr.To(v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
