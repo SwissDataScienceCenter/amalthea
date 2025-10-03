@@ -5,6 +5,9 @@
 
 set -e -o pipefail
 
+GIT_PROXY_WAIT_SLEEP_SECONDS=10
+GIT_PROXY_WAIT_RETRIES=10
+
 # Installs rclone
 #
 # Usage:
@@ -150,6 +153,9 @@ mounts = [
 ]
 
 workdir = "${SESSION_WORK_DIR}"
+
+[annotations]
+com.hooks.cxi.enabled = "false"
 EOF
 
 export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
@@ -176,17 +182,21 @@ echo "TODO: setup rclone mounts..."
 # "${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
 
 # echo "Starting tunnel..."
-# GIT_PROXY_PORT="${GIT_PROXY_PORT:-65480}"
-# GIT_PROXY_HEALTH_PORT="${GIT_PROXY_HEALTH_PORT:-65481}"
+GIT_PROXY_PORT="${GIT_PROXY_PORT:-65480}"
+GIT_PROXY_HEALTH_PORT="${GIT_PROXY_HEALTH_PORT:-65481}"
 WSTUNNEL_PATH_PREFIX="${WSTUNNEL_PATH_PREFIX:-sessions/my-session/wstunnel}"
 echo "wstunnel client \
   -R tcp://0.0.0.0:${RENKU_SESSION_PORT}:localhost:${RENKU_SESSION_PORT} \
+  -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT} \
+  -L tcp://${GIT_PROXY_HEALTH_PORT}:localhost:${GIT_PROXY_HEALTH_PORT} \
   wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT} \
   -P ${WSTUNNEL_PATH_PREFIX} \
   -H Authorization: Bearer <SECRET> \
   --tls-verify-certificate &"
 "${wstunnel}" client \
   -R "tcp://0.0.0.0:${RENKU_SESSION_PORT}:localhost:${RENKU_SESSION_PORT}" \
+  -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT} \
+  -L tcp://${GIT_PROXY_HEALTH_PORT}:localhost:${GIT_PROXY_HEALTH_PORT} \
   "wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT}" \
   -P "${WSTUNNEL_PATH_PREFIX}" \
   -H "Authorization: Bearer ${WSTUNNEL_SECRET}" \
@@ -203,6 +213,47 @@ echo "wstunnel client \
 # git checkout main
 # git pull
 # cd "${cwd}"
+
+if [ -n "${GIT_REPOSITORIES}" ]; then
+    echo "Waiting for git proxy..."
+    git_proxy_ready="0"
+    for i in $(seq 1 "${GIT_PROXY_WAIT_RETRIES}"); do
+        set +e
+        curl -sSL --fail -o /dev/null "http://localhost:${GIT_PROXY_HEALTH_PORT}/health" 2>/dev/null
+        ready="$(echo $?)"
+        set -e
+        if [ "${ready}" == "0" ]; then
+            git_proxy_ready="1"
+            break
+        fi
+        echo "Git proxy not ready ${i}/${GIT_PROXY_WAIT_RETRIES}..."
+        sleep "${GIT_PROXY_WAIT_SLEEP_SECONDS}"
+    done
+    if [ "${git_proxy_ready}" == "0" ]; then
+        echo "Git proxy not ready, aborting"
+        exit 1
+    fi
+
+    echo "Setting up git repositories..."
+    cwd="$(pwd)"
+    OIFS="${IFS}"
+    IFS=$'\n'
+    GIT_REPOSITORIES=(${GIT_REPOSITORIES})
+    IFS="${OIFS}"
+    for line in "${GIT_REPOSITORIES[@]}"; do
+        repo="$(echo "${line}" | cut -d$'\t' -f1)"
+        branch="$(echo "${line}" | cut -d$'\t' -f2)"
+        echo "repo: ${repo}, branch: ${branch}"
+        cd "${RENKU_WORKING_DIR}/${repo}"
+        git init
+        git fetch
+        if [ -n "${branch}" ]; then
+            git checkout "${branch}"
+            git pull
+        fi
+    done
+    cd "${cwd}"
+fi
 
 exit_script() {
     echo "Cleaning up session..."

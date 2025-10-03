@@ -17,6 +17,7 @@ limitations under the License.
 package firecrest
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	_ "embed"
@@ -27,6 +28,8 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -38,6 +41,8 @@ import (
 //
 //go:embed session_script.sh
 var sessionScript string
+
+var branchRegExp = regexp.MustCompile("[[]branch \"(.+)\"]")
 
 type FirecrestRemoteSessionController struct {
 	client *FirecrestClient
@@ -172,7 +177,28 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 	// TODO: upload user secrets into secretsPath
 
-	// TODO: handle git repositories
+	// Setup git repositories
+	renkuWorkDir := os.Getenv("RENKU_WORKING_DIR")
+	gitRepositories, err := c.collectGitRepositories(startCtx, renkuWorkDir)
+	if err != nil {
+		return err
+	}
+	slog.Info("collected git repositories", "gitRepositories", gitRepositories)
+	for repo := range gitRepositories {
+		repoGitDirPath := path.Join(sessionPath, "work", repo, ".git")
+		err = c.mkdir(startCtx, repoGitDirPath, true /* createParents */)
+		if err != nil {
+			return err
+		}
+		gitConfigContents, err := os.ReadFile(gitRepositories[repo].ConfigPath)
+		if err != nil {
+			return err
+		}
+		err = c.uploadFile(startCtx, repoGitDirPath, "config", gitConfigContents)
+		if err != nil {
+			return err
+		}
+	}
 
 	env := map[string]string{}
 	// Copy the REMOTE_SESSION environment variables
@@ -200,7 +226,15 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		env["WSTUNNEL_SERVICE_PORT"] = fmt.Sprintf("%d", 443)                                   // wss port (same as https)
 		env["WSTUNNEL_PATH_PREFIX"] = renkuBaseURLPath + "/" + v1alpha1.TunnelIngressPathSuffix // session path with tunnel
 	}
-	// TODO: setup env vars for git repositories
+	// Setup environment variables for git repositories
+	repos := []string{}
+	for repo := range gitRepositories {
+		repos = append(repos, fmt.Sprintf("%s\t%s", repo, gitRepositories[repo].Branch))
+	}
+	env["GIT_REPOSITORIES"] = strings.Join(repos, "\n")
+	// NOTE: we assume that the git proxy port is 65480 (default from the renku helm chart)
+	env["GIT_PROXY_PORT"] = fmt.Sprintf("%d", 65480)        // git proxy port
+	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
 	// TODO: upload session script
 	// TODO: maybe the session script should be a template: pass account, partition, log files, etc.
@@ -250,6 +284,62 @@ func (c *FirecrestRemoteSessionController) Stop(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (c *FirecrestRemoteSessionController) collectGitRepositories(ctx context.Context, workDir string) (gitRepositories map[string]gitRepository, err error) {
+	gitRepositories = map[string]gitRepository{}
+
+	entries, err := os.ReadDir(workDir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if !entry.IsDir() {
+			continue
+		}
+		fullPath := filepath.Join(workDir, entry.Name())
+		gitConfigPath := filepath.Join(fullPath, ".git", "config")
+		gitConfigFile, err := os.Open(gitConfigPath)
+		if err != nil {
+			continue
+		}
+		gitRepository := gitRepository{
+			ConfigPath: gitConfigPath,
+		}
+		scanner := bufio.NewScanner(gitConfigFile)
+		gitBranch := ""
+		for scanner.Scan() {
+			line := scanner.Text()
+			line = strings.TrimSpace(line)
+			res := branchRegExp.FindStringSubmatch(line)
+			if len(res) > 1 {
+				gitBranch = res[1]
+			}
+			if gitBranch != "" {
+				break
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			slog.Warn("error when reading a file", "file", gitConfigPath, "error", err)
+		}
+		if gitBranch != "" {
+			gitRepository.Branch = gitBranch
+		}
+		gitRepositories[entry.Name()] = gitRepository
+		if err := gitConfigFile.Close(); err != nil {
+			slog.Warn("error when closing a file", "file", gitConfigPath, "error", err)
+		}
+	}
+	return gitRepositories, nil
+}
+
+type gitRepository struct {
+	Branch     string
+	ConfigPath string
 }
 
 func (c *FirecrestRemoteSessionController) getUserInfo(ctx context.Context) (userInfo UserInfoResponse, err error) {
@@ -318,7 +408,7 @@ func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path strin
 		if message != "" {
 			return fmt.Errorf("could not run mkdir: %s", message)
 		}
-		return fmt.Errorf("could run not mkdir: HTTP %d", res.StatusCode())
+		return fmt.Errorf("could not run mkdir: HTTP %d", res.StatusCode())
 	}
 	return nil
 }
