@@ -11,7 +11,7 @@ import (
 
 const authproxyImage string = "harbor.renkulab.io/bitnami-mirror/oauth2-proxy:7.6.0"
 
-func (as *HpcAmaltheaSession) auth() (manifests, error) {
+func (as *AmaltheaSession) auth() (manifests, error) {
 	output := manifests{}
 	volumeMounts := []v1.VolumeMount{}
 	auth := as.Spec.Authentication
@@ -202,7 +202,7 @@ func (as *HpcAmaltheaSession) auth() (manifests, error) {
 	return output, nil
 }
 
-func (as *HpcAmaltheaSession) get_rewrite_authn_proxy(listenPort int32, metaListenPort int32, remotePort int32) v1.Container {
+func (as *AmaltheaSession) get_rewrite_authn_proxy(listenPort int32, metaListenPort int32, remotePort int32) v1.Container {
 	probeHandler := v1.ProbeHandler{
 		HTTPGet: &v1.HTTPGetAction{
 			Path: "/__amalthea__/health",
