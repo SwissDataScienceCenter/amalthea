@@ -247,47 +247,6 @@ if [ -n "${GIT_REPOSITORIES}" ]; then
     cd "${cwd}"
 fi
 
-if [ -n "${GIT_REPOSITORIES}" ]; then
-    echo "Waiting for git proxy..."
-    git_proxy_ready="0"
-    for i in $(seq 1 "${GIT_PROXY_WAIT_RETRIES}"); do
-        set +e
-        curl -sSL --fail -o /dev/null "http://localhost:${GIT_PROXY_HEALTH_PORT}/health" 2>/dev/null
-        ready="$(echo $?)"
-        set -e
-        if [ "${ready}" == "0" ]; then
-            git_proxy_ready="1"
-            break
-        fi
-        echo "Git proxy not ready ${i}/${GIT_PROXY_WAIT_RETRIES}..."
-        sleep "${GIT_PROXY_WAIT_SLEEP_SECONDS}"
-    done
-    if [ "${git_proxy_ready}" == "0" ]; then
-        echo "Git proxy not ready, aborting"
-        exit 1
-    fi
-
-    echo "Setting up git repositories..."
-    cwd="$(pwd)"
-    OIFS="${IFS}"
-    IFS=$'\n'
-    GIT_REPOSITORIES=(${GIT_REPOSITORIES})
-    IFS="${OIFS}"
-    for line in "${GIT_REPOSITORIES[@]}"; do
-        repo="$(echo "${line}" | cut -d$'\t' -f1)"
-        branch="$(echo "${line}" | cut -d$'\t' -f2)"
-        echo "repo: ${repo}, branch: ${branch}"
-        cd "${RENKU_WORKING_DIR}/${repo}"
-        git init
-        git fetch
-        if [ -n "${branch}" ]; then
-            git checkout "${branch}"
-            git pull
-        fi
-    done
-    cd "${cwd}"
-fi
-
 exit_script() {
     echo "Cleaning up session..."
     # fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
