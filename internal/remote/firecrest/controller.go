@@ -271,8 +271,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
 	// Upload the session script
-	sessionScriptFinal := c.addSbatchDirectivesToScript(sessionScript)
-	sessionScriptFinal = c.addSessionMountsToScript(sessionScriptFinal, system.FileSystems, secretsPath)
+	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, secretsPath)
 	err = c.uploadFile(ctx, sessionPath, "session_script.sh", []byte(sessionScriptFinal))
 	if err != nil {
 		return err
@@ -317,6 +316,11 @@ func (c *FirecrestRemoteSessionController) Stop(ctx context.Context) error {
 	if c.jobID == "" {
 		slog.Info("no job to cancel")
 		return nil
+	}
+
+	// Remove the saved state: if the session gets restarted later, we need to submit a fresh job
+	if err := c.deleteSavedState(); err != nil {
+		slog.Error("could not delete saved state before stopping", "error", err)
 	}
 
 	slog.Info("cancelling job", "jobID", c.jobID)
@@ -568,6 +572,12 @@ func (c *FirecrestRemoteSessionController) getCurrentStatus(ctx context.Context)
 	return state, nil
 }
 
+func (c *FirecrestRemoteSessionController) renderSessionScript(sessionScript string, fileSystems *[]FileSystem, secretsPath string) string {
+	sessionScriptFinal := c.addSbatchDirectivesToScript(sessionScript)
+	sessionScriptFinal = c.addSessionMountsToScript(sessionScriptFinal, fileSystems, secretsPath)
+	return sessionScriptFinal
+}
+
 func (c *FirecrestRemoteSessionController) addSbatchDirectivesToScript(sessionScript string) string {
 	directives := []string{
 		"#SBATCH --nodes=1",
@@ -647,6 +657,11 @@ func (c *FirecrestRemoteSessionController) saveJobID() error {
 	return os.WriteFile(savePath, contents, 0644)
 }
 
+func (c *FirecrestRemoteSessionController) deleteSavedState() error {
+	savePath := c.getSavePath()
+	return os.Remove(savePath)
+}
+
 func (c *FirecrestRemoteSessionController) recoverJobID() error {
 	contents, err := os.ReadFile(c.getSavePath())
 	if err != nil {
@@ -671,7 +686,7 @@ type savedState struct {
 
 func (c *FirecrestRemoteSessionController) getSaveDirPath() string {
 	renkuMountDir := os.Getenv("RENKU_MOUNT_DIR")
-	return path.Join(renkuMountDir, ".rsc")
+	return path.Join(renkuMountDir, ".rsc") // NOTE: "rsc" stands for "Remote Session Controller"
 }
 
 func (c *FirecrestRemoteSessionController) getSavePath() string {
