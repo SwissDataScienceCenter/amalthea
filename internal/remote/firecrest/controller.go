@@ -46,6 +46,8 @@ var sessionScript string
 
 var branchRegExp = regexp.MustCompile("[[]branch \"(.+)\"]")
 
+var sessionScriptNoteRegExp = regexp.MustCompile("# NOTE FOR AMALTHEA MAINTAINERS(?s:.*)# END NOTE.*\n")
+
 type FirecrestRemoteSessionController struct {
 	client *FirecrestClient
 
@@ -573,18 +575,27 @@ func (c *FirecrestRemoteSessionController) getCurrentStatus(ctx context.Context)
 }
 
 func (c *FirecrestRemoteSessionController) renderSessionScript(sessionScript string, fileSystems *[]FileSystem, secretsPath string) string {
-	sessionScriptFinal := c.addSbatchDirectivesToScript(sessionScript)
-	sessionScriptFinal = c.addSessionMountsToScript(sessionScriptFinal, fileSystems, secretsPath)
+	return renderSessionScriptStatic(sessionScript, c.partition, fileSystems, secretsPath)
+}
+
+func renderSessionScriptStatic(sessionScript, partition string, fileSystems *[]FileSystem, secretsPath string) string {
+	sessionScriptFinal := removeMaintainersNotesFromScript(sessionScript)
+	sessionScriptFinal = addSbatchDirectivesToScript(sessionScriptFinal, partition)
+	sessionScriptFinal = addSessionMountsToScript(sessionScriptFinal, fileSystems, secretsPath)
 	return sessionScriptFinal
 }
 
-func (c *FirecrestRemoteSessionController) addSbatchDirectivesToScript(sessionScript string) string {
+func removeMaintainersNotesFromScript(sessionScript string) string {
+	return sessionScriptNoteRegExp.ReplaceAllString(sessionScript, "")
+}
+
+func addSbatchDirectivesToScript(sessionScript, partition string) string {
 	directives := []string{
 		"#SBATCH --nodes=1",
 		"#SBATCH --ntasks-per-node=1",
 	}
-	if c.partition != "" {
-		directives = append(directives, fmt.Sprintf("#SBATCH --partition=%s", c.partition))
+	if partition != "" {
+		directives = append(directives, fmt.Sprintf("#SBATCH --partition=%s", partition))
 	}
 	// The slurm account can be set by the user as an environment variable
 	slurmAccount := os.Getenv("USER_ENV_SLURM_ACCOUNT")
@@ -595,7 +606,7 @@ func (c *FirecrestRemoteSessionController) addSbatchDirectivesToScript(sessionSc
 	return strings.Replace(sessionScript, "#{{SBATCH_DIRECTIVES}}", directivesStr, 1)
 }
 
-func (c *FirecrestRemoteSessionController) addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, secretsPath string) string {
+func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, secretsPath string) string {
 	if fileSystems == nil {
 		return strings.Replace(sessionScript, "#{{SBATCH_DIRECTIVES}}", "", 1)
 	}
