@@ -610,12 +610,12 @@ func addSbatchDirectivesToScript(sessionScript, partition string) string {
 		directives = append(directives, fmt.Sprintf("#SBATCH --account=%s", slurmAccount))
 	}
 	directivesStr := strings.Join(directives, "\n")
-	return strings.Replace(sessionScript, "#{{SBATCH_DIRECTIVES}}", directivesStr, 1)
+	return strings.Replace(sessionScript, "#{{SBATCH_DIRECTIVES_PLACEHOLDER}}", directivesStr, 1)
 }
 
 func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, secretsPath string) string {
 	if fileSystems == nil {
-		return strings.Replace(sessionScript, "#{{SBATCH_DIRECTIVES}}", "", 1)
+		return strings.Replace(sessionScript, "#{{SESSION_MOUNTS_PLACEHOLDER}}", "", 1)
 	}
 	// Collect file systems we want to mount
 	var scratch, project, home *FileSystem
@@ -651,7 +651,7 @@ func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, s
 	}
 
 	mountsStr := fmt.Sprintf("mounts = [\n%s\n]", strings.Join(mounts, "\n"))
-	return strings.Replace(sessionScript, "#{{SESSION_MOUNTS}}", mountsStr, 1)
+	return strings.Replace(sessionScript, "#{{SESSION_MOUNTS_PLACEHOLDER}}", mountsStr, 1)
 }
 
 func (c *FirecrestRemoteSessionController) saveJobID() error {

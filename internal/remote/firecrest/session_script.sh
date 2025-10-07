@@ -5,7 +5,7 @@
 #   in the remote session controller.
 # END NOTE
 #!/bin/bash
-#{{SBATCH_DIRECTIVES}}
+#{{SBATCH_DIRECTIVES_PLACEHOLDER}}
 
 set -e -o pipefail
 
@@ -158,7 +158,7 @@ EDF_FILE="${SESSION_DIR}/environment.toml"
 cat <<EOF >"${EDF_FILE}"
 image = "${REMOTE_SESSION_IMAGE}"
 
-#{{SESSION_MOUNTS}}
+#{{SESSION_MOUNTS_PLACEHOLDER}}
 
 workdir = "${SESSION_WORK_DIR}"
 
