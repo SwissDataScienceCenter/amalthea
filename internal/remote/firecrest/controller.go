@@ -133,6 +133,13 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		return nil
 	}
 
+	// do not do anything if `fakeStart` is true
+	if c.fakeStart {
+		c.jobID = "fake-job-id"
+		slog.Info("fake start", "jobID", c.jobID, "env", os.Environ())
+		return nil
+	}
+
 	// TODO: should the 15-minute timeout be configurable?
 	startCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
