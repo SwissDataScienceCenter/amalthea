@@ -1,7 +1,5 @@
 #!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --partition=debug
+#{{SBATCH_DIRECTIVES}}
 
 set -e -o pipefail
 
@@ -72,6 +70,13 @@ function install_wstunnel() {
     WSTUNNEL_VERSION="10.4.4"
     WSTUNNEL_PKG="${RENKU_PKG}/wstunnel/v${WSTUNNEL_VERSION}"
     WSTUNNEL_BIN="${WSTUNNEL_PKG}/wstunnel"
+
+    arch="$(uname -m)"
+    if [ "${arch}" = "aarch64" ]; then
+        WSTUNNEL_VERSION_FORCED="10.1.10"
+        >&2 echo "Warning: using wstunnel v${WSTUNNEL_VERSION_FORCED} instead of ${WSTUNNEL_VERSION}"
+        WSTUNNEL_VERSION="${WSTUNNEL_VERSION_FORCED}"
+    fi
 
     skip_install="0"
     if [ -f "${WSTUNNEL_BIN}" ]; then
@@ -166,7 +171,6 @@ export RENKU_SESSION_IP="127.0.0.1"
 # Load the wstunnel secret
 export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
 
-echo "TODO: setup git repositories..."
 echo "TODO: setup rclone mounts..."
 
 # echo "Setting up example rclone mount..."
@@ -201,18 +205,6 @@ echo "wstunnel client \
   -P "${WSTUNNEL_PATH_PREFIX}" \
   -H "Authorization: Bearer ${WSTUNNEL_SECRET}" \
   --tls-verify-certificate 2>&1 >"${LOGS_DIR}/wstunnel.logs" &
-
-# echo "Setting up example git repository..."
-# echo "Waiting for tunnel..."
-# # TODO: implement a faster check for the git proxy
-# sleep 5
-# cwd="$(pwd)"
-# cd "${RENKU_WORKING_DIR}/python-simple-conda"
-# git init
-# git fetch
-# git checkout main
-# git pull
-# cd "${cwd}"
 
 if [ -n "${GIT_REPOSITORIES}" ]; then
     echo "Waiting for git proxy..."
