@@ -35,6 +35,7 @@ import (
 
 	"github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
+	"k8s.io/utils/ptr"
 )
 
 // The script submitted to start a new remote session.
@@ -49,6 +50,7 @@ type FirecrestRemoteSessionController struct {
 
 	jobID      string
 	systemName string
+	partition  string
 
 	// currentStatus the current session status
 	currentStatus models.RemoteSessionState
@@ -56,15 +58,20 @@ type FirecrestRemoteSessionController struct {
 	currentStatusError error
 	// statusTicker a ticker which is used to update the session status in the background
 	statusTicker *time.Ticker
+
+	// fakeStart if true, do not start the remote session and print debug information
+	fakeStart bool
 }
 
-func NewFirecrestRemoteSessionController(client *FirecrestClient, systemName string) (c *FirecrestRemoteSessionController, err error) {
+func NewFirecrestRemoteSessionController(client *FirecrestClient, systemName, partition string, fakeStart bool) (c *FirecrestRemoteSessionController, err error) {
 	c = &FirecrestRemoteSessionController{
 		client:        client,
 		jobID:         "",
 		systemName:    systemName,
+		partition:     partition,
 		currentStatus: models.NotReady,
 		statusTicker:  time.NewTicker(time.Minute),
+		fakeStart:     fakeStart,
 	}
 	// Validate controller
 	if c.client == nil {
@@ -107,6 +114,13 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	// TODO: 1. we should save the job ID on disk, on the session PVC
 	// TODO: 2. try to load the currently running job ID from disk
 
+	// do not do anything if `fakeStart` is true
+	if c.fakeStart {
+		c.jobID = "fake-job-id"
+		slog.Info("fake start", "jobID", c.jobID, "env", os.Environ())
+		return nil
+	}
+
 	// TODO: should the 15-minute timeout be configurable?
 	startCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
@@ -146,6 +160,11 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		return fmt.Errorf("could not find scratch file system on '%s'", c.systemName)
 	}
 
+	renkuProjectPath := strings.TrimSuffix(os.Getenv("RENKU_PROJECT_PATH"), "/")
+	if renkuProjectPath == "" {
+		renkuProjectPath = "dev-project"
+		slog.Warn("RENKU_PROJECT_PATH is not defined", "defaultValue", renkuProjectPath)
+	}
 	renkuBaseURLPath := strings.TrimSuffix(os.Getenv("RENKU_BASE_URL_PATH"), "/")
 	if renkuBaseURLPath == "" {
 		renkuBaseURLPath = "dev-session"
@@ -153,7 +172,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 
 	scratchPathRenku := path.Join(scratch.Path, userName, "renku")
-	sessionPath := path.Join(scratchPathRenku, renkuBaseURLPath)
+	sessionPath := path.Join(scratchPathRenku, "sessions", renkuProjectPath, strings.TrimPrefix(renkuBaseURLPath, "/sessions"))
 
 	slog.Info("determined session path", "sessionPath", sessionPath)
 
@@ -168,7 +187,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	wstunnel_secret := os.Getenv("WSTUNNEL_SECRET")
+	// TODO: get wstunnel_secret as a config value
+	wstunnel_secret := os.Getenv("RSC_WSTUNNEL_SECRET")
 	if wstunnel_secret != "" {
 		err = c.uploadFile(startCtx, secretsPath, "wstunnel_secret", []byte(wstunnel_secret))
 		if err != nil {
@@ -201,6 +221,13 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 
 	env := map[string]string{}
+	// Copy the environment variables defined by the user
+	for _, environ := range os.Environ() {
+		key, val, _ := strings.Cut(environ, "=")
+		if newKey, isRenkuEnv := strings.CutPrefix(key, "USER_ENV_"); isRenkuEnv {
+			env[newKey] = val
+		}
+	}
 	// Copy the REMOTE_SESSION environment variables
 	for _, environ := range os.Environ() {
 		key, val, _ := strings.Cut(environ, "=")
@@ -236,8 +263,12 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	env["GIT_PROXY_PORT"] = fmt.Sprintf("%d", 65480)        // git proxy port
 	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
-	// TODO: upload session script
-	// TODO: maybe the session script should be a template: pass account, partition, log files, etc.
+	// Upload the session script
+	sessionScriptFinal := c.addSbatchDirectivesToScript(sessionScript)
+	err = c.uploadFile(ctx, sessionPath, "session_script.sh", []byte(sessionScriptFinal))
+	if err != nil {
+		return err
+	}
 
 	jobEnv := JobDescriptionModel_Env{}
 	err = jobEnv.FromJobDescriptionModelEnv0(env)
@@ -246,8 +277,13 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 	job := JobDescriptionModel{
 		Env:              &jobEnv,
-		Script:           &sessionScript,
+		ScriptPath:       ptr.To(path.Join(sessionPath, "session_script.sh")),
 		WorkingDirectory: sessionPath,
+	}
+	// The slurm account can be set by the user as an environment variable
+	slurmAccount := os.Getenv("USER_ENV_SLURM_ACCOUNT")
+	if slurmAccount != "" {
+		job.Account = &slurmAccount
 	}
 	jobID, err := c.submitJob(startCtx, job)
 	if err != nil {
@@ -517,4 +553,21 @@ func (c *FirecrestRemoteSessionController) getCurrentStatus(ctx context.Context)
 		return models.Failed, err
 	}
 	return state, nil
+}
+
+func (c *FirecrestRemoteSessionController) addSbatchDirectivesToScript(sessionScript string) string {
+	directives := []string{
+		"#SBATCH --nodes=1",
+		"#SBATCH --ntasks-per-node=1",
+	}
+	if c.partition != "" {
+		directives = append(directives, fmt.Sprintf("#SBATCH --partition=%s", c.partition))
+	}
+	// The slurm account can be set by the user as an environment variable
+	slurmAccount := os.Getenv("USER_ENV_SLURM_ACCOUNT")
+	if slurmAccount != "" {
+		directives = append(directives, fmt.Sprintf("#SBATCH --account=%s", slurmAccount))
+	}
+	directivesStr := strings.Join(directives, "\n")
+	return strings.Replace(sessionScript, "#{{SBATCH_DIRECTIVES}}", directivesStr, 1)
 }
