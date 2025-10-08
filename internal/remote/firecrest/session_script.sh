@@ -1,5 +1,11 @@
+# NOTE FOR AMALTHEA MAINTAINERS:
+#   This script contains template strings in the following form:
+#     `#{{NAME}}`
+#   These strings should be added or removed according to code changes
+#   in the remote session controller.
+# END NOTE
 #!/bin/bash
-#{{SBATCH_DIRECTIVES}}
+#{{SBATCH_DIRECTIVES_PLACEHOLDER}}
 
 set -e -o pipefail
 
@@ -152,10 +158,7 @@ EDF_FILE="${SESSION_DIR}/environment.toml"
 cat <<EOF >"${EDF_FILE}"
 image = "${REMOTE_SESSION_IMAGE}"
 
-mounts = [
-    "${SCRATCH}",
-    "${SECRETS_DIR}:/secrets:ro",
-]
+#{{SESSION_MOUNTS_PLACEHOLDER}}
 
 workdir = "${SESSION_WORK_DIR}"
 
