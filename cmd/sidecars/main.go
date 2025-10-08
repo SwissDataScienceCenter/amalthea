@@ -20,6 +20,8 @@ import (
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/authproxy"
 	"github.com/SwissDataScienceCenter/amalthea/internal/cloner"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote"
+	"github.com/SwissDataScienceCenter/amalthea/internal/tunnel"
 	"github.com/spf13/cobra"
 )
 
@@ -48,15 +50,32 @@ func buildCommands() *cobra.Command {
 		Use:   "cloner clone",
 		Short: "Cloning utilities",
 	}
+	remoteSessionControllerRoot := &cobra.Command{
+		Use:     "remote-session-controller",
+		Aliases: []string{"rsc"},
+		Short:   "Remote session controller",
+	}
+	tunnelRoot := &cobra.Command{
+		Use:   "tunnel listen",
+		Short: "Open an inbound tunnel",
+	}
 	rootCmd.AddCommand(versionCmd)
 	authCmd, err := authproxy.Command()
 	cobra.CheckErr(err)
 	clonerCmd, err := cloner.Command()
 	cobra.CheckErr(err)
+	remoteSessionControllerCmd, err := remote.Command()
+	cobra.CheckErr(err)
+	tunnelCmd, err := tunnel.Command()
+	cobra.CheckErr(err)
 	proxyRoot.AddCommand(authCmd)
 	clonerRoot.AddCommand(clonerCmd)
+	remoteSessionControllerRoot.AddCommand(remoteSessionControllerCmd)
+	tunnelRoot.AddCommand(tunnelCmd)
 	rootCmd.AddCommand(proxyRoot)
 	rootCmd.AddCommand(clonerRoot)
+	rootCmd.AddCommand(remoteSessionControllerRoot)
+	rootCmd.AddCommand(tunnelRoot)
 	return rootCmd
 }
 
