@@ -242,8 +242,18 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				}
 				fallthrough
 			case amaltheadevv1alpha1.Always:
+				// Preserve existing random tunnel secret values when updating
+				preservedStringData := make(map[string]string)
+				for k, v := range desired.StringData {
+					preservedStringData[k] = v
+				}
+				if current.Data != nil {
+					if existingTunnel, exists := current.Data["WSTUNNEL_SECRET"]; exists {
+						preservedStringData["WSTUNNEL_SECRET"] = string(existingTunnel)
+					}
+				}
 				current.Data = desired.Data
-				current.StringData = desired.StringData
+				current.StringData = preservedStringData
 			default:
 				return fmt.Errorf("attempting to reconcile secret with unknown stategy %s", strategy)
 			}

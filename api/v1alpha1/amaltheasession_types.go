@@ -31,6 +31,14 @@ import (
 
 // AmaltheaSessionSpec defines the desired state of AmaltheaSession
 type AmaltheaSessionSpec struct {
+	// +kubebuilder:default:="local"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="location is immutable"
+	// Specifies whether the process running the user's session is local or remote.
+	// - A local session runs as a container in the same pod as where the AmaltheaSession is defined and running.
+	// - A remote session runs as a remote process on an external compute resource.
+	//   The remote process is controlled by the "session_controller (TBC)" container in the session pod.
+	SessionLocation SessionLocation `json:"location,omitempty"`
+
 	// Specification for the main session container that the user will access and use
 	Session Session `json:"session"`
 
@@ -177,6 +185,12 @@ type Session struct {
 	// +kubebuilder:default:={}
 	// The readiness probe to use on the session container
 	ReadinessProbe ReadinessProbe `json:"readinessProbe,omitempty"`
+	// The secret containing the configuration needed to start a remote session.
+	// This field should be populated only when the session location is set to "remote".
+	// This secret will be loaded into environment variables passed to the remote
+	// session controller.
+	// See: [internal/remote/config.Config] for a list of configuration options.
+	RemoteSecretRef *SessionSecretRef `json:"remoteSecretRef,omitempty"`
 }
 
 type Ingress struct {
@@ -536,3 +550,9 @@ type ReadinessProbe struct {
 	// The type of readiness probe
 	Type ReadinessProbeType `json:"type,omitempty"`
 }
+
+// +kubebuilder:validation:Enum={local,remote}
+type SessionLocation string
+
+const Local SessionLocation = "local"
+const Remote SessionLocation = "remote"
