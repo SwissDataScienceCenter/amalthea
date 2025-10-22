@@ -5985,6 +5985,20 @@ spec:
                   - name
                   type: object
                 type: array
+              location:
+                default: local
+                description: |-
+                  Specifies whether the process running the user's session is local or remote.
+                  - A local session runs as a container in the same pod as where the AmaltheaSession is defined and running.
+                  - A remote session runs as a remote process on an external compute resource.
+                    The remote process is controlled by the "session_controller (TBC)" container in the session pod.
+                enum:
+                - local
+                - remote
+                type: string
+                x-kubernetes-validations:
+                - message: location is immutable
+                  rule: self == oldSelf
               nodeSelector:
                 additionalProperties:
                   type: string
@@ -6255,6 +6269,30 @@ spec:
                         - http
                         type: string
                     type: object
+                  remoteSecretRef:
+                    description: |-
+                      The secret containing the configuration needed to start a remote session.
+                      This field should be populated only when the session location is set to "remote".
+                      This secret will be loaded into environment variables passed to the remote
+                      session controller.
+                      See: [internal/remote/config.Config] for a list of configuration options.
+                    properties:
+                      adopt:
+                        description: If the secret is adopted then the operator will
+                          delete the secret when the custom resource that uses it
+                          is deleted.
+                        type: boolean
+                      key:
+                        description: |-
+                          The key is optional because it may not be relevant depending on where or how the secret is used.
+                          For example, for authentication see the `secretRef` field in `spec.authentication`
+                          for more details.
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - name
+                    type: object
                   resources:
                     description: Resource requirements and limits in the same format
                       as a Pod in Kubernetes
@@ -6456,6 +6494,9 @@ spec:
               error:
                 description: If the state is failed then the message will contain
                   information about what went wrong, otherwise it is empty
+                type: string
+              failedSchedulingSince:
+                format: date-time
                 type: string
               failingSince:
                 format: date-time
