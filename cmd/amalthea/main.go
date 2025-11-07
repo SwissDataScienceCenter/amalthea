@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -94,16 +95,24 @@ func main() {
 
 	// Initialize Sentry
 	if sentryDsn != "" {
+		setupLog.Info("initializing Sentry")
+		setupLog.Info("DSN: %s", sentryDsn)
+		setupLog.Info("Environment: %s", sentryEnvironment)
+		setupLog.Info("TracesSampleRate: %f", sentryTracesSampleRate)
 		err := sentry.Init(sentry.ClientOptions{
-			Dsn: sentryDsn,
+			Dsn:            sentryDsn,
 			SendDefaultPII: false,
-			EnableTracing: sentryTracesSampleRate > 0,
-			SampleRate: sentryTracesSampleRate,
+			EnableTracing:  sentryTracesSampleRate > 0,
+			SampleRate:     sentryTracesSampleRate,
 		})
 		if err != nil {
 			setupLog.Error(err, "failed to initialize Sentry: %s", err.Error())
 			os.Exit(1)
 		}
+		defer sentry.Flush(2 * time.Second)
+
+		// Test event
+		sentry.CaptureException(fmt.Errorf("test error for Sentry"))
 	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
