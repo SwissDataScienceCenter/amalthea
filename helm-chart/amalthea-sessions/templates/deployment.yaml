@@ -27,7 +27,7 @@ spec:
         {{- if .Values.controllerManager.manager.sentry.enabled }}
         - --sentry-dsn={{ .Values.controllerManager.manager.sentry.dsn | default "unset" | quote }}
         - --sentry-environment={{ .Values.controllerManager.manager.sentry.environment | default "" | quote }}
-        - --sentry-traces-sample-rate={{ .Values.controllerManager.manager.sentry.tracesSampleRate | default 0.1 | quote }}
+        - --sentry-traces-sample-rate={{ .Values.controllerManager.manager.sentry.tracesSampleRate | default 0.1 }}
         {{- end }}
         command:
         - /manager

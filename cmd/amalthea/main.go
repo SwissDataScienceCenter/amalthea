@@ -96,17 +96,15 @@ func main() {
 	// Initialize Sentry
 	if sentryDsn != "" {
 		setupLog.Info("initializing Sentry")
-		setupLog.Info("DSN: %s", sentryDsn)
-		setupLog.Info("Environment: %s", sentryEnvironment)
-		setupLog.Info("TracesSampleRate: %f", sentryTracesSampleRate)
+		setupLog.Info("Sentry config", "DSN", sentryDsn, "environment", sentryEnvironment, "tracesSampleRate", sentryTracesSampleRate)
 		err := sentry.Init(sentry.ClientOptions{
-			Dsn:            sentryDsn,
-			SendDefaultPII: false,
-			EnableTracing:  sentryTracesSampleRate > 0,
-			SampleRate:     sentryTracesSampleRate,
+			Dsn:              sentryDsn,
+			SendDefaultPII:   false,
+			EnableTracing:    sentryTracesSampleRate > 0,
+			TracesSampleRate: sentryTracesSampleRate,
 		})
 		if err != nil {
-			setupLog.Error(err, "failed to initialize Sentry: %s", err.Error())
+			setupLog.Error(err, "failed to initialize Sentry")
 			os.Exit(1)
 		}
 		defer sentry.Flush(2 * time.Second)
