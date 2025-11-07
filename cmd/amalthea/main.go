@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"flag"
-	"fmt"
 	"os"
 	"time"
 
@@ -108,9 +107,6 @@ func main() {
 			os.Exit(1)
 		}
 		defer sentry.Flush(2 * time.Second)
-
-		// Test event
-		sentry.CaptureException(fmt.Errorf("test error for Sentry"))
 	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
