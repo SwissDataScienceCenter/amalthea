@@ -24,6 +24,14 @@ spec:
     spec:
       containers:
       - args: {{- toYaml .Values.controllerManager.manager.args | nindent 8 }}
+        {{- if .Values.controllerManager.manager.sentry.enabled }}
+          --sentry-dsn={{ .Values.controllerManager.manager.sentry.dsn | default "unset" | quote }}
+          --sentry-environment={{ .Values.controllerManager.manager.sentry.environment | default "" | quote }}
+          --sentry-traces-sample-ratet={{ .Values.controllerManager.manager.sentry.tracesSampleRate | default 0.1 | quote }}
+        {{- end }}
+        -sentry-dsn string
+        -sentry-environment string
+        -sentry-traces-sample-rate float
         command:
         - /manager
         env:
