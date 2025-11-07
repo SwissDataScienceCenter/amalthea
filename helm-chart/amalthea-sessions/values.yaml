@@ -24,7 +24,7 @@ controllerManager:
       enabled: false
       dsn:
       environment:
-      sampleRate: 0.1
+      tracesSampleRate: 0.1
   replicas: 1
   serviceAccount:
     annotations: {}

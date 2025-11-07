@@ -24,6 +24,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -63,6 +65,9 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var sentryDsn string
+	var sentryEnvironment string
+	var sentryTracesSampleRate float64
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
@@ -76,6 +81,9 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&sentryDsn, "sentry-dsn", "", "The Sentry DSN to user. If left blank, Sentry will not be enabled.")
+	flag.StringVar(&sentryEnvironment, "sentry-environment", "", "The environment tag value for Sentry.")
+	flag.Float64Var(&sentryTracesSampleRate, "sentry-traces-sample-rate", 0, "The sample rate for Sentry performance monitoring.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -83,6 +91,20 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// Initialize Sentry
+	if sentryDsn != "" {
+		err := sentry.Init(sentry.ClientOptions{
+			Dsn: sentryDsn,
+			SendDefaultPII: false,
+			EnableTracing: sentryTracesSampleRate > 0,
+			SampleRate: sentryTracesSampleRate,
+		})
+		if err != nil {
+			setupLog.Error(err, "failed to initialize Sentry: %s", err.Error())
+			os.Exit(1)
+		}
+	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
