@@ -83,7 +83,12 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&sentryDsn, "sentry-dsn", "", "The Sentry DSN to user. If left blank, Sentry will not be enabled.")
 	flag.StringVar(&sentryEnvironment, "sentry-environment", "", "The environment tag value for Sentry.")
-	flag.Float64Var(&sentryTracesSampleRate, "sentry-traces-sample-rate", 0, "The sample rate for Sentry performance monitoring.")
+	flag.Float64Var(
+		&sentryTracesSampleRate,
+		"sentry-traces-sample-rate",
+		0,
+		"The sample rate for Sentry performance monitoring.",
+	)
 	opts := zap.Options{
 		Development: true,
 	}
@@ -95,7 +100,11 @@ func main() {
 	// Initialize Sentry
 	if sentryDsn != "" {
 		setupLog.Info("initializing Sentry")
-		setupLog.Info("Sentry config", "DSN", sentryDsn, "environment", sentryEnvironment, "tracesSampleRate", sentryTracesSampleRate)
+		setupLog.Info("Sentry config",
+			"DSN", sentryDsn,
+			"environment", sentryEnvironment,
+			"tracesSampleRate", sentryTracesSampleRate,
+		)
 		err := sentry.Init(sentry.ClientOptions{
 			Dsn:              sentryDsn,
 			SendDefaultPII:   false,
