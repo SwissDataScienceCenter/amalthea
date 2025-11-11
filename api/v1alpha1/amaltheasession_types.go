@@ -594,6 +594,7 @@ type TemplateMetadata struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 	Labels      map[string]string `json:"labels,omitempty"`
 }
+
 // +kubebuilder:validation:Enum={local,remote}
 type SessionLocation string
 
