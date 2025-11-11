@@ -354,10 +354,11 @@ func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
 	return pvc
 }
 
-// labelsForAmaltheaSessino returns the labels for selecting the resources
+// selectorLabels returns the labels for selecting the resources
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
 func selectorLabels(name string) map[string]string {
-	return map[string]string{"app.kubernetes.io/name": "AmaltheaSession",
+	return map[string]string{
+		"app.kubernetes.io/name":       "AmaltheaSession",
 		"app.kubernetes.io/instance":   name,
 		"app.kubernetes.io/part-of":    "amaltheasession-operator",
 		"app.kubernetes.io/created-by": "controller-manager",
@@ -960,11 +961,36 @@ func (cr *AmaltheaSession) tunnelContainer() v1.Container {
 	return tunnelContainer
 }
 
+// findConflicst will return all the keys from source that can be found in desintation.
+func findConflicts(destination, source map[string]string) []string {
+	conflicts := []string{}
+	for srcKey := range source {
+		_, found := destination[srcKey]
+		if found {
+			conflicts = append(conflicts, srcKey)
+		}
+	}
+	return conflicts
+}
+
 func (cr *AmaltheaSession) childLabels() map[string]string {
 	labels := map[string]string{}
 	maps.Copy(labels, cr.Spec.Template.Metadata.Labels)
+	selectorLabels := selectorLabels(cr.Name)
+	conflicts := findConflicts(labels, selectorLabels)
+	if len(conflicts) > 0 {
+		log.Log.Info(
+			"Found conflicts in template labels and selector labels, the selector labels will take precedence",
+			"template labels",
+			labels,
+			"selector labels",
+			selectorLabels,
+			"conflicting keys",
+			conflicts,
+		)
+	}
 	// NOTE: stuff from selectorLabels will overwrite conflicts in labels (if there are any)
 	// This is the desired behaviour, we do not want to overwrite the selector labels.
-	maps.Copy(labels, selectorLabels(cr.Name))
+	maps.Copy(labels, selectorLabels)
 	return labels
 }
