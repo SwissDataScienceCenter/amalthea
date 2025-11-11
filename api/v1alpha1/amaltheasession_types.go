@@ -126,7 +126,7 @@ type AmaltheaSessionSpec struct {
 
 	// +optional
 	// Template for the fields that should be added to all children (and their children if applicable).
-	Template Template `json:"template,omitzero"`
+	Template Template `json:"template,omitempty"`
 }
 
 type Session struct {
