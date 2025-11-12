@@ -1,9 +1,12 @@
+---
+# If set to true then the operator will watch and operate in all namespaces
+clusterScoped: false
 controllerManager:
   manager:
     args:
-      - --health-probe-bind-address=:8081
-      - --metrics-bind-address=127.0.0.1:8080
-      - --leader-elect
+      - '--health-probe-bind-address=:8081'
+      - '--metrics-bind-address=127.0.0.1:8080'
+      - '--leader-elect'
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:
@@ -26,15 +29,12 @@ controllerManager:
 # leader election and managing AmaltheaSessions.
 # If false, you have to create the Roles and RoleBindings manually.
 createRoles: true
-kubernetesClusterDomain: cluster.local
-# If set to true then the operator will watch and operate in all namespaces
-clusterScoped: false
-# Whether to install the CRD
-deployCrd: true
 # Whether to install the dependencies or not
 deploy:
   csiRclone: false
-
+# Whether to install the CRD
+deployCrd: true
+kubernetesClusterDomain: cluster.local
 # rcloneStorageClass is the storage class name for the csi-rclone Helm chart
 # from https://github.com/SwissDataScienceCenter/csi-rclone.
 # It is required to mount Rclone data sources in amalthea sessions.
