@@ -556,6 +556,7 @@ type ReadinessProbe struct {
 }
 
 type Template struct {
+	// +optional
 	Metadata TemplateMetadata `json:"metadata,omitzero"`
 }
 
