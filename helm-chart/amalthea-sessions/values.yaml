@@ -22,6 +22,10 @@ controllerManager:
   replicas: 1
   serviceAccount:
     annotations: {}
+# If true, Helm will create two Roles and RoleBindings for
+# leader election and managing AmaltheaSessions.
+# If false, you have to create the Roles and RoleBindings manually.
+createRoles: true
 kubernetesClusterDomain: cluster.local
 # If set to true then the operator will watch and operate in all namespaces
 clusterScoped: false
