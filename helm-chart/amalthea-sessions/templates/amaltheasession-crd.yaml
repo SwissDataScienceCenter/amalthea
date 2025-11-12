@@ -6453,8 +6453,6 @@ spec:
                           type: string
                         type: object
                     type: object
-                required:
-                - metadata
                 type: object
               tolerations:
                 description: |-
