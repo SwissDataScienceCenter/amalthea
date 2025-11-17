@@ -19,6 +19,12 @@ controllerManager:
       requests:
         cpu: 10m
         memory: 64Mi
+    # Sentry configuration
+    sentry:
+      enabled: false
+      dsn:
+      environment:
+      tracesSampleRate: 0.1
   replicas: 1
   serviceAccount:
     annotations: {}
