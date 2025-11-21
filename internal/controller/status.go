@@ -146,17 +146,20 @@ func getIdleState(
 		}
 	}
 
-	requestIdle := Unknown
-	lastRequesTime, err := getLastRequestTime(cr)
-	if err != nil {
-		log.Info("Request time check returned an error when checking idleness", "error", err)
-	} else {
-		if time.Since(lastRequesTime) >= lastRequestAgeThreshold {
-			requestIdle = Idle
-		} else {
-			requestIdle = NotIdle
-		}
-	}
+
+				// the lastRequestTime goes away (independently from the last-seen)
+//	requestIdle := Unknown
+
+	// lastRequesTime, err := getLastRequestTime(cr)
+	// if err != nil {
+	//	log.Info("Request time check returned an error when checking idleness", "error", err)
+	// } else {
+	//	if time.Since(lastRequesTime) >= lastRequestAgeThreshold {
+	//		requestIdle = Idle
+	//	} else {
+	//		requestIdle = NotIdle
+	//	}
+	// }
 
 	idle := false
 	// If the decision is Unknown or there is at least 1 NotIdle then we keep the final status not idle.
