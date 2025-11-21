@@ -164,14 +164,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 	slog.Info("got username", "username", userName)
 
-	var scratch *FileSystem
-	if system.FileSystems != nil {
-		for _, fs := range *system.FileSystems {
-			if fs.DataType == Scratch {
-				scratch = &fs
-			}
-		}
-	}
+	scratch := getPreferredScratch(system.FileSystems)
 	if scratch == nil {
 		return fmt.Errorf("could not find scratch file system on '%s'", c.systemName)
 	}
@@ -618,24 +611,27 @@ func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, s
 		return strings.Replace(sessionScript, "#{{SESSION_MOUNTS_PLACEHOLDER}}", "", 1)
 	}
 	// Collect file systems we want to mount
-	var scratch, project, home *FileSystem
-	for _, fs := range *fileSystems {
-		switch fs.DataType {
-		case Scratch:
-			scratch = &fs
-		case Store:
-			project = &fs
-		case Users:
-			home = &fs
+	var home *FileSystem
+	scratches, stores := []*FileSystem{}, []*FileSystem{}
+	if fileSystems != nil {
+		for _, fs := range *fileSystems {
+			switch fs.DataType {
+			case Scratch:
+				scratches = append(scratches, &fs)
+			case Store:
+				stores = append(stores, &fs)
+			case Users:
+				home = &fs
+			}
 		}
 	}
 
 	mounts := []string{}
-	if scratch != nil {
+	for _, scratch := range scratches {
 		mounts = append(mounts, scratch.Path)
 	}
-	if project != nil {
-		mounts = append(mounts, project.Path)
+	for _, store := range stores {
+		mounts = append(mounts, store.Path)
 	}
 	// TODO: Try to mount home at its location (need to handle ~/.bashrc)
 	// TODO: Alternatively, copy the contents in the container
@@ -710,4 +706,27 @@ func (c *FirecrestRemoteSessionController) getSaveDirPath() string {
 func (c *FirecrestRemoteSessionController) getSavePath() string {
 
 	return path.Join(c.getSaveDirPath(), "state.json")
+}
+
+func getPreferredScratch(fileSystems *[]FileSystem) *FileSystem {
+	var scratch *FileSystem
+	if fileSystems == nil {
+		return scratch
+	}
+	// Find the default work dir if it exists
+	for _, fs := range *fileSystems {
+		if fs.DataType == Scratch && fs.DefaultWorkDir != nil && *fs.DefaultWorkDir {
+			scratch = &fs
+		}
+	}
+	if scratch != nil {
+		return scratch
+	}
+	// Get the first scratch file system otherwise
+	for _, fs := range *fileSystems {
+		if fs.DataType == Scratch {
+			scratch = &fs
+		}
+	}
+	return scratch
 }

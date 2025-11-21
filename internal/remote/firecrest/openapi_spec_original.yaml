@@ -53,10 +53,11 @@ components:
     CompressRequest:
       examples:
       - account: group
+        compression: none
         dereference: 'true'
-        match_pattern: '*./[ab].*\.txt'
-        path: /home/user/dir
-        target_path: /home/user/file.tar.gz
+        matchPattern: '*./[ab].*\.txt'
+        sourcePath: /home/user/dir
+        targetPath: /home/user/file.tar.gz
       properties:
         account:
           anyOf:
@@ -64,6 +65,13 @@ components:
           - type: 'null'
           description: Name of the account in the scheduler
           title: Account
+        compression:
+          anyOf:
+          - $ref: '#/components/schemas/CompressionType'
+          - type: 'null'
+          default: gzip
+          description: Defines the type of compression to be used. By default gzip
+            is used.
         dereference:
           anyOf:
           - type: boolean
@@ -96,11 +104,19 @@ components:
     CompressResponse:
       properties:
         transferJob:
-          $ref: '#/components/schemas/TransferJob'
+          $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
       required:
       - transferJob
       title: CompressResponse
       type: object
+    CompressionType:
+      enum:
+      - none
+      - bzip2
+      - gzip
+      - xz
+      title: CompressionType
+      type: string
     ContentUnit:
       enum:
       - lines
@@ -111,8 +127,8 @@ components:
       examples:
       - account: group
         dereference: 'true'
-        source_path: /home/user/dir/file.orig
-        target_path: /home/user/dir/file.new
+        sourcePath: /home/user/dir/file.orig
+        targetPath: /home/user/dir/file.new
       properties:
         account:
           anyOf:
@@ -146,7 +162,7 @@ components:
     CopyResponse:
       properties:
         transferJob:
-          $ref: '#/components/schemas/TransferJob'
+          $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
       required:
       - transferJob
       title: CopyResponse
@@ -155,9 +171,19 @@ components:
       properties:
         data_transfer:
           anyOf:
-          - $ref: '#/components/schemas/S3DataTransfer'
+          - discriminator:
+              mapping:
+                s3: '#/components/schemas/S3DataTransfer'
+                streamer: '#/components/schemas/StreamerDataTransfer'
+                wormhole: '#/components/schemas/WormholeDataTransfer'
+              propertyName: serviceType
+            oneOf:
+            - $ref: '#/components/schemas/S3DataTransfer'
+            - $ref: '#/components/schemas/WormholeDataTransfer'
+            - $ref: '#/components/schemas/StreamerDataTransfer'
           - type: 'null'
           description: Data transfer service configuration
+          title: Data Transfer
         max_ops_file_size:
           default: 5242880
           description: Maximum file size (in bytes) allowed for direct upload and
@@ -166,55 +192,36 @@ components:
           type: integer
       title: DataOperation
       type: object
-    DataTransferType:
-      description: Types of data transfer services
-      enum:
-      - s3
-      title: DataTransferType
-      type: string
     DeleteResponse:
       properties:
         transferJob:
-          $ref: '#/components/schemas/TransferJob'
+          $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
       required:
       - transferJob
       title: DeleteResponse
       type: object
     DownloadFileResponse:
       properties:
-        completeUploadUrl:
+        transferDirectives:
           anyOf:
-          - type: string
-          - type: 'null'
-          title: Completeuploadurl
-        downloadUrl:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Downloadurl
-        maxPartSize:
-          anyOf:
-          - type: integer
-          - type: 'null'
-          title: Maxpartsize
-        partsUploadUrls:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Partsuploadurls
+          - $ref: '#/components/schemas/WormholeTransferResponse'
+          - $ref: '#/components/schemas/S3TransferResponse'
+          - $ref: '#/components/schemas/StreamerTransferResponse'
+          description: Data transfer parameters specific to the transfer method
+          title: Transferdirectives
         transferJob:
-          $ref: '#/components/schemas/TransferJob'
+          $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
       required:
       - transferJob
+      - transferDirectives
       title: DownloadFileResponse
       type: object
     ExtractRequest:
       examples:
       - account: group
-        source_path: /home/user/dir/file.tar.gz
-        target_path: /home/user/dir
+        compression: none
+        sourcePath: /home/user/dir/file.tar.gz
+        targetPath: /home/user/dir
       properties:
         account:
           anyOf:
@@ -222,6 +229,13 @@ components:
           - type: 'null'
           description: Name of the account in the scheduler
           title: Account
+        compression:
+          anyOf:
+          - $ref: '#/components/schemas/CompressionType'
+          - type: 'null'
+          default: gzip
+          description: Defines the type of compression to be used. By default gzip
+            is used.
         sourcePath:
           anyOf:
           - type: string
@@ -240,7 +254,7 @@ components:
     ExtractResponse:
       properties:
         transferJob:
-          $ref: '#/components/schemas/TransferJob'
+          $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
       required:
       - transferJob
       title: ExtractResponse
@@ -617,11 +631,13 @@ components:
           title: Filesystems
           type: array
         name:
-          description: Unique name for the cluster.
+          description: Unique name for the cluster. This field is case insensitive.
           title: Name
           type: string
         probing:
-          $ref: '#/components/schemas/Probing'
+          anyOf:
+          - $ref: '#/components/schemas/Probing'
+          - type: 'null'
           description: Probing configuration for monitoring the cluster.
         scheduler:
           $ref: '#/components/schemas/Scheduler'
@@ -645,7 +661,6 @@ components:
       - name
       - ssh
       - scheduler
-      - probing
       title: HPCCluster
       type: object
     HealthCheckException:
@@ -753,19 +768,19 @@ components:
           - type: 'null'
           description: Standard output file name
           title: Standardoutput
-        working_directory:
+        workingDirectory:
           description: Job working directory
-          title: Working Directory
+          title: Workingdirectory
           type: string
       required:
-      - working_directory
+      - workingDirectory
       title: JobDescriptionModel
       type: object
     JobMetadataModel:
       properties:
         jobId:
           title: Jobid
-          type: integer
+          type: string
         script:
           anyOf:
           - type: string
@@ -937,8 +952,8 @@ components:
     MoveRequest:
       examples:
       - account: group
-        source_path: /home/user/dir/file.orig
-        target_path: /home/user/dir/file.new
+        sourcePath: /home/user/dir/file.orig
+        targetPath: /home/user/dir/file.new
       properties:
         account:
           anyOf:
@@ -964,7 +979,7 @@ components:
     MoveResponse:
       properties:
         transferJob:
-          $ref: '#/components/schemas/TransferJob'
+          $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
       required:
       - transferJob
       title: MoveResponse
@@ -1129,11 +1144,19 @@ components:
       type: object
     PostCompressRequest:
       examples:
-      - dereference: 'true'
-        match_pattern: '*./[ab].*\.txt'
-        path: /home/user/dir
-        target_path: /home/user/file.tar.gz
+      - compression: none
+        dereference: 'true'
+        matchPattern: '*./[ab].*\.txt'
+        sourcePath: /home/user/dir
+        targetPath: /home/user/file.tar.gz
       properties:
+        compression:
+          anyOf:
+          - $ref: '#/components/schemas/CompressionType'
+          - type: 'null'
+          default: gzip
+          description: Defines the type of compression to be used. By default gzip
+            is used.
         dereference:
           anyOf:
           - type: boolean
@@ -1165,9 +1188,17 @@ components:
       type: object
     PostExtractRequest:
       examples:
-      - path: /home/user/dir/file.tar.gz
-        target_path: /home/user/dir
+      - compression: none
+        sourcePath: /home/user/dir/file.tar.gz
+        targetPath: /home/user/dir
       properties:
+        compression:
+          anyOf:
+          - $ref: '#/components/schemas/CompressionType'
+          - type: 'null'
+          default: gzip
+          description: Defines the type of compression to be used. By default gzip
+            is used.
         sourcePath:
           anyOf:
           - type: string
@@ -1186,7 +1217,9 @@ components:
     PostFileDownloadRequest:
       examples:
       - account: group
-        path: /home/user/dir/file
+        sourcePath: /home/user/dir/file
+        transferDirectives:
+           transferMethod: s3
       properties:
         account:
           anyOf:
@@ -1200,8 +1233,16 @@ components:
           - type: 'null'
           example: /home/user/dir
           title: Sourcepath
+        transferDirectives:
+          anyOf:
+          - $ref: '#/components/schemas/WormholeTransferRequest'
+          - $ref: '#/components/schemas/S3TransferRequest'
+          - $ref: '#/components/schemas/StreamerTransferRequest'
+          description: Data transfer parameters specific to the transfer method
+          title: Transferdirectives
       required:
       - sourcePath
+      - transferDirectives
       title: PostFileDownloadRequest
       type: object
     PostFileSymlinkRequest:
@@ -1237,9 +1278,10 @@ components:
     PostFileUploadRequest:
       examples:
       - account: group
-        file_name: /path/local/file
-        file_size: '7340032'
-        path: /home/user/dir/file
+        sourcePath: /home/user/dir/file
+        transferDirectives:
+          fileSize: '7340032'
+          transferMethod: s3
       properties:
         account:
           anyOf:
@@ -1247,24 +1289,22 @@ components:
           - type: 'null'
           description: Name of the account in the scheduler
           title: Account
-        fileName:
-          description: Name of the local file to upload
-          title: Filename
-          type: string
-        fileSize:
-          description: Size of the file to upload in bytes
-          title: Filesize
-          type: integer
         sourcePath:
           anyOf:
           - type: string
           - type: 'null'
           example: /home/user/dir
           title: Sourcepath
+        transferDirectives:
+          anyOf:
+          - $ref: '#/components/schemas/WormholeTransferRequest'
+          - $ref: '#/components/schemas/S3TransferRequest'
+          - $ref: '#/components/schemas/StreamerTransferRequest'
+          description: Data transfer parameters specific to the transfer method
+          title: Transferdirectives
       required:
       - sourcePath
-      - fileName
-      - fileSize
+      - transferDirectives
       title: PostFileUploadRequest
       type: object
     PostJobAttachRequest:
@@ -1307,10 +1347,10 @@ components:
             sleep 1
 
             done'
-          standard_error: count_to_100.err
-          standard_input: /dev/null
-          standard_output: count_to_100.out
-          working_directory: '{{home_path}}'
+          standardError: count_to_100.err
+          standardInput: /dev/null
+          standardOutput: count_to_100.out
+          workingDirectory: '{{home_path}}'
       - job:
           account: myproject
           env:
@@ -1318,10 +1358,10 @@ components:
             PATH: /path/to/bin
           name: Example with script path
           script_path: /path/to/batch_file.sh
-          standard_error: count_to_100.err
-          standard_input: /dev/null
-          standard_output: count_to_100.out
-          working_directory: '{{home_path}}'
+          standardError: count_to_100.err
+          standardInput: /dev/null
+          standardOutput: count_to_100.out
+          workingDirectory: '{{home_path}}'
       properties:
         job:
           $ref: '#/components/schemas/JobDescriptionModel'
@@ -1522,8 +1562,9 @@ components:
           type: string
           writeOnly: true
         serviceType:
-          $ref: '#/components/schemas/DataTransferType'
-          description: Type of data transfer service.
+          const: s3
+          title: Servicetype
+          type: string
         servicesHealth:
           anyOf:
           - items:
@@ -1590,6 +1631,54 @@ components:
       required:
       - serviceType
       title: S3ServiceHealth
+      type: object
+    S3TransferRequest:
+      properties:
+        fileSize:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Size of the file to upload in bytes
+          title: Filesize
+        transferMethod:
+          const: s3
+          title: Transfermethod
+          type: string
+      required:
+      - transferMethod
+      title: S3TransferRequest
+      type: object
+    S3TransferResponse:
+      properties:
+        completeUploadUrl:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Completeuploadurl
+        downloadUrl:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Downloadurl
+        maxPartSize:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Maxpartsize
+        partsUploadUrls:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Partsuploadurls
+        transferMethod:
+          const: s3
+          title: Transfermethod
+          type: string
+      required:
+      - transferMethod
+      title: S3TransferResponse
       type: object
     SSHClientPool:
       description: SSH connection pool configuration for remote execution.
@@ -1770,67 +1859,135 @@ components:
       - pbs
       title: SchedulerType
       type: string
-    TransferJob:
+    ServiceAccount:
+      description: Internal service account credentials.
       properties:
-        jobId:
-          title: Jobid
-          type: integer
-        logs:
-          $ref: '#/components/schemas/TransferJobLogs'
-        system:
-          title: System
+        clientId:
+          description: Service account client ID.
+          title: Clientid
           type: string
-        workingDirectory:
-          title: Workingdirectory
+        secret:
+          description: Service account secret token. You can give directly the content
+            or the file path using `'secret_file:/path/to/file'`.
+          format: password
+          title: Secret
           type: string
+          writeOnly: true
       required:
-      - jobId
-      - system
-      - workingDirectory
-      - logs
-      title: TransferJob
+      - clientId
+      - secret
+      title: ServiceAccount
       type: object
-    TransferJobLogs:
+    StreamerDataTransfer:
       properties:
-        errorLog:
-          title: Errorlog
-          type: string
-        outputLog:
-          title: Outputlog
-          type: string
-      required:
-      - outputLog
-      - errorLog
-      title: TransferJobLogs
-      type: object
-    UploadFileResponse:
-      properties:
-        completeUploadUrl:
+        host:
           anyOf:
           - type: string
           - type: 'null'
-          title: Completeuploadurl
-        downloadUrl:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Downloadurl
-        maxPartSize:
+          description: The interface to use for listening incoming connections
+          title: Host
+        inboundTransferLimit:
           anyOf:
           - type: integer
           - type: 'null'
-          title: Maxpartsize
-        partsUploadUrls:
+          default: 5368709120
+          description: Limit how much data can be received (in bytes)
+          title: Inboundtransferlimit
+        portRange:
+          default:
+          - 5665
+          - 5675
+          description: Port range for establishing connections.
+          maxItems: 2
+          minItems: 2
+          prefixItems:
+          - type: integer
+          - type: integer
+          title: Portrange
+          type: array
+        probing:
+          anyOf:
+          - $ref: '#/components/schemas/Probing'
+          - type: 'null'
+          description: Configuration for probing storage availability.
+        publicIps:
           anyOf:
           - items:
               type: string
             type: array
           - type: 'null'
-          title: Partsuploadurls
+          description: List of public IP addresses where server can be reached.
+          title: Publicips
+        pypiIndexUrl:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Optional local PyPI index URL for installing dependencies.
+          title: Pypiindexurl
+        serviceType:
+          const: streamer
+          title: Servicetype
+          type: string
+        servicesHealth:
+          anyOf:
+          - items:
+              anyOf:
+              - $ref: '#/components/schemas/S3ServiceHealth'
+              - $ref: '#/components/schemas/HealthCheckException'
+            type: array
+          - type: 'null'
+          description: Optional health information for different services in the cluster.
+          title: Serviceshealth
+        waitTimeout:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          default: 86400
+          description: How long to wait for a connection before exiting (in seconds)
+          title: Waittimeout
+      required:
+      - serviceType
+      title: StreamerDataTransfer
+      type: object
+    StreamerTransferRequest:
+      properties:
+        transferMethod:
+          const: streamer
+          title: Transfermethod
+          type: string
+      required:
+      - transferMethod
+      title: StreamerTransferRequest
+      type: object
+    StreamerTransferResponse:
+      properties:
+        coordinates:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Coordinates
+        transferMethod:
+          const: streamer
+          title: Transfermethod
+          type: string
+      required:
+      - transferMethod
+      title: StreamerTransferResponse
+      type: object
+    UploadFileResponse:
+      properties:
+        transferDirectives:
+          anyOf:
+          - $ref: '#/components/schemas/WormholeTransferResponse'
+          - $ref: '#/components/schemas/S3TransferResponse'
+          - $ref: '#/components/schemas/StreamerTransferResponse'
+          description: Data transfer parameters specific to the transfer method
+          title: Transferdirectives
         transferJob:
-          $ref: '#/components/schemas/TransferJob'
+          $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
       required:
       - transferJob
+      - transferDirectives
       title: UploadFileResponse
       type: object
     UserInfoResponse:
@@ -1850,6 +2007,95 @@ components:
       - groups
       title: UserInfoResponse
       type: object
+    WormholeDataTransfer:
+      properties:
+        probing:
+          anyOf:
+          - $ref: '#/components/schemas/Probing'
+          - type: 'null'
+          description: Configuration for probing storage availability.
+        pypiIndexUrl:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Optional local PyPI index URL for installing dependencies.
+          title: Pypiindexurl
+        serviceType:
+          const: wormhole
+          title: Servicetype
+          type: string
+        servicesHealth:
+          anyOf:
+          - items:
+              anyOf:
+              - $ref: '#/components/schemas/S3ServiceHealth'
+              - $ref: '#/components/schemas/HealthCheckException'
+            type: array
+          - type: 'null'
+          description: Optional health information for different services in the cluster.
+          title: Serviceshealth
+      required:
+      - serviceType
+      title: WormholeDataTransfer
+      type: object
+    WormholeTransferRequest:
+      properties:
+        transferMethod:
+          const: wormhole
+          title: Transfermethod
+          type: string
+      required:
+      - transferMethod
+      title: WormholeTransferRequest
+      type: object
+    WormholeTransferResponse:
+      properties:
+        transferMethod:
+          const: wormhole
+          title: Transfermethod
+          type: string
+        wormholeCode:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Wormholecode
+      required:
+      - transferMethod
+      title: WormholeTransferResponse
+      type: object
+    firecrest__filesystem__transfer__models__TransferJob:
+      properties:
+        jobId:
+          title: Jobid
+          type: integer
+        logs:
+          $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJobLogs'
+        system:
+          title: System
+          type: string
+        workingDirectory:
+          title: Workingdirectory
+          type: string
+      required:
+      - jobId
+      - system
+      - workingDirectory
+      - logs
+      title: TransferJob
+      type: object
+    firecrest__filesystem__transfer__models__TransferJobLogs:
+      properties:
+        errorLog:
+          title: Errorlog
+          type: string
+        outputLog:
+          title: Outputlog
+          type: string
+      required:
+      - outputLog
+      - errorLog
+      title: TransferJobLogs
+      type: object
   securitySchemes:
     APIAuthDependency:
       flows:
@@ -1862,7 +2108,7 @@ components:
       type: http
 info:
   title: FirecREST
-  version: 2.3.1
+  version: 2.4.1
 openapi: 3.1.0
 paths:
   /compute/{system_name}/jobs:
