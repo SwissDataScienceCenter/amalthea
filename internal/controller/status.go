@@ -16,9 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// If the cpu usage of the session is less than this then the session is considered idle
-var cpuUsageIdlenessThreshold resource.Quantity = *resource.NewMilliQuantity(300, resource.DecimalSI)
-
 // If the last request performed in the user session is older than this the session is considered idle
 const lastRequestAgeThreshold time.Duration = time.Minute * 30
 
@@ -86,30 +83,6 @@ func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *am
 	return nil, fmt.Errorf("could not find the metrics for the session container %s", amaltheadevv1alpha1.SessionContainerName)
 }
 
-func getLastRequestTime(cr *amaltheadevv1alpha1.AmaltheaSession) (time.Time, error) {
-	url := fmt.Sprintf("http://%s:%d/request_stats", cr.Service().Name, amaltheadevv1alpha1.AuthProxyMetaPort)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return time.Time{}, err
-	}
-	if resp.StatusCode != 200 {
-		return time.Time{}, fmt.Errorf("couldn't get last request time due to status: %d", resp.StatusCode)
-	}
-
-	defer func() {
-		err := resp.Body.Close()
-		if err != nil {
-			log.Log.Error(err, "couldn't close request body")
-		}
-	}()
-	req_stats := authproxy.RequestStatsResponse{}
-	err = json.NewDecoder(resp.Body).Decode(&req_stats)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return req_stats.LastRequestTime, nil
-}
 
 type IdleDecision int
 
@@ -138,6 +111,7 @@ func getIdleState(
 	} else {
 		cpuUsage = metrics.Cpu()
 	}
+	cpuUsageIdlenessThreshold := cr.Spec.Culling.CPUIdleThreshold
 	if cpuUsage != nil {
 		if cpuUsage.Cmp(cpuUsageIdlenessThreshold) == -1 {
 			cpuIdle = Idle
