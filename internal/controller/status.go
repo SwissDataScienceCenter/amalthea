@@ -146,26 +146,8 @@ func getIdleState(
 		}
 	}
 
-
-				// the lastRequestTime goes away (independently from the last-seen)
-//	requestIdle := Unknown
-
-	// lastRequesTime, err := getLastRequestTime(cr)
-	// if err != nil {
-	//	log.Info("Request time check returned an error when checking idleness", "error", err)
-	// } else {
-	//	if time.Since(lastRequesTime) >= lastRequestAgeThreshold {
-	//		requestIdle = Idle
-	//	} else {
-	//		requestIdle = NotIdle
-	//	}
-	// }
-
 	idle := false
-	// If the decision is Unknown or there is at least 1 NotIdle then we keep the final status not idle.
-	// If there is 2 Idle or an Unknown and an Idle then the status is Idle.
-	decision := max(cpuIdle, requestIdle)
-	if decision == Idle {
+	if cpuIdle == Idle {
 		idle = true
 	}
 	if idle && idleSince.IsZero() {
@@ -174,7 +156,7 @@ func getIdleState(
 		idleSince = metav1.Time{}
 	}
 
-	log.Info("session idle check", "idle", idle, "session", cr.Name, "cpuUsage", cpuUsage, "cpuUsageThreshold", cpuUsageIdlenessThreshold, "lastRequestTime", lastRequesTime, "lastRequestAgeThreshold", lastRequestAgeThreshold)
+	log.Info("session idle check", "idle", idle, "session", cr.Name, "cpuUsage", cpuUsage, "cpuUsageThreshold", cpuUsageIdlenessThreshold, "lastRequestAgeThreshold", lastRequestAgeThreshold)
 
 	return idleSince, idle
 }

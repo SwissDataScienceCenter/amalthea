@@ -315,13 +315,13 @@ type Culling struct {
 	// +optional
 	// +kubebuilder:validation:Format:=date-time
 	// +kubebuilder:validation:Type:=string
-	// A timestamp denoting the time when a user approved the session to not idle, preventing
-	// it from culling. This timestamp is used to restart MaxIdleDuration.
-	LastSeenInteraction metav1.Time `json:"lastSeenInteraction,omitempty"`
+	// A timestamp denoting the time when a user approved to have interacted with the session,
+	// preventing it from culling. This timestamp is used to restart MaxIdleDuration.
+	LastInteraction metav1.Time `json:"lastSeenInteraction,omitempty"`
 	// +optional
-  // +kubebuilder:default:="300m"
+	// +kubebuilder:default:="300m"
 	// Number of CPU cores that determine a session to be idling.
-	CPUIdleThreshold resource.Quantity  `json:"cpuIdleThreshold,omitempty"`
+	CPUIdleThreshold resource.Quantity `json:"cpuIdleThreshold,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={token,oauth2proxy,oidc}

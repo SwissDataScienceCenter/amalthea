@@ -62,11 +62,11 @@ func needsScaleDown(creationTimestamp metav1.Time, status amaltheadevv1alpha1.Am
 	starting := status.State == amaltheadevv1alpha1.NotReady
 	idleSince := status.IdleSince
 
-	// if we have a last-seen-interaction, it determines the start of the idle time that is used to decide upon hiberantion
-	// 
-	lastSeenInteraction := culling.LastSeenInteraction
-	if !lastSeenInteraction.IsZero() && lastSeenInteraction.Time.After(idleSince.Time) {
-		idleSince = lastSeenInteraction
+	// if we have a last-interaction, it determines the start of the idle
+	// time that is used to decide upon hibernation
+	lastInteraction := culling.LastInteraction
+	if !lastInteraction.IsZero() && lastInteraction.Time.After(idleSince.Time) {
+		idleSince = lastInteraction
 	}
 	idleDuration := now.Sub(idleSince.Time)
 	failingSince := status.FailingSince
