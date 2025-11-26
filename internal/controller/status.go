@@ -13,9 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// If the last request performed in the user session is older than this the session is considered idle
-const lastRequestAgeThreshold time.Duration = time.Minute * 30
-
 // countainerCounts provides from the total and completed/fully running containers in a pod.
 // The output is a tuple with the init container counts followed by the regular container counts.
 func containerCounts(pod *v1.Pod) (amaltheadevv1alpha1.ContainerCounts, amaltheadevv1alpha1.ContainerCounts) {
@@ -80,7 +77,6 @@ func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *am
 	return nil, fmt.Errorf("could not find the metrics for the session container %s", amaltheadevv1alpha1.SessionContainerName)
 }
 
-
 type IdleDecision int
 
 // The values are setup in a way so that max(x, y, z) where x, y, z are
@@ -127,7 +123,7 @@ func getIdleState(
 		idleSince = metav1.Time{}
 	}
 
-	log.Info("session idle check", "idle", idle, "session", cr.Name, "cpuUsage", cpuUsage, "cpuUsageThreshold", cpuUsageIdlenessThreshold, "lastRequestAgeThreshold", lastRequestAgeThreshold)
+	log.Info("session idle check", "idle", idle, "session", cr.Name, "cpuUsage", cpuUsage, "cpuUsageThreshold", cpuUsageIdlenessThreshold)
 
 	return idleSince, idle
 }
