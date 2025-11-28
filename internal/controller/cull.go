@@ -63,14 +63,15 @@ func needsScaleDown(log logr.Logger, creationTimestamp metav1.Time, status amalt
 	age := now.Sub(creationTimestamp.Time)
 	starting := status.State == amaltheadevv1alpha1.NotReady
 	idleSince := status.IdleSince
+	lastIdleSince := idleSince
 
 	// if we have a last-interaction, it determines the start of the idle
 	// time that is used to decide upon hibernation
 	lastInteraction := culling.LastInteraction
-	if !lastInteraction.IsZero() && lastInteraction.Time.After(idleSince.Time) {
-		idleSince = lastInteraction
+	if !lastInteraction.IsZero() && !idleSince.IsZero() && lastInteraction.After(idleSince.Time) {
+		lastIdleSince = lastInteraction
 	}
-	idleDuration := now.Sub(idleSince.Time)
+	idleDuration := now.Sub(lastIdleSince.Time)
 	failingSince := status.FailingSince
 	failedDuration := now.Sub(failingSince.Time)
 	zero := time.Duration(0)
@@ -83,27 +84,34 @@ func needsScaleDown(log logr.Logger, creationTimestamp metav1.Time, status amalt
 
 	decideViaMaxAge := maxAge > zero && age > maxAge
 	if maxAge > zero {
-		decideViaLog += fmt.Sprint("age>maxAge: ", age, ">", maxAge, ": ", decideViaMaxAge)
+		decideViaLog += fmt.Sprint("age>maxAge: ", age, ">", maxAge, "=", decideViaMaxAge)
 	}
 
 	decideViaMaxStartingDuration := maxStartingDuration > zero && age > maxStartingDuration && starting
 	if maxStartingDuration > zero && starting {
-		decideViaLog += fmt.Sprint(" age>maxStartingDuration: ", age, ">", maxStartingDuration, ": ", decideViaMaxStartingDuration)
+		decideViaLog += fmt.Sprint(" age>maxStartingDuration: ", age, ">", maxStartingDuration, "=", decideViaMaxStartingDuration)
 	}
 
-	decideViaIdleSince := !idleSince.IsZero() && maxIdleDuration > zero && idleDuration > maxIdleDuration
-	if !idleSince.IsZero() && maxIdleDuration > zero {
-		decideViaLog += fmt.Sprint(" idleDuration>maxIdleDuration: ", idleDuration, ">", maxIdleDuration, ": ", decideViaIdleSince)
+	decideViaIdleSince := !lastIdleSince.IsZero() && maxIdleDuration > zero && idleDuration > maxIdleDuration
+	if !lastIdleSince.IsZero() && maxIdleDuration > zero {
+		decideViaLog += fmt.Sprint(" idleDuration>maxIdleDuration: ", idleDuration, ">", maxIdleDuration, "=", decideViaIdleSince)
 	}
 
 	decideViaFailingSince := !failingSince.IsZero() && maxFailedDuration > zero && failedDuration > maxFailedDuration
 	if !failingSince.IsZero() && maxFailedDuration > zero {
-		decideViaLog += fmt.Sprint(" failedDuration>maxFailedDuration: ", failedDuration, ">", maxFailedDuration, ": ", decideViaFailingSince)
+		decideViaLog += fmt.Sprint(" failedDuration>maxFailedDuration: ", failedDuration, ">", maxFailedDuration, "=", decideViaFailingSince)
 	}
 
 	result := decideViaMaxAge || decideViaMaxStartingDuration || decideViaIdleSince || decideViaFailingSince
 
-	log.Info("needs scaledown", "Age", age, "idleSince", idleSince, "idleDuration", idleDuration, "lastInteraction", lastInteraction, "result", result, "decideLog", decideViaLog)
+	log.Info("needs scaledown",
+		"Result", result,
+		"Age", age,
+		"idleSince", idleSince,
+		"lastInteraction", lastInteraction,
+		"idleDuration", idleDuration,
+		"decideLog", decideViaLog,
+	)
 
 	return result
 }
