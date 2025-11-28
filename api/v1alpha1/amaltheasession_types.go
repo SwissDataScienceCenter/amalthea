@@ -312,6 +312,16 @@ type Culling struct {
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	MaxHibernatedDuration metav1.Duration `json:"maxHibernatedDuration,omitempty"`
+	// +optional
+	// +kubebuilder:validation:Format:=date-time
+	// +kubebuilder:validation:Type:=string
+	// A timestamp denoting the time when a user approved to have interacted with the session,
+	// preventing it from culling. This timestamp is used to restart MaxIdleDuration.
+	LastInteraction metav1.Time `json:"lastInteraction,omitempty"`
+	// +optional
+	// +kubebuilder:default:="300m"
+	// Number of CPU cores that determine a session to be idling.
+	CPUIdleThreshold resource.Quantity `json:"cpuIdleThreshold,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={token,oauth2proxy,oidc}
