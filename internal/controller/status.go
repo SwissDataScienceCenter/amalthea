@@ -113,10 +113,7 @@ func getIdleState(
 		}
 	}
 
-	idle := false
-	if cpuIdle == Idle {
-		idle = true
-	}
+	idle := cpuIdle == Idle
 	if idle && idleSince.IsZero() {
 		idleSince = metav1.NewTime(time.Now())
 	} else if !idle && !idleSince.IsZero() {
