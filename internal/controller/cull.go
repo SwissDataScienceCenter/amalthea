@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -43,19 +44,114 @@ func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, a
 		}
 		// then check whether we want to scale down the StatefulSet and do it
 		creationTimestamp := pod.GetCreationTimestamp()
-		if needsScaleDown(log, creationTimestamp, status, culling) {
+		hibernationDate := calculateHibernationDate(log, creationTimestamp, status, culling)
+
+		if status.State != amaltheadevv1alpha1.Hibernated && needsScaleDown(hibernationDate) {
 			amaltheasession.Spec.Hibernated = true
 			err = r.Update(ctx, amaltheasession)
 			if err != nil {
 				return err
 			}
 			log.Info("statefulSet scaled down")
+		} else {
+			if !hibernationDate.IsZero() && !hibernationDate.Time.Equal(status.WillHibernateAt.Time) {
+				log.Info(fmt.Sprint("ENTER UPDATE: time-equal:", hibernationDate.Time, " vs. ", status.WillHibernateAt.Time, hibernationDate.Time.Equal(status.WillHibernateAt.Time)))
+				amaltheasession.Status.WillHibernateAt = hibernationDate
+				err = r.Client.Status().Update(ctx, amaltheasession)
+				if err != nil {
+					log.Error(err, "OH NO UPDATE FAILED")
+					return err
+				}
+			}
 		}
 	}
 	return nil
 }
 
-func needsScaleDown(log logr.Logger, creationTimestamp metav1.Time, status amaltheadevv1alpha1.AmaltheaSessionStatus, culling amaltheadevv1alpha1.Culling) bool {
+func hibernationDateByMaxAge(creationTimestamp metav1.Time, culling amaltheadevv1alpha1.Culling) metav1.Time {
+	zero := time.Duration(0)
+	maxAge := culling.MaxAge.Duration
+	if maxAge > zero {
+		return metav1.NewTime(creationTimestamp.Time.Add(maxAge))
+	}
+	return metav1.Time{}
+}
+
+func hibernationDateByStartingDuration(creationTimestamp metav1.Time, status amaltheadevv1alpha1.AmaltheaSessionStatus, culling amaltheadevv1alpha1.Culling) metav1.Time {
+	zero := time.Duration(0)
+	maxStartingDuration := culling.MaxStartingDuration.Duration
+	starting := status.State == amaltheadevv1alpha1.NotReady
+	if maxStartingDuration > zero && starting {
+		return metav1.NewTime(creationTimestamp.Add(maxStartingDuration))
+	}
+	return metav1.Time{}
+}
+
+func hibernationDateByFailingSince(status amaltheadevv1alpha1.AmaltheaSessionStatus, culling amaltheadevv1alpha1.Culling) metav1.Time {
+	zero := time.Duration(0)
+	failingSince := status.FailingSince
+	maxFailedDuration := culling.MaxFailedDuration.Duration
+	if !failingSince.IsZero() && maxFailedDuration > zero {
+		return metav1.NewTime(failingSince.Add(maxFailedDuration))
+	}
+	return metav1.Time{}
+}
+
+func hibernationDateByIdleSince(status amaltheadevv1alpha1.AmaltheaSessionStatus, culling amaltheadevv1alpha1.Culling) metav1.Time {
+	zero := time.Duration(0)
+	idleSince := status.IdleSince
+	lastIdleSince := idleSince
+	maxIdleDuration := culling.MaxIdleDuration.Duration
+	// if we have a last-interaction, it determines the start of the idle
+	// time that is used to decide upon hibernation
+	lastInteraction := culling.LastInteraction
+	if !lastInteraction.IsZero() && !idleSince.IsZero() && lastInteraction.After(idleSince.Time) {
+		lastIdleSince = lastInteraction
+	}
+	if !lastIdleSince.IsZero() && maxIdleDuration > zero {
+		return metav1.NewTime(lastIdleSince.Time.Add(maxIdleDuration))
+	}
+	return metav1.Time{}
+}
+
+func calculateHibernationDate(log logr.Logger, creationTimestamp metav1.Time, status amaltheadevv1alpha1.AmaltheaSessionStatus, culling amaltheadevv1alpha1.Culling) metav1.Time {
+	type Pair struct {
+		Name string
+		Date metav1.Time
+	}
+
+	hibernationDates := []Pair{
+		{Name: "MaxAge", Date: hibernationDateByMaxAge(creationTimestamp, culling)},
+		{Name: "StartDuration", Date: hibernationDateByStartingDuration(creationTimestamp, status, culling)},
+		{Name: "FailingDuration", Date: hibernationDateByFailingSince(status, culling)},
+		{Name: "IdleDuration", Date: hibernationDateByIdleSince(status, culling)},
+	}
+
+	result := Pair{}
+	logMsg := ""
+	for _, hd := range hibernationDates {
+		if result.Date.IsZero() || (!hd.Date.IsZero() && hd.Date.Time.Before(result.Date.Time)) {
+			result = hd
+		}
+		if !hd.Date.IsZero() {
+			logMsg += fmt.Sprint(" ", hd.Name, ":", hd.Date)
+		}
+	}
+	if result.Date.IsZero() {
+		logMsg += " => NONE"
+	} else {
+		logMsg += fmt.Sprint(" => ", result.Name, ":", result.Date)
+	}
+	log.Info("hibernationDate", "DecisionLog", strings.TrimSpace(logMsg))
+	return result.Date
+}
+
+func needsScaleDown(hibernationDate metav1.Time) bool {
+	now := time.Now()
+	return !hibernationDate.IsZero() && (hibernationDate.Time.Equal(now) || hibernationDate.Time.Before(now))
+}
+
+func needsScaleDownOld(log logr.Logger, creationTimestamp metav1.Time, status amaltheadevv1alpha1.AmaltheaSessionStatus, culling amaltheadevv1alpha1.Culling) bool {
 	if status.State == amaltheadevv1alpha1.Hibernated {
 		return false
 	}

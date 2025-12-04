@@ -434,6 +434,11 @@ type AmaltheaSessionStatus struct {
 
 	// +kubebuilder:validation:Format:=date-time
 	HibernatedSince metav1.Time `json:"hibernatedSince,omitempty"`
+
+	// +kubebuilder:validation:Format:=date-time
+	// The date-time when the session is hibernated.
+	WillHibernateAt metav1.Time `json:"willHibernateAt,omitempty"`
+
 	// If the state is failed then the message will contain information about what went wrong, otherwise it is empty
 	// +optional
 	Error string `json:"error,omitempty"`

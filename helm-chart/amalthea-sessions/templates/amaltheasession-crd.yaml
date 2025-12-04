@@ -6547,6 +6547,10 @@ spec:
                 type: string
               url:
                 type: string
+              willHibernateAt:
+                description: The date-time when the session is hibernated.
+                format: date-time
+                type: string
             type: object
         type: object
     served: true

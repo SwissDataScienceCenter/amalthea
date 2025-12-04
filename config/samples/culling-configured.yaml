@@ -12,8 +12,8 @@ spec:
     readinessProbe:
       type: "none"
   culling:
-    maxAge: 50m
-    maxIdleDuration: 1m
+    maxAge: 10m
+    maxIdleDuration: 2m
     maxStartingDuration: 2m
     maxFailedDuration: 5m
     maxHibernatedDuration: 30s
