@@ -316,7 +316,8 @@ type Culling struct {
 	// +kubebuilder:validation:Format:=date-time
 	// +kubebuilder:validation:Type:=string
 	// A timestamp denoting the time when a user approved to have interacted with the session,
-	// preventing it from culling. This timestamp is used to restart MaxIdleDuration.
+	// preventing it from culling. The greater of this timestamp and `status.IdleSince` is used
+	// to count down `MaxIdleDuration`.
 	LastInteraction metav1.Time `json:"lastInteraction,omitempty"`
 	// +optional
 	// +kubebuilder:default:="300m"
