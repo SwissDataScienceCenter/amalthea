@@ -643,6 +643,8 @@ func (c ChildResourceUpdates) Status(
 		failingSince = metav1.Time{}
 	}
 
+	hibernationDate := calculateHibernationDate(log, pod.GetCreationTimestamp(), cr.Status, cr.Spec.Culling)
+
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
 		Conditions:            Conditions(state, ctx, r, cr),
 		State:                 state,
@@ -652,6 +654,7 @@ func (c ChildResourceUpdates) Status(
 		FailedSchedulingSince: failedSchedulingSince,
 		FailingSince:          failingSince,
 		HibernatedSince:       hibernatedSince,
+		WillHibernateAt:       hibernationDate,
 		Error:                 failMsg,
 	}
 	warning := c.warningMessage(pod)

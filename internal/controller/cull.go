@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -31,38 +30,17 @@ import (
 )
 
 func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, amaltheasession *amaltheadevv1alpha1.AmaltheaSession) error {
-	culling := amaltheasession.Spec.Culling
 	status := amaltheasession.Status
 	log := log.FromContext(ctx)
 	if !amaltheasession.Spec.Hibernated {
-		pod, err := amaltheasession.GetPod(ctx, r.Client)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}
-		// then check whether we want to scale down the StatefulSet and do it
-		creationTimestamp := pod.GetCreationTimestamp()
-		hibernationDate := calculateHibernationDate(log, creationTimestamp, status, culling)
-
+		hibernationDate := status.WillHibernateAt
 		if status.State != amaltheadevv1alpha1.Hibernated && needsScaleDown(hibernationDate) {
 			amaltheasession.Spec.Hibernated = true
-			err = r.Update(ctx, amaltheasession)
+			err := r.Update(ctx, amaltheasession)
 			if err != nil {
 				return err
 			}
 			log.Info("statefulSet scaled down")
-		} else {
-			if !hibernationDate.IsZero() && !hibernationDate.Time.Equal(status.WillHibernateAt.Time) {
-				log.Info(fmt.Sprint("ENTER UPDATE: time-equal:", hibernationDate.Time, " vs. ", status.WillHibernateAt.Time, hibernationDate.Time.Equal(status.WillHibernateAt.Time)))
-				amaltheasession.Status.WillHibernateAt = hibernationDate
-				err = r.Client.Status().Update(ctx, amaltheasession)
-				if err != nil {
-					log.Error(err, "OH NO UPDATE FAILED")
-					return err
-				}
-			}
 		}
 	}
 	return nil
@@ -149,65 +127,4 @@ func calculateHibernationDate(log logr.Logger, creationTimestamp metav1.Time, st
 func needsScaleDown(hibernationDate metav1.Time) bool {
 	now := time.Now()
 	return !hibernationDate.IsZero() && (hibernationDate.Time.Equal(now) || hibernationDate.Time.Before(now))
-}
-
-func needsScaleDownOld(log logr.Logger, creationTimestamp metav1.Time, status amaltheadevv1alpha1.AmaltheaSessionStatus, culling amaltheadevv1alpha1.Culling) bool {
-	if status.State == amaltheadevv1alpha1.Hibernated {
-		return false
-	}
-	now := time.Now()
-	age := now.Sub(creationTimestamp.Time)
-	starting := status.State == amaltheadevv1alpha1.NotReady
-	idleSince := status.IdleSince
-	lastIdleSince := idleSince
-
-	// if we have a last-interaction, it determines the start of the idle
-	// time that is used to decide upon hibernation
-	lastInteraction := culling.LastInteraction
-	if !lastInteraction.IsZero() && !idleSince.IsZero() && lastInteraction.After(idleSince.Time) {
-		lastIdleSince = lastInteraction
-	}
-	idleDuration := now.Sub(lastIdleSince.Time)
-	failingSince := status.FailingSince
-	failedDuration := now.Sub(failingSince.Time)
-	zero := time.Duration(0)
-	maxAge := culling.MaxAge.Duration
-	maxStartingDuration := culling.MaxStartingDuration.Duration
-	maxIdleDuration := culling.MaxIdleDuration.Duration
-	maxFailedDuration := culling.MaxFailedDuration.Duration
-
-	decideViaLog := ""
-
-	decideViaMaxAge := maxAge > zero && age > maxAge
-	if maxAge > zero {
-		decideViaLog += fmt.Sprint("age>maxAge: ", age, ">", maxAge, "=", decideViaMaxAge)
-	}
-
-	decideViaMaxStartingDuration := maxStartingDuration > zero && age > maxStartingDuration && starting
-	if maxStartingDuration > zero && starting {
-		decideViaLog += fmt.Sprint(" age>maxStartingDuration: ", age, ">", maxStartingDuration, "=", decideViaMaxStartingDuration)
-	}
-
-	decideViaIdleSince := !lastIdleSince.IsZero() && maxIdleDuration > zero && idleDuration > maxIdleDuration
-	if !lastIdleSince.IsZero() && maxIdleDuration > zero {
-		decideViaLog += fmt.Sprint(" idleDuration>maxIdleDuration: ", idleDuration, ">", maxIdleDuration, "=", decideViaIdleSince)
-	}
-
-	decideViaFailingSince := !failingSince.IsZero() && maxFailedDuration > zero && failedDuration > maxFailedDuration
-	if !failingSince.IsZero() && maxFailedDuration > zero {
-		decideViaLog += fmt.Sprint(" failedDuration>maxFailedDuration: ", failedDuration, ">", maxFailedDuration, "=", decideViaFailingSince)
-	}
-
-	result := decideViaMaxAge || decideViaMaxStartingDuration || decideViaIdleSince || decideViaFailingSince
-
-	log.Info("needs scaledown",
-		"Result", result,
-		"Age", age,
-		"idleSince", idleSince,
-		"lastInteraction", lastInteraction,
-		"idleDuration", idleDuration,
-		"decideLog", decideViaLog,
-	)
-
-	return result
 }
