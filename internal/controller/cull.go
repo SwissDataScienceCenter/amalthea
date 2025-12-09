@@ -126,5 +126,5 @@ func calculateHibernationDate(log logr.Logger, creationTimestamp metav1.Time, st
 
 func needsScaleDown(hibernationDate metav1.Time) bool {
 	now := time.Now()
-	return !hibernationDate.IsZero() && (hibernationDate.Time.Equal(now) || hibernationDate.Time.Before(now))
+	return !hibernationDate.IsZero() && hibernationDate.Time.Before(now)
 }
