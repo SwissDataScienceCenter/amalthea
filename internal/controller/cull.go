@@ -50,7 +50,7 @@ func hibernationDateByMaxAge(creationTimestamp metav1.Time, culling amaltheadevv
 	zero := time.Duration(0)
 	maxAge := culling.MaxAge.Duration
 	if maxAge > zero {
-		return metav1.NewTime(creationTimestamp.Time.Add(maxAge))
+		return metav1.NewTime(creationTimestamp.Add(maxAge))
 	}
 	return metav1.Time{}
 }
@@ -87,7 +87,7 @@ func hibernationDateByIdleSince(status amaltheadevv1alpha1.AmaltheaSessionStatus
 		lastIdleSince = lastInteraction
 	}
 	if !lastIdleSince.IsZero() && maxIdleDuration > zero {
-		return metav1.NewTime(lastIdleSince.Time.Add(maxIdleDuration))
+		return metav1.NewTime(lastIdleSince.Add(maxIdleDuration))
 	}
 	return metav1.Time{}
 }
