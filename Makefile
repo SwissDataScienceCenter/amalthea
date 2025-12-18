@@ -125,9 +125,9 @@ test: manifests generate fmt vet envtest ## Run tests.
 # Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
 .PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
 test-e2e:
-	go test ./test/e2e/ -v -ginkgo.v
+	go test -timeout=1h ./test/e2e/ -v -ginkgo.v --ginkgo.timeout=1h
 	$(MAKE) chartpress-cleanup
-	
+
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
 	$(GOLANGCI_LINT) run --timeout 5m
@@ -368,7 +368,7 @@ HELMIFY ?= $(LOCALBIN)/helmify
 helmify: $(HELMIFY) ## Download helmify locally if necessary.
 $(HELMIFY): $(LOCALBIN)
 	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
-    
+
 helm: manifests kustomize helmify
 	$(KUSTOMIZE) build config/default | $(HELMIFY) helm-chart/amalthea-sessions
 
@@ -401,6 +401,8 @@ run_kopf: ## Run the kopf controller
 tests: ## Run the kopf tests
 	poetry run pytest
 
+KIND_METRICSERVER_VERSION ?= v0.8.0
+
 .PHONY: kind_cluster
 kind_cluster: ## Start a kind cluster
 	kind delete cluster
@@ -408,6 +410,13 @@ kind_cluster: ## Start a kind cluster
 	docker network create -d=bridge -o com.docker.network.bridge.enable_ip_masquerade=true -o com.docker.network.driver.mtu=1500 --ipv6=false kind
 	kind create cluster --config kind_config.yaml
 	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-	echo "Waiting for ingress controller to initialize"
+	@echo "Waiting for ingress controller to initialize"
 	sleep 15
 	kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s
+	@echo "Install metrics server"
+	kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/$(KIND_METRICSERVER_VERSION)/components.yaml
+	kubectl -n kube-system get deployment metrics-server -o json | \
+    jq -e 'any(.spec.template.spec.containers[0].args[]; . == "--kubelet-insecure-tls")' > /dev/null || \
+    kubectl patch -n kube-system deployment metrics-server --type=json \
+    -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+	@echo "Done"

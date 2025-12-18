@@ -312,6 +312,17 @@ type Culling struct {
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	MaxHibernatedDuration metav1.Duration `json:"maxHibernatedDuration,omitempty"`
+	// +optional
+	// +kubebuilder:validation:Format:=date-time
+	// +kubebuilder:validation:Type:=string
+	// A timestamp denoting the time when a user has proven to have interacted with the session,
+	// preventing it from culling. The greater of this timestamp and `status.IdleSince` is used
+	// to count down `MaxIdleDuration`.
+	LastInteraction metav1.Time `json:"lastInteraction,omitempty"`
+	// +optional
+	// +kubebuilder:default:="300m"
+	// Number of CPU cores that determine a session to be idling.
+	CPUIdleThreshold resource.Quantity `json:"cpuIdleThreshold,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={token,oauth2proxy,oidc}
@@ -424,6 +435,11 @@ type AmaltheaSessionStatus struct {
 
 	// +kubebuilder:validation:Format:=date-time
 	HibernatedSince metav1.Time `json:"hibernatedSince,omitempty"`
+
+	// +kubebuilder:validation:Format:=date-time
+	// The date-time when the session is hibernated.
+	WillHibernateAt metav1.Time `json:"willHibernateAt,omitempty"`
+
 	// If the state is failed then the message will contain information about what went wrong, otherwise it is empty
 	// +optional
 	Error string `json:"error,omitempty"`

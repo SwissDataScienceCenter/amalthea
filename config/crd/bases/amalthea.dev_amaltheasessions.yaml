@@ -1172,6 +1172,22 @@ spec:
               culling:
                 description: Culling configuration
                 properties:
+                  cpuIdleThreshold:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    default: 300m
+                    description: Number of CPU cores that determine a session to be
+                      idling.
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  lastInteraction:
+                    description: |-
+                      A timestamp denoting the time when a user has proven to have interacted with the session,
+                      preventing it from culling. The greater of this timestamp and `status.IdleSince` is used
+                      to count down `MaxIdleDuration`.
+                    format: date-time
+                    type: string
                   maxAge:
                     description: |-
                       The maximum allowed age for a session, regardless of whether it
@@ -6529,6 +6545,10 @@ spec:
                 - RunningDegraded
                 type: string
               url:
+                type: string
+              willHibernateAt:
+                description: The date-time when the session is hibernated.
+                format: date-time
                 type: string
             type: object
         type: object
