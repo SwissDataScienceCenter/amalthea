@@ -1,4 +1,4 @@
-FROM python:3.13-bookworm as builder
+FROM python:3.14-bookworm as builder
 ARG DEV_BUILD=false
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
@@ -21,7 +21,7 @@ RUN if $DEV_BUILD ; then \
 RUN /home/renku/.local/bin/poetry build -f wheel 
 RUN env/bin/pip --no-cache-dir install dist/*.whl
 
-FROM python:3.13-slim-bookworm
+FROM python:3.14-slim-bookworm
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 ENV PROMETHEUS_MULTIPROC_DIR=/prometheus
