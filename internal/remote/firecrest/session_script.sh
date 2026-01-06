@@ -210,6 +210,11 @@ echo "wstunnel client \
   --tls-verify-certificate 2>&1 >"${LOGS_DIR}/wstunnel.logs" &
 
 if [ -n "${GIT_REPOSITORIES}" ]; then
+    OIFS="${IFS}"
+    IFS=$'\n'
+    GIT_REPOSITORIES=(${GIT_REPOSITORIES})
+    IFS="${OIFS}"
+
     echo "Waiting for git proxy..."
     git_proxy_ready="0"
     for i in $(seq 1 "${GIT_PROXY_WAIT_RETRIES}"); do
@@ -225,29 +230,30 @@ if [ -n "${GIT_REPOSITORIES}" ]; then
         sleep "${GIT_PROXY_WAIT_SLEEP_SECONDS}"
     done
     if [ "${git_proxy_ready}" == "0" ]; then
-        echo "Git proxy not ready, aborting"
-        exit 1
+        echo "Git proxy not ready, cannot setup git repositories"
+        for line in "${GIT_REPOSITORIES[@]}"; do
+            repo="$(echo "${line}" | cut -d$'\t' -f1)"
+            branch="$(echo "${line}" | cut -d$'\t' -f2)"
+            echo "repo: ${repo}, branch: ${branch}"
+            echo "Error: could not contact the git proxy" > "${RENKU_WORKING_DIR}/${repo}/ERROR"
+        done
+    else
+        echo "Setting up git repositories..."
+        cwd="$(pwd)"
+        for line in "${GIT_REPOSITORIES[@]}"; do
+            repo="$(echo "${line}" | cut -d$'\t' -f1)"
+            branch="$(echo "${line}" | cut -d$'\t' -f2)"
+            echo "repo: ${repo}, branch: ${branch}"
+            cd "${RENKU_WORKING_DIR}/${repo}"
+            git init || echo "Error: could not run git init" > "ERROR"
+            git fetch || echo "Error: could not run git fetch" > "ERROR"
+            if [ -n "${branch}" ]; then
+                git checkout "${branch}"  || echo "Error: could not run git checkout" > "ERROR"
+                git pull || echo "Error: could not run git pull" > "ERROR"
+            fi
+        done
+        cd "${cwd}"
     fi
-
-    echo "Setting up git repositories..."
-    cwd="$(pwd)"
-    OIFS="${IFS}"
-    IFS=$'\n'
-    GIT_REPOSITORIES=(${GIT_REPOSITORIES})
-    IFS="${OIFS}"
-    for line in "${GIT_REPOSITORIES[@]}"; do
-        repo="$(echo "${line}" | cut -d$'\t' -f1)"
-        branch="$(echo "${line}" | cut -d$'\t' -f2)"
-        echo "repo: ${repo}, branch: ${branch}"
-        cd "${RENKU_WORKING_DIR}/${repo}"
-        git init
-        git fetch
-        if [ -n "${branch}" ]; then
-            git checkout "${branch}"
-            git pull
-        fi
-    done
-    cd "${cwd}"
 fi
 
 exit_script() {
