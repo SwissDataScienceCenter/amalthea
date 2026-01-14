@@ -519,6 +519,8 @@ func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 	pvcs := []v1.PersistentVolumeClaim{}
 	vols := []v1.Volume{}
 	volMounts := []v1.VolumeMount{}
+	// Can't take the address of a constant, we have to go through a variable
+	mountPropagationMode := v1.MountPropagationHostToContainer
 	for ids, ds := range as.Spec.DataSources {
 		pvcName := fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)
 		switch ds.Type {
@@ -561,9 +563,10 @@ func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 			volMounts = append(
 				volMounts,
 				v1.VolumeMount{
-					Name:      pvcName,
-					ReadOnly:  readOnly,
-					MountPath: ds.MountPath,
+					Name:             pvcName,
+					ReadOnly:         readOnly,
+					MountPath:        ds.MountPath,
+					MountPropagation: &mountPropagationMode,
 				},
 			)
 		default:
