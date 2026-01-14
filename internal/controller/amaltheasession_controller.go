@@ -87,6 +87,13 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	if amaltheasession.Spec.Culling.ResumeAt.After(time.Now()) {
+		// remove resumeAt
+		// potentially change something in status if needed
+		r.Patch()
+		return
+	}
+
 	if amaltheasession.GetDeletionTimestamp() == nil {
 		if reflect.DeepEqual(amaltheasession.Status, amaltheadevv1alpha1.AmaltheaSessionStatus{State: amaltheadevv1alpha1.NotReady, Idle: false}) {
 			// First status update/render
