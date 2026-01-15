@@ -30,6 +30,7 @@ import logging
 import requests
 
 from controller import config
+from controller.k8s_resources import get_urls
 from controller.server_status_enum import ServerStatusEnum
 
 
@@ -238,6 +239,9 @@ class ServerStatus:
             reverse=True,
         )
         hibernated = server.get("spec", {}).get("jupyterServer", {}).get("hibernated", False)
+        server_url=server.get("status", {}).get("create_fn", {}).get("fullServerURL")
+        if server_url is None or len(server_url) == 0:
+            server_url = get_urls(server["spec"])[1]
         return cls(
             init_statuses=init_container_statuses,
             statuses=container_statuses,
@@ -245,7 +249,7 @@ class ServerStatus:
             pod_conditions=pod_conditions,
             deletion_timestamp=deletion_timestamp,
             events=server.get("status", {}).get("events", {}),
-            server_url=server.get("status", {}).get("create_fn", {}).get("fullServerURL"),
+            server_url=server_url,
             hibernated=hibernated,
         )
 

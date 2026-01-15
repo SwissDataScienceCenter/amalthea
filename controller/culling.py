@@ -4,6 +4,7 @@ import logging
 import requests
 from requests.exceptions import RequestException
 
+from controller.k8s_resources import get_urls
 from controller.utils import get_pod_metrics, parse_pod_metrics
 
 
@@ -43,19 +44,22 @@ def get_js_server_status(js_body):
     try:
         server_url = js_body["status"]["create_fn"]["fullServerURL"]
     except KeyError:
-        return None
+        server_url = get_urls(js_body["spec"])[1]
+        if server_url is None or len(server_url) == 0:
+            return None
 
     token = js_body["spec"]["auth"].get("token")
     payload = {} if not token else {"token": token}
+    url = f"{server_url.rstrip('/')}/api/status"
 
     try:
-        res = requests.get(f"{server_url.rstrip('/')}/api/status", params=payload)
+        res = requests.get(url, params=payload)
     except RequestException as err:
-        logging.warning(f"Could not get js server status for {server_url}, because: {err}")
+        logging.warning(f"Could not get js server status for {url}, because: {err}")
         return None
 
     if res.status_code != 200:
-        logging.warning(f"Could not get js server status for {server_url}, response status code is {res.status_code}")
+        logging.warning(f"Could not get js server status for {url}, response status code is {res.status_code}")
         return None
 
     try:
@@ -67,7 +71,7 @@ def get_js_server_status(js_body):
         # }
         res = res.json()
     except JSONDecodeError as err:
-        logging.warning(f"Could not parse js server status for {server_url}, because: {err}")
+        logging.warning(f"Could not parse js server status {res.text[:10]} for {url}, because: {err}")
         return None
 
     if isinstance(res, dict):
