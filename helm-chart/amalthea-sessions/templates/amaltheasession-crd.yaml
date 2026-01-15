@@ -4569,6 +4569,15 @@ spec:
                     required:
                     - name
                     type: object
+                  useDefaultClusterTLSCert:
+                    default: false
+                    description: |-
+                      If set to `true` it will set the `tls` field in the Ingress to `{}` which
+                      is used to indicate to certain ingress controllers and on Openshift that the
+                      default cluster TLS certificate should be used. This value is only take into
+                      account if `TLSSecret` above is left unset, if the `TLSSecret` field is set
+                      then that value will take precedence and this boolean flag will be ignored.
+                    type: boolean
                 required:
                 - host
                 type: object
