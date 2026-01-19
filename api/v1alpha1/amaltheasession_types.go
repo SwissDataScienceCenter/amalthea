@@ -207,6 +207,14 @@ type Ingress struct {
 	// The path prefix that will be used in the ingress. If this is explicitly set, then the
 	// urlPath value should be a subpath of this value.
 	PathPrefix string `json:"pathPrefix,omitempty"`
+	// +optional
+	// +kubebuilder:default:=false
+	// If set to `true` it will set the `tls` field in the Ingress to `{}` which
+	// is used to indicate to certain ingress controllers and on Openshift that the
+	// default cluster TLS certificate should be used. This value is only take into
+	// account if `TLSSecret` above is left unset, if the `TLSSecret` field is set
+	// then that value will take precedence and this boolean flag will be ignored.
+	UseDefaultClusterTLSCert bool `json:"useDefaultClusterTLSCert,omitempty"`
 }
 
 type Storage struct {

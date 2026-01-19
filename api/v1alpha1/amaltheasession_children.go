@@ -304,6 +304,11 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 		}}
 	}
 
+	// The default cluster TLS cert should be used only if the TLS secret is unset
+	if ingress.TLSSecret == nil && ingress.UseDefaultClusterTLSCert {
+		ing.Spec.TLS = []networkingv1.IngressTLS{{}}
+	}
+
 	// Add rule for __amalthea__/tunnel -> tunnel container
 	if cr.Spec.SessionLocation == Remote {
 		mainRule := &ing.Spec.Rules[0]
