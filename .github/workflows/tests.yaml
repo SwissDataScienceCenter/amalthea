@@ -21,8 +21,6 @@ jobs:
             make lint && \
             make test && \
             make test-e2e && \
-            helm dep update helm-chart/amalthea && \
-            helm lint helm-chart/amalthea && \
             helm dep update helm-chart/amalthea-sessions && \
             helm lint helm-chart/amalthea-sessions
           push: never
