@@ -1,27 +1,11 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
-    directory: "/"
-    schedule:
-      interval: "daily"
-    groups:
-      python:
-        patterns:
-          - "*"
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "daily"
     groups:
       go:
-        patterns:
-          - "*"
-  - package-ecosystem: "npm"
-    directory: "/acceptance-tests"
-    schedule:
-      interval: "daily"
-    groups:
-      node:
         patterns:
           - "*"
   - package-ecosystem: "docker"
