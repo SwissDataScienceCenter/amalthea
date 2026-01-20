@@ -1,8 +1,10 @@
-# Amalthea - A Kubernetes operator for Jupyter servers
+# Amalthea - A Kubernetes operator for user sessions
 
-This project defines a `JupyterServer` [custom resource](manifests/crd.yaml) for
-Kubernetes and implements a Kubernetes operator which controls the lifecycle of
-custom `JupyterServer` objects.
+This project defines an AmaltheaSession which provides a research work
+environment and implements a Kubernetes operator which controls the lifecycle of custom `AmaltheaSession` objects.
+
+
+## Description
 
 ## Installation
 
@@ -10,159 +12,72 @@ The recommended way of installing Amalthea is through its **helm chart**:
 
 ```bash
 helm repo add renku https://swissdatasciencecenter.github.io/helm-charts
-helm install amalthea renku/amalthea
+helm install amalthea-sessions renku/amalthea
 ```
 
-For people who prefer to use plain manifests in combination with tools like
-`kustomize`, we provide the rendered templates in the
-[manifests directory](manifests), together with a basic `kustomization.yaml`
-file which can serve as a base for overlays. A basic install equivalent to a
-helm install using the default values can be achieved through
+## Getting Started
 
-```bash
-kubectl apply -k github.com/SwissDataScienceCenter/amalthea/manifests/
+### Prerequisites
+- go version v1.20.0+
+- docker version 17.03+.
+- kubectl version v1.11.3+.
+- Access to a Kubernetes v1.11.3+ cluster.
+
+### To Deploy on the cluster
+**Build and push your image to the location specified by `IMG`:**
+
+```sh
+make docker-build docker-push IMG=<some-registry>/amalthea:tag
 ```
 
-## Example
+**NOTE:** This image ought to be published in the personal registry you specified. 
+And it is required to have access to pull the image from the working environment. 
+Make sure you have the proper permission to the registry if the above commands don’t work.
 
-Once Amalthea is installed in a cluster through the helm chart, deploying a
-jupyter server for a user `Jane Doe` with email `jane.doe@example.com` is as
-easy as applying the following YAML file to the cluster:
+**Install the CRDs into the cluster:**
 
-```yaml
-apiVersion: amalthea.dev/v1alpha1
-kind: JupyterServer
-metadata:
-  name: janes-spark-session
-  namespace: datascience-workloads
-spec:
-  jupyterServer:
-    image: jupyter/all-spark-notebook:latest
-  routing:
-    host: jane.datascience.example.com
-    path: /spark-session
-    tls:
-      enabled: true
-      secretName: example-com-wildcard-tls
-  auth:
-    oidc:
-      enabled: true
-      issuerUrl: https://auth.example.com
-      clientId: jupyter-servers
-      clientSecret:
-        value: 5912adbd5f946edd4bd783aa168f21810a1ae6181311e3c35346bebe679b4482
-      authorizedEmails:
-        - jane.doe@example.com
-    token: ""
+```sh
+make install
 ```
 
-For the full configuration options check out the
-[CRD documentation](docs/crd.md) as well as the
-[section on patching](#patching-a-jupyterserver).
+**Deploy the Manager to the cluster with the image specified by `IMG`:**
 
-## What's "inside" a JupyterServer resource
+```sh
+make deploy IMG=<some-registry>/amalthea:tag
+```
 
-The `JupyterServer` custom resource defines a bundle of standard Kubernetes
-resources that handle the following aspects of running a Jupyter server in a
-Kubernetes cluster:
+> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin 
+privileges or be logged in as admin.
 
-- Routing through the creation of an ingress object and a service to expose the
-  Jupyter server
-- Access control through integration with existing OpenID Connect (OIDC)
-  providers
-- Some failure recovery thanks to running the Jupyter server using a
-  statefulSet controller and by backing it with a persistent volume
-  (optional).
+**Create instances of your solution**
+You can apply the samples (examples) from the config/sample:
 
-When launching a Jupyter server, the custom resource spec is used to render the
-jinja templates defined [here](controller/templates). The rendered templates are
-then applied to the cluster, resulting in the creation of the following K8s
-resources:
+```sh
+kubectl apply -k config/samples/
+```
 
-- A statefulSet whose pod spec has two containers, tha actual Jupyter server and
-  an [oauth2 proxy](https://github.com/oauth2-proxy/oauth2-proxy) which is
-  running in front of the Jupyter server
-- A PVC which will be mounted into the Jupyter server
-- A configmap to hold some non-secret configuration
-- A secret to hold some secret configuration
-- A service to expose the pod defined in the statefulSet
-- An ingress to make the Jupyter server outside reachable from outside the cluster
+>**NOTE**: Ensure that the samples has default values to test it out.
 
-## Patching a JupyterServer
+### To Uninstall
+**Delete the instances (CRs) from the cluster:**
 
-We intentionally keep the configuration options through the jinja templates
-relatively limited to cover only what we believe to be the frequent use cases.
-However, as part of the custom resource spec, one can pass a list of
-[json](https://datatracker.ietf.org/doc/html/rfc6902) or
-[json merge](https://datatracker.ietf.org/doc/html/rfc7386) patches, which will
-be applied to the resource specifications _after_ the rendering of the Jinja
-templates. Through patching, one has the complete freedom to add, remove or
-change K8s resources which are created as part of the custom resource object.
+```sh
+kubectl delete -k config/samples/
+```
 
-## Motivation and use cases
+**Delete the APIs(CRDs) from the cluster:**
 
-The main use case of Amalthea is to provide a layer on top of which developers
-can build kubernetes-native applications that allow their users to spin-up and
-manage Jupyter servers. We do not see Amalthea as a standalone tool
-used by end users, as creating Jupyter servers with Amalthea requires access to
-the Kubernetes API.
+```sh
+make uninstall
+```
 
-### Comparison to JupyterHub
+**UnDeploy the controller from the cluster:**
 
-[JupyterHub](https://jupyterhub.readthedocs.io/en/stable/) is the standard
-application for serving Jupyter servers to multiple users. Unlike Amalthea,
-JupyterHub _is_ designed to be an application for the end user to interact with,
-and it can run on Kubernetes as well as on standalone servers. It therefore
-comes "batteries included" with a web frontend, user management, a database that
-keeps track of running servers, a configurable web proxy, etc.
+```sh
+make undeploy
+```
 
-The intended scope of Amalthea is much smaller than that. Specifically:
-
-- Amalthea requires that there is already an OpenID Connect provider in the
-  application stack.
-- Amalthea itself is stateless. All state is stored as Kubernetes objects in
-  etcd.
-- Amalthea uses the Kubernetes-native ingress- and service concepts for
-  dynamically adding and removing routes as Jupyter servers come and go, instead
-  of relying on an additoinal proxy for routing.
-
-## What's in the repo
-
-The [helm-chart/amalthea](helm-chart/amalthea) directory contains a chart which
-installs the custom resource definiton (optional) and the controller. The helm
-chart templates therefore contain the
-[Custom Resource Definition](helm-chart/amalthea/templates/crd.yaml) of the
-`JupyterServer` resource. The [controller](controller) directory contains the
-logic of that operator which is based on the very nice
-[kopf framework](https://github.com/nolar/kopf).
-
-## Testing Amalthea
-
-The easiest way to try amalthea out is to install it in a K8s cluster. If you
-don't have a K8s cluster handy you can also just use
-[kind](https://kind.sigs.k8s.io/). Further sections in the documentation give
-more details and information on how to do this.
-
-After installing the helm chart you can start creating `jupyterserver`
-resources.
-
-Amalthea can work with any image from the
-[Jupyter Docker Stacks](https://jupyter-docker-stacks.readthedocs.io/en/latest/using/selecting.html).
-But you can also build your own using the Jupyter Docker Stacks Images as a base.
-However, there are a few requirements for an image to work with Amalthea:
-
-- The container should use port 8888.
-- The configuration files at `/etc/jupyter/` should not be overwritten. But you
-  have complete freedom to override these configurations by either (1) passing
-  command line arguments to the `jupyter` command or start scripts or (2)
-  creating configuration files in locations which are more preferred than
-  `/etc/jupyter/` such as the `.jupyter` folder in the user home directory. See
-  [here](https://jupyter.readthedocs.io/en/latest/use/jupyter-directories.html#configuration-files)
-  for more information about which locations you can use to store and override
-  the jupyter configuration.
-
-## Amalthea development and contributing
-
+## Contributing
 You have found a bug or you are missing a feature? We would be happy to hear
 from you, and even happier to receive a pull request :)
 
@@ -172,7 +87,7 @@ There are 2 ways to setup a development environment:
 2. Using kind
 
 Regardless of which option you chose you will need to have the following installed:
-- poetry
+- go
 - docker
 - make
 
@@ -185,7 +100,7 @@ If not read on.
 2. `devcontainer build --workspace-folder ./"
 3. `devcontainer up --workspace-folder ./"
 4. `devcontainer exec --workspace-folder ./ bash"
-5. Run `make tests` inside the devcontainer 
+5. Run `make tests` inside the devcontainer
 
 Useful aliases for the devcontainer CLI:
 
@@ -200,17 +115,53 @@ alias dcu="devcontainer up --workspace-folder ./"
 1. Install kind - https://kind.sigs.k8s.io/docs/user/quick-start#installation
 2. `make kind_cluster`
 3. Ensure that you switch your current k8s context to the kind cluster (this usually happens automatically)
-4. `poetry install`
-5. `make tests`
+4. `make test`
+5. `make test-e2d`
 
-## Why is this project called Amalthea?
+**NOTE:** Run `make help` for more information on all potential `make` targets
 
-According to [Wikipedia](https://en.wikipedia.org/wiki/Amalthea), the name
-Amalthea stands for:
+More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
 
-- one of Jupiters many moons
-- the foster-mother of Zeus (ie Jupiter)
-- a unicorn
-- a container ship
+## Developer documentation: remote sessions
 
-Also, it's another Greek name for something Kubernetes related.
+This section documents how Amalthea supports remote sessions.
+
+The Amalthea Session resource definition contains a field named `location` which is set to `local` for
+local sessions and set to `remote` for remote sessions.
+The default value for `location` is `local` which means that the user-defined container runs in the session's pod
+alongside the extra containers for the session.
+
+Setting `location` to `remote` allows users to run sessions on remote computing environments where the session
+pod only runs sessions services.
+The first use-case for remote sessions is to make use of HPC resources, but the remote session architecture
+allows for remote sessions to be running on many types of computing environments.
+
+### Remote session containers
+
+When the `location` field is set to `remote`, there are some differences with `local` sessions:
+
+1. The "main" container is now running the `remote-session-controller`, see: [sidecars](cmd/sidecars/main.go).
+   
+   This container is now responsible for starting the remote session. This is done by providing it with a suitable configuration in the `remoteSecretRef` which is loaded as environment variables.
+
+2. A new "tunnel" container is added to establish network connections
+   between the remote session and the Amalthea pod.
+
+   The tunnel server accepts secured connections from the remote session
+   so that network traffic for its frontend can be forwarded from the
+   Amalthea session pod. This is a reverse proxy from the tunnel container to the remote session.
+
+   The remote session also establishes a forward proxy to the git proxy
+   so that it can be used by the remote session.
+
+### Remote session ingress
+
+The ingress for a `remote` session now has a new route, `__amalthea__/tunnel`, which exposes the tunnel service to the internet.
+
+The tunnel service only accepts authorized connections to make sure that
+only the remote session itself can make use of the tunnel service.
+
+### Remote session controller
+
+At the moment, the remote session controller can only start remote
+sessions using the FirecREST API (deployed in HPC environments).
