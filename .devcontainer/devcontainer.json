@@ -7,7 +7,7 @@
 		}
 	},
 	"containerUser": "root",
-	"postCreateCommand": "make kind_cluster && poetry install && echo alias k=kubectl >> ~/.bashrc && go mod download && make kustomize controller-gen operator-sdk envtest && pip install chartpress && git config --global --add safe.directory /${containerWorkspaceFolder}",
+	"postCreateCommand": "make kind_cluster && echo alias k=kubectl >> ~/.bashrc && go mod download && make kustomize controller-gen operator-sdk envtest && pip install chartpress && git config --global --add safe.directory /${containerWorkspaceFolder}",
 	"features": {
 		"ghcr.io/eitsupi/devcontainer-features/jq-likes:2": {
 			"jqVersion": "latest",
