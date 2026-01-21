@@ -528,7 +528,7 @@ func (a *AmaltheaSession) GetURL() *url.URL {
 	// NOTE: This preserves the search query and fragment found in Spec.Session.URLPath
 	sessionURL, err := url.Parse(path)
 	if err != nil {
-		// NOTE: this should really not happen because we prepend '/' just above
+		// NOTE: this should not happen, but invalid characters may have escaped validation
 		return &url.URL{
 			Scheme: urlScheme,
 			Path:   path,
