@@ -120,7 +120,7 @@ jobs:
           extra_values: "${{ needs.check-deploy.outputs.extra-values }}"
 
   cypress-acceptance-tests:
-    name: Cypress tests
+    name: Cypress acceptance tests
     runs-on: ubuntu-24.04
     needs: [check-deploy, deploy-pr]
     if: github.event.action != 'closed' && needs.check-deploy.outputs.deploy == 'true' && needs.check-deploy.outputs.test-enabled == 'true'
@@ -149,7 +149,7 @@ jobs:
           test-user-password: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
 
   cypress-acceptance-tests-slow:
-    name: Cypress tests
+    name: Cypress slow acceptance tests
     runs-on: ubuntu-24.04
     needs: [check-deploy, deploy-pr]
     if: github.event.action != 'closed' && needs.check-deploy.outputs.deploy == 'true' && needs.check-deploy.outputs.test-enabled == 'true' && needs.check-deploy.outputs.test-slow-enabled == 'true'
