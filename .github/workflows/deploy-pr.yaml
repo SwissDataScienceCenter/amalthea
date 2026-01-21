@@ -28,8 +28,8 @@ jobs:
       renku-notebooks: ${{ steps.deploy-comment.outputs.renku-notebooks}}
       renku-ui: ${{ steps.deploy-comment.outputs.renku-ui}}
       renku-data-services: ${{ steps.deploy-comment.outputs.renku-data-services}}
-      test-enabled: ${{ steps.deploy-comment.outputs.test-enabled}}
-      test-legacy-enabled: ${{ steps.deploy-comment.outputs.test-legacy-enabled}}
+      test-enabled: ${{ steps.deploy-comment.outputs.test-enabled == 'true' }}
+      test-slow-enabled: ${{ steps.deploy-comment.outputs.test-slow-enabled == 'true' }}
       extra-values: ${{ steps.deploy-comment.outputs.extra-values}}
     steps:
       - name: Check PR description
