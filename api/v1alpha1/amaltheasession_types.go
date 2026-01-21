@@ -525,12 +525,19 @@ func (a *AmaltheaSession) GetURL() *url.URL {
 	if !strings.HasSuffix(path, "/") {
 		path = path + "/"
 	}
-	sessionURL := url.URL{
-		Scheme: urlScheme,
-		Path:   path,
-		Host:   a.Spec.Ingress.Host,
+	// NOTE: This preserves the search query and fragment found in Spec.Session.URLPath
+	sessionURL, err := url.Parse(path)
+	if err != nil {
+		// NOTE: this should not happen, but invalid characters may have escaped validation
+		return &url.URL{
+			Scheme: urlScheme,
+			Path:   path,
+			Host:   a.Spec.Ingress.Host,
+		}
 	}
-	return &sessionURL
+	sessionURL.Scheme = urlScheme
+	sessionURL.Host = a.Spec.Ingress.Host
+	return sessionURL
 }
 
 func (a *AmaltheaSession) GetHealthcheckURL() *url.URL {
