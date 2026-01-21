@@ -28,13 +28,13 @@ jobs:
       renku-notebooks: ${{ steps.deploy-comment.outputs.renku-notebooks}}
       renku-ui: ${{ steps.deploy-comment.outputs.renku-ui}}
       renku-data-services: ${{ steps.deploy-comment.outputs.renku-data-services}}
-      test-enabled: ${{ steps.deploy-comment.outputs.test-enabled}}
-      test-legacy-enabled: ${{ steps.deploy-comment.outputs.test-legacy-enabled}}
+      test-enabled: ${{ steps.deploy-comment.outputs.test-enabled == 'true' }}
+      test-slow-enabled: ${{ steps.deploy-comment.outputs.test-slow-enabled == 'true' }}
       extra-values: ${{ steps.deploy-comment.outputs.extra-values}}
     steps:
       - name: Check PR description
         id: deploy-comment
-        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v1.19.0
+        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v1.20.0
         with:
           pr_ref: ${{ github.event.number }}
 
@@ -97,7 +97,7 @@ jobs:
           echo "KUBECONFIG=${KUBECONFIG}" >> "$GITHUB_ENV"
 
       - name: Build and deploy
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.19.0
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.20.0
         env:
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
@@ -119,34 +119,8 @@ jobs:
           amalthea_sessions: "@${{ github.head_ref }}"
           extra_values: "${{ needs.check-deploy.outputs.extra-values }}"
 
-  legacy-cypress-acceptance-tests:
-    name: Legacy Cypress tests
-    runs-on: ubuntu-24.04
-    needs: [check-deploy, deploy-pr]
-    if: github.event.action != 'closed' && needs.check-deploy.outputs.deploy == 'true' && needs.check-deploy.outputs.test-legacy-enabled == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        tests:
-          - publicProject
-          - privateProject
-          - updateProjects
-          - testDatasets
-          - useSession
-          - checkWorkflows
-          - rstudioSession
-    steps:
-      - name: Extract Renku repository reference
-        run: echo "RENKU_REFERENCE=`echo '${{ needs.check-deploy.outputs.renku }}' | cut -d'@' -f2`" >> $GITHUB_ENV
-      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.19.0
-        with:
-          e2e-target: ${{ matrix.tests }}
-          renku-reference: ${{ env.RENKU_REFERENCE }}
-          renku-release: renku-ci-am-${{ github.event.number }}
-          test-user-password: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
-
   cypress-acceptance-tests:
-    name: Cypress tests
+    name: Cypress acceptance tests
     runs-on: ubuntu-24.04
     needs: [check-deploy, deploy-pr]
     if: github.event.action != 'closed' && needs.check-deploy.outputs.deploy == 'true' && needs.check-deploy.outputs.test-enabled == 'true'
@@ -155,18 +129,42 @@ jobs:
       matrix:
         tests:
           - anonymousNavigation
-          - dashboardV2
-          - groupBasics
-          - projectBasics
-          - projectResources
-          - searchEntities
-          - sessionBasics
+          - codeRepositories
+          - dashboard
+          - dataConnectors
+          - groups
+          - projects
+          - search
+          - sessionLaunchers
+          - sessions
     steps:
       - name: Extract Renku repository reference
         run: echo "RENKU_REFERENCE=`echo '${{ needs.check-deploy.outputs.renku }}' | cut -d'@' -f2`" >> $GITHUB_ENV
-      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.19.0
+      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.20.0
         with:
           e2e-folder: cypress/e2e/v2/
+          e2e-target: ${{ matrix.tests }}
+          renku-reference: ${{ env.RENKU_REFERENCE }}
+          renku-release: renku-ci-am-${{ github.event.number }}
+          test-user-password: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
+
+  cypress-acceptance-tests-slow:
+    name: Cypress slow acceptance tests
+    runs-on: ubuntu-24.04
+    needs: [check-deploy, deploy-pr]
+    if: github.event.action != 'closed' && needs.check-deploy.outputs.deploy == 'true' && needs.check-deploy.outputs.test-enabled == 'true' && needs.check-deploy.outputs.test-slow-enabled == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        tests:
+          - sessions
+          - sessionSecrets
+    steps:
+      - name: Extract Renku repository reference
+        run: echo "RENKU_REFERENCE=`echo '${{ needs.check-deploy.outputs.renku }}' | cut -d'@' -f2`" >> $GITHUB_ENV
+      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.20.0
+        with:
+          e2e-folder: cypress/e2e/slow/
           e2e-target: ${{ matrix.tests }}
           renku-reference: ${{ env.RENKU_REFERENCE }}
           renku-release: renku-ci-am-${{ github.event.number }}
@@ -220,7 +218,7 @@ jobs:
           echo "KUBECONFIG=${KUBECONFIG}" >> "$GITHUB_ENV"
 
       - name: Renku teardown
-        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.19.0
+        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.20.0
         env:
           HELM_RELEASE_REGEX: "^renku-ci-am-${{ github.event.number }}$"
           GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
