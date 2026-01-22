@@ -9,26 +9,26 @@ packages = [{include = "controller"}]
 
 [tool.poetry.dependencies]
 python = "^3.12"
-pyyaml = "^6.0.2"
-kubernetes = "^31.0.0"
+pyyaml = "^6.0.3"
+kubernetes = "^35.0.0"
 jsonpatch = "^1.33"
-json-merge-patch = "^0.2"
+json-merge-patch = "^0.3"
 expiringdict = "^1.2.2"
 jinja2 = "^3.1.6"
-prometheus-client = "^0.22.0"
-dataconf = "^3.4.0"
-boto3 = "^1.38.18"
-kopf = {extras = ["uvloop"], version = "~1.37.4"}
-python-json-logger = "3.3.0" # Needed by kopf but kopf uses a wrong version which is missing APIs that kopf needs
+prometheus-client = "^0.24.1"
+dataconf = "^3.6.0"
+boto3 = "^1.42.32"
+kopf = {extras = ["uvloop"], version = "~1.40.0"}
+python-json-logger = "4.0.0" # Needed by kopf but kopf uses a wrong version which is missing APIs that kopf needs
 
 
 [tool.poetry.group.dev.dependencies]
-black = "^25.1.0"
-flake8 = "^7.2.0"
-pytest = "^8.3.5"
-pylint = "^3.3.7"
-pytest-mock = "^3.14.0"
-flake8-pyproject = "^1.2.3"
+black = "^26.1.0"
+flake8 = "^7.3.0"
+pytest = "^9.0.2"
+pylint = "^4.0.4"
+pytest-mock = "^3.15.1"
+flake8-pyproject = "^1.2.4"
 
 [build-system]
 requires = ["poetry-core"]
