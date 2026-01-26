@@ -334,7 +334,7 @@ type Culling struct {
 	// +optional
 	// +kubebuilder:validation:Format:=date-time
 	// +kubebuilder:validation:Type:=string
-	ResumeAt metav1.Time
+	ResumeAt metav1.Time `json:"resumeAt,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={token,oauth2proxy,oidc}

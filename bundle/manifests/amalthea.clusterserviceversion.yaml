@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-06-25T07:56:15Z"
+    createdAt: "2026-01-26T13:16:58Z"
     operators.operatorframework.io/builder: operator-sdk-v1.38.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: amalthea.v0.0.1

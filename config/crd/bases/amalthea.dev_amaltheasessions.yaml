@@ -1233,6 +1233,9 @@ spec:
                       valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
                     format: duration
                     type: string
+                  resumeAt:
+                    format: date-time
+                    type: string
                 type: object
               dataSources:
                 description: A list of data sources that should be added to the session
