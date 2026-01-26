@@ -7,7 +7,7 @@
 		}
 	},
 	"containerUser": "root",
-	"postCreateCommand": "make kind_cluster && echo alias k=kubectl >> ~/.bashrc && go mod download && make kustomize controller-gen operator-sdk envtest && pip install chartpress && git config --global --add safe.directory /${containerWorkspaceFolder}",
+	"postCreateCommand": " go mod download && pipx install chartpress && git config --global --add safe.directory ${containerWorkspaceFolder} && make kind_cluster && echo alias k=kubectl >> ~/.bashrc && make kustomize controller-gen operator-sdk envtest",
 	"features": {
 		"ghcr.io/eitsupi/devcontainer-features/jq-likes:2": {
 			"jqVersion": "latest",
@@ -23,7 +23,8 @@
 		},
 		"ghcr.io/dhoeric/features/k9s:1": {
 			"version": "0.50.18"
-		}
+		},
+		"ghcr.io/devcontainers/features/python:1": {}
 	},
 	"containerEnv": {"LOCALBIN": "/${containerWorkspaceFolder}/bin_devcontainer"}
 }
