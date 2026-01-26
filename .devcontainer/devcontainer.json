@@ -1,6 +1,6 @@
 {
 	"name": "Amalthea",
-	"image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
+	"image": "mcr.microsoft.com/devcontainers/go:2-1.25-trixie",
 	"build": {
 		"args": {
 			"DEV_BUILD": true
@@ -14,16 +14,15 @@
 			"yqVersion": "latest"
 		},
 		"ghcr.io/devcontainers-extra/features/curl-apt-get:1": {},
-		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
-		"ghcr.io/mpriscella/features/kind:1": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {
+			"moby": false
+		},
+		"ghcr.io/devcontainers-extra/features/kind:1": {},
 		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
 			"minikube": "none"
 		},
 		"ghcr.io/dhoeric/features/k9s:1": {
 			"version": "0.50.18"
-		},
-		"ghcr.io/devcontainers/features/go:1": {
-			"version": "1.24"
 		}
 	},
 	"containerEnv": {"LOCALBIN": "/${containerWorkspaceFolder}/bin_devcontainer"}
