@@ -331,6 +331,10 @@ type Culling struct {
 	// +kubebuilder:default:="300m"
 	// Number of CPU cores that determine a session to be idling.
 	CPUIdleThreshold resource.Quantity `json:"cpuIdleThreshold,omitempty"`
+	// +optional
+	// +kubebuilder:validation:Format:=date-time
+	// +kubebuilder:validation:Type:=string
+	ResumeAt metav1.Time `json:"resumeAt,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={token,oauth2proxy,oidc}

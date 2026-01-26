@@ -87,6 +87,23 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	if amaltheasession.Spec.Culling.ResumeAt.After(time.Now()) {
+
+		// If session is not hibernated, remove the resumeAt
+		if !amaltheasession.Spec.Hibernated {
+			amaltheasession.Spec.Culling.ResumeAt = time.Time{}
+			return ctrl.Result{}, nil
+		}
+
+		// Set hibernated to false
+		amaltheasession.Spec.Hibernated = false
+
+		// remove resumeAt
+		amaltheasession.Spec.Culling.ResumeAt = time.Time{}
+
+		return ctrl.Result{}, nil
+	}
+
 	if amaltheasession.GetDeletionTimestamp() == nil {
 		if reflect.DeepEqual(amaltheasession.Status, amaltheadevv1alpha1.AmaltheaSessionStatus{State: amaltheadevv1alpha1.NotReady, Idle: false}) {
 			// First status update/render
