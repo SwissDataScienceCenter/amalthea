@@ -11,9 +11,6 @@ import (
 )
 
 const (
-	authPrefix                = "auth"
-	authKindFlag              = "auth-kind"
-	tokenURIFlag              = "token-uri"
 	renkuAccessTokenFlag      = "renku-access-token"
 	renkuRefreshTokenFlag     = "renku-refresh-token"
 	renkuTokenURIFlag         = "renku-token-uri"
@@ -109,92 +106,76 @@ func (cfg *FirecrestAuthConfig) validateClientCredentials() error {
 }
 
 func SetAuthFlags(cmd *cobra.Command) error {
-	cmd.Flags().String(authKindFlag, "", "the kind of authentication to use ('renku' or 'client_credentials')")
-	if err := viper.BindPFlag(authKindFlag, cmd.Flags().Lookup(authKindFlag)); err != nil {
+	cmd.Flags().String(configUtils.AuthPrefix+"-"+renkuAccessTokenFlag, "", "the Renku access token (renku auth)")
+	if err := viper.BindPFlag(configUtils.AuthPrefix+"."+renkuAccessTokenFlag, cmd.Flags().Lookup(configUtils.AuthPrefix+"-"+renkuAccessTokenFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authKindFlag, configUtils.AsEnvVarFlag(authKindFlag)); err != nil {
-		return err
-	}
-
-	cmd.Flags().String(authPrefix+"-"+tokenURIFlag, "", "the URI used to issue new tokens to authenticate with FirecREST")
-	if err := viper.BindPFlag(authPrefix+"."+tokenURIFlag, cmd.Flags().Lookup(authPrefix+"-"+tokenURIFlag)); err != nil {
-		return err
-	}
-	if err := viper.BindEnv(authPrefix+"."+tokenURIFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+tokenURIFlag)); err != nil {
+	if err := viper.BindEnv(configUtils.AuthPrefix+"."+renkuAccessTokenFlag, configUtils.AsEnvVarFlag(configUtils.AuthPrefix+"-"+renkuAccessTokenFlag)); err != nil {
 		return err
 	}
 
-	cmd.Flags().String(authPrefix+"-"+renkuAccessTokenFlag, "", "the Renku access token (renku auth)")
-	if err := viper.BindPFlag(authPrefix+"."+renkuAccessTokenFlag, cmd.Flags().Lookup(authPrefix+"-"+renkuAccessTokenFlag)); err != nil {
+	cmd.Flags().String(configUtils.AuthPrefix+"-"+renkuRefreshTokenFlag, "", "the Renku refresh token (renku auth)")
+	if err := viper.BindPFlag(configUtils.AuthPrefix+"."+renkuRefreshTokenFlag, cmd.Flags().Lookup(configUtils.AuthPrefix+"-"+renkuRefreshTokenFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authPrefix+"."+renkuAccessTokenFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+renkuAccessTokenFlag)); err != nil {
-		return err
-	}
-
-	cmd.Flags().String(authPrefix+"-"+renkuRefreshTokenFlag, "", "the Renku refresh token (renku auth)")
-	if err := viper.BindPFlag(authPrefix+"."+renkuRefreshTokenFlag, cmd.Flags().Lookup(authPrefix+"-"+renkuRefreshTokenFlag)); err != nil {
-		return err
-	}
-	if err := viper.BindEnv(authPrefix+"."+renkuRefreshTokenFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+renkuRefreshTokenFlag)); err != nil {
+	if err := viper.BindEnv(configUtils.AuthPrefix+"."+renkuRefreshTokenFlag, configUtils.AsEnvVarFlag(configUtils.AuthPrefix+"-"+renkuRefreshTokenFlag)); err != nil {
 		return err
 	}
 
-	cmd.Flags().String(authPrefix+"-"+renkuTokenURIFlag, "", "the URI used to issue new renku tokens (renku auth)")
-	if err := viper.BindPFlag(authPrefix+"."+renkuTokenURIFlag, cmd.Flags().Lookup(authPrefix+"-"+renkuTokenURIFlag)); err != nil {
+	cmd.Flags().String(configUtils.AuthPrefix+"-"+renkuTokenURIFlag, "", "the URI used to issue new renku tokens (renku auth)")
+	if err := viper.BindPFlag(configUtils.AuthPrefix+"."+renkuTokenURIFlag, cmd.Flags().Lookup(configUtils.AuthPrefix+"-"+renkuTokenURIFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authPrefix+"."+renkuTokenURIFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+renkuTokenURIFlag)); err != nil {
-		return err
-	}
-
-	cmd.Flags().String(authPrefix+"-"+renkuClientIDFlag, "", "the Renku client ID (renku auth)")
-	if err := viper.BindPFlag(authPrefix+"."+renkuClientIDFlag, cmd.Flags().Lookup(authPrefix+"-"+renkuClientIDFlag)); err != nil {
-		return err
-	}
-	if err := viper.BindEnv(authPrefix+"."+renkuClientIDFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+renkuClientIDFlag)); err != nil {
+	if err := viper.BindEnv(configUtils.AuthPrefix+"."+renkuTokenURIFlag, configUtils.AsEnvVarFlag(configUtils.AuthPrefix+"-"+renkuTokenURIFlag)); err != nil {
 		return err
 	}
 
-	cmd.Flags().String(authPrefix+"-"+renkuClientSecretFlag, "", "the Renku client secret (renku auth)")
-	if err := viper.BindPFlag(authPrefix+"."+renkuClientSecretFlag, cmd.Flags().Lookup(authPrefix+"-"+renkuClientSecretFlag)); err != nil {
+	cmd.Flags().String(configUtils.AuthPrefix+"-"+renkuClientIDFlag, "", "the Renku client ID (renku auth)")
+	if err := viper.BindPFlag(configUtils.AuthPrefix+"."+renkuClientIDFlag, cmd.Flags().Lookup(configUtils.AuthPrefix+"-"+renkuClientIDFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authPrefix+"."+renkuClientSecretFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+renkuClientSecretFlag)); err != nil {
-		return err
-	}
-
-	cmd.Flags().String(authPrefix+"-"+firecrestClientIDFlag, "", "the FirecREST client ID (client credentials auth)")
-	if err := viper.BindPFlag(authPrefix+"."+firecrestClientIDFlag, cmd.Flags().Lookup(authPrefix+"-"+firecrestClientIDFlag)); err != nil {
-		return err
-	}
-	if err := viper.BindEnv(authPrefix+"."+firecrestClientIDFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+firecrestClientIDFlag)); err != nil {
+	if err := viper.BindEnv(configUtils.AuthPrefix+"."+renkuClientIDFlag, configUtils.AsEnvVarFlag(configUtils.AuthPrefix+"-"+renkuClientIDFlag)); err != nil {
 		return err
 	}
 
-	cmd.Flags().String(authPrefix+"-"+firecrestClientSecretFlag, "", "the FirecREST client secret (client credentials auth)")
-	if err := viper.BindPFlag(authPrefix+"."+firecrestClientSecretFlag, cmd.Flags().Lookup(authPrefix+"-"+firecrestClientSecretFlag)); err != nil {
+	cmd.Flags().String(configUtils.AuthPrefix+"-"+renkuClientSecretFlag, "", "the Renku client secret (renku auth)")
+	if err := viper.BindPFlag(configUtils.AuthPrefix+"."+renkuClientSecretFlag, cmd.Flags().Lookup(configUtils.AuthPrefix+"-"+renkuClientSecretFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authPrefix+"."+firecrestClientSecretFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+firecrestClientSecretFlag)); err != nil {
+	if err := viper.BindEnv(configUtils.AuthPrefix+"."+renkuClientSecretFlag, configUtils.AsEnvVarFlag(configUtils.AuthPrefix+"-"+renkuClientSecretFlag)); err != nil {
+		return err
+	}
+
+	cmd.Flags().String(configUtils.AuthPrefix+"-"+firecrestClientIDFlag, "", "the FirecREST client ID (client credentials auth)")
+	if err := viper.BindPFlag(configUtils.AuthPrefix+"."+firecrestClientIDFlag, cmd.Flags().Lookup(configUtils.AuthPrefix+"-"+firecrestClientIDFlag)); err != nil {
+		return err
+	}
+	if err := viper.BindEnv(configUtils.AuthPrefix+"."+firecrestClientIDFlag, configUtils.AsEnvVarFlag(configUtils.AuthPrefix+"-"+firecrestClientIDFlag)); err != nil {
+		return err
+	}
+
+	cmd.Flags().String(configUtils.AuthPrefix+"-"+firecrestClientSecretFlag, "", "the FirecREST client secret (client credentials auth)")
+	if err := viper.BindPFlag(configUtils.AuthPrefix+"."+firecrestClientSecretFlag, cmd.Flags().Lookup(configUtils.AuthPrefix+"-"+firecrestClientSecretFlag)); err != nil {
+		return err
+	}
+	if err := viper.BindEnv(configUtils.AuthPrefix+"."+firecrestClientSecretFlag, configUtils.AsEnvVarFlag(configUtils.AuthPrefix+"-"+firecrestClientSecretFlag)); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func GetAuthConfig() (cfg FirecrestAuthConfig, err error) {
-	cfg.Kind = FirecrestAuthConfigKind(viper.GetString(authKindFlag))
-	cfg.TokenURI = viper.GetString(authPrefix + "." + tokenURIFlag)
+func GetAuthConfig() (cfg FirecrestAuthConfig) {
+	cfg.Kind = FirecrestAuthConfigKind(viper.GetString(configUtils.AuthKindFlag))
+	cfg.TokenURI = viper.GetString(configUtils.AuthPrefix + "." + configUtils.TokenURIFlag)
 
-	cfg.RenkuAccessToken = configUtils.RedactedString(viper.GetString(authPrefix + "." + renkuAccessTokenFlag))
-	cfg.RenkuRefreshToken = configUtils.RedactedString(viper.GetString(authPrefix + "." + renkuRefreshTokenFlag))
-	cfg.RenkuTokenURI = viper.GetString(authPrefix + "." + renkuTokenURIFlag)
-	cfg.RenkuClientID = viper.GetString(authPrefix + "." + renkuClientIDFlag)
-	cfg.RenkuClientSecret = configUtils.RedactedString(viper.GetString(authPrefix + "." + renkuClientSecretFlag))
-	cfg.FirecrestClientID = viper.GetString(authPrefix + "." + firecrestClientIDFlag)
-	cfg.FirecrestClientSecret = configUtils.RedactedString(viper.GetString(authPrefix + "." + firecrestClientSecretFlag))
+	cfg.RenkuAccessToken = configUtils.RedactedString(viper.GetString(configUtils.AuthPrefix + "." + renkuAccessTokenFlag))
+	cfg.RenkuRefreshToken = configUtils.RedactedString(viper.GetString(configUtils.AuthPrefix + "." + renkuRefreshTokenFlag))
+	cfg.RenkuTokenURI = viper.GetString(configUtils.AuthPrefix + "." + renkuTokenURIFlag)
+	cfg.RenkuClientID = viper.GetString(configUtils.AuthPrefix + "." + renkuClientIDFlag)
+	cfg.RenkuClientSecret = configUtils.RedactedString(viper.GetString(configUtils.AuthPrefix + "." + renkuClientSecretFlag))
+	cfg.FirecrestClientID = viper.GetString(configUtils.AuthPrefix + "." + firecrestClientIDFlag)
+	cfg.FirecrestClientSecret = configUtils.RedactedString(viper.GetString(configUtils.AuthPrefix + "." + firecrestClientSecretFlag))
 
-	return cfg, nil
+	return cfg
 }
