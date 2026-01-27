@@ -15,22 +15,51 @@ const env = process.env.ENVIRONMENT || "lab"
 const sessionName = "test";
 const timeoutSeconds = process.env.TIMEOUT_SECS || 600;
 
-const url = `http://${hostName}/${sessionName}/${env}?token=${token}`
-const manifest = `apiVersion: amalthea.dev/v1alpha1
-kind: JupyterServer
+const url = `http://${hostName}/${env}?token=${token}`
+const manifest = `---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${sessionName}-secret
+  namespace: ${k8sNamespace}
+stringData:
+  token: ${token}
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: ${sessionName}-cm
+data:
+  jupyter_server_config.py: |
+    import os
+    c.IdentityProvider.token=os.environ["SERVER_APP_TOKEN"]
+    c.ServerApp.ip="0.0.0.0"
+---
+apiVersion: amalthea.dev/v1alpha1
+kind: AmaltheaSession
 metadata:
   name: ${sessionName}
   namespace: ${k8sNamespace}
 spec:
-  jupyterServer:
+  session:
     image: ${image}
-  routing:
+    port: 8888
+    env:
+      - name: SERVER_APP_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: ${sessionName}-secret
+            key: token
+    extraVolumeMounts:
+      - name: test-cm
+        mountPath: /etc/jupyter
+  extraVolumes:
+    - name: test-cm
+      configMap:
+        name: test-cm
+  ingress:
     host: ${hostName}
-    path: /${sessionName}
-    ingressAnnotations:
-      kubernetes.io/ingress.class: "nginx"
-  auth:
-    token: ${token}
+    ingressClassName: "nginx"
 `
 
 
@@ -42,7 +71,7 @@ function sleep(ms) {
 const checkStatusCode = async function (url) {
   var count = 0;
   while (true) {
-    console.log("Waiting for container to become ready...")
+    console.log(`Waiting for container to become ready at ${url}...`)
     try {
       res = await axios.get(url)
       if (res.status < 300) {
@@ -81,7 +110,7 @@ EOF`);
       console.log(`Error applying server manifest: ${err}`)
     }
     const {status} = await checkStatusCode(url);
-    assert(status < 300)
+    assert(status < 300 || status == 302)
   });
   it('Should pass all acceptance tests', async function () {
     console.log("Starting cypress tests")

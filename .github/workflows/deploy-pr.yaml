@@ -34,7 +34,7 @@ jobs:
     steps:
       - name: Check PR description
         id: deploy-comment
-        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v1.20.0
+        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v1.21.0
         with:
           pr_ref: ${{ github.event.number }}
 
@@ -97,7 +97,7 @@ jobs:
           echo "KUBECONFIG=${KUBECONFIG}" >> "$GITHUB_ENV"
 
       - name: Build and deploy
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.20.0
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.21.0
         env:
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
@@ -140,7 +140,7 @@ jobs:
     steps:
       - name: Extract Renku repository reference
         run: echo "RENKU_REFERENCE=`echo '${{ needs.check-deploy.outputs.renku }}' | cut -d'@' -f2`" >> $GITHUB_ENV
-      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.20.0
+      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.21.0
         with:
           e2e-folder: cypress/e2e/v2/
           e2e-target: ${{ matrix.tests }}
@@ -162,7 +162,7 @@ jobs:
     steps:
       - name: Extract Renku repository reference
         run: echo "RENKU_REFERENCE=`echo '${{ needs.check-deploy.outputs.renku }}' | cut -d'@' -f2`" >> $GITHUB_ENV
-      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.20.0
+      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.21.0
         with:
           e2e-folder: cypress/e2e/slow/
           e2e-target: ${{ matrix.tests }}
@@ -218,7 +218,7 @@ jobs:
           echo "KUBECONFIG=${KUBECONFIG}" >> "$GITHUB_ENV"
 
       - name: Renku teardown
-        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.20.0
+        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.21.0
         env:
           HELM_RELEASE_REGEX: "^renku-ci-am-${{ github.event.number }}$"
           GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}

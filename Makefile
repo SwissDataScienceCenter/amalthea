@@ -378,29 +378,6 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
-##@ Kopf
-
-.PHONY: crd
-crd: ## Create the kopf CRDs
-	poetry run python -m controller.crds template
-
-.PHONY: crd_check
-crd_check: ## Check the kopf CRDs
-	poetry run python -m controller.crds check
-
-.PHONY: style_checks
-style_checks: ## Run python style checks
-	poetry run flake8 ./
-	poetry run black --check ./
-
-.PHONY: run_kopf
-run_kopf: ## Run the kopf controller
-	poetry run python -m controller.main
-
-.PHONY: tests
-tests: ## Run the kopf tests
-	poetry run pytest
-
 KIND_METRICSERVER_VERSION ?= v0.8.0
 
 .PHONY: kind_cluster

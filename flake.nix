@@ -40,7 +40,6 @@
         k9s
         python312
         chartpress
-        poetry
         azure-cli
         kubernetes-helm
       ];
