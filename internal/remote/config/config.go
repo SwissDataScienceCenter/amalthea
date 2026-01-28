@@ -37,18 +37,22 @@ const (
 	fakeStartFlag           = "fake-start"
 )
 
+type FirecrestConfig struct {
+	// The URL of the FirecREST API
+	APIURL string
+	// The system name for FirecREST
+	SystemName string
+	// The partition to use for FirecREST (SLURM option)
+	Partition string
+	// The configuration used to authenticate with the FirecREST API
+	AuthConfig FirecrestAuthConfig
+}
+
 type RemoteSessionControllerConfig struct {
 	// NOTE: this config struct only support using the FirecREST API for now
 
-	// The URL of the FirecREST API
-	FirecrestAPIURL string
-	// The system name for FirecREST
-	FirecrestSystemName string
-	// The partition to use for FirecREST (SLURM option)
-	FirecrestPartition string
-
-	// The configuration used to authenticate with the FirecREST API
-	FirecrestAuthConfig FirecrestAuthConfig
+	// The configuration for the FirecREST API
+	Firecrest FirecrestConfig
 
 	// The port the server will listen to
 	ServerPort int32
@@ -107,9 +111,9 @@ func SetFlags(cmd *cobra.Command) error {
 }
 
 func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
-	cfg.FirecrestAPIURL = viper.GetString(firecrestAPIURLFlag)
-	cfg.FirecrestSystemName = viper.GetString(firecrestSystemNameFlag)
-	cfg.FirecrestPartition = viper.GetString(firecrestPartitionFlag)
+	cfg.Firecrest.APIURL = viper.GetString(firecrestAPIURLFlag)
+	cfg.Firecrest.SystemName = viper.GetString(firecrestSystemNameFlag)
+	cfg.Firecrest.Partition = viper.GetString(firecrestPartitionFlag)
 	cfg.ServerPort = viper.GetInt32(serverPortFlag)
 	cfg.FakeStart = viper.GetBool(fakeStartFlag)
 
@@ -117,22 +121,22 @@ func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
 	if err != nil {
 		return cfg, nil
 	}
-	cfg.FirecrestAuthConfig = firecrestAuthConfig
+	cfg.Firecrest.AuthConfig = firecrestAuthConfig
 
 	return cfg, nil
 }
 
 func (cfg *RemoteSessionControllerConfig) Validate() error {
-	if cfg.FirecrestAPIURL == "" {
+	if cfg.Firecrest.APIURL == "" {
 		return fmt.Errorf("firecrestAPIURL is not defined")
 	}
-	if _, err := url.Parse(cfg.FirecrestAPIURL); err != nil {
+	if _, err := url.Parse(cfg.Firecrest.APIURL); err != nil {
 		return fmt.Errorf("firecrestAPIURL is not valid: %w", err)
 	}
-	if cfg.FirecrestSystemName == "" {
+	if cfg.Firecrest.SystemName == "" {
 		return fmt.Errorf("firecrestSystemName is not defined")
 	}
-	if err := cfg.FirecrestAuthConfig.Validate(); err != nil {
+	if err := cfg.Firecrest.AuthConfig.Validate(); err != nil {
 		return err
 	}
 	return nil
