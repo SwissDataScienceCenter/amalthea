@@ -18,37 +18,32 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
-	"net/url"
-	"strings"
-
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	firecrestConfig "github.com/SwissDataScienceCenter/amalthea/internal/remote/config/firecrest"
+	configUtils "github.com/SwissDataScienceCenter/amalthea/internal/remote/config/utils"
 )
 
-const RemoteSessionControllerPrefix = "RSC"
+type RemoteKind string
 
 const (
-	firecrestAPIURLFlag     = "firecrest-api-url"
-	firecrestSystemNameFlag = "firecrest-system-name"
-	firecrestPartitionFlag  = "firecrest-partition"
-	serverPortFlag          = "server-port"
-	fakeStartFlag           = "fake-start"
+	RemoteKindFirecrest RemoteKind = "firecrest"
+)
+
+const (
+	serverPortFlag = "server-port"
+	fakeStartFlag  = "fake-start"
 )
 
 type RemoteSessionControllerConfig struct {
-	// NOTE: this config struct only support using the FirecREST API for now
 
-	// The URL of the FirecREST API
-	FirecrestAPIURL string
-	// The system name for FirecREST
-	FirecrestSystemName string
-	// The partition to use for FirecREST (SLURM option)
-	FirecrestPartition string
+	// The type of remote infrastructure to use, currently only FirecREST
+	RemoteKind RemoteKind
 
-	// The configuration used to authenticate with the FirecREST API
-	FirecrestAuthConfig FirecrestAuthConfig
+	// The configuration for the FirecREST API
+	Firecrest firecrestConfig.FirecrestConfig
 
 	// The port the server will listen to
 	ServerPort int32
@@ -58,35 +53,12 @@ type RemoteSessionControllerConfig struct {
 }
 
 func SetFlags(cmd *cobra.Command) error {
-	cmd.Flags().String(firecrestAPIURLFlag, "", "URL of the FirecREST API")
-	if err := viper.BindPFlag(firecrestAPIURLFlag, cmd.Flags().Lookup(firecrestAPIURLFlag)); err != nil {
-		return err
-	}
-	if err := viper.BindEnv(firecrestAPIURLFlag, AsEnvVarFlag(firecrestAPIURLFlag)); err != nil {
-		return err
-	}
-
-	cmd.Flags().String(firecrestSystemNameFlag, "", "system name for FirecREST")
-	if err := viper.BindPFlag(firecrestSystemNameFlag, cmd.Flags().Lookup(firecrestSystemNameFlag)); err != nil {
-		return err
-	}
-	if err := viper.BindEnv(firecrestSystemNameFlag, AsEnvVarFlag(firecrestSystemNameFlag)); err != nil {
-		return err
-	}
-
-	cmd.Flags().String(firecrestPartitionFlag, "", "partition to use for FirecREST (SLURM option)")
-	if err := viper.BindPFlag(firecrestPartitionFlag, cmd.Flags().Lookup(firecrestPartitionFlag)); err != nil {
-		return err
-	}
-	if err := viper.BindEnv(firecrestPartitionFlag, AsEnvVarFlag(firecrestPartitionFlag)); err != nil {
-		return err
-	}
 
 	cmd.Flags().Int32(serverPortFlag, amaltheadevv1alpha1.RemoteSessionControllerPort, "port to listen to")
 	if err := viper.BindPFlag(serverPortFlag, cmd.Flags().Lookup(serverPortFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(serverPortFlag, AsEnvVarFlag(serverPortFlag)); err != nil {
+	if err := viper.BindEnv(serverPortFlag, configUtils.AsEnvVarFlag(serverPortFlag)); err != nil {
 		return err
 	}
 
@@ -94,12 +66,12 @@ func SetFlags(cmd *cobra.Command) error {
 	if err := viper.BindPFlag(fakeStartFlag, cmd.Flags().Lookup(fakeStartFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(fakeStartFlag, AsEnvVarFlag(fakeStartFlag)); err != nil {
+	if err := viper.BindEnv(fakeStartFlag, configUtils.AsEnvVarFlag(fakeStartFlag)); err != nil {
 		return err
 	}
 
-	// Set up auth flags
-	if err := SetAuthFlags(cmd); err != nil {
+	// Set up firecREST flags
+	if err := firecrestConfig.SetFlags(cmd); err != nil {
 		return err
 	}
 
@@ -107,42 +79,21 @@ func SetFlags(cmd *cobra.Command) error {
 }
 
 func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
-	cfg.FirecrestAPIURL = viper.GetString(firecrestAPIURLFlag)
-	cfg.FirecrestSystemName = viper.GetString(firecrestSystemNameFlag)
-	cfg.FirecrestPartition = viper.GetString(firecrestPartitionFlag)
+	cfg.RemoteKind = RemoteKindFirecrest
+	firecrestConfig, err := firecrestConfig.GetConfig()
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Firecrest = firecrestConfig
 	cfg.ServerPort = viper.GetInt32(serverPortFlag)
 	cfg.FakeStart = viper.GetBool(fakeStartFlag)
-
-	firecrestAuthConfig, err := GetAuthConfig()
-	if err != nil {
-		return cfg, nil
-	}
-	cfg.FirecrestAuthConfig = firecrestAuthConfig
 
 	return cfg, nil
 }
 
 func (cfg *RemoteSessionControllerConfig) Validate() error {
-	if cfg.FirecrestAPIURL == "" {
-		return fmt.Errorf("firecrestAPIURL is not defined")
-	}
-	if _, err := url.Parse(cfg.FirecrestAPIURL); err != nil {
-		return fmt.Errorf("firecrestAPIURL is not valid: %w", err)
-	}
-	if cfg.FirecrestSystemName == "" {
-		return fmt.Errorf("firecrestSystemName is not defined")
-	}
-	if err := cfg.FirecrestAuthConfig.Validate(); err != nil {
+	if err := cfg.Firecrest.Validate(); err != nil {
 		return err
 	}
 	return nil
-}
-
-// Converts a flag into its environment variable version, with the "RSC" prefix.
-//
-// Example: my-flag -> RSC_MY_FLAG
-// NOTE: "RSC" stands for "Remote Session Controller"
-func AsEnvVarFlag(flag string) string {
-	withUnderscores := strings.ReplaceAll(RemoteSessionControllerPrefix+"_"+flag, "-", "_")
-	return strings.ToUpper(withUnderscores)
 }
