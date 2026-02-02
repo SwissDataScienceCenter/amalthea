@@ -31,8 +31,6 @@ const (
 	firecrestAPIURLFlag     = "firecrest-api-url"
 	firecrestSystemNameFlag = "firecrest-system-name"
 	firecrestPartitionFlag  = "firecrest-partition"
-	serverPortFlag          = "server-port"
-	fakeStartFlag           = "fake-start"
 )
 
 type FirecrestConfig struct {
