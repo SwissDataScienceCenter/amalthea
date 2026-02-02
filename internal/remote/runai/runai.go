@@ -27,26 +27,26 @@ type RunaiClient struct {
 	httpClient *http.Client
 }
 
-func NewRunaiClient(apiURL *url.URL, options ...RunaiClientOption) (fc *RunaiClient, err error) {
-	fc = &RunaiClient{}
+func NewRunaiClient(apiURL *url.URL, options ...RunaiClientOption) (rc *RunaiClient, err error) {
+	rc = &RunaiClient{}
 	for _, opt := range options {
-		if err := opt(fc); err != nil {
+		if err := opt(rc); err != nil {
 			return nil, err
 		}
 	}
 	// Create httpClient, if not already present
-	if fc.httpClient == nil {
-		fc.httpClient = http.DefaultClient
+	if rc.httpClient == nil {
+		rc.httpClient = http.DefaultClient
 	}
 	// Create client
-	return fc, nil
+	return rc, nil
 }
 
 type RunaiClientOption func(*RunaiClient) error
 
 func WithHttpClient(httpClient *http.Client) RunaiClientOption {
-	return func(fc *RunaiClient) error {
-		fc.httpClient = httpClient
+	return func(rc *RunaiClient) error {
+		rc.httpClient = httpClient
 		return nil
 	}
 }

@@ -83,7 +83,7 @@ func (c *RunaiRemoteSessionController) Status(ctx context.Context) (state models
 	return c.currentStatus, c.currentStatusError
 }
 
-// Start sets up and starts the remote session using the FirecREST API
+// Start sets up and starts the remote session using the Runai API
 //
 //nolint:gocyclo // TODO: can we break down session start?
 func (c *RunaiRemoteSessionController) Start(ctx context.Context) error {
@@ -137,7 +137,7 @@ func (c *RunaiRemoteSessionController) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the remote session using the FirecREST API.
+// Stop stops the remote session using the Runai API.
 //
 // The caller needs to make sure Stop is not called before Start has returned.
 func (c *RunaiRemoteSessionController) Stop(ctx context.Context) error {
