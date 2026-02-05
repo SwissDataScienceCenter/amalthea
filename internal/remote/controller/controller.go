@@ -17,15 +17,23 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"net/url"
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest/auth"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
 )
 
+type RemoteSessionController interface {
+	Status(ctx context.Context) (models.RemoteSessionState, error)
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+}
+
 // TODO: support different types of remote session controller
-func NewRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c *firecrest.FirecrestRemoteSessionController, err error) {
+func NewRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c RemoteSessionController, err error) {
 	firecrestAuth, err := auth.NewFirecrestAuth(cfg.Firecrest.AuthConfig)
 	if err != nil {
 		return nil, err
