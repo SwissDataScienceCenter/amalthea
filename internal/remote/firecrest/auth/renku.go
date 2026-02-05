@@ -113,17 +113,7 @@ type RenkuAuthOption func(*RenkuAuth) error
 // RequestEditor returns a request editor which injects a valid access token
 // for FirecREST API requests.
 func (a *RenkuAuth) RequestEditor() sharedAuth.RequestEditorFn {
-	return func(ctx context.Context, req *http.Request) error {
-		if req.Header.Get("Authorization") != "" {
-			return nil
-		}
-		token, err := a.GetAccessToken(ctx)
-		if err != nil {
-			return err
-		}
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
-		return nil
-	}
+	return sharedAuth.RequestEditorInjectAccessToken(a)
 }
 
 func (a *RenkuAuth) GetAccessToken(ctx context.Context) (token string, err error) {
