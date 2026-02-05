@@ -21,9 +21,12 @@ package runai
 import (
 	"net/http"
 	"net/url"
+
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/runai/auth"
 )
 
 type RunaiClient struct {
+	auth       auth.RunaiAuth
 	httpClient *http.Client
 }
 
@@ -43,6 +46,13 @@ func NewRunaiClient(apiURL *url.URL, options ...RunaiClientOption) (rc *RunaiCli
 }
 
 type RunaiClientOption func(*RunaiClient) error
+
+func WithAuth(auth auth.RunaiAuth) RunaiClientOption {
+	return func(rc *RunaiClient) error {
+		rc.auth = auth
+		return nil
+	}
+}
 
 func WithHttpClient(httpClient *http.Client) RunaiClientOption {
 	return func(rc *RunaiClient) error {
