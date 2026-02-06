@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"maps"
 	"net/url"
 	"os"
 	"sort"
@@ -95,7 +96,6 @@ func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
 func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.StatefulSet, error) {
-	labels := labelsForAmaltheaSession(cr.Name)
 	replicas := int32(1)
 	if cr.Spec.Hibernated {
 		replicas = 0
@@ -160,8 +160,10 @@ func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.Stateful
 
 	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name,
-			Namespace: cr.Namespace,
+			Name:        cr.Name,
+			Namespace:   cr.Namespace,
+			Labels:      cr.childLabels(),
+			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			// NOTE: Parallel pod management policy is important
@@ -169,11 +171,12 @@ func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.Stateful
 			PodManagementPolicy: appsv1.ParallelPodManagement,
 			Replicas:            &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
+				MatchLabels: selectorLabels(cr.Name),
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Labels:      cr.childLabels(),
+					Annotations: cr.Spec.Template.Metadata.Annotations,
 				},
 				Spec: pod,
 			},
@@ -188,7 +191,6 @@ func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.Stateful
 
 // Service returns a AmaltheaSession Service object
 func (cr *AmaltheaSession) Service() v1.Service {
-	labels := labelsForAmaltheaSession(cr.Name)
 	targetPort := cr.Spec.Session.Port
 	if cr.Spec.Authentication != nil && cr.Spec.Authentication.Enabled {
 		targetPort = authenticatedPort
@@ -196,11 +198,13 @@ func (cr *AmaltheaSession) Service() v1.Service {
 
 	svc := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name,
-			Namespace: cr.Namespace,
+			Name:        cr.Name,
+			Namespace:   cr.Namespace,
+			Labels:      cr.childLabels(),
+			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: v1.ServiceSpec{
-			Selector: labels,
+			Selector: selectorLabels(cr.Name),
 			Ports: []v1.ServicePort{
 				{
 					Protocol:   v1.ProtocolTCP,
@@ -255,20 +259,26 @@ func (cr *AmaltheaSession) ingressPathPrefix() string {
 
 // Ingress returns a AmaltheaSession Ingress object
 func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
-	labels := labelsForAmaltheaSession(cr.Name)
-
 	ingress := cr.Spec.Ingress
 
 	if ingress == nil {
 		return nil
 	}
 
+	conflicts := findConflicts(ingress.Annotations, cr.Spec.Template.Metadata.Annotations)
+	if len(conflicts) > 0 {
+		log.Log.Info("Found conflicts in ingress annotations, will ignore templated conflicting annotations for ingress", "conflicting keys", conflicts)
+	}
+	annotations := map[string]string{}
+	// NOTE: Order between the two copy calls is important to avoid overwriting ingress annotations
+	maps.Copy(annotations, cr.Spec.Template.Metadata.Annotations)
+	maps.Copy(annotations, cr.Spec.Ingress.Annotations)
 	ing := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cr.Name,
 			Namespace:   cr.Namespace,
-			Labels:      labels,
-			Annotations: ingress.Annotations,
+			Labels:      cr.childLabels(),
+			Annotations: annotations,
 		},
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: ingress.IngressClassName,
@@ -331,7 +341,6 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 
 // PVC returned the desired specification for a persistent volume claim
 func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
-	labels := labelsForAmaltheaSession(cr.Name)
 	requests := v1.ResourceList{"storage": resource.MustParse("1Gi")}
 	if cr.Spec.Session.Storage.Size != nil {
 		requests = v1.ResourceList{"storage": *cr.Spec.Session.Storage.Size}
@@ -339,9 +348,10 @@ func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
 
 	pvc := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name,
-			Namespace: cr.Namespace,
-			Labels:    labels,
+			Name:        cr.Name,
+			Namespace:   cr.Namespace,
+			Labels:      cr.childLabels(),
+			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
@@ -352,10 +362,11 @@ func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
 	return pvc
 }
 
-// labelsForAmaltheaSessino returns the labels for selecting the resources
+// selectorLabels returns the labels for selecting the resources
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
-func labelsForAmaltheaSession(name string) map[string]string {
-	return map[string]string{"app.kubernetes.io/name": "AmaltheaSession",
+func selectorLabels(name string) map[string]string {
+	return map[string]string{
+		"app.kubernetes.io/name":       "AmaltheaSession",
 		"app.kubernetes.io/instance":   name,
 		"app.kubernetes.io/part-of":    "amaltheasession-operator",
 		"app.kubernetes.io/created-by": "controller-manager",
@@ -530,15 +541,17 @@ func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 		case Rclone:
 			storageClass := rcloneStorageClass
 			readOnly := ds.AccessMode == v1.ReadOnlyMany
+			annotations := map[string]string{}
+			maps.Copy(annotations, as.Spec.Template.Metadata.Annotations)
+			annotations[rcloneStorageSecretNameAnnotation] = ds.SecretRef.Name
 			pvcs = append(
 				pvcs,
 				v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      pvcName,
-						Namespace: as.Namespace,
-						Annotations: map[string]string{
-							rcloneStorageSecretNameAnnotation: ds.SecretRef.Name,
-						},
+						Name:        pvcName,
+						Namespace:   as.Namespace,
+						Annotations: annotations,
+						Labels:      as.childLabels(),
 					},
 					Spec: v1.PersistentVolumeClaimSpec{
 						AccessModes: []v1.PersistentVolumeAccessMode{ds.AccessMode},
@@ -614,12 +627,12 @@ func (as *AmaltheaSession) InternalSecretName() string {
 // The secret will contain either, both or none of these configurations depending
 // on the configuration of the Amalthea session.
 func (as *AmaltheaSession) Secret() v1.Secret {
-	labels := labelsForAmaltheaSession(as.Name)
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      as.InternalSecretName(),
-			Namespace: as.Namespace,
-			Labels:    labels,
+			Name:        as.InternalSecretName(),
+			Namespace:   as.Namespace,
+			Labels:      as.childLabels(),
+			Annotations: as.Spec.Template.Metadata.Annotations,
 		},
 	}
 	// Secret used to secure the tunnel for remote sessions
@@ -954,4 +967,38 @@ func (cr *AmaltheaSession) tunnelContainer() v1.Container {
 	}
 
 	return tunnelContainer
+}
+
+// findConflicst will return all the keys from source that can be found in desintation.
+func findConflicts(destination, source map[string]string) []string {
+	conflicts := []string{}
+	for srcKey := range source {
+		_, found := destination[srcKey]
+		if found {
+			conflicts = append(conflicts, srcKey)
+		}
+	}
+	return conflicts
+}
+
+func (cr *AmaltheaSession) childLabels() map[string]string {
+	labels := map[string]string{}
+	maps.Copy(labels, cr.Spec.Template.Metadata.Labels)
+	selectorLabels := selectorLabels(cr.Name)
+	conflicts := findConflicts(labels, selectorLabels)
+	if len(conflicts) > 0 {
+		log.Log.Info(
+			"Found conflicts in template labels and selector labels, the selector labels will take precedence",
+			"template labels",
+			labels,
+			"selector labels",
+			selectorLabels,
+			"conflicting keys",
+			conflicts,
+		)
+	}
+	// NOTE: stuff from selectorLabels will overwrite conflicts in labels (if there are any)
+	// This is the desired behaviour, we do not want to overwrite the selector labels.
+	maps.Copy(labels, selectorLabels)
+	return labels
 }

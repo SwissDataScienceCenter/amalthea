@@ -29,6 +29,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	netwv1 "k8s.io/api/networking/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -78,7 +79,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 			}
 			err := k8sClient.Get(ctx, typeNamespacedName, amaltheasession)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &amaltheadevv1alpha1.AmaltheaSession{
+				amaltheasession = &amaltheadevv1alpha1.AmaltheaSession{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: namespace,
@@ -93,7 +94,7 @@ var _ = Describe("AmaltheaSession Controller", func() {
 						},
 					},
 				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+				Expect(k8sClient.Create(ctx, amaltheasession)).To(Succeed())
 			}
 		})
 
@@ -112,6 +113,53 @@ var _ = Describe("AmaltheaSession Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
 			// Example: If you expect a certain status condition after reconciliation, verify it here.
+		})
+
+		It("should propagate template labels", func(ctx SpecContext) {
+			// Run reconcile once to start
+			controllerReconciler := newReconciler()
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			// Adding new labels and annotations
+			newLabels := map[string]string{"renku.io/test": "something", "renku.io/new": "label"}
+			newAnnotations := map[string]string{"renku.io/annotation": "new", "renku.io/new": "annotation"}
+			newSession0 := amaltheasession.DeepCopy()
+			newSession0.Spec.Template.Metadata.Labels = newLabels
+			newSession0.Spec.Template.Metadata.Annotations = newAnnotations
+			newSession0.Spec.ReconcileStrategy = amaltheadevv1alpha1.Always
+			err = k8sClient.Patch(ctx, newSession0, client.MergeFrom(amaltheasession))
+			Expect(err).NotTo(HaveOccurred())
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			childrenMetadataCheck(ctx, k8sClient, typeNamespacedName, newLabels, newAnnotations, false)
+			// Removing some labels and annotations
+			newLabels = map[string]string{"renku.io/test": "something"}
+			newAnnotations = map[string]string{"renku.io/annotation": "new"}
+			newSession1 := newSession0.DeepCopy()
+			newSession1.Spec.Template.Metadata.Labels = newLabels
+			newSession1.Spec.Template.Metadata.Annotations = newAnnotations
+			err = k8sClient.Patch(ctx, newSession1, client.MergeFrom(newSession0))
+			Expect(err).NotTo(HaveOccurred())
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			childrenMetadataCheck(ctx, k8sClient, typeNamespacedName, newLabels, newAnnotations, false)
+			childrenMetadataCheck(ctx, k8sClient, typeNamespacedName, map[string]string{"renku.io/new": "label"}, map[string]string{"renku.io/new": "annotation"}, true)
+			// Labels that conflict with statefulset selectors are ignored
+			newLabels = map[string]string{"app.kubernetes.io/instance": "something"}
+			newSession2 := newSession1.DeepCopy()
+			newSession2.Spec.Template.Metadata.Labels = newLabels
+			err = k8sClient.Patch(ctx, newSession2, client.MergeFrom(newSession1))
+			Expect(err).NotTo(HaveOccurred())
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
@@ -513,3 +561,33 @@ var _ = Describe("AmaltheaSession Controller", func() {
 		})
 	})
 })
+
+func childrenMetadataCheck(ctx SpecContext, k8sClient client.Client, session types.NamespacedName, labels map[string]string, annotations map[string]string, testForAbsence bool) {
+	checkMetadata := func(child client.Object, labels, annotations map[string]string) {
+		for k, v := range labels {
+			if testForAbsence {
+				_, ok := child.GetLabels()[k]
+				Expect(ok).To(BeFalse())
+			} else {
+				Expect(child.GetLabels()[k]).To(Equal(v))
+			}
+		}
+		for k, v := range annotations {
+			if testForAbsence {
+				_, ok := child.GetAnnotations()[k]
+				Expect(ok).To(BeFalse())
+			} else {
+				Expect(child.GetAnnotations()[k]).To(Equal(v))
+			}
+		}
+	}
+	children := []client.Object{
+		&appsv1.StatefulSet{},
+		&netwv1.Ingress{},
+		&corev1.Service{},
+	}
+	for _, child := range children {
+		Expect(k8sClient.Get(ctx, session, child)).To(Succeed())
+		checkMetadata(child, labels, annotations)
+	}
+}

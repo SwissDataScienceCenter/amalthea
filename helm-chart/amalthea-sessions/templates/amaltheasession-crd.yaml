@@ -6438,6 +6438,22 @@ spec:
                 required:
                 - image
                 type: object
+              template:
+                description: Template for the fields that should be added to all children
+                  (and their children if applicable).
+                properties:
+                  metadata:
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                    type: object
+                type: object
               tolerations:
                 description: |-
                   If specified, the pod's tolerations.
