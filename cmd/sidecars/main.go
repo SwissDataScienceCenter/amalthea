@@ -20,6 +20,7 @@ import (
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/authproxy"
 	"github.com/SwissDataScienceCenter/amalthea/internal/cloner"
+	"github.com/SwissDataScienceCenter/amalthea/internal/git-https-proxy"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote"
 	"github.com/SwissDataScienceCenter/amalthea/internal/tunnel"
 	"github.com/spf13/cobra"
@@ -59,6 +60,10 @@ func buildCommands() *cobra.Command {
 		Use:   "tunnel listen",
 		Short: "Open an inbound tunnel",
 	}
+	gitProxyRoot := &cobra.Command{
+		Use:   "gitproxy proxy",
+		Short: "Proxy https git call",
+	}
 	rootCmd.AddCommand(versionCmd)
 	authCmd, err := authproxy.Command()
 	cobra.CheckErr(err)
@@ -68,14 +73,18 @@ func buildCommands() *cobra.Command {
 	cobra.CheckErr(err)
 	tunnelCmd, err := tunnel.Command()
 	cobra.CheckErr(err)
+	gitProxyCmd, err := gitproxy.Command()
+	cobra.CheckErr(err)
 	proxyRoot.AddCommand(authCmd)
 	clonerRoot.AddCommand(clonerCmd)
 	remoteSessionControllerRoot.AddCommand(remoteSessionControllerCmd)
 	tunnelRoot.AddCommand(tunnelCmd)
+	gitProxyRoot.AddCommand(gitProxyCmd)
 	rootCmd.AddCommand(proxyRoot)
 	rootCmd.AddCommand(clonerRoot)
 	rootCmd.AddCommand(remoteSessionControllerRoot)
 	rootCmd.AddCommand(tunnelRoot)
+	rootCmd.AddCommand(gitProxyRoot)
 	return rootCmd
 }
 

@@ -69,6 +69,14 @@ jobs:
           args: --file=./sidecars.Dockerfile --severity-threshold=high
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Scan git-https-proxy image
+        uses: snyk/actions/docker@master
+        continue-on-error: true
+        with:
+          image: ${{ steps.publish-chart.outputs.amalthea-git-https-proxy-image}}
+          args: --file=./git-https-proxy.Dockerfile --severity-threshold=high
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       - name: Upload Snyk report
         uses: github/codeql-action/upload-sarif@v3
         with:

@@ -158,7 +158,7 @@ build: manifests generate fmt vet ## Build manager binary.
 build-sidecars: fmt vet
 	go build -o bin/sidecars cmd/sidecars/main.go
 
-.PHONY: build-sidecars
+.PHONY: docker-build-sidecars
 docker-build-sidecars: build-sidecars
 	$(CONTAINER_TOOL) build -t ${SIDECARS_IMG} -f sidecars.Dockerfile .
 
