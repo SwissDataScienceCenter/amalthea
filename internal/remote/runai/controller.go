@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -30,7 +31,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/runai/auth"
 )
 
 // The script submitted to start a new remote session.
@@ -59,14 +62,26 @@ type RunaiRemoteSessionController struct {
 	fakeStart bool
 }
 
-func NewRunaiRemoteSessionController(client *RunaiClient, project string, fakeStart bool) (c *RunaiRemoteSessionController, err error) {
+func NewRunaiRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c *RunaiRemoteSessionController, err error) {
+	runaiAuth, err := auth.NewRunaiAuth(cfg.Runai.AuthConfig)
+	if err != nil {
+		return nil, err
+	}
+	runaiAPIURL, err := url.Parse(cfg.Runai.APIURL)
+	if err != nil {
+		return nil, err
+	}
+	runaiClient, err := NewRunaiClient(runaiAPIURL, WithAuth(runaiAuth))
+	if err != nil {
+		return nil, err
+	}
 	c = &RunaiRemoteSessionController{
-		client:        client,
+		client:        runaiClient,
 		jobName:       "",
-		project:       project,
+		project:       cfg.Runai.Project,
 		currentStatus: models.NotReady,
 		statusTicker:  time.NewTicker(time.Minute),
-		fakeStart:     fakeStart,
+		fakeStart:     cfg.FakeStart,
 	}
 	// Validate controller
 	if c.client == nil {

@@ -28,7 +28,8 @@ import (
 )
 
 const (
-	runaiAPIURLFlag = "runai-api-url"
+	runaiAPIURLFlag  = "runai-api-url"
+	runaiProjectFlag = "runai-project"
 )
 
 type RunaiConfig struct {
@@ -36,6 +37,8 @@ type RunaiConfig struct {
 	APIURL string
 	// The configuration used to authenticate with the Runai API
 	AuthConfig RunaiAuthConfig
+	// The Runai Project to use for running sessions
+	Project string
 }
 
 func SetFlags(cmd *cobra.Command) error {
@@ -44,6 +47,14 @@ func SetFlags(cmd *cobra.Command) error {
 		return err
 	}
 	if err := viper.BindEnv(runaiAPIURLFlag, configUtils.AsEnvVarFlag(runaiAPIURLFlag)); err != nil {
+		return err
+	}
+
+	cmd.Flags().String(runaiProjectFlag, "", "Runai project to use for running sessions")
+	if err := viper.BindPFlag(runaiProjectFlag, cmd.Flags().Lookup(runaiProjectFlag)); err != nil {
+		return err
+	}
+	if err := viper.BindEnv(runaiProjectFlag, configUtils.AsEnvVarFlag(runaiProjectFlag)); err != nil {
 		return err
 	}
 
@@ -58,6 +69,7 @@ func SetFlags(cmd *cobra.Command) error {
 func GetConfig() (cfg RunaiConfig, err error) {
 	cfg = RunaiConfig{}
 	cfg.APIURL = viper.GetString(runaiAPIURLFlag)
+	cfg.Project = viper.GetString(runaiProjectFlag)
 
 	runaiAuthConfig, err := GetAuthConfig()
 	if err != nil {
@@ -74,6 +86,7 @@ func (cfg *RunaiConfig) Validate() error {
 	if _, err := url.Parse(cfg.APIURL); err != nil {
 		return fmt.Errorf("runai.APIURL is not valid: %w", err)
 	}
+
 	if err := cfg.AuthConfig.Validate(); err != nil {
 		return err
 	}
