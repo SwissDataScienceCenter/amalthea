@@ -52,7 +52,7 @@ rules:
   resources:
     - persistentvolumeclaims
     - services
-  verbs: [create, get, list, watch]
+  verbs: [create, get, list, watch, patch]
 - apiGroups:
   - apps
   resources:
