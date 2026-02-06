@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
+	firecrestConfig "github.com/SwissDataScienceCenter/amalthea/internal/remote/config/firecrest"
 )
 
 // FirecrestAuth can inject authentication credentials into HTTP request to the FirecREST API
@@ -34,8 +34,8 @@ type FirecrestAuth interface {
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
 
-func NewFirecrestAuth(cfg config.FirecrestAuthConfig, options ...FirecrestAuthOption) (auth FirecrestAuth, err error) {
-	if cfg.Kind == config.FirecrestAuthConfigKindRenku {
+func NewFirecrestAuth(cfg firecrestConfig.FirecrestAuthConfig, options ...FirecrestAuthOption) (auth FirecrestAuth, err error) {
+	if cfg.Kind == firecrestConfig.FirecrestAuthConfigKindRenku {
 		opts := make([]RenkuAuthOption, len(options))
 		for i := range options {
 			opts[i] = options[i].renkuAuthOption
@@ -50,7 +50,7 @@ func NewFirecrestAuth(cfg config.FirecrestAuthConfig, options ...FirecrestAuthOp
 			opts...,
 		)
 	}
-	if cfg.Kind == config.FirecrestAuthConfigKindClientCredentials {
+	if cfg.Kind == firecrestConfig.FirecrestAuthConfigKindClientCredentials {
 		opts := make([]FirecrestClientCredentialsAuthOption, len(options))
 		for i := range options {
 			opts[i] = options[i].firecrestClientCredentialsAuthOption

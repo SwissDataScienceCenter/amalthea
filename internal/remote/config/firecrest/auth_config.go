@@ -1,19 +1,3 @@
-/*
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package config
 
 import (
@@ -22,6 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	configUtils "github.com/SwissDataScienceCenter/amalthea/internal/remote/config/utils"
 )
 
 const (
@@ -46,20 +32,20 @@ type FirecrestAuthConfig struct {
 	TokenURI string
 
 	// The Renku access token (renku auth)
-	RenkuAccessToken RedactedString
+	RenkuAccessToken configUtils.RedactedString
 	// The Renku refresh token (renku auth)
-	RenkuRefreshToken RedactedString
+	RenkuRefreshToken configUtils.RedactedString
 	// The URI used to issue new renku tokens (renku auth)
 	RenkuTokenURI string
 	// The Renku client ID (renku auth)
 	RenkuClientID string
 	// The Renku client secret (renku auth)
-	RenkuClientSecret RedactedString
+	RenkuClientSecret configUtils.RedactedString
 
 	// The FirecREST client ID (client credentials auth)
 	FirecrestClientID string
 	// The FirecREST client secret (client credentials auth)
-	FirecrestClientSecret RedactedString
+	FirecrestClientSecret configUtils.RedactedString
 }
 
 type FirecrestAuthConfigKind string
@@ -127,7 +113,7 @@ func SetAuthFlags(cmd *cobra.Command) error {
 	if err := viper.BindPFlag(authKindFlag, cmd.Flags().Lookup(authKindFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authKindFlag, AsEnvVarFlag(authKindFlag)); err != nil {
+	if err := viper.BindEnv(authKindFlag, configUtils.AsEnvVarFlag(authKindFlag)); err != nil {
 		return err
 	}
 
@@ -135,7 +121,7 @@ func SetAuthFlags(cmd *cobra.Command) error {
 	if err := viper.BindPFlag(authPrefix+"."+tokenURIFlag, cmd.Flags().Lookup(authPrefix+"-"+tokenURIFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authPrefix+"."+tokenURIFlag, AsEnvVarFlag(authPrefix+"-"+tokenURIFlag)); err != nil {
+	if err := viper.BindEnv(authPrefix+"."+tokenURIFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+tokenURIFlag)); err != nil {
 		return err
 	}
 
@@ -143,7 +129,7 @@ func SetAuthFlags(cmd *cobra.Command) error {
 	if err := viper.BindPFlag(authPrefix+"."+renkuAccessTokenFlag, cmd.Flags().Lookup(authPrefix+"-"+renkuAccessTokenFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authPrefix+"."+renkuAccessTokenFlag, AsEnvVarFlag(authPrefix+"-"+renkuAccessTokenFlag)); err != nil {
+	if err := viper.BindEnv(authPrefix+"."+renkuAccessTokenFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+renkuAccessTokenFlag)); err != nil {
 		return err
 	}
 
@@ -151,7 +137,7 @@ func SetAuthFlags(cmd *cobra.Command) error {
 	if err := viper.BindPFlag(authPrefix+"."+renkuRefreshTokenFlag, cmd.Flags().Lookup(authPrefix+"-"+renkuRefreshTokenFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authPrefix+"."+renkuRefreshTokenFlag, AsEnvVarFlag(authPrefix+"-"+renkuRefreshTokenFlag)); err != nil {
+	if err := viper.BindEnv(authPrefix+"."+renkuRefreshTokenFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+renkuRefreshTokenFlag)); err != nil {
 		return err
 	}
 
@@ -159,7 +145,7 @@ func SetAuthFlags(cmd *cobra.Command) error {
 	if err := viper.BindPFlag(authPrefix+"."+renkuTokenURIFlag, cmd.Flags().Lookup(authPrefix+"-"+renkuTokenURIFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authPrefix+"."+renkuTokenURIFlag, AsEnvVarFlag(authPrefix+"-"+renkuTokenURIFlag)); err != nil {
+	if err := viper.BindEnv(authPrefix+"."+renkuTokenURIFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+renkuTokenURIFlag)); err != nil {
 		return err
 	}
 
@@ -167,7 +153,7 @@ func SetAuthFlags(cmd *cobra.Command) error {
 	if err := viper.BindPFlag(authPrefix+"."+renkuClientIDFlag, cmd.Flags().Lookup(authPrefix+"-"+renkuClientIDFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authPrefix+"."+renkuClientIDFlag, AsEnvVarFlag(authPrefix+"-"+renkuClientIDFlag)); err != nil {
+	if err := viper.BindEnv(authPrefix+"."+renkuClientIDFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+renkuClientIDFlag)); err != nil {
 		return err
 	}
 
@@ -175,7 +161,7 @@ func SetAuthFlags(cmd *cobra.Command) error {
 	if err := viper.BindPFlag(authPrefix+"."+renkuClientSecretFlag, cmd.Flags().Lookup(authPrefix+"-"+renkuClientSecretFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authPrefix+"."+renkuClientSecretFlag, AsEnvVarFlag(authPrefix+"-"+renkuClientSecretFlag)); err != nil {
+	if err := viper.BindEnv(authPrefix+"."+renkuClientSecretFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+renkuClientSecretFlag)); err != nil {
 		return err
 	}
 
@@ -183,7 +169,7 @@ func SetAuthFlags(cmd *cobra.Command) error {
 	if err := viper.BindPFlag(authPrefix+"."+firecrestClientIDFlag, cmd.Flags().Lookup(authPrefix+"-"+firecrestClientIDFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authPrefix+"."+firecrestClientIDFlag, AsEnvVarFlag(authPrefix+"-"+firecrestClientIDFlag)); err != nil {
+	if err := viper.BindEnv(authPrefix+"."+firecrestClientIDFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+firecrestClientIDFlag)); err != nil {
 		return err
 	}
 
@@ -191,7 +177,7 @@ func SetAuthFlags(cmd *cobra.Command) error {
 	if err := viper.BindPFlag(authPrefix+"."+firecrestClientSecretFlag, cmd.Flags().Lookup(authPrefix+"-"+firecrestClientSecretFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(authPrefix+"."+firecrestClientSecretFlag, AsEnvVarFlag(authPrefix+"-"+firecrestClientSecretFlag)); err != nil {
+	if err := viper.BindEnv(authPrefix+"."+firecrestClientSecretFlag, configUtils.AsEnvVarFlag(authPrefix+"-"+firecrestClientSecretFlag)); err != nil {
 		return err
 	}
 
@@ -202,14 +188,13 @@ func GetAuthConfig() (cfg FirecrestAuthConfig, err error) {
 	cfg.Kind = FirecrestAuthConfigKind(viper.GetString(authKindFlag))
 	cfg.TokenURI = viper.GetString(authPrefix + "." + tokenURIFlag)
 
-	cfg.RenkuAccessToken = RedactedString(viper.GetString(authPrefix + "." + renkuAccessTokenFlag))
-	cfg.RenkuRefreshToken = RedactedString(viper.GetString(authPrefix + "." + renkuRefreshTokenFlag))
+	cfg.RenkuAccessToken = configUtils.RedactedString(viper.GetString(authPrefix + "." + renkuAccessTokenFlag))
+	cfg.RenkuRefreshToken = configUtils.RedactedString(viper.GetString(authPrefix + "." + renkuRefreshTokenFlag))
 	cfg.RenkuTokenURI = viper.GetString(authPrefix + "." + renkuTokenURIFlag)
 	cfg.RenkuClientID = viper.GetString(authPrefix + "." + renkuClientIDFlag)
-	cfg.RenkuClientSecret = RedactedString(viper.GetString(authPrefix + "." + renkuClientSecretFlag))
-
+	cfg.RenkuClientSecret = configUtils.RedactedString(viper.GetString(authPrefix + "." + renkuClientSecretFlag))
 	cfg.FirecrestClientID = viper.GetString(authPrefix + "." + firecrestClientIDFlag)
-	cfg.FirecrestClientSecret = RedactedString(viper.GetString(authPrefix + "." + firecrestClientSecretFlag))
+	cfg.FirecrestClientSecret = configUtils.RedactedString(viper.GetString(authPrefix + "." + firecrestClientSecretFlag))
 
 	return cfg, nil
 }
