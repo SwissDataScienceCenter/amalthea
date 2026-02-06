@@ -18,11 +18,9 @@ package controller
 
 import (
 	"context"
-	"net/url"
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest"
-	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest/auth"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
 )
 
@@ -34,19 +32,7 @@ type RemoteSessionController interface {
 
 // TODO: support different types of remote session controller
 func NewRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c RemoteSessionController, err error) {
-	firecrestAuth, err := auth.NewFirecrestAuth(cfg.Firecrest.AuthConfig)
-	if err != nil {
-		return nil, err
-	}
-	firecrestAPIURL, err := url.Parse(cfg.Firecrest.APIURL)
-	if err != nil {
-		return nil, err
-	}
-	firecrestClient, err := firecrest.NewFirecrestClient(firecrestAPIURL, firecrest.WithAuth(firecrestAuth))
-	if err != nil {
-		return nil, err
-	}
-	controller, err := firecrest.NewFirecrestRemoteSessionController(firecrestClient, cfg.Firecrest.SystemName, cfg.Firecrest.Partition, cfg.FakeStart)
+	controller, err := firecrest.NewFirecrestRemoteSessionController(cfg)
 	if err != nil {
 		return nil, err
 	}
