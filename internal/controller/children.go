@@ -93,6 +93,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				fallthrough
 			case amaltheadevv1alpha1.Always:
 				current.Spec = desired.Spec
+				current.ObjectMeta = desired.ObjectMeta
 			default:
 				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
 			}
@@ -146,6 +147,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
 				current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
 				current.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
+				current.ObjectMeta = desired.ObjectMeta
+				current.Spec.Template.ObjectMeta = desired.Spec.Template.ObjectMeta
 			default:
 				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
 			}
@@ -179,6 +182,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 					// NOTE: If the desired storage class is nil then the current spec contains the name for the default storage class
 					current.Spec.StorageClassName = desired.Spec.StorageClassName
 				}
+				current.ObjectMeta = desired.ObjectMeta
 			default:
 				return fmt.Errorf("attempting to reconcile PVC with unknown stategy %s", strategy)
 			}
@@ -209,6 +213,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Always:
 				current.Spec.Ports = desired.Spec.Ports
 				current.Spec.Selector = desired.Spec.Selector
+				current.ObjectMeta = desired.ObjectMeta
 			default:
 				return fmt.Errorf("attempting to reconcile service with unknown stategy %s", strategy)
 			}
@@ -254,6 +259,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				}
 				current.Data = desired.Data
 				current.StringData = preservedStringData
+				current.ObjectMeta = desired.ObjectMeta
 			default:
 				return fmt.Errorf("attempting to reconcile secret with unknown stategy %s", strategy)
 			}
