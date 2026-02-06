@@ -93,8 +93,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				fallthrough
 			case amaltheadevv1alpha1.Always:
 				current.Spec = desired.Spec
-				current.ObjectMeta.Labels = desired.ObjectMeta.Labels
-				current.ObjectMeta.Annotations = desired.ObjectMeta.Annotations
+				current.Labels = desired.Labels
+				current.Annotations = desired.Annotations
 			default:
 				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
 			}
@@ -149,10 +149,10 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
 				current.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
 				current.Spec.Selector = desired.Spec.Selector
-				current.ObjectMeta.Labels = desired.ObjectMeta.Labels
-				current.ObjectMeta.Annotations = desired.ObjectMeta.Annotations
-				current.Spec.Template.ObjectMeta.Labels = desired.Spec.Template.ObjectMeta.Labels
-				current.Spec.Template.ObjectMeta.Annotations = desired.Spec.Template.ObjectMeta.Annotations
+				current.Labels = desired.Labels
+				current.Annotations = desired.Annotations
+				current.Spec.Template.Labels = desired.Spec.Template.Labels
+				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
 			default:
 				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
 			}
@@ -186,8 +186,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 					// NOTE: If the desired storage class is nil then the current spec contains the name for the default storage class
 					current.Spec.StorageClassName = desired.Spec.StorageClassName
 				}
-				current.ObjectMeta.Labels = desired.ObjectMeta.Labels
-				current.ObjectMeta.Annotations = desired.ObjectMeta.Annotations
+				current.Labels = desired.Labels
+				current.Annotations = desired.Annotations
 			default:
 				return fmt.Errorf("attempting to reconcile PVC with unknown stategy %s", strategy)
 			}
@@ -218,8 +218,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Always:
 				current.Spec.Ports = desired.Spec.Ports
 				current.Spec.Selector = desired.Spec.Selector
-				current.ObjectMeta.Labels = desired.ObjectMeta.Labels
-				current.ObjectMeta.Annotations = desired.ObjectMeta.Annotations
+				current.Labels = desired.Labels
+				current.Annotations = desired.Annotations
 			default:
 				return fmt.Errorf("attempting to reconcile service with unknown stategy %s", strategy)
 			}
@@ -265,8 +265,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				}
 				current.Data = desired.Data
 				current.StringData = preservedStringData
-				current.ObjectMeta.Labels = desired.ObjectMeta.Labels
-				current.ObjectMeta.Annotations = desired.ObjectMeta.Annotations
+				current.Labels = desired.Labels
+				current.Annotations = desired.Annotations
 			default:
 				return fmt.Errorf("attempting to reconcile secret with unknown stategy %s", strategy)
 			}
