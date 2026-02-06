@@ -265,12 +265,20 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 		return nil
 	}
 
+	conflicts := findConflicts(ingress.Annotations, cr.Spec.Template.Metadata.Annotations)
+	if len(conflicts) > 0 {
+		log.Log.Info("Found conflicts in ingress annotations, will ignore templated conflicting annotations for ingress", "conflicting keys", conflicts)
+	}
+	annotations := map[string]string{}
+	// NOTE: Order between the two copy calls is important to avoid overwriting ingress annotations
+	maps.Copy(annotations, cr.Spec.Template.Metadata.Annotations)
+	maps.Copy(annotations, cr.Spec.Ingress.Annotations)
 	ing := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cr.Name,
 			Namespace:   cr.Namespace,
 			Labels:      cr.childLabels(),
-			Annotations: ingress.Annotations,
+			Annotations: annotations,
 		},
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: ingress.IngressClassName,
