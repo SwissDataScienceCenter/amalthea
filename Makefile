@@ -397,3 +397,17 @@ kind_cluster: ## Start a kind cluster
     kubectl patch -n kube-system deployment metrics-server --type=json \
     -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
 	@echo "Done"
+
+##@ Devcontainer
+
+.PHONY: devcontainer_up
+devcontainer_up:  ## Start dev containers
+	devcontainer up --workspace-folder .
+
+.PHONY: devcontainer_rebuild
+devcontainer_rebuild:  ## Rebuild dev containers images
+	devcontainer up --remove-existing-container --workspace-folder .
+
+.PHONY: devcontainer_exec
+devcontainer_exec: devcontainer_up ## Start a shell in the development container
+	devcontainer exec --workspace-folder . -- bash
