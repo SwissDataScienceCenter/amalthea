@@ -90,4 +90,7 @@ func TestBasicAPI(t *testing.T) {
 	cmd.SetArgs([]string{"tunnel", "listen", "--help"})
 	err = cmd.Execute()
 	assert.NoError(err)
+	cmd.SetArgs([]string{"gitproxy", "proxy", "--help"})
+	err = cmd.Execute()
+	assert.NoError(err)
 }

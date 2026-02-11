@@ -1,0 +1,6 @@
+{
+  "id": "fix-yarnpkg",
+  "version": "1.0.0",
+  "name": "A feature to fix the GPG signing key of yarnpkg",
+  "options": {}
+}
