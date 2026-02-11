@@ -111,12 +111,14 @@ func hostsMatch(url1 *url.URL, url2 *url.URL) bool {
 
 // Infer port if not explicitly specified
 func getPort(urlAddress *url.URL) string {
-	if urlAddress.Port() == "" {
-		if urlAddress.Scheme == "http" {
-			return "80"
-		} else if urlAddress.Scheme == "https" {
-			return "443"
+	port := urlAddress.Port()
+	if port == "" {
+		switch urlAddress.Scheme {
+		case "http":
+			port = "80"
+		case "https":
+			port = "443"
 		}
 	}
-	return urlAddress.Port()
+	return port
 }

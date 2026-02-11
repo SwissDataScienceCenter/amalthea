@@ -20,7 +20,7 @@ import (
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/authproxy"
 	"github.com/SwissDataScienceCenter/amalthea/internal/cloner"
-	"github.com/SwissDataScienceCenter/amalthea/internal/git-https-proxy"
+	gitproxy "github.com/SwissDataScienceCenter/amalthea/internal/git-https-proxy"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote"
 	"github.com/SwissDataScienceCenter/amalthea/internal/tunnel"
 	"github.com/spf13/cobra"

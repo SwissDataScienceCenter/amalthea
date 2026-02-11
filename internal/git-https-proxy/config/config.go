@@ -84,7 +84,7 @@ func GetConfig() (GitProxyConfig, error) {
 }
 
 func (c *GitProxyConfig) Validate() error {
-	//? INFO: The proxy is a pass-through for anonymous sessions, so no config is required.
+	// INFO: The proxy is a pass-through for anonymous sessions, so no config is required.
 	if c.AnonymousSession {
 		return nil
 	}

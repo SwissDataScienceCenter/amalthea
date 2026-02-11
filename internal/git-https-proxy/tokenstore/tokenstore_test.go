@@ -64,17 +64,29 @@ func setUpDummyRefreshEndpoints(gitRefreshResponse *gitTokenRefreshResponse, ren
 		log.Printf("Handling git token refresh request at %s", r.URL.String())
 		if gitRefreshResponse == nil {
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("Cannot refresh git token"))
+			_, err := w.Write([]byte("Cannot refresh git token"))
+			if err != nil {
+				log.Fatalln(err)
+			}
 		}
-		json.NewEncoder(w).Encode(gitRefreshResponse)
+		err := json.NewEncoder(w).Encode(gitRefreshResponse)
+		if err != nil {
+			log.Fatalln(err)
+		}
 	}
 	renkuHandlerFunc := func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Handling renku token refresh request at %s", r.URL.String())
 		if renkuRefreshResponse == nil {
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("Cannot refresh renku token"))
+			_, err := w.Write([]byte("Cannot refresh renku token"))
+			if err != nil {
+				log.Fatalln(err)
+			}
 		}
-		json.NewEncoder(w).Encode(renkuRefreshResponse)
+		err := json.NewEncoder(w).Encode(renkuRefreshResponse)
+		if err != nil {
+			log.Fatalln(err)
+		}
 	}
 	handler.HandleFunc("/api/oauth2/token", gitHandlerFunc)
 	handler.HandleFunc("/auth/realms/Renku/protocol/openid-connect/token", renkuHandlerFunc)

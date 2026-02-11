@@ -58,12 +58,12 @@ func gitproxy(cmd *cobra.Command, args []string) error {
 		cmd.Println("Warning: Starting the git-proxy for an anonymous session, which is essentially useless.")
 	}
 
-	//? INFO: Make a channel that will receive the SIGTERM on shutdown
+	// INFO: Make a channel that will receive the SIGTERM on shutdown
 	sigTerm := make(chan os.Signal, 1)
 	signal.Notify(sigTerm, syscall.SIGTERM, syscall.SIGINT)
 	ctx := context.Background()
 
-	//? INFO: Setup servers
+	// INFO: Setup servers
 	proxyHandler := proxy.GetProxyHandler(config)
 	proxyServer := http.Server{
 		Addr:    fmt.Sprintf(":%d", config.ProxyPort),
@@ -75,7 +75,7 @@ func gitproxy(cmd *cobra.Command, args []string) error {
 		Handler: healthHandler,
 	}
 
-	//? INFO: Run servers in the background
+	// INFO: Run servers in the background
 	go func() {
 		cmd.Printf("Health server active on port %d\n", config.HealthPort)
 		log.Fatalln(healthServer.ListenAndServe())
@@ -85,9 +85,9 @@ func gitproxy(cmd *cobra.Command, args []string) error {
 		log.Fatalln(proxyServer.ListenAndServe())
 	}()
 
-	//? INFO: Block until you receive sigTerm to shutdown. All of this is necessary
-	//? INFO: because the proxy has to shut down only after all the other containers do so in case
-	//? INFO: any other containers (i.e. session or sidecar) need git right before shutting down.
+	// INFO: Block until you receive sigTerm to shutdown. All of this is necessary
+	// INFO: because the proxy has to shut down only after all the other containers do so in case
+	// INFO: any other containers (i.e. session or sidecar) need git right before shutting down.
 	<-sigTerm
 	cmd.Println("SIGTERM received. Shutting down servers.")
 	err = healthServer.Shutdown(ctx)
@@ -117,7 +117,10 @@ func getHealthHandler(config configLib.GitProxyConfig) *http.ServeMux {
 		if err != nil {
 			log.Fatalf("Error happened in JSON marshal. Err: %s", err)
 		}
-		w.Write(jsonResp)
+		_, err = w.Write(jsonResp)
+		if err != nil {
+			log.Fatalf("Error writing . Err: %s", err)
+		}
 	})
 	handler.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		proxyUrl, err := url.Parse(fmt.Sprintf("http://localhost:%d", config.ProxyPort))
@@ -130,7 +133,9 @@ func getHealthHandler(config configLib.GitProxyConfig) *http.ServeMux {
 			log.Println("The GET request to /ping from within /health failed with:", err)
 			w.WriteHeader(http.StatusBadRequest)
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 		if resp.StatusCode >= 200 && resp.StatusCode <= 400 {
 			w.WriteHeader(http.StatusOK)
 		} else {
