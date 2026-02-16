@@ -217,7 +217,7 @@ func serve(cmd *cobra.Command, args []string) {
 		// NOTE: Rstudio has problems with parsing the Forwarded header to decide where the url is and
 		// because it parses the forwarded header wrong it gets the hostname wrong. So we remove the
 		// forwarded header so that it falls back to X-Forwarded-Host which it can parse correctly.
-		// This problem occured on openshift which adds the forwarded header which is newer. But Rstudio
+		// This problem occurred on openshift which adds the forwarded header which is newer. But Rstudio
 		// does not parse this correctly, splitting on dashes and it gets the hostname wrong.
 		return func(c echo.Context) error {
 			c.Request().Header.Del("Forwarded")
