@@ -212,6 +212,19 @@ func serve(cmd *cobra.Command, args []string) {
 			URL: remoteURL,
 		},
 	}
+
+	removeForwardedHeader := func(next echo.HandlerFunc) echo.HandlerFunc {
+		// NOTE: Rstudio has problems with parsing the Forwarded header to decide where the url is and
+		// because it parses the forwarded header wrong it gets the hostname wrong. So we remove the
+		// forwarded header so that it falls back to X-Forwarded-Host which it can parse correctly.
+		// This problem occurred on openshift which adds the forwarded header which is newer. But Rstudio
+		// does not parse this correctly, splitting on dashes and it gets the hostname wrong.
+		return func(c echo.Context) error {
+			c.Request().Header.Del("Forwarded")
+			return next(c)
+		}
+	}
+
 	// NOTE: You have to have "/*", if you just use "/" for the group path it will not route properly
 	proxy := e.Group("/*")
 	if len(stripPathPrefix) > 0 {
@@ -225,10 +238,12 @@ func serve(cmd *cobra.Command, args []string) {
 			fmt.Sprintf("%s*", stripPathPrefix): "/$1",
 		}
 		e.Logger.Info("Will use path rewrite rules %+v", rules)
+		proxyMWs = append(proxyMWs, removeForwardedHeader)
 		proxyMWs = append(proxyMWs, middleware.Rewrite(rules))
 	} else {
 		e.Logger.Info("Running without path rewriting")
 	}
+
 	proxyMWs = append(proxyMWs, middleware.Proxy(middleware.NewRoundRobinBalancer(targets)))
 	proxy.Use(proxyMWs...)
 
