@@ -11,7 +11,7 @@ import (
 	"time"
 
 	configLib "github.com/SwissDataScienceCenter/amalthea/internal/git-https-proxy/config"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -95,12 +95,14 @@ func setUpDummyRefreshEndpoints(gitRefreshResponse *gitTokenRefreshResponse, ren
 
 type DummySigningMethod struct{}
 
-func (d DummySigningMethod) Verify(signingString, signature string, key interface{}) error {
+func (d DummySigningMethod) Verify(signingString string, signature []byte, key any) error {
 	return nil
 }
 
-func (d DummySigningMethod) Sign(signingString string, key interface{}) (string, error) {
-	return base64.URLEncoding.EncodeToString([]byte(signingString)), nil
+func (d DummySigningMethod) Sign(signingString string, key any) ([]byte, error) {
+	dst := make([]byte, base64.StdEncoding.EncodedLen(len(signingString)))
+	base64.URLEncoding.Encode(dst, []byte(signingString))
+	return dst, nil
 }
 
 func (d DummySigningMethod) Alg() string { return "none" }

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/git-https-proxy/config"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type TokenSet struct {
@@ -166,6 +166,29 @@ func (s *TokenStore) getRenkuAccessToken() string {
 	return s.renkuAccessToken
 }
 
+// VerifyExpiresAt implements the same logic as can be found in jwt v4 but
+// in the style of v5.
+//
+// Main difference is that the exp nil check is hard coded to false.
+//
+// v4 implementation boils down to comparing the value passed to the expiration time.
+// v5 changed that: "now" is compared to the expiration time with leeway added.
+func VerifyExpiresAt(claims jwt.RegisteredClaims, leeway time.Duration) (bool, error) {
+	exp, err := claims.GetExpirationTime()
+	if err != nil {
+		return true, err
+	}
+
+	// Here we have it setup so that if the exp claim is not defined we assume the token is not expired.
+	// Keycloak does not set the `exp` claim on tokens that have the offline access grant - because they do not expire.
+	if exp == nil {
+		return false, nil
+	}
+
+	cmp := time.Now().Add(+leeway)
+	return cmp.Before(exp.Time), nil
+}
+
 // Checks if the expiry of the token has passed or is coming up soon based on a predefined threshold.
 // NOTE: no signature validation is performed at all. All of the tokens in the proxy are trusted implicitly
 // because they come from trusted/controlled sources.
@@ -176,11 +199,13 @@ func (s *TokenStore) isJWTExpired(token string) (bool, error) {
 		log.Printf("Cannot parse token claims, assuming token is expired: %s\n", err.Error())
 		return true, err
 	}
-	// VerifyExpiresAt returns cmp.Before(exp) if exp is set, otherwise !req if exp is not set.
-	// Here we have it setup so that if the exp claim is not defined we assume the token is not expired.
-	// Keycloak does not set the `exp` claim on tokens that have the offline access grant - because they do not expire.
-	jwtIsNotExpired := claims.VerifyExpiresAt(time.Now().Add(s.ExpirationLeeway), false)
-	return !jwtIsNotExpired, nil
+
+	jwtIsNotExpired, err := VerifyExpiresAt(claims, s.ExpirationLeeway)
+	if err != nil {
+		return true, err
+	}
+
+	return !jwtIsNotExpired, err
 }
 
 type renkuTokenRefreshResponse struct {
@@ -207,7 +232,7 @@ func (s *TokenStore) refreshRenkuAccessToken() error {
 		return err
 	}
 	if res.StatusCode != 200 {
-		err = fmt.Errorf("cannot refresh renku access token, failed with staus code: %d", res.StatusCode)
+		err = fmt.Errorf("cannot refresh renku access token, failed with status code: %d", res.StatusCode)
 		return err
 	}
 	var resParsed renkuTokenRefreshResponse
