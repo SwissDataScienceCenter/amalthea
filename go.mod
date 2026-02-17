@@ -6,6 +6,7 @@ tool fybrik.io/crdoc
 
 require (
 	github.com/distribution/reference v0.6.0
+	github.com/elazarl/goproxy v1.7.2
 	github.com/getkin/kin-openapi v0.132.0
 	github.com/getsentry/sentry-go v0.36.2
 	github.com/go-git/go-git/v5 v5.16.0
@@ -13,6 +14,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/labstack/gommon v0.4.2
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/oapi-codegen/oapi-codegen/v2 v2.5.0
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
