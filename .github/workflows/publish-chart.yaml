@@ -34,9 +34,7 @@ jobs:
           git config --global user.name "Renku Bot"
           echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
           export TAG=$(echo ${GITHUB_REF} | cut -d/ -f3)
-          helm dep update amalthea
           helm dep update amalthea-sessions
-          helm lint amalthea
           helm lint amalthea-sessions
           cd ..
           export PLATFORM_ARGS="--platform linux/amd64 --platform linux/arm64 --builder docker-buildx"
