@@ -47,7 +47,7 @@ func TestConfig(t *testing.T) {
 		{
 			name: "runai with client credentials",
 			args: []string{
-				"--runai-api-url=https://runai.example.com",
+				"--runai-base-url=https://runai.example.com",
 				"--runai-project=my-project",
 				"--auth-kind=client_credentials",
 				"--auth-token-uri=https://runai-auth.example.com/token",

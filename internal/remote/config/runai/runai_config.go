@@ -28,13 +28,13 @@ import (
 )
 
 const (
-	runaiAPIURLFlag  = "runai-api-url"
+	runaiBaseURLFlag = "runai-base-url"
 	runaiProjectFlag = "runai-project"
 )
 
 type RunaiConfig struct {
-	// The URL of the Runai API
-	APIURL string
+	// The Base URL of the Runai host
+	BaseURL string
 	// The configuration used to authenticate with the Runai API
 	AuthConfig RunaiAuthConfig
 	// The Runai Project to use for running sessions
@@ -42,11 +42,11 @@ type RunaiConfig struct {
 }
 
 func SetFlags(cmd *cobra.Command) error {
-	cmd.Flags().String(runaiAPIURLFlag, "", "URL of the Runai API")
-	if err := viper.BindPFlag(runaiAPIURLFlag, cmd.Flags().Lookup(runaiAPIURLFlag)); err != nil {
+	cmd.Flags().String(runaiBaseURLFlag, "", "Base URL of the Runai host")
+	if err := viper.BindPFlag(runaiBaseURLFlag, cmd.Flags().Lookup(runaiBaseURLFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(runaiAPIURLFlag, configUtils.AsEnvVarFlag(runaiAPIURLFlag)); err != nil {
+	if err := viper.BindEnv(runaiBaseURLFlag, configUtils.AsEnvVarFlag(runaiBaseURLFlag)); err != nil {
 		return err
 	}
 
@@ -68,20 +68,20 @@ func SetFlags(cmd *cobra.Command) error {
 
 func GetConfig() (cfg RunaiConfig) {
 	cfg = RunaiConfig{}
-	cfg.APIURL = viper.GetString(runaiAPIURLFlag)
+	cfg.BaseURL = viper.GetString(runaiBaseURLFlag)
 	cfg.Project = viper.GetString(runaiProjectFlag)
 
-	runaiAuthConfig := GetAuthConfig(cfg.APIURL)
+	runaiAuthConfig := GetAuthConfig(cfg.BaseURL)
 	cfg.AuthConfig = runaiAuthConfig
 	return cfg
 }
 
 func (cfg *RunaiConfig) Validate() error {
-	if cfg.APIURL == "" {
-		return fmt.Errorf("runai.APIURL is not defined")
+	if cfg.BaseURL == "" {
+		return fmt.Errorf("runai.BaseURL is not defined")
 	}
-	if _, err := url.Parse(cfg.APIURL); err != nil {
-		return fmt.Errorf("runai.APIURL is not valid: %w", err)
+	if _, err := url.Parse(cfg.BaseURL); err != nil {
+		return fmt.Errorf("runai.BaseURL is not valid: %w", err)
 	}
 
 	if err := cfg.AuthConfig.Validate(); err != nil {

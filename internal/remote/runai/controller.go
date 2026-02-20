@@ -68,11 +68,11 @@ func NewRunaiRemoteSessionController(cfg config.RemoteSessionControllerConfig) (
 	if err != nil {
 		return nil, err
 	}
-	runaiAPIURL, err := url.Parse(cfg.Runai.APIURL)
+	runaiBaseURL, err := url.Parse(cfg.Runai.BaseURL)
 	if err != nil {
 		return nil, err
 	}
-	runaiClient, err := NewRunaiClient(runaiAPIURL, WithAuth(runaiAuth))
+	runaiClient, err := NewRunaiClient(runaiBaseURL, WithAuth(runaiAuth))
 	if err != nil {
 		return nil, err
 	}

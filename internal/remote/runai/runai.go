@@ -31,7 +31,7 @@ type RunaiClient struct {
 	httpClient *http.Client
 }
 
-func NewRunaiClient(apiURL *url.URL, options ...RunaiClientOption) (rc *RunaiClient, err error) {
+func NewRunaiClient(baseUrl *url.URL, options ...RunaiClientOption) (rc *RunaiClient, err error) {
 	rc = &RunaiClient{}
 	for _, opt := range options {
 		if err := opt(rc); err != nil {
@@ -43,7 +43,7 @@ func NewRunaiClient(apiURL *url.URL, options ...RunaiClientOption) (rc *RunaiCli
 		rc.httpClient = http.DefaultClient
 	}
 
-	client, err := NewRunaiApi(apiURL.String(), rc.auth, rc.httpClient)
+	client, err := NewRunaiApi(baseUrl.String(), rc.auth, rc.httpClient)
 	if err != nil {
 		return nil, err
 	}
