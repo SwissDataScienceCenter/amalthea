@@ -43,6 +43,7 @@ jobs:
           chartpress --tag latest --push $PLATFORM_ARGS
           echo "amalthea-sessions-image=renku/amalthea-sessions:$TAG" >> $GITHUB_OUTPUT
           echo "amalthea-sidecars-image=renku/sidecars:$TAG" >> $GITHUB_OUTPUT
+          echo "amalthea-cloner-image=renku/cloner:$TAG" >> $GITHUB_OUTPUT
       - name: Scan amalthea-sessions image
         uses: snyk/actions/docker@master
         continue-on-error: true
@@ -73,6 +74,14 @@ jobs:
         with:
           image: ${{ steps.publish-chart.outputs.amalthea-git-https-proxy-image}}
           args: --file=./git-https-proxy.Dockerfile --severity-threshold=high
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Scan cloner image
+        uses: snyk/actions/docker@master
+        continue-on-error: true
+        with:
+          image: ${{ steps.publish-chart.outputs.amalthea-cloner-image}}
+          args: --file=./cloner.Dockerfile --severity-threshold=high
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       - name: Upload Snyk report

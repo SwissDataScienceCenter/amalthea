@@ -51,3 +51,8 @@ sidecars:
   image:
     repository: renku/sidecars
     tag: latest
+
+cloner:
+  image:
+    repository: renku/cloner
+    tag: latest
