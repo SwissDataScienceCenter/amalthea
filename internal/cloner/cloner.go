@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -56,22 +55,6 @@ func (c *Cloner) execute(repository Repository) error {
 	}
 
 	err = c.clone(repository)
-	if err != nil {
-		return err
-	}
-
-	// Manage storage mounts
-	// NOTE: If the storage mount location already exists it means that the repo folder/file
-	// or another existing file will be overwritten, so raise an error here and crash.
-	for _, mount := range c.config.StorageMounts {
-		_, err := os.Stat(mount)
-		if err == nil {
-			return fmt.Errorf("cloud storage overwrites existing file")
-		}
-	}
-
-	log.Println("Excluding cloud storage from git")
-	err = repository.ExcludePathFromGit(c.config.StorageMounts)
 	if err != nil {
 		return err
 	}

@@ -38,7 +38,6 @@ type CloneConfig struct {
 	GitProxyPort      int    `mapstructure:"git_proxy_port"`
 	Repositories      []Repository
 	GitProviders      []GitProvider
-	StorageMounts     []string
 }
 
 type RefreshTokenAnswer struct {
@@ -105,25 +104,6 @@ func loadGitProviders() []GitProvider {
 	return providers
 }
 
-func loadStorageMounts() []string {
-	template := "GIT_CLONE_STORAGE_MOUNTS_%v"
-
-	mounts := []string{}
-
-	i := 0
-	for {
-		val, ok := os.LookupEnv(fmt.Sprintf(template, i))
-		if !ok {
-			// All variables have been handled
-			break
-		}
-		mounts = append(mounts, strings.Trim(val, "\""))
-		i += 1
-	}
-
-	return mounts
-}
-
 func shellClone(cmd *cobra.Command, args []string) {
 	v := viper.New()
 	v.SetConfigType("env")
@@ -158,7 +138,6 @@ func shellClone(cmd *cobra.Command, args []string) {
 
 	config.Repositories = loadRepositories(config)
 	config.GitProviders = loadGitProviders()
-	config.StorageMounts = loadStorageMounts()
 
 	cloner := Cloner{config, user, "origin"}
 
