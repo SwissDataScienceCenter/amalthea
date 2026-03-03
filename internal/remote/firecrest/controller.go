@@ -38,6 +38,7 @@ import (
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest/auth"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
+	"github.com/SwissDataScienceCenter/amalthea/internal/utils"
 	"k8s.io/utils/ptr"
 )
 
@@ -258,6 +259,16 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 			env[key] = val
 		}
 	}
+
+	// Format the REMOTE_SESSION_IMAGE environment variable for enroot
+	enrootImage, err := utils.EnrootImageFormat(env["REMOTE_SESSION_IMAGE"])
+	if err == nil {
+		env["REMOTE_SESSION_IMAGE"] = enrootImage
+	} else {
+		// TODO: Is this the best way to report this?
+		slog.Warn("could not format REMOTE_SESSION_IMAGE for enroot, using the original value", "REMOTE_SESSION_IMAGE", env["REMOTE_SESSION_IMAGE"], "error", err)
+	}
+
 	// Copy RENKU environment variables
 	for _, environ := range os.Environ() {
 		key, val, _ := strings.Cut(environ, "=")
