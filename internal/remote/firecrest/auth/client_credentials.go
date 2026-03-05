@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	sharedAuth "github.com/SwissDataScienceCenter/amalthea/internal/remote/auth/shared"
 )
 
 // FirecrestClientCredentialsAuth implements the "Client Credentials Grant"
@@ -85,18 +87,8 @@ type FirecrestClientCredentialsAuthOption func(*FirecrestClientCredentialsAuth) 
 
 // RequestEditor returns a request editor which injects a valid access token
 // for FirecREST API requests.
-func (a *FirecrestClientCredentialsAuth) RequestEditor() RequestEditorFn {
-	return func(ctx context.Context, req *http.Request) error {
-		if req.Header.Get("Authorization") != "" {
-			return nil
-		}
-		token, err := a.GetAccessToken(ctx)
-		if err != nil {
-			return err
-		}
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
-		return nil
-	}
+func (a *FirecrestClientCredentialsAuth) RequestEditor() sharedAuth.RequestEditorFn {
+	return sharedAuth.RequestEditorInjectAccessToken(a)
 }
 
 func (a *FirecrestClientCredentialsAuth) GetAccessToken(ctx context.Context) (token string, err error) {
