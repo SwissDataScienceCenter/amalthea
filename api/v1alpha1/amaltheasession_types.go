@@ -221,6 +221,14 @@ type Ingress struct {
 	UseDefaultClusterTLSCert bool `json:"useDefaultClusterTLSCert,omitempty"`
 }
 
+func (ingress *Ingress) UrlScheme() string {
+	urlScheme := "http"
+	if (ingress.TLSSecret != nil && ingress.TLSSecret.Name != "") || ingress.UseDefaultClusterTLSCert {
+		urlScheme = "https"
+	}
+	return urlScheme
+}
+
 type Storage struct {
 	// +optional
 	ClassName *string `json:"className,omitempty"`
@@ -519,10 +527,7 @@ func (a *AmaltheaSession) GetURL() *url.URL {
 	if a.Spec.Ingress == nil || a.Spec.Ingress.Host == "" {
 		return nil
 	}
-	urlScheme := "http"
-	if a.Spec.Ingress.TLSSecret != nil && a.Spec.Ingress.TLSSecret.Name != "" {
-		urlScheme = "https"
-	}
+	urlScheme := a.Spec.Ingress.UrlScheme()
 	path := a.Spec.Session.URLPath
 	// NOTE: We have to end with / because of the oauth2proxy, it matches paths
 	// that do not end with / exactly and wont match subpaths.

@@ -209,6 +209,12 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 				Expect(k8sClient.Get(ctx, typeNamespacedName, patched)).To(Succeed())
 				patched.Spec.Hibernated = true
 				Expect(k8sClient.Update(ctx, patched)).To(Succeed())
+				// Make sure the session has stopped, and the pod has been cleaned up
+				Eventually(func(g Gomega) {
+					sessionPod, err = amaltheasession.GetPod(ctx, k8sClient)
+					g.Expect(err).To(HaveOccurred())
+					g.Expect(sessionPod).To(BeNil())
+				}, "60s").WithContext(ctx).Should(Succeed())
 				By("Resuming the session we should see the new changes")
 				patched = &amaltheadevv1alpha1.AmaltheaSession{}
 				Expect(k8sClient.Get(ctx, typeNamespacedName, patched)).To(Succeed())
