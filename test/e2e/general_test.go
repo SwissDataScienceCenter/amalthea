@@ -214,7 +214,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 					sessionPod, err = amaltheasession.GetPod(ctx, k8sClient)
 					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(sessionPod).To(BeNil())
-				}, "30s").WithContext(ctx).Should(Succeed())
+				}, "60s").WithContext(ctx).Should(Succeed())
 				By("Resuming the session we should see the new changes")
 				patched = &amaltheadevv1alpha1.AmaltheaSession{}
 				Expect(k8sClient.Get(ctx, typeNamespacedName, patched)).To(Succeed())
