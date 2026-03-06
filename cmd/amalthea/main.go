@@ -22,6 +22,7 @@ import (
 	"errors"
 	"flag"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -89,6 +90,13 @@ func main() {
 		0,
 		"The sample rate for Sentry performance monitoring.",
 	)
+
+	var extraArgsString string
+	flag.StringVar(&extraArgsString, "oauth2-extra-args", "", "extra arguments to provide to the OAuth2Proxy sidecar Container, separated by comma.")
+	for _, arg := range strings.Split(extraArgsString, ",") {
+		amaltheadevv1alpha1.OAuth2ExtraArgs = append(amaltheadevv1alpha1.OAuth2ExtraArgs, strings.TrimSpace(arg))
+	}
+
 	opts := zap.Options{
 		Development: true,
 	}
