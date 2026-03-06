@@ -212,7 +212,7 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 				// Make sure the session has stopped, and the pod has been cleaned up
 				Eventually(func(g Gomega) {
 					sessionPod, err = amaltheasession.GetPod(ctx, k8sClient)
-					g.Expect(err).To(HaveOccurred())
+					g.Expect(err).NotTo(HaveOccurred())
 					g.Expect(sessionPod).To(BeNil())
 				}, "30s").WithContext(ctx).Should(Succeed())
 				By("Resuming the session we should see the new changes")
