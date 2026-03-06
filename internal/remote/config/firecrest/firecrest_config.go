@@ -31,8 +31,6 @@ const (
 	firecrestAPIURLFlag     = "firecrest-api-url"
 	firecrestSystemNameFlag = "firecrest-system-name"
 	firecrestPartitionFlag  = "firecrest-partition"
-	serverPortFlag          = "server-port"
-	fakeStartFlag           = "fake-start"
 )
 
 type FirecrestConfig struct {
@@ -79,19 +77,16 @@ func SetFlags(cmd *cobra.Command) error {
 	return nil
 }
 
-func GetConfig() (cfg FirecrestConfig, err error) {
+func GetConfig() (cfg FirecrestConfig) {
 	cfg = FirecrestConfig{}
 	cfg.APIURL = viper.GetString(firecrestAPIURLFlag)
 	cfg.SystemName = viper.GetString(firecrestSystemNameFlag)
 	cfg.Partition = viper.GetString(firecrestPartitionFlag)
 
-	firecrestAuthConfig, err := GetAuthConfig()
-	if err != nil {
-		return cfg, nil
-	}
+	firecrestAuthConfig := GetAuthConfig()
 	cfg.AuthConfig = firecrestAuthConfig
 
-	return cfg, nil
+	return cfg
 }
 
 func (cfg *FirecrestConfig) Validate() error {
