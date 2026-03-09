@@ -138,16 +138,7 @@ func (c *RunaiRemoteSessionController) Start(ctx context.Context) error {
 		renkuBaseURLPath = "/"
 		slog.Warn("RENKU_BASE_URL_PATH is not defined", "defaultValue", renkuBaseURLPath)
 	}
-	renkuWorkDir := strings.TrimSuffix(os.Getenv("RENKU_WORKING_DIR"), "/")
-	if renkuWorkDir == "" {
-		renkuWorkDir = "/home/renku/work"
-		slog.Warn("RENKU_WORKING_DIR is not defined", "defaultValue", renkuWorkDir)
-	}
-	renkuMountDir := strings.TrimSuffix(os.Getenv("RENKU_MOUNT_DIR"), "/")
-	if renkuMountDir == "" {
-		renkuMountDir = renkuWorkDir
-		slog.Warn("RENKU_MOUNT_DIR is not defined", "defaultValue", renkuMountDir)
-	}
+	renkuWorkDir, renkuMountDir := getRenkuSessionDirs()
 	renkuPort := os.Getenv("RENKU_SESSION_PORT")
 	if renkuPort == "" {
 		renkuPort = "8888"
@@ -328,8 +319,22 @@ type savedState struct {
 	JobId   string `json:"job_id"`
 }
 
+func getRenkuSessionDirs() (workDir, mountDir string) {
+	workDir = strings.TrimSuffix(os.Getenv("RENKU_WORKING_DIR"), "/")
+	if workDir == "" {
+		workDir = "/home/renku/work"
+		slog.Warn("RENKU_WORKING_DIR is not defined", "defaultValue", workDir)
+	}
+	mountDir = strings.TrimSuffix(os.Getenv("RENKU_MOUNT_DIR"), "/")
+	if mountDir == "" {
+		mountDir = workDir
+		slog.Warn("RENKU_MOUNT_DIR is not defined", "defaultValue", mountDir)
+	}
+	return workDir, mountDir
+}
+
 func (c *RunaiRemoteSessionController) getSaveDirPath() string {
-	renkuMountDir := os.Getenv("RENKU_MOUNT_DIR")
+	_, renkuMountDir := getRenkuSessionDirs()
 	return path.Join(renkuMountDir, ".rsc") // NOTE: "rsc" stands for "Remote Session Controller"
 }
 
