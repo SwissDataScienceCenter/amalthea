@@ -59,11 +59,7 @@ func SetFlags(cmd *cobra.Command) error {
 	}
 
 	// Set up auth flags
-	if err := SetAuthFlags(cmd); err != nil {
-		return err
-	}
-
-	return nil
+	return SetAuthFlags(cmd)
 }
 
 func GetConfig() (cfg RunaiConfig) {

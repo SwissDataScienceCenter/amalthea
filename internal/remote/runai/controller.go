@@ -182,12 +182,11 @@ func (c *RunaiRemoteSessionController) Start(ctx context.Context) error {
 	}
 	slog.Info("workspace created", "project", c.project, "image", remoteSessionImage, "renkuProjectPath", renkuProjectPath, "renkuBaseURLPath", renkuBaseURLPath, "workspace", workspaceResp)
 	c.jobId = workspaceResp.WorkloadId
-	if err := c.saveJobInfo(); err != nil {
+	err = c.saveJobInfo()
+	if err != nil {
 		slog.Error("failed to save job info", "error", err)
-		return err
 	}
-
-	return nil
+	return err
 }
 
 // Stop stops the remote session using the Runai API.
