@@ -92,7 +92,7 @@ func NewRunaiApi(baseURL string, auth auth.RunaiAuth, httpClient *http.Client) (
 
 	// create httpClient, if not already present
 	if client.HTTPClient == nil {
-		client.HTTPClient = &http.Client{Timeout: 30 * time.Second}
+		client.HTTPClient = &http.Client{}
 	}
 
 	client.RequestEditors = append(client.RequestEditors, client.Auth.RequestEditor())
