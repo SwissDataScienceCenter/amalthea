@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -59,7 +61,12 @@ func (c *Cloner) execute(repository Repository) error {
 
 	err = c.clone(repository)
 	if err != nil {
-		return err
+		log.Printf("Cloning failed for %v: %v\n", repository.URL, err)
+		return os.WriteFile(
+			filepath.Join(repository.clonePath, "ERROR"),
+			[]byte(fmt.Sprintf("Cannot clone %v:\n %v", repository.URL, err)),
+			0644,
+		)
 	}
 
 	return c.setupProxy(repository)
