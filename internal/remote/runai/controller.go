@@ -276,6 +276,7 @@ func (c *RunaiRemoteSessionController) deleteSavedState() error {
 func (c *RunaiRemoteSessionController) recoverJobInfo() error {
 	contents, err := os.ReadFile(c.getSavePath())
 	if err != nil {
+		// This is expected to fail if there is no saved state, which is the most common case
 		return nil
 	}
 
