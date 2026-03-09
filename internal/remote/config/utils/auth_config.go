@@ -25,9 +25,5 @@ func SetFlags(cmd *cobra.Command) error {
 	if err := viper.BindPFlag(AuthPrefix+"."+TokenURIFlag, cmd.Flags().Lookup(AuthPrefix+"-"+TokenURIFlag)); err != nil {
 		return err
 	}
-	if err := viper.BindEnv(AuthPrefix+"."+TokenURIFlag, AsEnvVarFlag(AuthPrefix+"-"+TokenURIFlag)); err != nil {
-		return err
-	}
-
-	return nil
+	return viper.BindEnv(AuthPrefix+"."+TokenURIFlag, AsEnvVarFlag(AuthPrefix+"-"+TokenURIFlag))
 }

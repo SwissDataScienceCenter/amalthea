@@ -82,12 +82,7 @@ func SetFlags(cmd *cobra.Command) error {
 		return err
 	}
 
-	// Set up Runai flags
-	if err := runaiConfig.SetFlags(cmd); err != nil {
-		return err
-	}
-
-	return nil
+	return runaiConfig.SetFlags(cmd)
 }
 
 func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
