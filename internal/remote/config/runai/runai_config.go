@@ -84,4 +84,5 @@ func (cfg *RunaiConfig) Validate() error {
 		return fmt.Errorf("runai.BaseURL is not valid: %w", err)
 	}
 
-	return  cfg.AuthConfig.Validate()
+	return cfg.AuthConfig.Validate()
+}
