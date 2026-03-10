@@ -35,7 +35,10 @@ import (
 	"time"
 
 	"github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest/auth"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
+	"github.com/SwissDataScienceCenter/amalthea/internal/utils"
 	"k8s.io/utils/ptr"
 )
 
@@ -66,15 +69,27 @@ type FirecrestRemoteSessionController struct {
 	fakeStart bool
 }
 
-func NewFirecrestRemoteSessionController(client *FirecrestClient, systemName, partition string, fakeStart bool) (c *FirecrestRemoteSessionController, err error) {
+func NewFirecrestRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c *FirecrestRemoteSessionController, err error) {
+	firecrestAuth, err := auth.NewFirecrestAuth(cfg.Firecrest.AuthConfig)
+	if err != nil {
+		return nil, err
+	}
+	firecrestAPIURL, err := url.Parse(cfg.Firecrest.APIURL)
+	if err != nil {
+		return nil, err
+	}
+	firecrestClient, err := NewFirecrestClient(firecrestAPIURL, WithAuth(firecrestAuth))
+	if err != nil {
+		return nil, err
+	}
 	c = &FirecrestRemoteSessionController{
-		client:        client,
+		client:        firecrestClient,
 		jobID:         "",
-		systemName:    systemName,
-		partition:     partition,
+		systemName:    cfg.Firecrest.SystemName,
+		partition:     cfg.Firecrest.Partition,
 		currentStatus: models.NotReady,
 		statusTicker:  time.NewTicker(time.Minute),
-		fakeStart:     fakeStart,
+		fakeStart:     cfg.FakeStart,
 	}
 	// Validate controller
 	if c.client == nil {
@@ -244,6 +259,16 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 			env[key] = val
 		}
 	}
+
+	// Format the REMOTE_SESSION_IMAGE environment variable for enroot
+	enrootImage, err := utils.EnrootImageFormat(env["REMOTE_SESSION_IMAGE"])
+	if err == nil {
+		env["REMOTE_SESSION_IMAGE"] = enrootImage
+	} else {
+		// TODO: Is this the best way to report this?
+		slog.Warn("could not format REMOTE_SESSION_IMAGE for enroot, using the original value", "REMOTE_SESSION_IMAGE", env["REMOTE_SESSION_IMAGE"], "error", err)
+	}
+
 	// Copy RENKU environment variables
 	for _, environ := range os.Environ() {
 		key, val, _ := strings.Cut(environ, "=")

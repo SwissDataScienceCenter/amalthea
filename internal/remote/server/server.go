@@ -28,7 +28,6 @@ import (
 	"github.com/SwissDataScienceCenter/amalthea/internal/common"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/controller"
-	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -95,7 +94,7 @@ func Start() {
 var logLevel *slog.LevelVar = new(slog.LevelVar)
 var jsonLogger *slog.Logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 
-func newServer(controller *firecrest.FirecrestRemoteSessionController) (server *echo.Echo) {
+func newServer(controller controller.RemoteSessionController) (server *echo.Echo) {
 	e := echo.New()
 
 	e.HideBanner = true

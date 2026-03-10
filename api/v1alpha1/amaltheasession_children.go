@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SwissDataScienceCenter/amalthea/internal/utils"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -845,17 +844,11 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 		},
 	}
 
-	enrootImage, err := utils.EnrootImageFormat(cr.Spec.Session.Image)
-	if err != nil {
-		// TODO: How can we log and report this?
-		enrootImage = cr.Spec.Session.Image
-	}
-
 	sessionContainer.Env = append(
 		sessionContainer.Env,
 		v1.EnvVar{
 			Name:  "REMOTE_SESSION_IMAGE",
-			Value: enrootImage,
+			Value: cr.Spec.Session.Image,
 		},
 		v1.EnvVar{
 			Name:  "RSC_SERVER_PORT",

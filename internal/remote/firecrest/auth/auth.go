@@ -18,21 +18,17 @@ limitations under the License.
 package auth
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
+	sharedAuth "github.com/SwissDataScienceCenter/amalthea/internal/remote/auth/shared"
 	firecrestConfig "github.com/SwissDataScienceCenter/amalthea/internal/remote/config/firecrest"
 )
 
 // FirecrestAuth can inject authentication credentials into HTTP request to the FirecREST API
 type FirecrestAuth interface {
-	// RequestEditor returns a request editor to be used by FirecREST clients
-	RequestEditor() RequestEditorFn
+	sharedAuth.RemoteAuth
 }
-
-// RequestEditorFn  is the function signature for the RequestEditor callback function
-type RequestEditorFn func(ctx context.Context, req *http.Request) error
 
 func NewFirecrestAuth(cfg firecrestConfig.FirecrestAuthConfig, options ...FirecrestAuthOption) (auth FirecrestAuth, err error) {
 	if cfg.Kind == firecrestConfig.FirecrestAuthConfigKindRenku {
