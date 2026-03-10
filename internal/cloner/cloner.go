@@ -98,7 +98,8 @@ func (c *Cloner) getAccessToken(providerId string) (string, error) {
 	}
 
 	if provider == nil {
-		return "", fmt.Errorf("failed to find provider %v", providerId)
+		// e.g. public repositories
+		return "", nil
 	}
 
 	log.Printf("Get token for: %v\n", provider.Id)
