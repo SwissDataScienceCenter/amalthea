@@ -43,11 +43,19 @@ func (c *Cloner) execute(repository Repository) error {
 	}
 
 	gitUser := "oauth2"
-	gitAccessToken, err := c.getAccessToken(repository.Provider)
-	if err != nil {
-		log.Printf("Failed to acquire token: %v\n", err)
-		log.Println("Continuing without credentials")
+	var gitAccessToken string
+	var err error
+
+	if repository.Provider != "" {
+		gitAccessToken, err = c.getAccessToken(repository.Provider)
+		if err != nil {
+			log.Printf("Failed to acquire token: %v\n", err)
+			log.Println("Continuing without credentials")
+		}
+	} else {
+		gitAccessToken = ""
 	}
+
 	err = c.initializeRepository(repository)
 	if err != nil {
 		return err
