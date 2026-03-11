@@ -34,7 +34,8 @@ IMAGE_TAG_BASE ?= renku/amalthea
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
-SIDECARS_IMG ?= $(IMAGE_TAG_BASE)-sidecars:v$(VERSION) 
+SIDECARS_IMG ?= $(IMAGE_TAG_BASE)-sidecars:v$(VERSION)
+CLONER_IMG ?= $(IMAGE_TAG_BASE)-cloner:v$(VERSION)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -161,6 +162,10 @@ build-sidecars: fmt vet
 .PHONY: docker-build-sidecars
 docker-build-sidecars: build-sidecars
 	$(CONTAINER_TOOL) build -t ${SIDECARS_IMG} -f sidecars.Dockerfile .
+
+.PHONY: docker-build-cloner
+docker-build-cloner: build-sidecars
+	$(CONTAINER_TOOL) build -t ${CLONER_IMG} -f cloner.Dockerfile .
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.

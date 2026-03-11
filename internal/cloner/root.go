@@ -21,6 +21,11 @@ import (
 )
 
 func Command() (*cobra.Command, error) {
+	clonerRoot := &cobra.Command{
+		Use:   "cloner clone",
+		Short: "Cloning utilities",
+	}
+
 	cmd := &cobra.Command{
 		Use:   "clone",
 		Short: "A small utility to clone repositories",
@@ -45,7 +50,14 @@ func Command() (*cobra.Command, error) {
 	}
 
 	cmd.Flags().BoolVar(&verbose, VerboseFlag, false, "make the command verbose")
-
 	cmd.Flags().VarP(preCloningStrategy, StrategyFlag, "", "the pre cloning strategy")
-	return cmd, nil
+
+	shellCloneCmd := &cobra.Command{
+		Use: "shellclone",
+		Run: shellClone,
+	}
+
+	clonerRoot.AddCommand(cmd)
+	clonerRoot.AddCommand(shellCloneCmd)
+	return clonerRoot, nil
 }
