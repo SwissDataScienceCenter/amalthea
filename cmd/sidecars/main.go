@@ -47,10 +47,6 @@ func buildCommands() *cobra.Command {
 		Use:   "proxy serve",
 		Short: "Authentication proxy",
 	}
-	clonerRoot := &cobra.Command{
-		Use:   "cloner clone",
-		Short: "Cloning utilities",
-	}
 	remoteSessionControllerRoot := &cobra.Command{
 		Use:     "remote-session-controller",
 		Aliases: []string{"rsc"},
@@ -67,7 +63,7 @@ func buildCommands() *cobra.Command {
 	rootCmd.AddCommand(versionCmd)
 	authCmd, err := authproxy.Command()
 	cobra.CheckErr(err)
-	clonerCmd, err := cloner.Command()
+	clonerRoot, err := cloner.Command()
 	cobra.CheckErr(err)
 	remoteSessionControllerCmd, err := remote.Command()
 	cobra.CheckErr(err)
@@ -76,7 +72,6 @@ func buildCommands() *cobra.Command {
 	gitProxyCmd, err := gitproxy.Command()
 	cobra.CheckErr(err)
 	proxyRoot.AddCommand(authCmd)
-	clonerRoot.AddCommand(clonerCmd)
 	remoteSessionControllerRoot.AddCommand(remoteSessionControllerCmd)
 	tunnelRoot.AddCommand(tunnelCmd)
 	gitProxyRoot.AddCommand(gitProxyCmd)
