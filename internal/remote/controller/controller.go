@@ -18,10 +18,12 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/runai"
 )
 
 type RemoteSessionController interface {
@@ -30,11 +32,25 @@ type RemoteSessionController interface {
 	Stop(ctx context.Context) error
 }
 
-// TODO: support different types of remote session controller
+// Check that the backend-specific session controllers satisfy the RemoteSessionController interface
+var _ RemoteSessionController = (*firecrest.FirecrestRemoteSessionController)(nil)
+var _ RemoteSessionController = (*runai.RunaiRemoteSessionController)(nil)
+
 func NewRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c RemoteSessionController, err error) {
-	controller, err := firecrest.NewFirecrestRemoteSessionController(cfg)
-	if err != nil {
-		return nil, err
+	if cfg.RemoteKind == config.RemoteKindFirecrest {
+		controller, err := firecrest.NewFirecrestRemoteSessionController(cfg)
+		if err != nil {
+			return nil, err
+		}
+		return controller, nil
 	}
-	return controller, nil
+	if cfg.RemoteKind == config.RemoteKindRunai {
+		controller, err := runai.NewRunaiRemoteSessionController(cfg)
+		if err != nil {
+			return nil, err
+		}
+		return controller, nil
+	}
+
+	return nil, fmt.Errorf("remote kind: '%s' is not supported", cfg.RemoteKind)
 }

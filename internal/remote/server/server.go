@@ -48,6 +48,7 @@ func Start() {
 		slog.Error("invalid configuration", "error", err)
 		os.Exit(1)
 	}
+	slog.Info("using remote kind", "kind", cfg.RemoteKind)
 
 	controller, err := controller.NewRemoteSessionController(cfg)
 	if err != nil {
