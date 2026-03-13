@@ -51,6 +51,11 @@ sidecars:
   image:
     repository: renku/sidecars
     tag: latest
+  oauth2Proxy:
+    # When deployed on an external cluster, it may be necessary to add
+    extraArgs:
+      []
+#      - "--cookie-samesite=none"
 
 cloner:
   image:

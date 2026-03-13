@@ -11,6 +11,8 @@ import (
 
 const authproxyImage string = "harbor.renkulab.io/bitnami-mirror/oauth2-proxy:7.6.0"
 
+var OAuth2ExtraArgs []string
+
 func (as *AmaltheaSession) auth() (manifests, error) {
 	output := manifests{}
 	volumeMounts := []v1.VolumeMount{}
@@ -150,11 +152,11 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				AllowPrivilegeEscalation: ptr.To(false),
 				RunAsNonRoot:             ptr.To(true),
 			},
-			Args: []string{
+			Args: append([]string{
 				"--silence-ping-logging",
 				"--alpha-config=/etc/oauth2-proxy/oauth2-proxy-alpha-config.yaml",
 				"--config=/etc/oauth2-proxy/oauth2-proxy-config.yaml",
-			},
+			}, OAuth2ExtraArgs...),
 			EnvFrom: []v1.EnvFromSource{
 				{
 					// This secret contains the client ID, secret and issuer URL for oidc
