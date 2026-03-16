@@ -80,7 +80,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			// If the custom resource is not found then, it usually means that it was deleted or not created
 			// In this way, we will stop the reconciliation
 			log.Info("amaltheasession resource not found. Ignoring since object must be deleted")
-			return ctrl.Result{}, nil
+			return ctrl.Result{Requeue: false}, nil
 		}
 		// Error reading the object - requeue the request.
 		log.Error(err, "Failed to get amaltheasession")
@@ -141,7 +141,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			}
 		}
 
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{Requeue: false}, nil
 	}
 
 	children, err := NewChildResources(amaltheasession, r.ClusterType)
@@ -164,7 +164,6 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	newStatus := updates.Status(ctx, r, amaltheasession)
-	statusChanged := reflect.DeepEqual(amaltheasession.Status, newStatus)
 	amaltheasession.Status = newStatus
 	err = r.Status().Update(ctx, amaltheasession)
 	if err != nil {
@@ -191,13 +190,16 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	// Now requeue to make sure we can watch for idleness and other status changes
-	requeueAfter := time.Second * 10
-	if statusChanged {
-		// If the status is evolving we should requeue faster
-		requeueAfter = 0
+	switch amaltheasession.Status.State {
+	case amaltheadevv1alpha1.Hibernated:
+		if amaltheasession.Spec.Culling.MaxHibernatedDuration.Duration > 0 {
+			return ctrl.Result{Requeue: true, RequeueAfter: amaltheasession.Spec.Culling.MaxHibernatedDuration.Duration}, nil
+		} else {
+			return ctrl.Result{Requeue: false}, nil
+		}
+	default:
+		return ctrl.Result{Requeue: true, RequeueAfter: time.Second * 10}, nil
 	}
-	return ctrl.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
 }
 
 func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession) error {
