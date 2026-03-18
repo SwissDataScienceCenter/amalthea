@@ -6438,6 +6438,12 @@ spec:
                 required:
                 - image
                 type: object
+              sessionType:
+                description: |-
+                  The session type, it is "interactive" by default, but can be set to "non-interactive". Non-interactive
+                  sessions are handled differently in that the main process is expected to be run-once and once it
+                  terminates, the resources are cleaned up.
+                type: string
               template:
                 description: Template for the fields that should be added to all children
                   (and their children if applicable).
