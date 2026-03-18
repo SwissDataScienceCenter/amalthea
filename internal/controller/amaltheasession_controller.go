@@ -247,6 +247,21 @@ func CheckNonInteractiveDone(ctx context.Context, clnt client.Client, cr *amalth
 		if pod != nil && err == nil && PodIsTerminated(pod) {
 			return true
 		}
+
+		// check max running time
+		createdAt := cr.GetCreationTimestamp()
+		now := time.Now()
+		until := createdAt.Add(1 * time.Hour)
+		maxTime := cr.Spec.Culling.MaxNonInteractiveRuntime
+		if maxTime.Duration > 0 {
+			until = createdAt.Add(maxTime.Duration)
+		}
+		if until.Before(now) {
+			// need to forcibly kill things
+			gracePeriod := int64(0)
+			clnt.Delete(ctx, pod, &client.DeleteOptions{GracePeriodSeconds: &gracePeriod})
+			return true
+		}
 	}
 	return false
 }
