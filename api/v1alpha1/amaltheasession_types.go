@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -25,6 +26,29 @@ import (
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// SessionType describes the type of session to be started. If none is specified, the
+// default SessionType will be "Interactive"
+// +enum
+type SessionType string
+
+const (
+	SessionTypeInteractive    SessionType = "Interactive"
+	SessionTypeNonInteractive SessionType = "NonInteractive"
+)
+
+func (s SessionType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(s))
+}
+
+func (s *SessionType) UnmarshalJSON(data []byte) error {
+	var tmp string
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+	*s = SessionType(tmp)
+	return nil
+}
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 // Important: Run "make" to regenerate code after modifying this file
@@ -127,6 +151,12 @@ type AmaltheaSessionSpec struct {
 	// +optional
 	// Template for the fields that should be added to all children (and their children if applicable).
 	Template Template `json:"template,omitempty"`
+
+	// +optional
+	// The session type, it is "interactive" by default, but can be set to "non-interactive". Non-interactive
+	// sessions are handled differently in that the main process is expected to be run-once and once it
+	// terminates, the resources are cleaned up.
+	SessionType SessionType `json:"sessionType,omitempty"`
 }
 
 type Session struct {

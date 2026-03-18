@@ -144,6 +144,13 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	nonInteractiveDone := CheckNonInteractiveDone(ctx, r.Client, amaltheasession)
+	if nonInteractiveDone {
+		log.Info("Stop session as requested by reconciling child resources")
+		err = r.Delete(ctx, amaltheasession)
+		return ctrl.Result{}, err
+	}
+
 	children, err := NewChildResources(amaltheasession, r.ClusterType)
 	if err != nil {
 		log.Error(
@@ -231,4 +238,27 @@ func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&corev1.Secret{}).
 		Complete(r)
+}
+
+func CheckNonInteractiveDone(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) bool {
+	if cr.Spec.SessionType == amaltheadevv1alpha1.SessionTypeNonInteractive {
+		// check pod and return early if it is down
+		pod, err := cr.GetPod(ctx, clnt)
+		if pod != nil && err == nil && PodIsTerminated(pod) {
+			return true
+		}
+	}
+	return false
+}
+
+func PodIsTerminated(pod *corev1.Pod) bool {
+	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+		return true
+	} else {
+		if len(pod.Status.ContainerStatuses) > 0 {
+			containerStatus := pod.Status.ContainerStatuses[0]
+			return containerStatus.State.Terminated != nil
+		}
+	}
+	return false
 }
