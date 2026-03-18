@@ -373,6 +373,10 @@ type Culling struct {
 	// +kubebuilder:default:="300m"
 	// Number of CPU cores that determine a session to be idling.
 	CPUIdleThreshold resource.Quantity `json:"cpuIdleThreshold,omitempty"`
+	// +optional
+	// +kubebuilder:validation:Format:=duration
+	// When running non-interactive sessions, this is the maximum runtime for the process.
+	MaxNonInteractiveRuntime metav1.Duration `json:"maxNonInteractiveRuntime,omitempty"`
 }
 
 // +kubebuilder:validation:Enum={token,oauth2proxy,oidc}
