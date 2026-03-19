@@ -16,3 +16,7 @@ charts:
         contextPath: .
         dockerfilePath: sidecars.Dockerfile
         valuesPath: sidecars.image
+      cloner:
+        contextPath: .
+        dockerfilePath: cloner.Dockerfile
+        valuesPath: cloner.image
