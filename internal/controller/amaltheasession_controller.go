@@ -144,14 +144,21 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	nonInteractiveDone := CheckNonInteractiveDone(ctx, r.Client, amaltheasession)
-	if nonInteractiveDone {
-		log.Info("Stop session as requested by reconciling child resources")
-		err = r.Delete(ctx, amaltheasession)
-		return ctrl.Result{}, err
+	// nonInteractiveDone := CheckNonInteractiveDone(ctx, r.Client, amaltheasession)
+	// if nonInteractiveDone {
+	// 	log.Info("Stop session as requested by reconciling child resources")
+	// 	err = r.Delete(ctx, amaltheasession)
+	// 	return ctrl.Result{}, err
+	// }
+
+	var children ChildResources
+	switch amaltheasession.Spec.SessionType {
+	case amaltheadevv1alpha1.SessionTypeInteractive:
+		children, err = NewChildResources(amaltheasession, r.ClusterType)
+	case amaltheadevv1alpha1.SessionTypeNonInteractive:
+		children, err = NewJobChildResources(amaltheasession, r.ClusterType)
 	}
 
-	children, err := NewChildResources(amaltheasession, r.ClusterType)
 	if err != nil {
 		log.Error(
 			err,
