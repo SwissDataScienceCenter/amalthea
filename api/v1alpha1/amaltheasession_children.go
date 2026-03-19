@@ -16,6 +16,7 @@ import (
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -95,13 +96,8 @@ func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 	return volumes, volumeMounts
 }
 
-// StatefulSet returns a AmaltheaSession StatefulSet object
-func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) (appsv1.StatefulSet, error) {
-	replicas := int32(1)
-	if cr.Spec.Hibernated {
-		replicas = 0
-	}
 
+func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.PodSpec, error) {
 	volumes := []v1.Volume{}
 	volumeMounts := []v1.VolumeMount{}
 	initContainers := []v1.Container{}
@@ -125,7 +121,7 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 
 	auth, err := cr.auth()
 	if err != nil {
-		return appsv1.StatefulSet{}, err
+		return nil, err
 	}
 	containers = append(containers, sessionContainer)
 	containers = append(containers, auth.Containers...)
@@ -158,6 +154,51 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 	if cfg.ClusterType == config.OpenShift {
 		pod.DeprecatedServiceAccount = pod.ServiceAccountName
 	}
+	return &pod, nil
+}
+
+func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1.Job, error) {
+	pod, err := cr.Pod(cfg)
+	if err != nil {
+		return batchv1.Job{}, err
+	}
+
+	parallel := int32(1)
+
+	job := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        cr.Name,
+			Namespace:   cr.Namespace,
+			Labels:      cr.childLabels(),
+			Annotations: cr.Spec.Template.Metadata.Annotations,
+		},
+		Spec: batchv1.JobSpec{
+			Parallelism: &parallel,
+			Completions: &parallel,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      cr.childLabels(),
+					Annotations: cr.Spec.Template.Metadata.Annotations,
+				},
+				Spec: *pod,
+			},
+		},
+	}
+
+	return job, nil
+}
+
+// StatefulSet returns a AmaltheaSession StatefulSet object
+func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) (appsv1.StatefulSet, error) {
+	replicas := int32(1)
+	if cr.Spec.Hibernated {
+		replicas = 0
+	}
+
+	pod, err := cr.Pod(cfg)
+	if err != nil {
+		return appsv1.StatefulSet{}, err
+	}
 
 	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -179,7 +220,7 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 					Labels:      cr.childLabels(),
 					Annotations: cr.Spec.Template.Metadata.Annotations,
 				},
-				Spec: pod,
+				Spec: *pod,
 			},
 		},
 	}
