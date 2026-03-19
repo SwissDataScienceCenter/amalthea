@@ -9,6 +9,7 @@ import (
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,7 +22,7 @@ import (
 )
 
 type ChildResourceType interface {
-	networkingv1.Ingress | v1.Service | v1.PersistentVolumeClaim | appsv1.StatefulSet | v1.Secret
+	networkingv1.Ingress | v1.Service | v1.PersistentVolumeClaim | appsv1.StatefulSet | v1.Secret | batchv1.Job
 }
 
 type ChildResource[T ChildResourceType] struct {
@@ -43,6 +44,7 @@ type ChildResources struct {
 	PVC             ChildResource[v1.PersistentVolumeClaim]
 	DataSourcesPVCs []ChildResource[v1.PersistentVolumeClaim]
 	Secret          ChildResource[v1.Secret]
+	Job             ChildResource[batchv1.Job]
 }
 
 type ChildResourceUpdates struct {
@@ -52,6 +54,7 @@ type ChildResourceUpdates struct {
 	PVC             ChildResourceUpdate[v1.PersistentVolumeClaim]
 	DataSourcesPVCs []ChildResourceUpdate[v1.PersistentVolumeClaim]
 	Secret          ChildResourceUpdate[v1.Secret]
+	Job             ChildResourceUpdate[batchv1.Job]
 }
 
 // The metrics server requires at least 10 seconds before container metrics can
@@ -140,7 +143,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !(cr.Status.State != amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
 					return nil
 				}
 				fallthrough
@@ -273,9 +276,41 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			return nil
 		})
 		return ChildResourceUpdate[T]{c.Current, res, err, nil}
+	case *batchv1.Job:
+		log.Info("Reconcile Job", "Thing", c.Current)
+		return ChildResourceUpdate[T]{Manifest: c.Current, UpdateResult: controllerutil.OperationResultNone}
 	default:
 		return ChildResourceUpdate[T]{Error: fmt.Errorf("encountered an uknown child resource type")}
 	}
+}
+
+func NewJobChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, clusterType amaltheadevv1alpha1.ClusterType) (ChildResources, error) {
+	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
+	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
+	desiredJob, err := cr.Job(clusterType)
+	desiredPVC := cr.PVC()
+	if err != nil {
+		return ChildResources{}, err
+	}
+	desiredSecret := cr.Secret()
+	output := ChildResources{
+		PVC:    ChildResource[v1.PersistentVolumeClaim]{&v1.PersistentVolumeClaim{ObjectMeta: metadata}, &desiredPVC},
+		Secret: ChildResource[v1.Secret]{&v1.Secret{ObjectMeta: secretMetadata}, &desiredSecret},
+		Job:    ChildResource[batchv1.Job]{&batchv1.Job{ObjectMeta: metadata}, &desiredJob},
+	}
+	desiredDataSourcesPVCs := []ChildResource[v1.PersistentVolumeClaim]{}
+	specPVCs, _, _ := cr.DataSources()
+	for i := range specPVCs {
+		desiredPVC := &specPVCs[i]
+		childRes := ChildResource[v1.PersistentVolumeClaim]{
+			Current: &v1.PersistentVolumeClaim{ObjectMeta: desiredPVC.ObjectMeta},
+			Desired: desiredPVC,
+		}
+		desiredDataSourcesPVCs = append(desiredDataSourcesPVCs, childRes)
+	}
+	output.DataSourcesPVCs = desiredDataSourcesPVCs
+
+	return output, nil
 }
 
 func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, clusterType amaltheadevv1alpha1.ClusterType) (ChildResources, error) {
@@ -322,6 +357,7 @@ func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *a
 		Service:     c.Service.Reconcile(ctx, clnt, cr),
 		Ingress:     c.Ingress.Reconcile(ctx, clnt, cr),
 		Secret:      c.Secret.Reconcile(ctx, clnt, cr),
+		Job:         c.Job.Reconcile(ctx, clnt, cr),
 	}
 
 	dataSourceUpdates := []ChildResourceUpdate[v1.PersistentVolumeClaim]{}
@@ -348,7 +384,14 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	// updates from k8s (I think from a mutating or defaulting webhook) to fields other than the status.
 	// onlyStatusUpdates := c.AllEqual(controllerutil.OperationResultUpdatedStatusOnly)
 	// noUpdates := c.AllEqual(controllerutil.OperationResultNone)
-	stsReady := c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
+
+	stsReady := false
+	if c.StatefulSet.Manifest != nil {
+		stsReady = c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
+	}
+	if c.Job.Manifest != nil {
+		stsReady = c.Job.Manifest.Status.Ready != nil && *c.Job.Manifest.Status.Ready == 1
+	}
 	podExists := pod != nil
 	podReady := podExists && podIsReady(pod)
 	return stsReady && podReady
