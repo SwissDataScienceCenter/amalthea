@@ -147,7 +147,7 @@ go-generate: internal/remote/firecrest/firecrest_gen.go
 internal/remote/firecrest/firecrest_gen.go: internal/remote/firecrest/openapi_spec_original.yaml
 	go generate internal/remote/firecrest/firecrest.go
 
-FIRECREST_API_VERSION ?= 2.4.1
+FIRECREST_API_VERSION ?= 2.5.0
 
 ##@ Build
 

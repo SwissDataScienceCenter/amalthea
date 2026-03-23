@@ -30,8 +30,8 @@ components:
         Body_post_upload_filesystem__system_name__ops_upload_post:
             properties:
                 file:
+                    contentMediaType: application/octet-stream
                     description: File to be uploaded as `multipart/form-data`
-                    format: binary
                     title: File
                     type: string
             required:
@@ -66,11 +66,11 @@ components:
                     $ref: '#/components/schemas/CompressionType'
                     default: gzip
                     description: Defines the type of compression to be used. By default gzip is used.
-                    nullable: true
+                    nullable: false
                 dereference:
                     default: false
                     description: If set to `true`, it follows symbolic links and archive the files they point to instead of the links themselves.
-                    nullable: true
+                    nullable: false
                     title: Dereference
                     type: boolean
                 matchPattern:
@@ -95,7 +95,7 @@ components:
         CompressResponse:
             properties:
                 transferJob:
-                    $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
+                    $ref: '#/components/schemas/TransferJob'
             required:
                 - transferJob
             title: CompressResponse
@@ -129,7 +129,7 @@ components:
                 dereference:
                     default: false
                     description: If set to `true`, it follows symbolic links and copies the files they point to instead of the links themselves.
-                    nullable: true
+                    nullable: false
                     title: Dereference
                     type: boolean
                 sourcePath:
@@ -149,7 +149,7 @@ components:
         CopyResponse:
             properties:
                 transferJob:
-                    $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
+                    $ref: '#/components/schemas/TransferJob'
             required:
                 - transferJob
             title: CopyResponse
@@ -170,6 +170,12 @@ components:
                         - $ref: '#/components/schemas/WormholeDataTransfer'
                         - $ref: '#/components/schemas/StreamerDataTransfer'
                     title: Data Transfer
+                datatransfer_jobs_directives:
+                    description: Custom scheduler flags passed to data transfer jobs (e.g. `-pxfer` for a dedicated partition).
+                    items:
+                        type: string
+                    title: Datatransfer Jobs Directives
+                    type: array
                 max_ops_file_size:
                     default: 5242880
                     description: Maximum file size (in bytes) allowed for direct upload and download. Larger files will go through the staging area.
@@ -180,7 +186,7 @@ components:
         DeleteResponse:
             properties:
                 transferJob:
-                    $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
+                    $ref: '#/components/schemas/TransferJob'
             required:
                 - transferJob
             title: DeleteResponse
@@ -195,7 +201,7 @@ components:
                     description: Data transfer parameters specific to the transfer method
                     title: Transferdirectives
                 transferJob:
-                    $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
+                    $ref: '#/components/schemas/TransferJob'
             required:
                 - transferJob
                 - transferDirectives
@@ -217,7 +223,7 @@ components:
                     $ref: '#/components/schemas/CompressionType'
                     default: gzip
                     description: Defines the type of compression to be used. By default gzip is used.
-                    nullable: true
+                    nullable: false
                 sourcePath:
                     example: /home/user/dir
                     nullable: true
@@ -235,7 +241,7 @@ components:
         ExtractResponse:
             properties:
                 transferJob:
-                    $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
+                    $ref: '#/components/schemas/TransferJob'
             required:
                 - transferJob
             title: ExtractResponse
@@ -270,7 +276,6 @@ components:
             required:
                 - name
                 - type
-                - linkTarget
                 - user
                 - group
                 - permissions
@@ -393,7 +398,7 @@ components:
                 healthy:
                     default: false
                     description: True if the service is healthy.
-                    nullable: true
+                    nullable: false
                     title: Healthy
                     type: boolean
                 lastChecked:
@@ -432,8 +437,6 @@ components:
                     nullable: true
                     title: Output
                     type: array
-            required:
-                - output
             title: GetDirectoryLsResponse
             type: object
         GetFileChecksumResponse:
@@ -441,8 +444,6 @@ components:
                 output:
                     $ref: '#/components/schemas/FileChecksum'
                     nullable: true
-            required:
-                - output
             title: GetFileChecksumResponse
             type: object
         GetFileHeadResponse:
@@ -450,8 +451,6 @@ components:
                 output:
                     $ref: '#/components/schemas/FileContent'
                     nullable: true
-            required:
-                - output
             title: GetFileHeadResponse
             type: object
         GetFileStatResponse:
@@ -459,8 +458,6 @@ components:
                 output:
                     $ref: '#/components/schemas/FileStat'
                     nullable: true
-            required:
-                - output
             title: GetFileStatResponse
             type: object
         GetFileTailResponse:
@@ -468,8 +465,6 @@ components:
                 output:
                     $ref: '#/components/schemas/FileContent'
                     nullable: true
-            required:
-                - output
             title: GetFileTailResponse
             type: object
         GetFileTypeResponse:
@@ -479,8 +474,6 @@ components:
                     nullable: true
                     title: Output
                     type: string
-            required:
-                - output
             title: GetFileTypeResponse
             type: object
         GetJobMetadataResponse:
@@ -551,9 +544,6 @@ components:
             type: object
         GetSystemsResponse:
             properties:
-                dataOperation:
-                    $ref: '#/components/schemas/DataOperation'
-                    nullable: true
                 systems:
                     items:
                         $ref: '#/components/schemas/HPCCluster'
@@ -569,8 +559,6 @@ components:
                     nullable: true
                     title: Output
                     type: string
-            required:
-                - output
             title: GetViewFileResponse
             type: object
         HPCCluster:
@@ -579,26 +567,32 @@ components:
                 filesystem layout. More info in
                 [the systems' section](../arch/systems//README.md).
             properties:
-                datatransferJobsDirectives:
-                    description: Custom scheduler flags passed to data transfer jobs (e.g. `-pxfer` for a dedicated partition).
-                    items:
-                        type: string
-                    title: Datatransferjobsdirectives
-                    type: array
+                dataOperation:
+                    $ref: '#/components/schemas/DataOperation'
+                    default:
+                        datatransfer_jobs_directives: []
+                        max_ops_file_size: 5242880
+                    description: Data transfer backend configuration. More details in [this section](../arch/external_storage/README.md).
+                    nullable: false
                 fileSystems:
                     description: List of mounted file systems on the cluster, such as scratch or home directories.
                     items:
                         $ref: '#/components/schemas/FileSystem'
                     title: Filesystems
                     type: array
+                lastHealthCheck:
+                    description: Timestamp of the last health check.
+                    format: date-time
+                    nullable: true
+                    title: Lasthealthcheck
+                    type: string
                 name:
                     description: Unique name for the cluster. This field is case insensitive.
                     title: Name
                     type: string
                 probing:
-                    $ref: '#/components/schemas/Probing'
-                    description: Probing configuration for monitoring the cluster.
-                    nullable: true
+                    $ref: '#/components/schemas/ProbingServices'
+                    description: Probing configuration for monitoring the cluster's services.
                 scheduler:
                     $ref: '#/components/schemas/Scheduler'
                     description: Job scheduler configuration.
@@ -609,6 +603,7 @@ components:
                             - $ref: '#/components/schemas/SchedulerServiceHealth'
                             - $ref: '#/components/schemas/FilesystemServiceHealth'
                             - $ref: '#/components/schemas/SSHServiceHealth'
+                            - $ref: '#/components/schemas/S3ServiceHealth'
                             - $ref: '#/components/schemas/HealthCheckException'
                     nullable: true
                     title: Serviceshealth
@@ -620,6 +615,7 @@ components:
                 - name
                 - ssh
                 - scheduler
+                - probing
             title: HPCCluster
             type: object
         HealthCheckException:
@@ -628,7 +624,7 @@ components:
                 healthy:
                     default: false
                     description: True if the service is healthy.
-                    nullable: true
+                    nullable: false
                     title: Healthy
                     type: boolean
                 lastChecked:
@@ -680,15 +676,14 @@ components:
                     anyOf:
                         - additionalProperties:
                             type: string
-                          nullable: true
                           type: object
                         - items:
                             type: string
-                          nullable: true
                           type: array
                     default:
                         F7T_version: v2.0.0
                     description: Dictionary of environment variables to set in the job context
+                    nullable: false
                     title: Env
                 name:
                     description: Name for the job
@@ -769,7 +764,7 @@ components:
                     type: string
                 jobId:
                     title: Jobid
-                    type: integer
+                    type: string
                 killRequestUser:
                     nullable: true
                     title: Killrequestuser
@@ -909,7 +904,7 @@ components:
         MoveResponse:
             properties:
                 transferJob:
-                    $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
+                    $ref: '#/components/schemas/TransferJob'
             required:
                 - transferJob
             title: MoveResponse
@@ -972,6 +967,7 @@ components:
                             type: string
                           nullable: true
                           type: array
+                    nullable: true
                     title: Features
                 freeMemory:
                     nullable: true
@@ -1069,11 +1065,11 @@ components:
                     $ref: '#/components/schemas/CompressionType'
                     default: gzip
                     description: Defines the type of compression to be used. By default gzip is used.
-                    nullable: true
+                    nullable: false
                 dereference:
                     default: false
                     description: If set to `true`, it follows symbolic links and archive the files they point to instead of the links themselves.
-                    nullable: true
+                    nullable: false
                     title: Dereference
                     type: boolean
                 matchPattern:
@@ -1105,7 +1101,7 @@ components:
                     $ref: '#/components/schemas/CompressionType'
                     default: gzip
                     description: Defines the type of compression to be used. By default gzip is used.
-                    nullable: true
+                    nullable: false
                 sourcePath:
                     example: /home/user/dir
                     nullable: true
@@ -1173,8 +1169,6 @@ components:
                 output:
                     $ref: '#/components/schemas/File'
                     nullable: true
-            required:
-                - output
             title: PostFileSymlinkResponse
             type: object
         PostFileUploadRequest:
@@ -1197,7 +1191,7 @@ components:
                     type: string
                 transferDirectives:
                     anyOf:
-                        - $ref: '#/components/schemas/WormholeTransferRequest'
+                        - $ref: '#/components/schemas/WormholeTransferUploadRequest'
                         - $ref: '#/components/schemas/S3TransferRequest'
                         - $ref: '#/components/schemas/StreamerTransferRequest'
                     description: Data transfer parameters specific to the transfer method
@@ -1222,7 +1216,7 @@ components:
                 jobId:
                     nullable: true
                     title: Jobid
-                    type: integer
+                    type: string
             title: PostJobSubmissionResponse
             type: object
         PostJobSubmitRequest:
@@ -1271,7 +1265,7 @@ components:
                 parent:
                     default: false
                     description: If set to `true` creates all its parent directories if they do not already exist
-                    nullable: true
+                    nullable: false
                     title: Parent
                     type: boolean
                 sourcePath:
@@ -1288,25 +1282,35 @@ components:
                 output:
                     $ref: '#/components/schemas/File'
                     nullable: true
-            required:
-                - output
             title: PostMkdirResponse
             type: object
-        Probing:
-            description: Cluster monitoring attributes.
+        ProbingService:
+            description: Health check enable settings.
             properties:
-                interval:
-                    description: Interval in seconds between cluster checks.
-                    title: Interval
-                    type: integer
                 timeout:
-                    description: Maximum time in seconds allowed per check.
+                    default: 10
+                    description: Timeout for specific health check, if not specified the default of 10s is applied.
+                    nullable: true
                     title: Timeout
                     type: integer
-            required:
-                - interval
-                - timeout
-            title: Probing
+            title: ProbingService
+            type: object
+        ProbingServices:
+            description: Health check interval and list of services.
+            properties:
+                intervalCheck:
+                    default: 120
+                    description: Interval in seconds between cluster checks, if not specified the default of 120s is applied.
+                    title: Intervalcheck
+                    type: integer
+                services:
+                    additionalProperties:
+                        $ref: '#/components/schemas/ProbingService'
+                    description: Services to be checked.
+                    nullable: true
+                    title: Services
+                    type: object
+            title: ProbingServices
             type: object
         PutFileChmodRequest:
             examples:
@@ -1332,8 +1336,6 @@ components:
                 output:
                     $ref: '#/components/schemas/File'
                     nullable: true
-            required:
-                - output
             title: PutFileChmodResponse
             type: object
         PutFileChownRequest:
@@ -1345,13 +1347,13 @@ components:
                 group:
                     default: ""
                     description: Group name of the new group owner of the file
-                    nullable: true
+                    nullable: false
                     title: Group
                     type: string
                 owner:
                     default: ""
                     description: User name of the new user owner of the file
-                    nullable: true
+                    nullable: false
                     title: Owner
                     type: string
                 sourcePath:
@@ -1368,8 +1370,6 @@ components:
                 output:
                     $ref: '#/components/schemas/File'
                     nullable: true
-            required:
-                - output
             title: PutFileChownResponse
             type: object
         ReservationModel:
@@ -1422,10 +1422,6 @@ components:
                     title: Privateurl
                     type: string
                     writeOnly: true
-                probing:
-                    $ref: '#/components/schemas/Probing'
-                    description: Configuration for probing storage availability.
-                    nullable: true
                 publicUrl:
                     description: Public/external URL for the storage.
                     title: Publicurl
@@ -1444,15 +1440,6 @@ components:
                     const: s3
                     title: Servicetype
                     type: string
-                servicesHealth:
-                    description: Optional health information for different services in the cluster.
-                    items:
-                        anyOf:
-                            - $ref: '#/components/schemas/S3ServiceHealth'
-                            - $ref: '#/components/schemas/HealthCheckException'
-                    nullable: true
-                    title: Serviceshealth
-                    type: array
                 tenant:
                     description: Optional tenant identifier for multi-tenant setups.
                     nullable: true
@@ -1479,7 +1466,7 @@ components:
                 healthy:
                     default: false
                     description: True if the service is healthy.
-                    nullable: true
+                    nullable: false
                     title: Healthy
                     type: boolean
                 lastChecked:
@@ -1588,7 +1575,7 @@ components:
                 healthy:
                     default: false
                     description: True if the service is healthy.
-                    nullable: true
+                    nullable: false
                     title: Healthy
                     type: boolean
                 lastChecked:
@@ -1657,10 +1644,15 @@ components:
                     nullable: true
                     title: Apiversion
                     type: string
+                connectionMode:
+                    $ref: '#/components/schemas/SchedulerConnectionMode'
+                    default: ssh
+                    description: Scheduler connection mode.
+                    nullable: true
                 timeout:
                     default: 10
                     description: Timeout in seconds for scheduler communication with the API.
-                    nullable: true
+                    nullable: false
                     title: Timeout
                     type: integer
                 type:
@@ -1675,13 +1667,21 @@ components:
                 - version
             title: Scheduler
             type: object
+        SchedulerConnectionMode:
+            description: Modes to connect to the schedulers present in the system
+            enum:
+                - hybrid
+                - rest
+                - ssh
+            title: SchedulerConnectionMode
+            type: string
         SchedulerServiceHealth:
             description: Health check result for the job scheduler.
             properties:
                 healthy:
                     default: false
                     description: True if the service is healthy.
-                    nullable: true
+                    nullable: false
                     title: Healthy
                     type: boolean
                 lastChecked:
@@ -1742,7 +1742,7 @@ components:
                 inboundTransferLimit:
                     default: 5368709120
                     description: Limit how much data can be received (in bytes)
-                    nullable: true
+                    nullable: false
                     title: Inboundtransferlimit
                     type: integer
                 portRange:
@@ -1757,10 +1757,6 @@ components:
                         - type: integer
                     title: Portrange
                     type: array
-                probing:
-                    $ref: '#/components/schemas/Probing'
-                    description: Configuration for probing storage availability.
-                    nullable: true
                 publicIps:
                     description: List of public IP addresses where server can be reached.
                     items:
@@ -1777,19 +1773,10 @@ components:
                     const: streamer
                     title: Servicetype
                     type: string
-                servicesHealth:
-                    description: Optional health information for different services in the cluster.
-                    items:
-                        anyOf:
-                            - $ref: '#/components/schemas/S3ServiceHealth'
-                            - $ref: '#/components/schemas/HealthCheckException'
-                    nullable: true
-                    title: Serviceshealth
-                    type: array
                 waitTimeout:
                     default: 86400
                     description: How long to wait for a connection before exiting (in seconds)
-                    nullable: true
+                    nullable: false
                     title: Waittimeout
                     type: integer
             required:
@@ -1820,6 +1807,39 @@ components:
                 - transferMethod
             title: StreamerTransferResponse
             type: object
+        TransferJob:
+            properties:
+                jobId:
+                    title: Jobid
+                    type: string
+                logs:
+                    $ref: '#/components/schemas/TransferJobLogs'
+                system:
+                    title: System
+                    type: string
+                workingDirectory:
+                    title: Workingdirectory
+                    type: string
+            required:
+                - jobId
+                - system
+                - workingDirectory
+                - logs
+            title: TransferJob
+            type: object
+        TransferJobLogs:
+            properties:
+                errorLog:
+                    title: Errorlog
+                    type: string
+                outputLog:
+                    title: Outputlog
+                    type: string
+            required:
+                - outputLog
+                - errorLog
+            title: TransferJobLogs
+            type: object
         UploadFileResponse:
             properties:
                 transferDirectives:
@@ -1830,7 +1850,7 @@ components:
                     description: Data transfer parameters specific to the transfer method
                     title: Transferdirectives
                 transferJob:
-                    $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJob'
+                    $ref: '#/components/schemas/TransferJob'
             required:
                 - transferJob
                 - transferDirectives
@@ -1855,10 +1875,6 @@ components:
             type: object
         WormholeDataTransfer:
             properties:
-                probing:
-                    $ref: '#/components/schemas/Probing'
-                    description: Configuration for probing storage availability.
-                    nullable: true
                 pypiIndexUrl:
                     description: Optional local PyPI index URL for installing dependencies.
                     nullable: true
@@ -1868,15 +1884,6 @@ components:
                     const: wormhole
                     title: Servicetype
                     type: string
-                servicesHealth:
-                    description: Optional health information for different services in the cluster.
-                    items:
-                        anyOf:
-                            - $ref: '#/components/schemas/S3ServiceHealth'
-                            - $ref: '#/components/schemas/HealthCheckException'
-                    nullable: true
-                    title: Serviceshealth
-                    type: array
             required:
                 - serviceType
             title: WormholeDataTransfer
@@ -1905,38 +1912,21 @@ components:
                 - transferMethod
             title: WormholeTransferResponse
             type: object
-        firecrest__filesystem__transfer__models__TransferJob:
+        WormholeTransferUploadRequest:
             properties:
-                jobId:
-                    title: Jobid
-                    type: integer
-                logs:
-                    $ref: '#/components/schemas/firecrest__filesystem__transfer__models__TransferJobLogs'
-                system:
-                    title: System
+                transferMethod:
+                    const: wormhole
+                    title: Transfermethod
                     type: string
-                workingDirectory:
-                    title: Workingdirectory
+                wormholeCode:
+                    description: Wormhole code to use for the transfer
+                    nullable: false
+                    title: Wormholecode
                     type: string
             required:
-                - jobId
-                - system
-                - workingDirectory
-                - logs
-            title: TransferJob
-            type: object
-        firecrest__filesystem__transfer__models__TransferJobLogs:
-            properties:
-                errorLog:
-                    title: Errorlog
-                    type: string
-                outputLog:
-                    title: Outputlog
-                    type: string
-            required:
-                - outputLog
-                - errorLog
-            title: TransferJobLogs
+                - transferMethod
+                - wormholeCode
+            title: WormholeTransferUploadRequest
             type: object
     securitySchemes:
         APIAuthDependency:
@@ -1950,7 +1940,7 @@ components:
             type: http
 info:
     title: FirecREST
-    version: 2.4.1
+    version: 2.5.0
 openapi: 3.1.0
 paths:
     /compute/{system_name}/jobs:
@@ -1973,6 +1963,15 @@ paths:
                     description: If set to `true` returns all jobs visible by the current user, otherwise only the current user owned jobs
                     title: Allusers
                     type: boolean
+                - description: If specified, filter jobs by account name
+                  in: query
+                  name: account
+                  required: false
+                  schema:
+                    description: If specified, filter jobs by account name
+                    nullable: true
+                    title: Account
+                    type: string
             responses:
                 4XX:
                     content:
@@ -2388,7 +2387,7 @@ paths:
                 - filesystem
     /filesystem/{system_name}/ops/download:
         get:
-            description: Download a small file (max 5242880 Bytes)
+            description: Download a small file
             operationId: get_download_filesystem__system_name__ops_download_get
             parameters:
                 - in: path
@@ -2922,7 +2921,7 @@ paths:
                 - filesystem
     /filesystem/{system_name}/ops/upload:
         post:
-            description: Upload a small file (max 5242880 Bytes)
+            description: Upload a small file
             operationId: post_upload_filesystem__system_name__ops_upload_post
             parameters:
                 - in: path
@@ -2969,7 +2968,7 @@ paths:
                 - filesystem
     /filesystem/{system_name}/ops/view:
         get:
-            description: View file content (up to max 5242880 bytes)
+            description: View file content
             operationId: get_view_filesystem__system_name__ops_view_get
             parameters:
                 - in: path
@@ -3034,7 +3033,7 @@ paths:
                 - filesystem
     /filesystem/{system_name}/transfer/compress:
         post:
-            description: Create compress file or directory operation (`tar`) (for files larger than 5242880 Bytes)
+            description: Create compress file or directory operation (`tar`)
             operationId: compress_filesystem__system_name__transfer_compress_post
             parameters:
                 - in: path
@@ -3077,7 +3076,7 @@ paths:
                 - filesystem
     /filesystem/{system_name}/transfer/cp:
         post:
-            description: Create copy file or directory operation (`cp`) (for files larger than 5242880 Bytes)
+            description: Create copy file or directory operation (`cp`)
             operationId: post_cp_filesystem__system_name__transfer_cp_post
             parameters:
                 - in: path
@@ -3120,7 +3119,7 @@ paths:
                 - filesystem
     /filesystem/{system_name}/transfer/download:
         post:
-            description: Create asynchronous download operation (for files larger than 5242880 Bytes)
+            description: Create asynchronous download operation
             operationId: post_download_filesystem__system_name__transfer_download_post
             parameters:
                 - in: path
@@ -3163,7 +3162,7 @@ paths:
                 - filesystem
     /filesystem/{system_name}/transfer/extract:
         post:
-            description: Create extract file operation (`tar`) (for files larger than 5242880 Bytes)
+            description: Create extract file operation (`tar`)
             operationId: extract_filesystem__system_name__transfer_extract_post
             parameters:
                 - in: path
@@ -3206,7 +3205,7 @@ paths:
                 - filesystem
     /filesystem/{system_name}/transfer/mv:
         post:
-            description: Create move file or directory operation (`mv`) (for files larger than 5242880 Bytes)
+            description: Create move file or directory operation (`mv`)
             operationId: move_mv_filesystem__system_name__transfer_mv_post
             parameters:
                 - in: path
@@ -3249,7 +3248,7 @@ paths:
                 - filesystem
     /filesystem/{system_name}/transfer/rm:
         delete:
-            description: Create remove file or directory operation (`rm`) (for files larger than 5242880 Bytes)
+            description: Create remove file or directory operation (`rm`)
             operationId: delete_rm_filesystem__system_name__transfer_rm_delete
             parameters:
                 - in: path
@@ -3301,7 +3300,7 @@ paths:
                 - filesystem
     /filesystem/{system_name}/transfer/upload:
         post:
-            description: Create asynchronous upload operation (for files larger than 5242880 Bytes)
+            description: Create asynchronous upload operation
             operationId: post_upload_filesystem__system_name__transfer_upload_post
             parameters:
                 - in: path

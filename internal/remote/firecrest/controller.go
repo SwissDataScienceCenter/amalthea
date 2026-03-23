@@ -530,7 +530,7 @@ func (c *FirecrestRemoteSessionController) submitJob(ctx context.Context, job Jo
 	if res.JSON201.JobId == nil {
 		return "", fmt.Errorf("invalid job submission response")
 	}
-	return fmt.Sprintf("%d", *res.JSON201.JobId), nil
+	return *res.JSON201.JobId, nil
 }
 
 func getErrorMessage(json4XX, json5XX *ApiResponseError) (message string) {
@@ -638,16 +638,14 @@ func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, s
 	// Collect file systems we want to mount
 	var home *FileSystem
 	scratches, stores := []*FileSystem{}, []*FileSystem{}
-	if fileSystems != nil {
-		for _, fs := range *fileSystems {
-			switch fs.DataType {
-			case Scratch:
-				scratches = append(scratches, &fs)
-			case Store:
-				stores = append(stores, &fs)
-			case Users:
-				home = &fs
-			}
+	for _, fs := range *fileSystems {
+		switch fs.DataType {
+		case Scratch:
+			scratches = append(scratches, &fs)
+		case Store:
+			stores = append(stores, &fs)
+		case Users:
+			home = &fs
 		}
 	}
 
