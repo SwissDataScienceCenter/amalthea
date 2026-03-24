@@ -604,6 +604,11 @@ func (as *AmaltheaSession) PodName() string {
 	return fmt.Sprintf("%s-0", as.Name)
 }
 
+// Return the job name.
+func (as *AmaltheaSession) JobName() string {
+	return as.Name
+}
+
 // +kubebuilder:validation:Enum={never,always,whenFailedOrHibernated}
 type ReconcileStrategy string
 

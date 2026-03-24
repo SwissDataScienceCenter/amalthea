@@ -23,9 +23,11 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
@@ -144,12 +146,12 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// nonInteractiveDone := CheckNonInteractiveDone(ctx, r.Client, amaltheasession)
-	// if nonInteractiveDone {
-	// 	log.Info("Stop session as requested by reconciling child resources")
-	// 	err = r.Delete(ctx, amaltheasession)
-	// 	return ctrl.Result{}, err
-	// }
+	nonInteractiveDone := CheckNonInteractiveDone(ctx, r.Client, amaltheasession)
+	if nonInteractiveDone {
+		log.Info("Stop session as requested by reconciling child resources")
+		err = r.Delete(ctx, amaltheasession)
+		return ctrl.Result{}, err
+	}
 
 	var children ChildResources
 	switch amaltheasession.Spec.SessionType {
@@ -249,9 +251,9 @@ func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func CheckNonInteractiveDone(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) bool {
 	if cr.Spec.SessionType == amaltheadevv1alpha1.SessionTypeNonInteractive {
-		// check pod and return early if it is down
-		pod, err := cr.GetPod(ctx, clnt)
-		if pod != nil && err == nil && PodIsTerminated(pod) {
+		// check job and return early if it is down
+		job, err := cr.GetJob(ctx, clnt)
+		if job != nil && err == nil && isJobFinished(job) {
 			return true
 		}
 
@@ -265,11 +267,34 @@ func CheckNonInteractiveDone(ctx context.Context, clnt client.Client, cr *amalth
 		}
 		if until.Before(now) {
 			// need to forcibly kill things
-			gracePeriod := int64(0)
-			clnt.Delete(ctx, pod, &client.DeleteOptions{GracePeriodSeconds: &gracePeriod})
+			prop := metav1.DeletePropagationForeground
+			clnt.Delete(ctx, job, &client.DeleteOptions{PropagationPolicy: &prop})
 			return true
 		}
 	}
+	return false
+}
+
+func isJobFinished(j *batchv1.Job) bool {
+	if j.Status.Succeeded > 0 {
+		return true
+	}
+	for _, c := range j.Status.Conditions {
+		if c.Type == batchv1.JobComplete && c.Status == corev1.ConditionTrue {
+			return true
+		}
+		if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	bol := int32(0)
+	if j.Spec.BackoffLimit != nil {
+		bol = int32(*j.Spec.BackoffLimit)
+	}
+	if j.Status.Failed > 0 && j.Spec.BackoffLimit != nil && j.Status.Failed >= bol {
+		return true
+	}
+	log.Log.Info(">>>>> NOT FINISHED: ", "status", j.Status)
 	return false
 }
 

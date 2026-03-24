@@ -277,8 +277,68 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 		})
 		return ChildResourceUpdate[T]{c.Current, res, err, nil}
 	case *batchv1.Job:
-		log.Info("Reconcile Job", "Thing", c.Current)
-		return ChildResourceUpdate[T]{Manifest: c.Current, UpdateResult: controllerutil.OperationResultNone}
+		var statusCallback func(*amaltheadevv1alpha1.AmaltheaSessionStatus)
+		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
+			desired, ok := any(c.Desired).(*batchv1.Job)
+			if !ok {
+				return fmt.Errorf("could not cast when reconciling")
+			}
+			if current.CreationTimestamp.IsZero() {
+				log.Info("Creating a Job")
+				current.Spec = desired.Spec
+				current.ObjectMeta = desired.ObjectMeta
+				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				return err
+			}
+
+			// TODO suspending jobs
+			// if current.Spec.Replicas != nil && desired.Spec.Replicas != nil && *current.Spec.Replicas == 0 && *desired.Spec.Replicas == 1 {
+			//	// The session is being resumed
+			//	statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+			//		status.IdleSince = metav1.Time{}
+			//		status.FailingSince = metav1.Time{}
+			//		status.HibernatedSince = metav1.Time{}
+			//	}
+			// }
+			// if current.Spec.Replicas != nil && desired.Spec.Replicas != nil && *current.Spec.Replicas == 1 && *desired.Spec.Replicas == 0 {
+			//	// The session is being hibernated
+			//	statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+			//		status.IdleSince = metav1.Time{}
+			//		status.FailingSince = metav1.Time{}
+			//		status.HibernatedSince = metav1.Now()
+			//	}
+			// }
+			current.Spec.Template.Spec.Tolerations = desired.Spec.Template.Spec.Tolerations
+			current.Spec.Template.Spec.Affinity = desired.Spec.Template.Spec.Affinity
+			current.Spec.Template.Spec.NodeSelector = desired.Spec.Template.Spec.NodeSelector
+			current.Spec.Template.Spec.PriorityClassName = desired.Spec.Template.Spec.PriorityClassName
+			switch strategy := cr.Spec.ReconcileStrategy; strategy {
+			case amaltheadevv1alpha1.Never:
+				return nil
+			case amaltheadevv1alpha1.WhenFailedOrHibernated:
+				if !(cr.Status.State != amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+					return nil
+				}
+				fallthrough
+			case amaltheadevv1alpha1.Always:
+				current.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
+				current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
+				current.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
+				//current.Spec.Selector = desired.Spec.Selector
+				current.Labels = desired.Labels
+				current.Annotations = desired.Annotations
+				//current.Spec.Template.Labels = desired.Spec.Template.Labels
+				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
+			default:
+				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
+			}
+			return nil
+		})
+		if err != nil {
+			log.Error(err, "Error reconciling Job")
+		}
+		return ChildResourceUpdate[T]{c.Current, res, err, statusCallback}
+
 	default:
 		return ChildResourceUpdate[T]{Error: fmt.Errorf("encountered an uknown child resource type")}
 	}
