@@ -163,6 +163,8 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 		return batchv1.Job{}, err
 	}
 
+	pod.RestartPolicy = v1.RestartPolicyNever
+
 	parallel := int32(1)
 
 	job := batchv1.Job{
@@ -451,6 +453,17 @@ func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.
 		return nil, err
 	}
 	return &pod, err
+}
+
+func (cr *AmaltheaSession) GetJob(ctx context.Context, clnt client.Client) (*batchv1.Job, error) {
+	job := batchv1.Job{}
+	jobName := cr.JobName()
+	key := types.NamespacedName{Name: jobName, Namespace: cr.GetNamespace()}
+	err := clnt.Get(ctx, key, &job)
+	if err != nil {
+		return nil, err
+	}
+	return &job, err
 }
 
 // FirstTimestamp maybe null or eventTime is null… then it is
