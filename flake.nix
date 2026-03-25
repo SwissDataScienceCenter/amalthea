@@ -42,6 +42,7 @@
         chartpress
         azure-cli
         kubernetes-helm
+        gcc
       ];
     in {
       formatter = pkgs.alejandra;
