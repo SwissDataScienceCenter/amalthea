@@ -291,23 +291,23 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return err
 			}
 
-			// TODO suspending jobs
-			// if current.Spec.Replicas != nil && desired.Spec.Replicas != nil && *current.Spec.Replicas == 0 && *desired.Spec.Replicas == 1 {
-			//	// The session is being resumed
-			//	statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
-			//		status.IdleSince = metav1.Time{}
-			//		status.FailingSince = metav1.Time{}
-			//		status.HibernatedSince = metav1.Time{}
-			//	}
-			// }
-			// if current.Spec.Replicas != nil && desired.Spec.Replicas != nil && *current.Spec.Replicas == 1 && *desired.Spec.Replicas == 0 {
-			//	// The session is being hibernated
-			//	statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
-			//		status.IdleSince = metav1.Time{}
-			//		status.FailingSince = metav1.Time{}
-			//		status.HibernatedSince = metav1.Now()
-			//	}
-			// }
+			// suspending jobs
+			if current.Spec.Suspend != nil && desired.Spec.Suspend != nil && *current.Spec.Suspend == true && *desired.Spec.Suspend == false {
+				// The session is being resumed
+				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+					status.IdleSince = metav1.Time{}
+					status.FailingSince = metav1.Time{}
+					status.HibernatedSince = metav1.Time{}
+				}
+			}
+			if current.Spec.Suspend != nil && desired.Spec.Suspend != nil && *current.Spec.Suspend == false && *desired.Spec.Suspend == true {
+				// The session is being hibernated
+				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+					status.IdleSince = metav1.Time{}
+					status.FailingSince = metav1.Time{}
+					status.HibernatedSince = metav1.Now()
+				}
+			}
 			current.Spec.Template.Spec.Tolerations = desired.Spec.Template.Spec.Tolerations
 			current.Spec.Template.Spec.Affinity = desired.Spec.Template.Spec.Affinity
 			current.Spec.Template.Spec.NodeSelector = desired.Spec.Template.Spec.NodeSelector
@@ -325,9 +325,9 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
 				current.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
 				//current.Spec.Selector = desired.Spec.Selector
+				//current.Spec.Template.Labels = desired.Spec.Template.Labels
 				current.Labels = desired.Labels
 				current.Annotations = desired.Annotations
-				//current.Spec.Template.Labels = desired.Spec.Template.Labels
 				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
 			default:
 				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
