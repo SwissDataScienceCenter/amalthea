@@ -297,15 +297,3 @@ func isJobFinished(j *batchv1.Job) bool {
 	}
 	return false
 }
-
-func PodIsTerminated(pod *corev1.Pod) bool {
-	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
-		return true
-	} else {
-		if len(pod.Status.ContainerStatuses) > 0 {
-			containerStatus := pod.Status.ContainerStatuses[0]
-			return containerStatus.State.Terminated != nil
-		}
-	}
-	return false
-}
