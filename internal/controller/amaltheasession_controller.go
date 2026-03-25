@@ -261,12 +261,13 @@ func CheckNonInteractiveDone(ctx context.Context, clnt client.Client, cr *amalth
 		createdAt := cr.GetCreationTimestamp()
 		now := time.Now()
 		until := createdAt.Add(1 * time.Hour)
-		maxTime := cr.Spec.Culling.MaxNonInteractiveRuntime
+		maxTime := cr.Spec.Culling.MaxAge
 		if maxTime.Duration > 0 {
 			until = createdAt.Add(maxTime.Duration)
 		}
 		if until.Before(now) {
-			// need to forcibly kill things
+			// need to forcibly kill things, the propagationForeground lets the controller terminate
+			// the associated pod
 			prop := metav1.DeletePropagationForeground
 			clnt.Delete(ctx, job, &client.DeleteOptions{PropagationPolicy: &prop})
 			return true
@@ -294,7 +295,6 @@ func isJobFinished(j *batchv1.Job) bool {
 	if j.Status.Failed > 0 && j.Spec.BackoffLimit != nil && j.Status.Failed >= bol {
 		return true
 	}
-	log.Log.Info(">>>>> NOT FINISHED: ", "status", j.Status)
 	return false
 }
 
