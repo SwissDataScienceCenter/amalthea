@@ -1226,11 +1226,6 @@ spec:
                       valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
                     format: duration
                     type: string
-                  maxNonInteractiveRuntime:
-                    description: When running non-interactive sessions, this is the
-                      maximum runtime for the process.
-                    format: duration
-                    type: string
                   maxStartingDuration:
                     description: |-
                       How long can a server be in starting state before it gets hibernated. A
