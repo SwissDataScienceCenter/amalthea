@@ -20,6 +20,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
@@ -163,17 +164,23 @@ func (cr *AmaltheaSession) Job(clusterType ClusterType) (batchv1.Job, error) {
 	pod.RestartPolicy = v1.RestartPolicyNever
 
 	parallel := int32(1)
+	zero := int32(0)
+	activeTTL := int64(cr.Spec.Culling.MaxAge.Duration.Seconds())
+	ttlFinish := int32(cr.Spec.Culling.MaxHibernatedDuration.Duration)
 
 	job := batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        cr.Name,
+			Name:        cr.JobName(),
 			Namespace:   cr.Namespace,
 			Labels:      cr.childLabels(),
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: batchv1.JobSpec{
-			Parallelism: &parallel,
-			Completions: &parallel,
+			Parallelism:             &parallel,
+			Completions:             &parallel,
+			BackoffLimit:            &zero,
+			ActiveDeadlineSeconds:   &activeTTL,
+			TTLSecondsAfterFinished: &ttlFinish,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      cr.childLabels(),
@@ -442,14 +449,27 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 }
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
-	pod := v1.Pod{}
-	podName := cr.PodName()
-	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
-	err := clnt.Get(ctx, key, &pod)
-	if err != nil {
-		return nil, err
+	if cr.Spec.SessionType == SessionTypeInteractive {
+		pod := v1.Pod{}
+		podName := cr.PodName()
+		key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
+		err := clnt.Get(ctx, key, &pod)
+		if err != nil {
+			return nil, err
+		}
+		return &pod, err
+	} else {
+		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
+		podList := &v1.PodList{}
+		listOpts := &client.ListOptions{Namespace: cr.Namespace, LabelSelector: selector}
+		if err := clnt.List(ctx, podList, listOpts); err != nil {
+			return nil, err
+		}
+		if len(podList.Items) > 0 {
+			return &podList.Items[0], nil
+		}
+		return nil, nil
 	}
-	return &pod, err
 }
 
 func (cr *AmaltheaSession) GetJob(ctx context.Context, clnt client.Client) (*batchv1.Job, error) {

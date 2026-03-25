@@ -437,6 +437,34 @@ func (c ChildResourceUpdates) AllEqual(op controllerutil.OperationResult) bool {
 	return ingressOK && c.Service.UpdateResult == op && c.PVC.UpdateResult == op && c.StatefulSet.UpdateResult == op && dataSourcesOK && c.Secret.UpdateResult == op
 }
 
+// func isJobFinished(j *batchv1.Job) bool {
+//	if j == nil {
+//		return false
+//	}
+//	if j.Status.Succeeded > 0 {
+//		return true
+//	}
+//	for _, c := range j.Status.Conditions {
+//		if c.Type == batchv1.JobComplete && c.Status == v1.ConditionTrue {
+//			return true
+//		}
+//		if c.Type == batchv1.JobFailed && c.Status == v1.ConditionTrue {
+//			return true
+//		}
+//		if c.Type == batchv1.JobFailureTarget && c.Status == v1.ConditionTrue {
+//			return true
+//		}
+//	}
+//	bol := int32(0)
+//	if j.Spec.BackoffLimit != nil {
+//		bol = int32(*j.Spec.BackoffLimit)
+//	}
+//	if j.Status.Failed > 0 && j.Spec.BackoffLimit != nil && j.Status.Failed >= bol {
+//		return true
+//	}
+//	return false
+// }
+
 func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	// TODO: Try to re-enable the two checks below and potentially use them to determine readiness.
 	// Currently the resources created by the operator have slight changes that k8s itself applies in a few places outside
@@ -462,7 +490,7 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
 		return amaltheadevv1alpha1.NotReady, ""
-	case cr.Spec.Hibernated && c.StatefulSet.Manifest.Spec.Replicas != nil && *c.StatefulSet.Manifest.Spec.Replicas == 0:
+	case (cr.Spec.Hibernated && c.StatefulSet.Manifest != nil && c.StatefulSet.Manifest.Spec.Replicas != nil && *c.StatefulSet.Manifest.Spec.Replicas == 0) || (c.Job.Manifest != nil && c.Job.Manifest.Spec.Suspend != nil && *c.Job.Manifest.Spec.Suspend == true):
 		return amaltheadevv1alpha1.Hibernated, ""
 	case msg != "":
 		return amaltheadevv1alpha1.Failed, msg
@@ -694,6 +722,14 @@ func (c ChildResourceUpdates) Status(
 			log.Error(err, "Could not read the session pod when updating the status")
 		}
 	}
+	if cr.Spec.SessionType == amaltheadevv1alpha1.SessionTypeNonInteractive {
+		// mark the status so we don't do a path-or-create that re-creates the job
+		// job, err = cr.GetJob(ctx, r.Client)
+		// if isJobFinished(job) {
+
+		// }
+	}
+
 
 	idle := false
 	idleSince := cr.Status.IdleSince
