@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -278,16 +277,6 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 		})
 		return ChildResourceUpdate[T]{c.Current, res, err, nil}
 	case *batchv1.Job:
-		job, _ := cr.GetJob(ctx, clnt)
-		finished := isJobFinished(job)
-		if job != nil {
-			DebugThis(job)
-		}
-		if finished {
-			log.Info(">>>>>>>>>>>>>>>>>>>>>>>>> FINISHED FINISHED")
-			return ChildResourceUpdate[T]{c.Current, controllerutil.OperationResultNone, nil, nil}
-		}
-
 		var statusCallback func(*amaltheadevv1alpha1.AmaltheaSessionStatus)
 		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
 			desired, ok := any(c.Desired).(*batchv1.Job)
@@ -295,10 +284,13 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a Job")
+				log.Info("Creating a Job", "job", desired.Spec)
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				if err != nil {
+					log.Error(err, "Error setting controller reference")
+				}
 				return err
 			}
 
@@ -311,7 +303,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 					status.HibernatedSince = metav1.Time{}
 				}
 			}
-			if current.Spec.Suspend != nil && desired.Spec.Suspend != nil && *current.Spec.Suspend == false && *desired.Spec.Suspend == true {
+			if (current.Spec.Suspend == nil || *current.Spec.Suspend == false) && desired.Spec.Suspend != nil && *desired.Spec.Suspend == true {
 				// The session is being hibernated
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
@@ -323,6 +315,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			current.Spec.Template.Spec.Affinity = desired.Spec.Template.Spec.Affinity
 			current.Spec.Template.Spec.NodeSelector = desired.Spec.Template.Spec.NodeSelector
 			current.Spec.Template.Spec.PriorityClassName = desired.Spec.Template.Spec.PriorityClassName
+			current.Spec.Suspend = desired.Spec.Suspend
 			switch strategy := cr.Spec.ReconcileStrategy; strategy {
 			case amaltheadevv1alpha1.Never:
 				return nil
@@ -358,8 +351,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 func NewJobChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, clusterType amaltheadevv1alpha1.ClusterType) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
-	desiredJob, err := cr.Job(clusterType)
 	desiredPVC := cr.PVC()
+	desiredJob, err := cr.Job(clusterType)
 	if err != nil {
 		return ChildResources{}, err
 	}
@@ -446,69 +439,6 @@ func (c ChildResourceUpdates) AllEqual(op controllerutil.OperationResult) bool {
 		dataSourcesOK = dataSourcesOK && (ds.UpdateResult == op)
 	}
 	return ingressOK && c.Service.UpdateResult == op && c.PVC.UpdateResult == op && c.StatefulSet.UpdateResult == op && dataSourcesOK && c.Secret.UpdateResult == op
-}
-
-func DebugThis(job *batchv1.Job) {
-	finished := isJobFinished(job)
-	f, _ := os.OpenFile("/tmp/test.x", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-	defer f.Close()
-	fmt.Fprint(f, "Active:", job.Status.Active, " succeeded:", job.Status.Succeeded, " failed: ", job.Status.Failed, " Finished:", finished, "\n")
-
-	fmt.Print("\n==============================\n")
-	fmt.Print("Active:", job.Status.Active, " succeeded:", job.Status.Succeeded, " failed: ", job.Status.Failed)
-	fmt.Print("\n==============================\n")
-}
-
-func isJobFinished(j *batchv1.Job) bool {
-	_, rerr := os.Stat("/tmp/done")
-	if rerr == nil {
-		return true
-	}
-
-	if j == nil {
-		return false
-	}
-	if j.Status.Active == 0 && j.Status.Succeeded == 0 && j.Status.Failed == 0 {
-		return false
-	}
-
-	if j.Status.Succeeded > 0 || j.Status.Failed > 0 {
-		f, _ := os.Create("/tmp/done")
-		if f != nil {
-			defer f.Close()
-		}
-
-		return true
-	}
-	if j.Status.Terminating != nil && *j.Status.Terminating > 0 {
-		f, _ := os.Create("/tmp/done")
-		if f != nil {
-			defer f.Close()
-		}
-
-		return true
-	}
-
-	return false
-	// for _, c := range j.Status.Conditions {
-	//	if c.Type == batchv1.JobComplete && c.Status == v1.ConditionTrue {
-	//		return true
-	//	}
-	//	if c.Type == batchv1.JobFailed && c.Status == v1.ConditionTrue {
-	//		return true
-	//	}
-	//	if c.Type == batchv1.JobFailureTarget && c.Status == v1.ConditionTrue {
-	//		return true
-	//	}
-	// }
-	// bol := int32(0)
-	// if j.Spec.BackoffLimit != nil {
-	//	bol = int32(*j.Spec.BackoffLimit)
-	// }
-	// if j.Status.Failed > 0 && j.Spec.BackoffLimit != nil && j.Status.Failed >= bol {
-	//	return true
-	// }
-	// return false
 }
 
 func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {

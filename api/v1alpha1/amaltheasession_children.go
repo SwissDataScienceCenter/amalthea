@@ -165,8 +165,21 @@ func (cr *AmaltheaSession) Job(clusterType ClusterType) (batchv1.Job, error) {
 
 	parallel := int32(1)
 	zero := int32(0)
-	activeTTL := int64(cr.Spec.Culling.MaxAge.Duration.Seconds())
-	ttlFinish := int32(cr.Spec.Culling.MaxHibernatedDuration.Duration)
+
+	// use MaxAge (amount of time until a session gets terminated) to set maximum job runtime
+	var activeTTL *int64
+	if cr.Spec.Culling.MaxAge.Duration.Seconds() > 0 {
+		vv := int64(cr.Spec.Culling.MaxAge.Duration.Seconds())
+		activeTTL = &vv
+	}
+
+	// use MaxHibernatedDuration (amount of time until a hibernated session is deleted) to set the time
+	// after which the job is removed after it has completed
+	var ttlFinish *int32
+	if cr.Spec.Culling.MaxHibernatedDuration.Duration.Seconds() > 0 {
+		vv := int32(cr.Spec.Culling.MaxHibernatedDuration.Duration.Seconds())
+		ttlFinish = &vv
+	}
 
 	job := batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -179,8 +192,9 @@ func (cr *AmaltheaSession) Job(clusterType ClusterType) (batchv1.Job, error) {
 			Parallelism:             &parallel,
 			Completions:             &parallel,
 			BackoffLimit:            &zero,
-			ActiveDeadlineSeconds:   &activeTTL,
-			TTLSecondsAfterFinished: &ttlFinish,
+			ActiveDeadlineSeconds:   activeTTL,
+			TTLSecondsAfterFinished: ttlFinish,
+			Suspend:                 &cr.Spec.Hibernated,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      cr.childLabels(),
@@ -449,7 +463,8 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 }
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
-	if cr.Spec.SessionType == SessionTypeInteractive {
+	switch cr.Spec.SessionType {
+	case SessionTypeInteractive:
 		pod := v1.Pod{}
 		podName := cr.PodName()
 		key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
@@ -458,7 +473,8 @@ func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.
 			return nil, err
 		}
 		return &pod, err
-	} else {
+
+	case SessionTypeNonInteractive:
 		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
 		podList := &v1.PodList{}
 		listOpts := &client.ListOptions{Namespace: cr.Namespace, LabelSelector: selector}
@@ -468,6 +484,8 @@ func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.
 		if len(podList.Items) > 0 {
 			return &podList.Items[0], nil
 		}
+		return nil, nil
+	default:
 		return nil, nil
 	}
 }
