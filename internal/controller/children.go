@@ -698,13 +698,6 @@ func (c ChildResourceUpdates) Status(
 			log.Error(err, "Could not read the session pod when updating the status")
 		}
 	}
-	if cr.Spec.SessionType == amaltheadevv1alpha1.SessionTypeNonInteractive {
-		// mark the status so we don't do a path-or-create that re-creates the job
-		// job, err = cr.GetJob(ctx, r.Client)
-		// if isJobFinished(job) {
-
-		// }
-	}
 
 	idle := false
 	idleSince := cr.Status.IdleSince
