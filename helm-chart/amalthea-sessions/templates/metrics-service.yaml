@@ -1,0 +1,22 @@
+{{- if .Values.controllerManager.metricsService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "amalthea-sessions.fullname" . }}-metrics
+  labels:
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/created-by: amalthea
+    app.kubernetes.io/part-of: amalthea
+    control-plane: controller-manager
+  {{- include "amalthea-sessions.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.controllerManager.metricsService.type }}
+  ports:
+    - name: https
+      port: {{ .Values.controllerManager.metricsService.port }}
+      protocol: TCP
+      targetPort: {{ .Values.controllerManager.metricsService.targetPort }}
+  selector:
+    control-plane: controller-manager
+  {{- include "amalthea-sessions.selectorLabels" . | nindent 4 }}
+{{- end }}

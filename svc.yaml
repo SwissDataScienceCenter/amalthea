@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: amalthea
+  namespace: renku-ci-am-1094
+spec:
+  selector:
+    "app.kubernetes.io/name": "amalthea-sessions"
+  clusterIP: None
+  ports:
+  - name: metrics
+    port: 8080

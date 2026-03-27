@@ -2,7 +2,7 @@ controllerManager:
   manager:
     args:
       - --health-probe-bind-address=:8081
-      - --metrics-bind-address=127.0.0.1:8080
+      - --metrics-bind-address=:8080
       - --leader-elect
     containerSecurityContext:
       allowPrivilegeEscalation: false
@@ -26,6 +26,11 @@ controllerManager:
       environment:
       tracesSampleRate: 0.1
   replicas: 1
+  metricsService:
+    enabled: true
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
   serviceAccount:
     annotations: {}
 kubernetesClusterDomain: cluster.local
