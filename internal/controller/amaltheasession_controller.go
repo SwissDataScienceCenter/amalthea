@@ -144,14 +144,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	var children ChildResources
-	switch amaltheasession.Spec.SessionType {
-	case amaltheadevv1alpha1.SessionTypeInteractive:
-		children, err = NewChildResources(amaltheasession, r.ClusterType)
-	case amaltheadevv1alpha1.SessionTypeNonInteractive:
-		children, err = NewJobChildResources(amaltheasession, r.ClusterType)
-	}
-
+	children, err := NewChildResources(amaltheasession, r.ClusterType)
 	if err != nil {
 		log.Error(
 			err,
