@@ -366,7 +366,25 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 	}
 }
 
-func NewJobChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.AmaltheaSessionConfiguration) (ChildResources, error) {
+type SessionTypeError struct {
+	SessionType amaltheadevv1alpha1.SessionType
+}
+
+func (e *SessionTypeError) Error() string {
+	return fmt.Sprint("Unsupported session type:", e.SessionType)
+}
+
+func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.AmaltheaSessionConfiguration) (ChildResources, error) {
+	switch cr.Spec.SessionType {
+	case amaltheadevv1alpha1.SessionTypeInteractive:
+		return NewInteractiveChildResources(cr, cfg)
+	case amaltheadevv1alpha1.SessionTypeNonInteractive:
+		return NewNonInteractiveChildResources(cr, cfg)
+	}
+	return ChildResources{}, &SessionTypeError{SessionType: cr.Spec.SessionType}
+}
+
+func NewNonInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.AmaltheaSessionConfiguration) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredPVC := cr.PVC()
@@ -395,7 +413,7 @@ func NewJobChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.Am
 	return output, nil
 }
 
-func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, config config.AmaltheaSessionConfiguration) (ChildResources, error) {
+func NewInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, config config.AmaltheaSessionConfiguration) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredService := cr.Service()
