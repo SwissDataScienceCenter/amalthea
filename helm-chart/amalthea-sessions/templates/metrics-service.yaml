@@ -16,7 +16,7 @@ metadata:
 spec:
   type: {{ .Values.controllerManager.metricsService.type }}
   ports:
-    - name: https
+    - name: http
       port: {{ .Values.controllerManager.metricsService.port }}
       protocol: TCP
       targetPort: {{ .Values.controllerManager.metricsService.targetPort }}
