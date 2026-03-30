@@ -2,8 +2,9 @@ controllerManager:
   manager:
     args:
       - --health-probe-bind-address=:8081
-      - --metrics-bind-address=127.0.0.1:8080
+      - --metrics-bind-address=:8080
       - --leader-elect
+      - --metrics-secure=false
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:
@@ -26,6 +27,16 @@ controllerManager:
       environment:
       tracesSampleRate: 0.1
   replicas: 1
+  metricsService:
+    enabled: true
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/path: /metrics
+      prometheus.io/port: "8080"
+      prometheus.io/scheme: http
   serviceAccount:
     annotations: {}
 kubernetesClusterDomain: cluster.local

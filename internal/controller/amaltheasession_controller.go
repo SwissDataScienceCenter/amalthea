@@ -1,5 +1,5 @@
 /*
-Copyright 2024.
+Copyright 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -102,6 +102,8 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 					return ctrl.Result{}, err
 				}
 			}
+			// Record initial metrics
+			RecordAmaltheaSessionMetrics(amaltheasession)
 		}
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
@@ -180,7 +182,12 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
+	// Record metrics for the session status
+	RecordAmaltheaSessionMetrics(amaltheasession)
+
 	if amaltheasession.NeedsDeletion() {
+		// Clean up metrics for this session before deleting it
+		RemoveAmaltheaSessionMetrics(amaltheasession)
 		err = r.Delete(ctx, amaltheasession)
 		log.Info("custom resource deleted")
 		return ctrl.Result{}, err
