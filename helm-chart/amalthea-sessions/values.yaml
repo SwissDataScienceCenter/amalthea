@@ -32,6 +32,11 @@ controllerManager:
     type: ClusterIP
     port: 8080
     targetPort: 8080
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/path: /metrics
+      prometheus.io/port: "8080"
+      prometheus.io/scheme: http
   serviceAccount:
     annotations: {}
 kubernetesClusterDomain: cluster.local

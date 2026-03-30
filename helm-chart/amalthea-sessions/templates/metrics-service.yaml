@@ -8,6 +8,10 @@ metadata:
     app.kubernetes.io/created-by: amalthea
     app.kubernetes.io/part-of: amalthea
     control-plane: controller-manager
+  {{- with .Values.controllerManager.metricsService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- include "amalthea-sessions.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.controllerManager.metricsService.type }}
