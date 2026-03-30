@@ -48,6 +48,7 @@ const TunnelPort int32 = 65531
 var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
 var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
+var useNoneSameSiteSessionCookie = getUseNoneSameSiteSessionCookie()
 
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
@@ -604,6 +605,10 @@ func getSidecarsImage() string {
 		sc = "renku/sidecars:latest"
 	}
 	return sc
+}
+
+func getUseNoneSameSiteSessionCookie() bool {
+	return strings.ToLower(os.Getenv("USE_NONE_SAME_SITE_SESSION_COOKIE")) == "true"
 }
 
 // InternalSecretName returns the name of the secret that is a child

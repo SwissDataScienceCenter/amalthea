@@ -67,3 +67,5 @@ cloner:
   image:
     repository: renku/cloner
     tag: latest
+
+useNoneSameSiteSessionCookie: false

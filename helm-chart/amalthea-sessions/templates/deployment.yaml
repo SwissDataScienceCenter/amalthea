@@ -42,6 +42,8 @@ spec:
           value: {{ .Values.rcloneStorageClass | quote }}
         - name: SIDECARS_IMAGE
           value: {{ .Values.sidecars.image.repository }}:{{ .Values.sidecars.image.tag }}
+        - name: USE_NONE_SAME_SITE_SESSION_COOKIE
+          value: {{ .Values.useNoneSameSiteSessionCookie | quote }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
         livenessProbe:

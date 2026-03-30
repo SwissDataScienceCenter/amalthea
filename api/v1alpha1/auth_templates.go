@@ -47,6 +47,10 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				Port: intstr.FromInt32(authenticatedPort),
 			},
 		}
+		sameSiteCookieFlag := "strict"
+		if useNoneSameSiteSessionCookie {
+			sameSiteCookieFlag = "none"
+		}
 		oauth2ProxyContainer := v1.Container{
 			Image: authproxyImage,
 			Name:  "oauth2-proxy",
@@ -59,6 +63,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				fmt.Sprintf("--http-address=:%d", authenticatedPort),
 				"--silence-ping-logging",
 				"--config=/etc/oauth2-proxy/" + auth.SecretRef.Key,
+				fmt.Sprintf("--cookie-samesite=%s", sameSiteCookieFlag),
 			},
 			VolumeMounts: append(
 				[]v1.VolumeMount{
@@ -89,6 +94,9 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 
 		output.Containers = append(output.Containers, oauth2ProxyContainer)
 	case Token:
+		if useNoneSameSiteSessionCookie {
+			return output, fmt.Errorf("cannot set the same site cookie parameter for anonymous sessions")
+		}
 		volName := fmt.Sprintf("%sproxy-configuration-secret", prefix)
 		output.Volumes = append(output.Volumes, v1.Volume{
 			Name: volName,
@@ -143,6 +151,10 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				Port: intstr.FromInt32(authenticatedPort),
 			},
 		}
+		sameSiteCookieFlag := "strict"
+		if useNoneSameSiteSessionCookie {
+			sameSiteCookieFlag = "none"
+		}
 		oauth2ProxyContainer := v1.Container{
 			Image: authproxyImage,
 			Name:  "oauth2-proxy",
@@ -154,6 +166,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 				"--silence-ping-logging",
 				"--alpha-config=/etc/oauth2-proxy/oauth2-proxy-alpha-config.yaml",
 				"--config=/etc/oauth2-proxy/oauth2-proxy-config.yaml",
+				fmt.Sprintf("--cookie-samesite=%s", sameSiteCookieFlag),
 			},
 			EnvFrom: []v1.EnvFromSource{
 				{
