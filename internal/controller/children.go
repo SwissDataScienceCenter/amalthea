@@ -371,7 +371,7 @@ type SessionTypeError struct {
 }
 
 func (e *SessionTypeError) Error() string {
-	return fmt.Sprint("Unsupported session type:", e.SessionType)
+	return fmt.Sprintf("Unsupported session type: '%v'", e.SessionType)
 }
 
 func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.AmaltheaSessionConfiguration) (ChildResources, error) {
