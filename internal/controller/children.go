@@ -362,6 +362,8 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, clusterType amal
 		return NewInteractiveChildResources(cr, clusterType)
 	case amaltheadevv1alpha1.SessionTypeNonInteractive:
 		return NewNonInteractiveChildResources(cr, clusterType)
+	case "":
+		return NewInteractiveChildResources(cr, clusterType)
 	}
 	return ChildResources{}, &SessionTypeError{SessionType: cr.Spec.SessionType}
 }
