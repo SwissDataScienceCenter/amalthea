@@ -40,7 +40,7 @@ rules:
   - update
 # Required for tracking pods for session status
 - apiGroups: [""]
-  resources: [pods]
+  resources: [pods,jobs]
   verbs: [get, list, watch]
 # Amalthea get pod metrics used to cull idle sessions
 - apiGroups: ["metrics.k8s.io"]
