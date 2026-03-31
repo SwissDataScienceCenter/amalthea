@@ -68,4 +68,7 @@ cloner:
     repository: renku/cloner
     tag: latest
 
+# Setting this flag to true will make the oauth2-proxy session cookie set its
+# SameSite parameter to None. This is only useful in specific cases for remote Renku cluster.
+# Setting this value to true can have security implications without adjusting CSP and CORS on the session ingress.
 useNoneSameSiteSessionCookie: false
