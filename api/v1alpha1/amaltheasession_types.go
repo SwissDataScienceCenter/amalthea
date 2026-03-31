@@ -153,7 +153,7 @@ type AmaltheaSessionSpec struct {
 	Template Template `json:"template,omitempty"`
 
 	// +optional
-	// The session type, it is "interactive" by default, but can be set to "non-interactive". Non-interactive
+	// The session type, it is "Interactive" by default, but can be set to "NonInteractive". Non-interactive
 	// sessions are handled differently in that the main process is expected to be run-once and once it
 	// terminates, the resources are cleaned up.
 	SessionType SessionType `json:"sessionType,omitempty"`
