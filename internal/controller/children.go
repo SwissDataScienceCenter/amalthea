@@ -380,6 +380,8 @@ func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.Amalt
 		return NewInteractiveChildResources(cr, cfg)
 	case amaltheadevv1alpha1.SessionTypeNonInteractive:
 		return NewNonInteractiveChildResources(cr, cfg)
+	case "":
+		return NewInteractiveChildResources(cr, cfg)
 	}
 	return ChildResources{}, &SessionTypeError{SessionType: cr.Spec.SessionType}
 }
