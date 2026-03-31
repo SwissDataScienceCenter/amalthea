@@ -55,9 +55,10 @@ rules:
   resources:
   - jobs
   verbs:
+  - create
   - get
   - list
-  - create
+  - patch
   - watch
 - apiGroups:
   - ""
