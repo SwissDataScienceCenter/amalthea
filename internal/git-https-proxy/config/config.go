@@ -28,6 +28,8 @@ type GitProxyConfig struct {
 	HealthPort int `mapstructure:"health_port"`
 	// True if this is an anonymous session
 	AnonymousSession bool `mapstructure:"anonymous_session"`
+	// The Renku authentication version, set to "v2" when using internal tokens
+	RenkuAuthenticationVersion string `mapstructure:"renku_authentication_version"`
 	// The oauth access token issued by Keycloak to a logged in Renku user
 	RenkuAccessToken string `mapstructure:"renku_access_token"`
 	// The oauth refresh token issued by Keycloak to a logged in Renku user
@@ -43,6 +45,8 @@ type GitProxyConfig struct {
 	RenkuClientID string `mapstructure:"renku_client_id"`
 	// The client secret for the client ID
 	RenkuClientSecret string `mapstructure:"renku_client_secret"`
+	// The URL used to refresh tokens (with "v2" authentication version)
+	RenkuTokenURL string `mapstructure:"renku_token_url"`
 	// The git repositories to proxy
 	Repositories []GitRepository `mapstructure:"repositories"`
 	// The git providers
@@ -60,12 +64,14 @@ func GetConfig() (GitProxyConfig, error) {
 	v.SetDefault("port", 8080)
 	v.SetDefault("health_port", 8081)
 	v.SetDefault("anonymous_session", true)
+	v.SetDefault("renku_authentication_version", "")
 	v.SetDefault("renku_access_token", "")
 	v.SetDefault("renku_refresh_token", "")
 	v.SetDefault("renku_url", nil)
 	v.SetDefault("renku_realm", "")
 	v.SetDefault("renku_client_id", "")
 	v.SetDefault("renku_client_secret", "")
+	v.SetDefault("renku_token_url", "")
 	v.SetDefault("repositories", []GitRepository{})
 	v.SetDefault("providers", []GitProvider{})
 	v.SetDefault("refresh_check_period_seconds", 600)
@@ -87,6 +93,10 @@ func (c *GitProxyConfig) Validate() error {
 	// INFO: The proxy is a pass-through for anonymous sessions, so no config is required.
 	if c.AnonymousSession {
 		return nil
+	}
+	// Validate "v2" authentication separately
+	if c.RenkuAuthenticationVersion == "v2" {
+		return c.validateRenkuAuthenticationV2()
 	}
 	if c.RenkuAccessToken == "" {
 		return fmt.Errorf("the renku access token is not defined")
@@ -203,4 +213,19 @@ func parseJsonVariable() mapstructure.DecodeHookFuncType {
 
 		return value.Interface(), nil
 	}
+}
+
+// validateRenkuAuthenticationV2 validates then config when "renku_authentication_version" is "v2"
+func (c *GitProxyConfig) validateRenkuAuthenticationV2() error {
+	if c.RenkuAccessToken == "" {
+		return fmt.Errorf("the renku access token is not defined")
+	}
+	if c.RenkuTokenURL == "" {
+		return fmt.Errorf("the renku token URL is not defined")
+	}
+	if _, err := url.Parse(c.RenkuTokenURL); err != nil {
+		return fmt.Errorf("cannot parse renku token URL: %w", err)
+	}
+	return fmt.Errorf("not yet supported")
+	// return nil
 }
