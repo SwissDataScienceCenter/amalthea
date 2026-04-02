@@ -69,6 +69,12 @@ func New(c *config.GitProxyConfig) *TokenStore {
 	if c.RenkuAuthenticationVersion == "v2" {
 		store.renkuRefreshToken = store.renkuAccessToken
 	}
+
+	// Debug
+	log.Printf("RenkuAuthenticationVersion = %s\n", store.Config.RenkuAuthenticationVersion)
+	log.Printf("RenkuTokenURL = %s\n", store.Config.RenkuTokenURL)
+	log.Printf("RefreshCheckPeriodSeconds = %d\n", store.Config.RefreshCheckPeriodSeconds)
+
 	// Start a go routine to keep the refresh token valid
 	go store.periodicTokenRefresh()
 	return &store
@@ -292,6 +298,8 @@ func (s *TokenStore) refreshRenkuAccessTokenV2() error {
 func (s *TokenStore) periodicTokenRefresh() {
 	for {
 		<-s.refreshTicker.C
+		// Debug
+		log.Println("tick periodicTokenRefresh()")
 		s.renkuAccessTokenLock.RLock()
 		renkuRefreshToken := s.renkuRefreshToken
 		s.renkuAccessTokenLock.RUnlock()
