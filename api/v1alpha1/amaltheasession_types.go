@@ -456,7 +456,7 @@ func (s *SessionSecretRef) isAdopted() bool {
 	return s != nil && s.Name != "" && s.Adopt
 }
 
-// +kubebuilder:validation:Enum={Running,Failed,Hibernated,NotReady,RunningDegraded}
+// +kubebuilder:validation:Enum={Running,Failed,Hibernated,NotReady,RunningDegraded,Succeeded}
 type State string
 
 const Running State = "Running"
@@ -464,6 +464,7 @@ const Failed State = "Failed"
 const Hibernated State = "Hibernated"
 const NotReady State = "NotReady"
 const RunningDegraded State = "RunningDegraded"
+const Succeeded State = "Succeeded"
 
 // Counts of the total and ready containers, can represent either regular or init containers.
 type ContainerCounts struct {
