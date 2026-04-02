@@ -233,7 +233,7 @@ func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.Stateful
 			PodManagementPolicy: appsv1.ParallelPodManagement,
 			Replicas:            &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: selectorLabels(cr.Name),
+				MatchLabels: selectorLabels(cr.Name, cr.Spec.SessionType),
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -266,7 +266,7 @@ func (cr *AmaltheaSession) Service() v1.Service {
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: v1.ServiceSpec{
-			Selector: selectorLabels(cr.Name),
+			Selector: selectorLabels(cr.Name, cr.Spec.SessionType),
 			Ports: []v1.ServicePort{
 				{
 					Protocol:   v1.ProtocolTCP,
@@ -428,11 +428,11 @@ func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
 func selectorLabels(name string, sessionType SessionType) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name":       "AmaltheaSession",
-		"app.kubernetes.io/instance":   name,
-		"app.kubernetes.io/part-of":    "amaltheasession-operator",
-		"app.kubernetes.io/created-by": "controller-manager",
-		"app.kubernetes.io/session-type": string(sessionType)
+		"app.kubernetes.io/name":         "AmaltheaSession",
+		"app.kubernetes.io/instance":     name,
+		"app.kubernetes.io/part-of":      "amaltheasession-operator",
+		"app.kubernetes.io/created-by":   "controller-manager",
+		"app.kubernetes.io/session-type": string(sessionType),
 	}
 }
 
@@ -457,10 +457,25 @@ func NewConditions() []AmaltheaSessionCondition {
 }
 
 func (cr *AmaltheaSession) NeedsDeletion() bool {
-	hibernatedDuration := time.Since(cr.Status.HibernatedSince.Time)
-	durationIsZero := cr.Spec.Culling.MaxHibernatedDuration == metav1.Duration{}
-	return cr.Status.State == Hibernated && !durationIsZero &&
-		hibernatedDuration > cr.Spec.Culling.MaxHibernatedDuration.Duration
+	switch cr.Spec.SessionType {
+	case SessionTypeNonInteractive:
+		// delete if session is a job and it has been completed for longer than maxHibernatedDuration
+		doneSince := cr.Status.IdleSince
+		if !cr.Status.FailingSince.IsZero() &&
+			!doneSince.IsZero() && cr.Status.FailingSince.Before(&doneSince) {
+			doneSince = cr.Status.FailingSince
+		}
+		hibernatedDuration := time.Since(doneSince.Time)
+		return !doneSince.IsZero() &&
+			(cr.Status.State == Failed || cr.Status.State == Succeeded) &&
+			hibernatedDuration > cr.Spec.Culling.MaxHibernatedDuration.Duration
+
+	default:
+		hibernatedDuration := time.Since(cr.Status.HibernatedSince.Time)
+		durationIsZero := cr.Spec.Culling.MaxHibernatedDuration == metav1.Duration{}
+		return cr.Status.State == Hibernated && !durationIsZero &&
+			hibernatedDuration > cr.Spec.Culling.MaxHibernatedDuration.Duration
+	}
 }
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {

@@ -486,12 +486,16 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
 		return amaltheadevv1alpha1.NotReady, ""
-	case (cr.Spec.Hibernated && c.StatefulSet.Manifest != nil && c.StatefulSet.Manifest.Spec.Replicas != nil && *c.StatefulSet.Manifest.Spec.Replicas == 0) || (c.Job.Manifest != nil && c.Job.Manifest.Spec.Suspend != nil && *c.Job.Manifest.Spec.Suspend == true):
+	case cr.Spec.Hibernated && c.StatefulSet.Manifest != nil && c.StatefulSet.Manifest.Spec.Replicas != nil && *c.StatefulSet.Manifest.Spec.Replicas == 0:
+		return amaltheadevv1alpha1.Hibernated, ""
+	case cr.Spec.Hibernated && c.Job.Manifest != nil && c.Job.Manifest.Spec.Suspend != nil && *c.Job.Manifest.Spec.Suspend == true:
 		return amaltheadevv1alpha1.Hibernated, ""
 	case msg != "":
 		return amaltheadevv1alpha1.Failed, msg
 	case c.IsRunning(pod):
 		return amaltheadevv1alpha1.Running, ""
+	case podIsCompleted(pod):
+		return amaltheadevv1alpha1.Succeeded, ""
 	default:
 		return amaltheadevv1alpha1.NotReady, ""
 	}
@@ -742,6 +746,13 @@ func (c ChildResourceUpdates) Status(
 
 		if state == amaltheadevv1alpha1.Running && oldEnough {
 			idleSince, idle = getIdleState(ctx, r, cr)
+		}
+		if (state == amaltheadevv1alpha1.Succeeded || state == amaltheadevv1alpha1.Failed) && idleSince.IsZero() {
+			// set idle time when containers exited
+			idleSince = metav1.NewTime(time.Now())
+		}
+		if !idle {
+			idle = state == amaltheadevv1alpha1.Succeeded || state == amaltheadevv1alpha1.Failed
 		}
 	} else {
 		events := v1.EventList{}

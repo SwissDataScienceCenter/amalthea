@@ -6579,6 +6579,7 @@ spec:
                 - Hibernated
                 - NotReady
                 - RunningDegraded
+                - Succeeded
                 type: string
               url:
                 type: string
