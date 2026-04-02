@@ -226,6 +226,5 @@ func (c *GitProxyConfig) validateRenkuAuthenticationV2() error {
 	if _, err := url.Parse(c.RenkuTokenURL); err != nil {
 		return fmt.Errorf("cannot parse renku token URL: %w", err)
 	}
-	return fmt.Errorf("not yet supported")
-	// return nil
+	return nil
 }

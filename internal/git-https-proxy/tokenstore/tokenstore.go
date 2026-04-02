@@ -66,6 +66,9 @@ func New(c *config.GitProxyConfig) *TokenStore {
 		gitAccessTokens:      make(map[string]TokenSet, len(c.Providers)),
 		gitAccessTokensLock:  &sync.RWMutex{},
 	}
+	if c.RenkuAuthenticationVersion == "v2" {
+		store.renkuRefreshToken = store.renkuAccessToken
+	}
 	// Start a go routine to keep the refresh token valid
 	go store.periodicTokenRefresh()
 	return &store
@@ -213,8 +216,15 @@ type renkuTokenRefreshResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+type renkuTokenRefreshV2Response struct {
+	AccessToken string `json:"access_token"`
+}
+
 // Refreshes the renku access token.
 func (s *TokenStore) refreshRenkuAccessToken() error {
+	if s.Config.RenkuAuthenticationVersion == "v2" {
+		return s.refreshRenkuAccessTokenV2()
+	}
 	s.renkuAccessTokenLock.Lock()
 	defer s.renkuAccessTokenLock.Unlock()
 	payload := url.Values{}
@@ -244,6 +254,37 @@ func (s *TokenStore) refreshRenkuAccessToken() error {
 	if resParsed.RefreshToken != "" {
 		s.renkuRefreshToken = resParsed.RefreshToken
 	}
+	return nil
+}
+
+func (s *TokenStore) refreshRenkuAccessTokenV2() error {
+	s.renkuAccessTokenLock.Lock()
+	defer s.renkuAccessTokenLock.Unlock()
+
+	url, err := url.Parse(s.Config.RenkuTokenURL)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodPost, url.String(), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.renkuRefreshToken))
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if res.StatusCode != 200 {
+		err = fmt.Errorf("cannot refresh renku access token, failed with status code: %d", res.StatusCode)
+		return err
+	}
+	var resParsed renkuTokenRefreshV2Response
+	err = json.NewDecoder(res.Body).Decode(&resParsed)
+	if err != nil {
+		return err
+	}
+	s.renkuAccessToken = resParsed.AccessToken
+	s.renkuRefreshToken = s.renkuAccessToken
 	return nil
 }
 
