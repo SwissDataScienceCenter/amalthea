@@ -426,12 +426,13 @@ func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
 
 // selectorLabels returns the labels for selecting the resources
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
-func selectorLabels(name string) map[string]string {
+func selectorLabels(name string, sessionType SessionType) map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":       "AmaltheaSession",
 		"app.kubernetes.io/instance":   name,
 		"app.kubernetes.io/part-of":    "amaltheasession-operator",
 		"app.kubernetes.io/created-by": "controller-manager",
+		"app.kubernetes.io/session-type": string(sessionType)
 	}
 }
 
@@ -1065,10 +1066,11 @@ func findConflicts(destination, source map[string]string) []string {
 	return conflicts
 }
 
+// Creates a map of labels from the given session spec. A new allocated map is returned.
 func (cr *AmaltheaSession) childLabels() map[string]string {
 	labels := map[string]string{}
 	maps.Copy(labels, cr.Spec.Template.Metadata.Labels)
-	selectorLabels := selectorLabels(cr.Name)
+	selectorLabels := selectorLabels(cr.Name, cr.Spec.SessionType)
 	conflicts := findConflicts(labels, selectorLabels)
 	if len(conflicts) > 0 {
 		log.Log.Info(
