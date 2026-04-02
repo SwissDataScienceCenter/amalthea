@@ -9,6 +9,7 @@ import (
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,7 +22,7 @@ import (
 )
 
 type ChildResourceType interface {
-	networkingv1.Ingress | v1.Service | v1.PersistentVolumeClaim | appsv1.StatefulSet | v1.Secret
+	networkingv1.Ingress | v1.Service | v1.PersistentVolumeClaim | appsv1.StatefulSet | v1.Secret | batchv1.Job
 }
 
 type ChildResource[T ChildResourceType] struct {
@@ -43,6 +44,7 @@ type ChildResources struct {
 	PVC             ChildResource[v1.PersistentVolumeClaim]
 	DataSourcesPVCs []ChildResource[v1.PersistentVolumeClaim]
 	Secret          ChildResource[v1.Secret]
+	Job             ChildResource[batchv1.Job]
 }
 
 type ChildResourceUpdates struct {
@@ -52,6 +54,7 @@ type ChildResourceUpdates struct {
 	PVC             ChildResourceUpdate[v1.PersistentVolumeClaim]
 	DataSourcesPVCs []ChildResourceUpdate[v1.PersistentVolumeClaim]
 	Secret          ChildResourceUpdate[v1.Secret]
+	Job             ChildResourceUpdate[batchv1.Job]
 }
 
 // The metrics server requires at least 10 seconds before container metrics can
@@ -140,7 +143,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !(cr.Status.State != amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
 					return nil
 				}
 				fallthrough
@@ -273,12 +276,128 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			return nil
 		})
 		return ChildResourceUpdate[T]{c.Current, res, err, nil}
+	case *batchv1.Job:
+		var statusCallback func(*amaltheadevv1alpha1.AmaltheaSessionStatus)
+		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
+			desired, ok := any(c.Desired).(*batchv1.Job)
+			if !ok {
+				return fmt.Errorf("could not cast when reconciling")
+			}
+			if current.CreationTimestamp.IsZero() {
+				log.Info("Creating a Job", "job", desired.Spec)
+				current.Spec = desired.Spec
+				current.ObjectMeta = desired.ObjectMeta
+				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				if err != nil {
+					log.Error(err, "Error setting controller reference")
+				}
+				return err
+			}
+
+			// suspending jobs
+			if current.Spec.Suspend != nil && desired.Spec.Suspend != nil && *current.Spec.Suspend == true && *desired.Spec.Suspend == false {
+				// The session is being resumed
+				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+					status.IdleSince = metav1.Time{}
+					status.FailingSince = metav1.Time{}
+					status.HibernatedSince = metav1.Time{}
+				}
+			}
+			if (current.Spec.Suspend == nil || *current.Spec.Suspend == false) && desired.Spec.Suspend != nil && *desired.Spec.Suspend == true {
+				// The session is being hibernated
+				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+					status.IdleSince = metav1.Time{}
+					status.FailingSince = metav1.Time{}
+					status.HibernatedSince = metav1.Now()
+				}
+			}
+			current.Spec.Template.Spec.Tolerations = desired.Spec.Template.Spec.Tolerations
+			current.Spec.Template.Spec.Affinity = desired.Spec.Template.Spec.Affinity
+			current.Spec.Template.Spec.NodeSelector = desired.Spec.Template.Spec.NodeSelector
+			current.Spec.Template.Spec.PriorityClassName = desired.Spec.Template.Spec.PriorityClassName
+			current.Spec.Suspend = desired.Spec.Suspend
+			switch strategy := cr.Spec.ReconcileStrategy; strategy {
+			case amaltheadevv1alpha1.Never:
+				return nil
+			case amaltheadevv1alpha1.WhenFailedOrHibernated:
+				if !(cr.Status.State != amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+					return nil
+				}
+				fallthrough
+			case amaltheadevv1alpha1.Always:
+				current.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
+				current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
+				current.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
+				//current.Spec.Selector = desired.Spec.Selector
+				//current.Spec.Template.Labels = desired.Spec.Template.Labels
+				current.Labels = desired.Labels
+				current.Annotations = desired.Annotations
+				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
+			default:
+				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
+			}
+			return nil
+		})
+		if err != nil {
+			log.Error(err, "Error reconciling Job")
+		}
+		return ChildResourceUpdate[T]{c.Current, res, err, statusCallback}
+
 	default:
 		return ChildResourceUpdate[T]{Error: fmt.Errorf("encountered an uknown child resource type")}
 	}
 }
 
+type SessionTypeError struct {
+	SessionType amaltheadevv1alpha1.SessionType
+}
+
+func (e *SessionTypeError) Error() string {
+	return fmt.Sprintf("Unsupported session type: '%v'", e.SessionType)
+}
+
 func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, clusterType amaltheadevv1alpha1.ClusterType) (ChildResources, error) {
+	switch cr.Spec.SessionType {
+	case amaltheadevv1alpha1.SessionTypeInteractive:
+		return NewInteractiveChildResources(cr, clusterType)
+	case amaltheadevv1alpha1.SessionTypeNonInteractive:
+		return NewNonInteractiveChildResources(cr, clusterType)
+	case "":
+		return NewInteractiveChildResources(cr, clusterType)
+	}
+	return ChildResources{}, &SessionTypeError{SessionType: cr.Spec.SessionType}
+}
+
+func NewNonInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, clusterType amaltheadevv1alpha1.ClusterType) (ChildResources, error) {
+	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
+	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
+	desiredPVC := cr.PVC()
+	desiredJob, err := cr.Job(clusterType)
+	if err != nil {
+		return ChildResources{}, err
+	}
+	desiredSecret := cr.Secret()
+	output := ChildResources{
+		PVC:    ChildResource[v1.PersistentVolumeClaim]{&v1.PersistentVolumeClaim{ObjectMeta: metadata}, &desiredPVC},
+		Secret: ChildResource[v1.Secret]{&v1.Secret{ObjectMeta: secretMetadata}, &desiredSecret},
+		Job:    ChildResource[batchv1.Job]{&batchv1.Job{ObjectMeta: metadata}, &desiredJob},
+	}
+	desiredDataSourcesPVCs := []ChildResource[v1.PersistentVolumeClaim]{}
+	specPVCs, _, _ := cr.DataSources()
+	for i := range specPVCs {
+		desiredPVC := &specPVCs[i]
+		childRes := ChildResource[v1.PersistentVolumeClaim]{
+			Current: &v1.PersistentVolumeClaim{ObjectMeta: desiredPVC.ObjectMeta},
+			Desired: desiredPVC,
+		}
+		desiredDataSourcesPVCs = append(desiredDataSourcesPVCs, childRes)
+	}
+	output.DataSourcesPVCs = desiredDataSourcesPVCs
+
+	return output, nil
+}
+
+func NewInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, clusterType amaltheadevv1alpha1.ClusterType) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredService := cr.Service()
@@ -322,6 +441,7 @@ func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *a
 		Service:     c.Service.Reconcile(ctx, clnt, cr),
 		Ingress:     c.Ingress.Reconcile(ctx, clnt, cr),
 		Secret:      c.Secret.Reconcile(ctx, clnt, cr),
+		Job:         c.Job.Reconcile(ctx, clnt, cr),
 	}
 
 	dataSourceUpdates := []ChildResourceUpdate[v1.PersistentVolumeClaim]{}
@@ -348,7 +468,14 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	// updates from k8s (I think from a mutating or defaulting webhook) to fields other than the status.
 	// onlyStatusUpdates := c.AllEqual(controllerutil.OperationResultUpdatedStatusOnly)
 	// noUpdates := c.AllEqual(controllerutil.OperationResultNone)
-	stsReady := c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
+
+	stsReady := false
+	if c.StatefulSet.Manifest != nil {
+		stsReady = c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
+	}
+	if c.Job.Manifest != nil {
+		stsReady = c.Job.Manifest.Status.Ready != nil && *c.Job.Manifest.Status.Ready == 1
+	}
 	podExists := pod != nil
 	podReady := podExists && podIsReady(pod)
 	return stsReady && podReady
@@ -359,12 +486,16 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
 		return amaltheadevv1alpha1.NotReady, ""
-	case cr.Spec.Hibernated && c.StatefulSet.Manifest.Spec.Replicas != nil && *c.StatefulSet.Manifest.Spec.Replicas == 0:
+	case cr.Spec.Hibernated && c.StatefulSet.Manifest != nil && c.StatefulSet.Manifest.Spec.Replicas != nil && *c.StatefulSet.Manifest.Spec.Replicas == 0:
+		return amaltheadevv1alpha1.Hibernated, ""
+	case cr.Spec.Hibernated && c.Job.Manifest != nil && c.Job.Manifest.Spec.Suspend != nil && *c.Job.Manifest.Spec.Suspend == true:
 		return amaltheadevv1alpha1.Hibernated, ""
 	case msg != "":
 		return amaltheadevv1alpha1.Failed, msg
 	case c.IsRunning(pod):
 		return amaltheadevv1alpha1.Running, ""
+	case podIsCompleted(pod):
+		return amaltheadevv1alpha1.Succeeded, ""
 	default:
 		return amaltheadevv1alpha1.NotReady, ""
 	}
@@ -615,6 +746,13 @@ func (c ChildResourceUpdates) Status(
 
 		if state == amaltheadevv1alpha1.Running && oldEnough {
 			idleSince, idle = getIdleState(ctx, r, cr)
+		}
+		if (state == amaltheadevv1alpha1.Succeeded || state == amaltheadevv1alpha1.Failed) && idleSince.IsZero() {
+			// set idle time when containers exited
+			idleSince = metav1.NewTime(time.Now())
+		}
+		if !idle {
+			idle = state == amaltheadevv1alpha1.Succeeded || state == amaltheadevv1alpha1.Failed
 		}
 	} else {
 		events := v1.EventList{}

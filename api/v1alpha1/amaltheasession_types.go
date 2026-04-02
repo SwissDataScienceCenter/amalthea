@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -25,6 +26,29 @@ import (
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// SessionType describes the type of session to be started. If none is specified, the
+// default SessionType will be "Interactive"
+// +enum
+type SessionType string
+
+const (
+	SessionTypeInteractive    SessionType = "Interactive"
+	SessionTypeNonInteractive SessionType = "NonInteractive"
+)
+
+func (s SessionType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(s))
+}
+
+func (s *SessionType) UnmarshalJSON(data []byte) error {
+	var tmp string
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+	*s = SessionType(tmp)
+	return nil
+}
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 // Important: Run "make" to regenerate code after modifying this file
@@ -127,6 +151,12 @@ type AmaltheaSessionSpec struct {
 	// +optional
 	// Template for the fields that should be added to all children (and their children if applicable).
 	Template Template `json:"template,omitempty"`
+
+	// +optional
+	// The session type, it is "Interactive" by default, but can be set to "NonInteractive". Non-interactive
+	// sessions are handled differently in that the main process is expected to be run-once and once it
+	// terminates, the resources are cleaned up.
+	SessionType SessionType `json:"sessionType,omitempty"`
 }
 
 type Session struct {
@@ -302,12 +332,15 @@ type Culling struct {
 	// is active or not. When the threshold is reached the session is hibernated.
 	// A value of zero indicates that Amalthea will not automatically hibernate
 	// the session based on its age.
+	// For Non-Interactive sessions, this time indicates runtime of a job. When
+	// the threshold is reached, the job is suspended.
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	MaxAge metav1.Duration `json:"maxAge,omitempty"`
 	// +kubebuilder:validation:Format:=duration
 	// How long should a server be idle for before it is hibernated. A value of
 	// zero indicates that Amalthea will not automatically hibernate inactive sessions.
+	// For Non-Interactive sessions, this value is not used.
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	MaxIdleDuration metav1.Duration `json:"maxIdleDuration,omitempty"`
@@ -315,6 +348,7 @@ type Culling struct {
 	// How long can a server be in starting state before it gets hibernated. A
 	// value of zero indicates that the server will not be automatically hibernated
 	// by Amalthea because it took to long to start.
+	// For Non-Interactive sessions, this value is not used.
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	MaxStartingDuration metav1.Duration `json:"maxStartingDuration,omitempty"`
@@ -322,12 +356,13 @@ type Culling struct {
 	// How long can a server be in failed state before it gets hibernated. A
 	// value of zero indicates that the server will not be automatically
 	// hibernated by Amalthea if it is failing.
+	// For Non-Interactive sessions, this value is not used.
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	MaxFailedDuration metav1.Duration `json:"maxFailedDuration,omitempty"`
 	// +kubebuilder:validation:Format:=duration
 	// How long can a session be in hibernated state before
-	// it gets completely deleted. A value of zero indicates that hibernated servers
+	// it gets completely deleted. A value of zero indicates that hibernated servers or jobs
 	// will not be automatically be deleted by Amalthea after a period of time.
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
@@ -413,7 +448,7 @@ func (s *SessionSecretRef) isAdopted() bool {
 	return s != nil && s.Name != "" && s.Adopt
 }
 
-// +kubebuilder:validation:Enum={Running,Failed,Hibernated,NotReady,RunningDegraded}
+// +kubebuilder:validation:Enum={Running,Failed,Hibernated,NotReady,RunningDegraded,Succeeded}
 type State string
 
 const Running State = "Running"
@@ -421,6 +456,7 @@ const Failed State = "Failed"
 const Hibernated State = "Hibernated"
 const NotReady State = "NotReady"
 const RunningDegraded State = "RunningDegraded"
+const Succeeded State = "Succeeded"
 
 // Counts of the total and ready containers, can represent either regular or init containers.
 type ContainerCounts struct {
@@ -568,6 +604,11 @@ func (a *AmaltheaSession) GetHealthcheckURL() *url.URL {
 // There will be always only one pod, so the `-0` suffix is used.
 func (as *AmaltheaSession) PodName() string {
 	return fmt.Sprintf("%s-0", as.Name)
+}
+
+// Return the job name derived from the session spec.
+func (as *AmaltheaSession) JobName() string {
+	return as.Name
 }
 
 // +kubebuilder:validation:Enum={never,always,whenFailedOrHibernated}

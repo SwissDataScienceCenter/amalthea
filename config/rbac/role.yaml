@@ -53,6 +53,16 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - jobs
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - persistentvolumeclaims
   - services
   verbs:

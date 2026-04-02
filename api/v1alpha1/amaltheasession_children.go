@@ -15,10 +15,12 @@ import (
 
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
@@ -94,13 +96,7 @@ func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 	return volumes, volumeMounts
 }
 
-// StatefulSet returns a AmaltheaSession StatefulSet object
-func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.StatefulSet, error) {
-	replicas := int32(1)
-	if cr.Spec.Hibernated {
-		replicas = 0
-	}
-
+func (cr *AmaltheaSession) Pod(clusterType ClusterType) (*v1.PodSpec, error) {
 	volumes := []v1.Volume{}
 	volumeMounts := []v1.VolumeMount{}
 	initContainers := []v1.Container{}
@@ -124,7 +120,7 @@ func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.Stateful
 
 	auth, err := cr.auth()
 	if err != nil {
-		return appsv1.StatefulSet{}, err
+		return nil, err
 	}
 	containers = append(containers, sessionContainer)
 	containers = append(containers, auth.Containers...)
@@ -157,6 +153,73 @@ func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.Stateful
 	if clusterType == OpenShift {
 		pod.DeprecatedServiceAccount = pod.ServiceAccountName
 	}
+	return &pod, nil
+}
+
+func (cr *AmaltheaSession) Job(clusterType ClusterType) (batchv1.Job, error) {
+	pod, err := cr.Pod(clusterType)
+	if err != nil {
+		return batchv1.Job{}, err
+	}
+
+	pod.RestartPolicy = v1.RestartPolicyNever
+
+	parallel := int32(1)
+	zero := int32(0)
+
+	// use MaxAge (amount of time until a session gets terminated) to set maximum job runtime
+	var activeTTL *int64
+	if cr.Spec.Culling.MaxAge.Duration.Seconds() > 0 {
+		vv := int64(cr.Spec.Culling.MaxAge.Duration.Seconds())
+		activeTTL = &vv
+	}
+
+	// use MaxHibernatedDuration (amount of time until a hibernated session is deleted) to set the time
+	// after which the job is removed after it has completed
+	var ttlFinish *int32
+	if cr.Spec.Culling.MaxHibernatedDuration.Duration.Seconds() > 0 {
+		vv := int32(cr.Spec.Culling.MaxHibernatedDuration.Duration.Seconds())
+		ttlFinish = &vv
+	}
+
+	job := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        cr.JobName(),
+			Namespace:   cr.Namespace,
+			Labels:      cr.childLabels(),
+			Annotations: cr.Spec.Template.Metadata.Annotations,
+		},
+		Spec: batchv1.JobSpec{
+			Parallelism:             &parallel,
+			Completions:             &parallel,
+			BackoffLimit:            &zero,
+			ActiveDeadlineSeconds:   activeTTL,
+			TTLSecondsAfterFinished: ttlFinish,
+			Suspend:                 &cr.Spec.Hibernated,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      cr.childLabels(),
+					Annotations: cr.Spec.Template.Metadata.Annotations,
+				},
+				Spec: *pod,
+			},
+		},
+	}
+
+	return job, nil
+}
+
+// StatefulSet returns a AmaltheaSession StatefulSet object
+func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.StatefulSet, error) {
+	replicas := int32(1)
+	if cr.Spec.Hibernated {
+		replicas = 0
+	}
+
+	pod, err := cr.Pod(clusterType)
+	if err != nil {
+		return appsv1.StatefulSet{}, err
+	}
 
 	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -171,14 +234,14 @@ func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.Stateful
 			PodManagementPolicy: appsv1.ParallelPodManagement,
 			Replicas:            &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: selectorLabels(cr.Name),
+				MatchLabels: selectorLabels(cr.Name, cr.Spec.SessionType),
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      cr.childLabels(),
 					Annotations: cr.Spec.Template.Metadata.Annotations,
 				},
-				Spec: pod,
+				Spec: *pod,
 			},
 		},
 	}
@@ -204,7 +267,7 @@ func (cr *AmaltheaSession) Service() v1.Service {
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: v1.ServiceSpec{
-			Selector: selectorLabels(cr.Name),
+			Selector: selectorLabels(cr.Name, cr.Spec.SessionType),
 			Ports: []v1.ServicePort{
 				{
 					Protocol:   v1.ProtocolTCP,
@@ -364,12 +427,13 @@ func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
 
 // selectorLabels returns the labels for selecting the resources
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
-func selectorLabels(name string) map[string]string {
+func selectorLabels(name string, sessionType SessionType) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name":       "AmaltheaSession",
-		"app.kubernetes.io/instance":   name,
-		"app.kubernetes.io/part-of":    "amaltheasession-operator",
-		"app.kubernetes.io/created-by": "controller-manager",
+		"app.kubernetes.io/name":         "AmaltheaSession",
+		"app.kubernetes.io/instance":     name,
+		"app.kubernetes.io/part-of":      "amaltheasession-operator",
+		"app.kubernetes.io/created-by":   "controller-manager",
+		"app.kubernetes.io/session-type": string(sessionType),
 	}
 }
 
@@ -394,21 +458,64 @@ func NewConditions() []AmaltheaSessionCondition {
 }
 
 func (cr *AmaltheaSession) NeedsDeletion() bool {
-	hibernatedDuration := time.Since(cr.Status.HibernatedSince.Time)
-	durationIsZero := cr.Spec.Culling.MaxHibernatedDuration == metav1.Duration{}
-	return cr.Status.State == Hibernated && !durationIsZero &&
-		hibernatedDuration > cr.Spec.Culling.MaxHibernatedDuration.Duration
+	switch cr.Spec.SessionType {
+	case SessionTypeNonInteractive:
+		// delete if session is a job and it has been completed for longer than maxHibernatedDuration
+		doneSince := cr.Status.IdleSince
+		if !cr.Status.FailingSince.IsZero() &&
+			!doneSince.IsZero() && cr.Status.FailingSince.Before(&doneSince) {
+			doneSince = cr.Status.FailingSince
+		}
+		hibernatedDuration := time.Since(doneSince.Time)
+		return !doneSince.IsZero() &&
+			(cr.Status.State == Failed || cr.Status.State == Succeeded) &&
+			hibernatedDuration > cr.Spec.Culling.MaxHibernatedDuration.Duration
+
+	default:
+		hibernatedDuration := time.Since(cr.Status.HibernatedSince.Time)
+		durationIsZero := cr.Spec.Culling.MaxHibernatedDuration == metav1.Duration{}
+		return cr.Status.State == Hibernated && !durationIsZero &&
+			hibernatedDuration > cr.Spec.Culling.MaxHibernatedDuration.Duration
+	}
 }
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
-	pod := v1.Pod{}
-	podName := cr.PodName()
-	key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
-	err := clnt.Get(ctx, key, &pod)
+	switch cr.Spec.SessionType {
+	case SessionTypeInteractive:
+		pod := v1.Pod{}
+		podName := cr.PodName()
+		key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
+		err := clnt.Get(ctx, key, &pod)
+		if err != nil {
+			return nil, err
+		}
+		return &pod, err
+
+	case SessionTypeNonInteractive:
+		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
+		podList := &v1.PodList{}
+		listOpts := &client.ListOptions{Namespace: cr.Namespace, LabelSelector: selector}
+		if err := clnt.List(ctx, podList, listOpts); err != nil {
+			return nil, err
+		}
+		if len(podList.Items) > 0 {
+			return &podList.Items[0], nil
+		}
+		return nil, nil
+	default:
+		return nil, nil
+	}
+}
+
+func (cr *AmaltheaSession) GetJob(ctx context.Context, clnt client.Client) (*batchv1.Job, error) {
+	job := batchv1.Job{}
+	jobName := cr.JobName()
+	key := types.NamespacedName{Name: jobName, Namespace: cr.GetNamespace()}
+	err := clnt.Get(ctx, key, &job)
 	if err != nil {
 		return nil, err
 	}
-	return &pod, err
+	return &job, err
 }
 
 // FirstTimestamp maybe null or eventTime is null… then it is
@@ -979,10 +1086,11 @@ func findConflicts(destination, source map[string]string) []string {
 	return conflicts
 }
 
+// Creates a map of labels from the given session spec. A new allocated map is returned.
 func (cr *AmaltheaSession) childLabels() map[string]string {
 	labels := map[string]string{}
 	maps.Copy(labels, cr.Spec.Template.Metadata.Labels)
-	selectorLabels := selectorLabels(cr.Name)
+	selectorLabels := selectorLabels(cr.Name, cr.Spec.SessionType)
 	conflicts := findConflicts(labels, selectorLabels)
 	if len(conflicts) > 0 {
 		log.Log.Info(
