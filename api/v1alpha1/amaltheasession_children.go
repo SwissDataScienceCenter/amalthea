@@ -579,9 +579,10 @@ func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 			volMounts = append(
 				volMounts,
 				v1.VolumeMount{
-					Name:      pvcName,
-					ReadOnly:  readOnly,
-					MountPath: ds.MountPath,
+					Name:             pvcName,
+					ReadOnly:         readOnly,
+					MountPath:        ds.MountPath,
+					MountPropagation: ptr.To(v1.MountPropagationHostToContainer),
 				},
 			)
 		default:
