@@ -48,6 +48,7 @@ type FirecrestAuthConfig struct {
 type FirecrestAuthConfigKind string
 
 const FirecrestAuthConfigKindRenku = "renku"
+const FirecrestAuthConfigKindRenkuV2 = "renku_v2"
 const FirecrestAuthConfigKindClientCredentials = "client_credentials"
 
 // Validate checks that the authentication config is valid
@@ -57,6 +58,9 @@ func (cfg *FirecrestAuthConfig) Validate() error {
 	}
 	if cfg.Kind == FirecrestAuthConfigKindRenku {
 		return cfg.validateRenku()
+	}
+	if cfg.Kind == FirecrestAuthConfigKindRenkuV2 {
+		return fmt.Errorf("not yet implemented")
 	}
 	if cfg.Kind == FirecrestAuthConfigKindClientCredentials {
 		return cfg.validateClientCredentials()
