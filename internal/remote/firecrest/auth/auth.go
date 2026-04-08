@@ -38,8 +38,25 @@ func NewFirecrestAuth(cfg firecrestConfig.FirecrestAuthConfig, options ...Firecr
 		}
 		return newRenkuAuth(
 			cfg.TokenURI,
+			"",
 			string(cfg.RenkuAccessToken),
 			string(cfg.RenkuRefreshToken),
+			cfg.RenkuTokenURI,
+			cfg.RenkuClientID,
+			string(cfg.RenkuClientSecret),
+			opts...,
+		)
+	}
+	if cfg.Kind == firecrestConfig.FirecrestAuthConfigKindRenkuV2 {
+		opts := make([]RenkuAuthOption, len(options))
+		for i := range options {
+			opts[i] = options[i].renkuAuthOption
+		}
+		return newRenkuAuth(
+			cfg.TokenURI,
+			"v2",
+			string(cfg.RenkuAccessToken),
+			string(cfg.RenkuAccessToken),
 			cfg.RenkuTokenURI,
 			cfg.RenkuClientID,
 			string(cfg.RenkuClientSecret),

@@ -60,7 +60,7 @@ func (cfg *FirecrestAuthConfig) Validate() error {
 		return cfg.validateRenku()
 	}
 	if cfg.Kind == FirecrestAuthConfigKindRenkuV2 {
-		return fmt.Errorf("not yet implemented")
+		return cfg.validateRenkuV2()
 	}
 	if cfg.Kind == FirecrestAuthConfigKindClientCredentials {
 		return cfg.validateClientCredentials()
@@ -89,6 +89,25 @@ func (cfg *FirecrestAuthConfig) validateRenku() error {
 	}
 	if cfg.RenkuClientSecret == "" {
 		return fmt.Errorf("renkuClientSecret is not defined")
+	}
+	return nil
+}
+
+func (cfg *FirecrestAuthConfig) validateRenkuV2() error {
+	if cfg.TokenURI == "" {
+		return fmt.Errorf("tokenURI is not defined")
+	}
+	if _, err := url.Parse(cfg.TokenURI); err != nil {
+		return fmt.Errorf("tokenURI is not valid: %w", err)
+	}
+	if cfg.RenkuRefreshToken == "" {
+		return fmt.Errorf("renkuRefreshToken is not defined")
+	}
+	if cfg.RenkuTokenURI == "" {
+		return fmt.Errorf("renkuTokenURI is not defined")
+	}
+	if _, err := url.Parse(cfg.RenkuTokenURI); err != nil {
+		return fmt.Errorf("renkuTokenURI is not valid: %w", err)
 	}
 	return nil
 }
