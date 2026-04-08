@@ -103,10 +103,10 @@ func newRenkuAuth(firecrestTokenURI, renkuAuthenticationVersion, renkuAccessToke
 	if renkuTokenURI == "" {
 		return nil, fmt.Errorf("renkuTokenURI is not set")
 	}
-	if renkuClientID == "" {
+	if renkuAuthenticationVersion != "v2" && renkuClientID == "" {
 		return nil, fmt.Errorf("renkuClientID is not set")
 	}
-	if renkuClientSecret == "" {
+	if renkuAuthenticationVersion != "v2" && renkuClientSecret == "" {
 		return nil, fmt.Errorf("renkuClientSecret is not set")
 	}
 	// Create httpClient, if not already present
