@@ -191,8 +191,22 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 					// NOTE: If the desired storage class is nil then the current spec contains the name for the default storage class
 					current.Spec.StorageClassName = desired.Spec.StorageClassName
 				}
+				// Do not touch reserved labels and annotations
+				// Reference: https://kubernetes.io/docs/reference/labels-annotations-taints/
+				// TODO: handle labels
 				current.Labels = desired.Labels
+				preservedAnnotations := map[string]string{}
+				for key := range current.Annotations {
+					domain, _, _ := strings.Cut(key, "/")
+					if domain == "kubernetes.io" || domain == "k8s.io" || strings.HasSuffix(domain, ".kubernetes.io") ||
+						strings.HasSuffix(domain, ".k8s.io") {
+						preservedAnnotations[key] = current.Annotations[key]
+					}
+				}
 				current.Annotations = desired.Annotations
+				for key := range preservedAnnotations {
+					current.Annotations[key] = preservedAnnotations[key]
+				}
 			default:
 				return fmt.Errorf("attempting to reconcile PVC with unknown stategy %s", strategy)
 			}
