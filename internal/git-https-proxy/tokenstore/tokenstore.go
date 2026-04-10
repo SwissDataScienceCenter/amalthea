@@ -271,6 +271,7 @@ func (s *TokenStore) refreshRenkuAccessTokenV2() error {
 	payload.Set("grant_type", "refresh_token")
 	payload.Set("refresh_token", s.renkuRefreshToken)
 	req, err := http.NewRequest(http.MethodPost, renkuTokenURL.String(), strings.NewReader((payload.Encode())))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if err != nil {
 		return err
 	}
