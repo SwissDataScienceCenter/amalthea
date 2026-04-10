@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"time"
@@ -168,6 +169,18 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	newStatus := updates.Status(ctx, r, amaltheasession)
 	statusChanged := reflect.DeepEqual(amaltheasession.Status, newStatus)
 	log.Info("reconcile", "statusChanged", statusChanged)
+	if statusChanged {
+		oldJson, err1 := json.Marshal(amaltheasession.Status)
+		newJson, err2 := json.Marshal(newStatus)
+		if err1 != nil {
+			log.Error(err1, "reconcile debug failed")
+		} else if err2 != nil {
+			log.Error(err2, "reconcile debug failed")
+		} else {
+			log.Info("reconcile - statuses", "old", oldJson, "new", newJson)
+		}
+	}
+
 	amaltheasession.Status = newStatus
 	err = r.Status().Update(ctx, amaltheasession)
 	if err != nil {
