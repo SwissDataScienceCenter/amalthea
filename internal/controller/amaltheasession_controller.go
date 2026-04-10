@@ -181,19 +181,23 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	amaltheasession.Status = newStatus
-	err = r.Status().Update(ctx, amaltheasession)
-	if err != nil {
-		// The status update can fail if the CR is out of date, re-read the CR here and retry
-		err = r.Get(ctx, req.NamespacedName, amaltheasession)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+	if statusChanged {
 		amaltheasession.Status = newStatus
 		err = r.Status().Update(ctx, amaltheasession)
 		if err != nil {
-			return ctrl.Result{}, err
+			// The status update can fail if the CR is out of date, re-read the CR here and retry
+			err = r.Get(ctx, req.NamespacedName, amaltheasession)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			amaltheasession.Status = newStatus
+			err = r.Status().Update(ctx, amaltheasession)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
 		}
+	} else {
+		log.Info("reconcile: skip status write")
 	}
 
 	// Record metrics for the session status
@@ -218,6 +222,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		// If the status is evolving we should requeue faster
 		requeueAfter = 0
 	}
+	log.Info("reconcile - requeue", "RequeueAfter", requeueAfter.String())
 	return ctrl.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
 }
 
