@@ -4536,6 +4536,15 @@ spec:
                     additionalProperties:
                       type: string
                     type: object
+                  assumeHttps:
+                    default: false
+                    description: |-
+                      If set to true Amalthea will template HTTPS for the URL to access the session
+                      that is reported in the status. Without trying to guess whether to use HTTP or HTTPS
+                      based on the TLS secret or other configurations provided. The reason for this flag
+                      is that sometimes TLS secret can be provisioned simply by adding ingress annotations.
+                      And in this case we cannot determine the right scheme reliably from the session spec.
+                    type: boolean
                   host:
                     type: string
                     x-kubernetes-validations:
