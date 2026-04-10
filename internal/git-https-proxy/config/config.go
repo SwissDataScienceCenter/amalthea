@@ -220,6 +220,9 @@ func (c *GitProxyConfig) validateRenkuAuthenticationV2() error {
 	if c.RenkuAccessToken == "" {
 		return fmt.Errorf("the renku access token is not defined")
 	}
+	if c.RenkuRefreshToken == "" {
+		return fmt.Errorf("the renku refresh token is not defined")
+	}
 	if c.RenkuTokenURL == "" {
 		return fmt.Errorf("the renku token URL is not defined")
 	}

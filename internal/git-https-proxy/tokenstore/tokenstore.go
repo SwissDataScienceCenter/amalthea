@@ -222,10 +222,6 @@ type renkuTokenRefreshResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-type renkuTokenRefreshV2Response struct {
-	AccessToken string `json:"access_token"`
-}
-
 // Refreshes the renku access token.
 func (s *TokenStore) refreshRenkuAccessToken() error {
 	if s.Config.RenkuAuthenticationVersion == "v2" {
@@ -267,15 +263,17 @@ func (s *TokenStore) refreshRenkuAccessTokenV2() error {
 	s.renkuAccessTokenLock.Lock()
 	defer s.renkuAccessTokenLock.Unlock()
 
-	url, err := url.Parse(s.Config.RenkuTokenURL)
+	renkuTokenURL, err := url.Parse(s.Config.RenkuTokenURL)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest(http.MethodPost, url.String(), nil)
+	payload := url.Values{}
+	payload.Set("grant_type", "refresh_token")
+	payload.Set("refresh_token", s.renkuRefreshToken)
+	req, err := http.NewRequest(http.MethodPost, renkuTokenURL.String(), strings.NewReader((payload.Encode())))
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.renkuRefreshToken))
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
@@ -284,13 +282,13 @@ func (s *TokenStore) refreshRenkuAccessTokenV2() error {
 		err = fmt.Errorf("cannot refresh renku access token, failed with status code: %d", res.StatusCode)
 		return err
 	}
-	var resParsed renkuTokenRefreshV2Response
+	var resParsed renkuTokenRefreshResponse
 	err = json.NewDecoder(res.Body).Decode(&resParsed)
 	if err != nil {
 		return err
 	}
 	s.renkuAccessToken = resParsed.AccessToken
-	s.renkuRefreshToken = s.renkuAccessToken
+	s.renkuRefreshToken = resParsed.RefreshToken
 	return nil
 }
 
