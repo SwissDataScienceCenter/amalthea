@@ -167,7 +167,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	newStatus := updates.Status(ctx, r, amaltheasession)
-	statusChanged := reflect.DeepEqual(amaltheasession.Status, newStatus)
+	statusChanged := !reflect.DeepEqual(amaltheasession.Status, newStatus)
 	log.Info("reconcile", "statusChanged", statusChanged)
 	if statusChanged {
 		oldJson, err1 := json.Marshal(amaltheasession.Status)
@@ -177,7 +177,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		} else if err2 != nil {
 			log.Error(err2, "reconcile debug failed")
 		} else {
-			log.Info("reconcile - statuses", "old", oldJson, "new", newJson)
+			log.Info("reconcile - statuses", "old", string(oldJson), "new", string(newJson))
 		}
 	}
 
