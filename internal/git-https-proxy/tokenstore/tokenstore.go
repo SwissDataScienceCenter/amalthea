@@ -66,9 +66,6 @@ func New(c *config.GitProxyConfig) *TokenStore {
 		gitAccessTokens:      make(map[string]TokenSet, len(c.Providers)),
 		gitAccessTokensLock:  &sync.RWMutex{},
 	}
-	if c.RenkuAuthenticationVersion == "v2" {
-		store.renkuRefreshToken = store.renkuAccessToken
-	}
 
 	// Debug
 	log.Printf("RenkuAuthenticationVersion = %s\n", store.Config.RenkuAuthenticationVersion)
