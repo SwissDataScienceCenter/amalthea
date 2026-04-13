@@ -103,6 +103,9 @@ func (cfg *FirecrestAuthConfig) validateRenkuV2() error {
 	if cfg.RenkuAccessToken == "" {
 		return fmt.Errorf("renkuAccessToken is not defined")
 	}
+	if cfg.RenkuRefreshToken == "" {
+		return fmt.Errorf("renkuRefreshToken is not defined")
+	}
 	if cfg.RenkuTokenURI == "" {
 		return fmt.Errorf("renkuTokenURI is not defined")
 	}

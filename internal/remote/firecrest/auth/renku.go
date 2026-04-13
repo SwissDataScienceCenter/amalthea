@@ -23,6 +23,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -252,15 +253,18 @@ func (a *RenkuAuth) refreshRenkuAccessTokenV2(ctx context.Context) error {
 	a.renkuAccessTokenLock.Lock()
 	defer a.renkuAccessTokenLock.Unlock()
 
-	url, err := url.Parse(a.renkuTokenURI)
+	renkuTokenURL, err := url.Parse(a.renkuTokenURI)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url.String(), nil)
+	payload := url.Values{}
+	payload.Set("grant_type", "refresh_token")
+	payload.Set("refresh_token", a.renkuRefreshToken)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, renkuTokenURL.String(), strings.NewReader(payload.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.renkuRefreshToken))
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
@@ -269,18 +273,19 @@ func (a *RenkuAuth) refreshRenkuAccessTokenV2(ctx context.Context) error {
 		err = fmt.Errorf("cannot refresh renku access token, failed with status code: %d", res.StatusCode)
 		return err
 	}
-	var resParsed renkuTokenRefreshV2Response
+	var resParsed renkuTokenRefreshResponse
 	err = json.NewDecoder(res.Body).Decode(&resParsed)
 	if err != nil {
 		return err
 	}
 	a.renkuAccessToken = resParsed.AccessToken
-	a.renkuRefreshToken = a.renkuAccessToken
+	a.renkuRefreshToken = resParsed.RefreshToken
 	return nil
 }
 
-type renkuTokenRefreshV2Response struct {
-	AccessToken string `json:"access_token"`
+type renkuTokenRefreshResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 // Periodically refreshes the renku access token. Used to make sure the refresh token does not expire.

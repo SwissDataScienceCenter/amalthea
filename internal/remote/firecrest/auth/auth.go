@@ -56,7 +56,7 @@ func NewFirecrestAuth(cfg firecrestConfig.FirecrestAuthConfig, options ...Firecr
 			cfg.TokenURI,
 			"v2",
 			string(cfg.RenkuAccessToken),
-			string(cfg.RenkuAccessToken),
+			string(cfg.RenkuRefreshToken),
 			cfg.RenkuTokenURI,
 			cfg.RenkuClientID,
 			string(cfg.RenkuClientSecret),
