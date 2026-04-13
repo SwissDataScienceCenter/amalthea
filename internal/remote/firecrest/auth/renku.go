@@ -280,6 +280,15 @@ func (a *RenkuAuth) refreshRenkuAccessTokenV2(ctx context.Context) error {
 	}
 	a.renkuAccessToken = resParsed.AccessToken
 	a.renkuRefreshToken = resParsed.RefreshToken
+
+	parser := jwt.NewParser()
+	claims := jwt.RegisteredClaims{}
+	if _, _, err := parser.ParseUnverified(a.renkuAccessToken, &claims); err != nil {
+		log.Printf("cannot parse token claims: %s\n", err.Error())
+		return err
+	}
+	a.renkuAccessTokenExpiresAt = claims.ExpiresAt.Time
+
 	return nil
 }
 
