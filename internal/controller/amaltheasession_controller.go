@@ -166,7 +166,8 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	newStatus := updates.Status(ctx, r, amaltheasession)
-	statusChanged := reflect.DeepEqual(amaltheasession.Status, newStatus)
+	statusChanged := !reflect.DeepEqual(amaltheasession.Status, newStatus)
+
 	amaltheasession.Status = newStatus
 	err = r.Status().Update(ctx, amaltheasession)
 	if err != nil {
