@@ -219,11 +219,19 @@ type Ingress struct {
 	// account if `TLSSecret` above is left unset, if the `TLSSecret` field is set
 	// then that value will take precedence and this boolean flag will be ignored.
 	UseDefaultClusterTLSCert bool `json:"useDefaultClusterTLSCert,omitempty"`
+	// +optional
+	// +kubebuilder:default:=false
+	// If set to true Amalthea will template HTTPS for the URL to access the session
+	// that is reported in the status. Without trying to guess whether to use HTTP or HTTPS
+	// based on the TLS secret or other configurations provided. The reason for this flag
+	// is that sometimes TLS secret can be provisioned simply by adding ingress annotations.
+	// And in this case we cannot determine the right scheme reliably from the session spec.
+	AssumeHttps bool `json:"assumeHttps,omitempty"`
 }
 
 func (ingress *Ingress) UrlScheme() string {
 	urlScheme := "http"
-	if (ingress.TLSSecret != nil && ingress.TLSSecret.Name != "") || ingress.UseDefaultClusterTLSCert {
+	if (ingress.TLSSecret != nil && ingress.TLSSecret.Name != "") || ingress.UseDefaultClusterTLSCert || ingress.AssumeHttps {
 		urlScheme = "https"
 	}
 	return urlScheme
