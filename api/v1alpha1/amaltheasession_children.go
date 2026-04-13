@@ -611,6 +611,10 @@ func getUseNoneSameSiteSessionCookie() bool {
 	return strings.ToLower(os.Getenv("USE_NONE_SAME_SITE_SESSION_COOKIE")) == "true"
 }
 
+func getHttpsSessionIngress() bool {
+	return strings.ToLower(os.Getenv("HTTPS_SESSION_INGRESS")) == "true"
+}
+
 // InternalSecretName returns the name of the secret that is a child
 // of the AmaltheaSession CR, as opposed to all other adopted secrets that
 // are not children of the AmaltheaSession CR and are created by the creator of each AmaltheaSession CR.
