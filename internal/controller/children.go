@@ -199,6 +199,9 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 					}
 				}
 				current.Annotations = desired.Annotations
+				if current.Annotations == nil {
+					current.Annotations = map[string]string{}
+				}
 				for key := range preservedAnnotations {
 					current.Annotations[key] = preservedAnnotations[key]
 				}
