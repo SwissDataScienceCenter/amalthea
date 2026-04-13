@@ -51,6 +51,12 @@ type AmaltheaSessionSpec struct {
 	// A list of data sources that should be added to the session
 	DataSources []DataSource `json:"dataSources,omitempty"`
 
+	// +optional
+	// +kubebuilder:default:={}
+	// Common configuration for rcloneV2 data sources, ignored for rclone data sources.
+	// Can be used to configure caching and resource requirements for the server.
+	DataSourcesConfig *DataSourcesConfig `json:"dataSourcesConfig,omitempty"`
+
 	// Authentication configuration for the session
 	// +optional
 	Authentication *Authentication `json:"authentication,omitempty"`
@@ -273,14 +279,17 @@ type CodeRepository struct {
 	ConfigSecretRef *SessionSecretKeyRef `json:"configSecretRef,omitempty"`
 }
 
-// +kubebuilder:validation:Enum={rclone}
+// +kubebuilder:validation:Enum={rclone, rcloneV2}
 type StorageType string
 
 const Rclone StorageType = "rclone"
+const RcloneV2 StorageType = "rcloneV2"
 
 type DataSource struct {
 	// +kubebuilder:default:=rclone
 	// The data source type
+	// rclone requires the csi-rclone driver
+	// rcloneV2 does not require a CSI driver, will provision a separate statefulset to run NFS server
 	Type StorageType `json:"type,omitempty"`
 	// +kubebuilder:example:=data/storages
 	// +kubebuilder:default:="data"
@@ -606,3 +615,46 @@ type SessionLocation string
 
 const Local SessionLocation = "local"
 const Remote SessionLocation = "remote"
+
+type DataSourcesConfig struct {
+	// +optional
+	// Extra arguments to be passed to `rclone nfs serve`
+	// Can be used to configure caching
+	ExtraArgs []string
+	// +optional
+	// Mount options to pass to the PV
+	MountOptions []string
+	// +optional
+	// +kubebuilder:default:=rclone:latest
+	// The rclone image to use to run the NFS server.
+	Image string `json:"image,omitempty"`
+	// +optional
+	// +kubebuilder:default:={requirements: {cpu: 500m, memory: 500Mi}, limits: {memory: 500Mi}}
+	// The resources requests and limits for the statefulset that runs rclone
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+	// +optional
+	// +kubebuilder:default:={}
+	// Caching configuration
+	Cache Cache `json:"cache,omitempty"`
+	// +optional
+	// If set to true Amalthe will not make network policies to limit access
+	// to the NFS server. Beware that this has security implications if set to true.
+	SkipNetworkPolicies bool `json:"skipNetworkPolicies,omitempty"`
+	// TODO: Add option to inject self signed certs
+}
+
+type Cache struct {
+	// +optional
+	// If set to true a dedicated PVC for the cache will not be created
+	// If set to false then the cache will be located at /tmp
+	CreatePVC bool `json:"createPVC,omitempty"`
+	// +optional
+	// +kubebuilder:default:=1Gi
+	// The size of the cache, if using PVC it will be the size of the PVC.
+	// If using /tmp then it will only be used to inform rclone of the size constraints
+	// Setting the value to zero means the cache is unlimited.
+	Size resource.Quantity `json:"size,omitempty"`
+	// +optional
+	// The name of the storage class that should be used for the cache, only valid if PVC is used.
+	ClassName *string `json:"className,omitempty"`
+}
