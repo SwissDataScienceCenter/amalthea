@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"reflect"
 	"time"
@@ -34,9 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 )
@@ -170,36 +167,20 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	newStatus := updates.Status(ctx, r, amaltheasession)
 	statusChanged := !reflect.DeepEqual(amaltheasession.Status, newStatus)
-	log.Info("reconcile", "statusChanged", statusChanged)
-	if statusChanged {
-		oldJson, err1 := json.Marshal(amaltheasession.Status)
-		newJson, err2 := json.Marshal(newStatus)
-		if err1 != nil {
-			log.Error(err1, "reconcile debug failed")
-		} else if err2 != nil {
-			log.Error(err2, "reconcile debug failed")
-		} else {
-			log.Info("reconcile - statuses", "old", string(oldJson), "new", string(newJson))
-		}
-	}
 
-	if statusChanged {
+	amaltheasession.Status = newStatus
+	err = r.Status().Update(ctx, amaltheasession)
+	if err != nil {
+		// The status update can fail if the CR is out of date, re-read the CR here and retry
+		err = r.Get(ctx, req.NamespacedName, amaltheasession)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 		amaltheasession.Status = newStatus
 		err = r.Status().Update(ctx, amaltheasession)
 		if err != nil {
-			// The status update can fail if the CR is out of date, re-read the CR here and retry
-			err = r.Get(ctx, req.NamespacedName, amaltheasession)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			amaltheasession.Status = newStatus
-			err = r.Status().Update(ctx, amaltheasession)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
+			return ctrl.Result{}, err
 		}
-	} else {
-		log.Info("reconcile: skip status write")
 	}
 
 	// Record metrics for the session status
@@ -224,7 +205,6 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		// If the status is evolving we should requeue faster
 		requeueAfter = 0
 	}
-	log.Info("reconcile - requeue", "RequeueAfter", requeueAfter.String())
 	return ctrl.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
 }
 
@@ -251,20 +231,6 @@ func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amalt
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Debug hibernate spam
-	logger := log.FromContext(context.Background())
-	eventFilter := predicate.Funcs{
-		UpdateFunc: func(e event.TypedUpdateEvent[client.Object]) bool {
-			logger.Info("UpdateFunc", "event", e)
-			return true
-
-		},
-		GenericFunc: func(e event.TypedGenericEvent[client.Object]) bool {
-			logger.Info("GenericFunc", "event", e)
-			return true
-		},
-	}
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&amaltheadevv1alpha1.AmaltheaSession{}).
 		Owns(&appsv1.StatefulSet{}).
@@ -272,6 +238,5 @@ func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&networkingv1.Ingress{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&corev1.Secret{}).
-		WithEventFilter(eventFilter).
 		Complete(r)
 }

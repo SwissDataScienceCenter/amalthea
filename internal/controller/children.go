@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -172,10 +171,6 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
 				return err
-			}
-			if reflect.DeepEqual(*current, *desired) {
-				log.Info("reconcile", "message", "current deep equals desired")
-				return nil
 			}
 			switch strategy := cr.Spec.ReconcileStrategy; strategy {
 			case amaltheadevv1alpha1.Never:
