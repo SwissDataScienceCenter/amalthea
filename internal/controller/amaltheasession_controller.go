@@ -35,6 +35,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -96,8 +97,16 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		sentry.WithTransactionSource("component"),
 	}
 	transaction := sentry.StartTransaction(ctx, txName, options...)
+	reconcileID := controller.ReconcileIDFromContext(ctx)
+	if reconcileID != "" {
+		transaction.SetData("controller.reconcile_id", reconcileID)
+	}
+
+	logr := log.FromContext(ctx)
+	logr.Info("Started transaction", "tx", transaction)
+
 	defer transaction.Finish()
-	res, err := r.reconcileInner(ctx, req)
+	res, err := r.reconcileInner(transaction.Context(), req)
 	if err != nil {
 		hub.CaptureException(err)
 	}
