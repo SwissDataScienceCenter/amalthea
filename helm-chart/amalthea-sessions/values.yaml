@@ -72,3 +72,8 @@ cloner:
 # SameSite parameter to None. This is only useful in specific cases for remote Renku cluster.
 # Setting this value to true can have security implications without adjusting CSP and CORS on the session ingress.
 useNoneSameSiteSessionCookie: false
+
+# Setting this to true will result the url for the session always using https.
+# Regardless of whether a TLS secret or cluster-wide TLS secret is used.
+# This is useful because in many cases TLS can be provided through other means.
+httpsSessionIngress: false

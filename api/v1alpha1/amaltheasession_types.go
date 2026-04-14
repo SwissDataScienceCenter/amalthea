@@ -231,7 +231,7 @@ type Ingress struct {
 
 func (ingress *Ingress) UrlScheme() string {
 	urlScheme := "http"
-	if (ingress.TLSSecret != nil && ingress.TLSSecret.Name != "") || ingress.UseDefaultClusterTLSCert || ingress.AssumeHttps {
+	if (ingress.TLSSecret != nil && ingress.TLSSecret.Name != "") || ingress.UseDefaultClusterTLSCert || ingress.AssumeHttps || getHttpsSessionIngress() {
 		urlScheme = "https"
 	}
 	return urlScheme
