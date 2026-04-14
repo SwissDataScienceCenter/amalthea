@@ -89,17 +89,14 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			panic(err)
 		}
 	}()
-
-	transactionName := fmt.Sprintf("RECONCILE AmaltheaSession %s %s", req.Namespace, req.Name)
+	// Start Sentry transaction
 	options := []sentry.SpanOption{
-		sentry.WithOpName("function"),
-		sentry.WithDescription(transactionName),
+		sentry.WithOpName("function.reconcile"),
+		sentry.WithDescription(fmt.Sprintf("RECONCILE AmaltheaSession %s %s", req.Namespace, req.Name)),
 		sentry.WithSpanOrigin(sentry.SpanOriginManual),
 		sentry.WithTransactionSource(sentry.SourceComponent),
 	}
 	transaction := sentry.StartTransaction(ctx, "AmaltheaSessionReconciler.Reconcile", options...)
-	// transaction.Name = "RECONCILE"
-	// transaction.Op = "AmaltheaSessionReconciler.Reconcile"
 	transaction.SetData("controller.request.namespace", req.Namespace)
 	transaction.SetData("controller.request.name", req.Name)
 	reconcileID := controller.ReconcileIDFromContext(ctx)
@@ -107,11 +104,10 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		transaction.SetData("controller.reconcile_id", string(reconcileID))
 	}
 
-	logr := log.FromContext(ctx)
-	logr.Info("Started transaction", "tx", transaction)
-
 	defer transaction.Finish()
+
 	res, err := r.reconcileInner(transaction.Context(), req)
+	// Set transaction results
 	if err == nil {
 		transaction.Status = sentry.SpanStatusOK
 	} else {
@@ -122,7 +118,6 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if res.RequeueAfter != 0 {
 		transaction.SetData("controller.result.requeue_after", res.RequeueAfter)
 	}
-	logr.Info("Finished transaction", "tx", transaction)
 	return res, err
 }
 

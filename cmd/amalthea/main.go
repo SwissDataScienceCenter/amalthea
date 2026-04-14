@@ -181,14 +181,6 @@ func main() {
 	if releaseNamespace == "" {
 		releaseNamespace = "default"
 	}
-	cacheOptions := cache.Options{
-		DefaultNamespaces: map[string]cache.Config{releaseNamespace: {}},
-	}
-	if clusterScoped {
-		cacheOptions = cache.Options{
-			DefaultNamespaces: nil,
-		}
-	}
 
 	config := ctrl.GetConfigOrDie()
 
@@ -198,6 +190,14 @@ func main() {
 		os.Exit(1)
 	}
 	httpClient.Transport = sentryhttpclient.NewSentryRoundTripper(httpClient.Transport)
+
+	cacheOptions := cache.Options{
+		HTTPClient:        httpClient,
+		DefaultNamespaces: map[string]cache.Config{releaseNamespace: {}},
+	}
+	if clusterScoped {
+		cacheOptions.DefaultNamespaces = nil
+	}
 
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:                 scheme,
