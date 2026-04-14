@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -68,6 +69,7 @@ func main() {
 	var sentryDsn string
 	var sentryEnvironment string
 	var sentryTracesSampleRate float64
+	var sentryRelease string
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
@@ -89,6 +91,7 @@ func main() {
 		0,
 		"The sample rate for Sentry performance monitoring.",
 	)
+	flag.StringVar(&sentryRelease, "sentry-release", "", "The release value used for Sentry.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -108,6 +111,8 @@ func main() {
 		err := sentry.Init(sentry.ClientOptions{
 			Dsn:              sentryDsn,
 			SendDefaultPII:   false,
+			Environment:      sentryEnvironment,
+			Release:          sentryRelease,
 			EnableTracing:    sentryTracesSampleRate > 0,
 			TracesSampleRate: sentryTracesSampleRate,
 		})
@@ -125,6 +130,12 @@ func main() {
 		}()
 		defer sentry.Flush(2 * time.Second)
 	}
+
+	// Test error
+	go func() {
+		err := fmt.Errorf("test error")
+		sentry.CurrentHub().CaptureException(err)
+	}()
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
