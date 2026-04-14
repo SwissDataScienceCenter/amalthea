@@ -19,8 +19,11 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"time"
+
+	"github.com/getsentry/sentry-go"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -71,6 +74,37 @@ const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// Sentry Trace
+	hub := sentry.GetHubFromContext(ctx)
+	if hub == nil {
+		hub = sentry.CurrentHub().Clone()
+		ctx = sentry.SetHubOnContext(ctx, hub)
+	}
+	// Capture panics
+	defer func() {
+		err := recover()
+		if err != nil {
+			hub.RecoverWithContext(ctx, err)
+			panic(err)
+		}
+	}()
+
+	txName := fmt.Sprintf("RECONCILE AmaltheaSession %s %s", req.Namespace, req.Name)
+	options := []sentry.SpanOption{
+		sentry.WithOpName("function"),
+		sentry.WithDescription(txName),
+		sentry.WithTransactionSource("component"),
+	}
+	transaction := sentry.StartTransaction(ctx, txName, options...)
+	defer transaction.Finish()
+	res, err := r.reconcileInner(ctx, req)
+	if err != nil {
+		hub.CaptureException(err)
+	}
+	return res, err
+}
+
+func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
 	amaltheasession := &amaltheadevv1alpha1.AmaltheaSession{}

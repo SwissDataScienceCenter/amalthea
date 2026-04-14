@@ -115,6 +115,14 @@ func main() {
 			setupLog.Error(err, "failed to initialize Sentry")
 			os.Exit(1)
 		}
+		defer func() {
+			err := recover()
+			if err != nil {
+				sentry.CurrentHub().Recover(err)
+				sentry.Flush(2 * time.Second)
+				panic(err)
+			}
+		}()
 		defer sentry.Flush(2 * time.Second)
 	}
 
