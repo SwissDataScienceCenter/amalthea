@@ -45,6 +45,8 @@ spec:
           value: {{ .Values.sidecars.image.repository }}:{{ .Values.sidecars.image.tag }}
         - name: USE_NONE_SAME_SITE_SESSION_COOKIE
           value: {{ .Values.useNoneSameSiteSessionCookie | quote }}
+        - name: HTTPS_SESSION_INGRESS
+          value: {{ .Values.httpsSessionIngress | quote }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
         livenessProbe:
