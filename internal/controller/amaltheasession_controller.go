@@ -99,7 +99,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	transaction := sentry.StartTransaction(ctx, txName, options...)
 	reconcileID := controller.ReconcileIDFromContext(ctx)
 	if reconcileID != "" {
-		transaction.SetData("controller.reconcile_id", reconcileID)
+		transaction.SetTag("controller.reconcile_id", string(reconcileID))
 	}
 
 	logr := log.FromContext(ctx)
