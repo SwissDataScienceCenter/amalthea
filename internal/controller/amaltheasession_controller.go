@@ -97,9 +97,11 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		sentry.WithSpanOrigin(sentry.SpanOriginManual),
 		sentry.WithTransactionSource(sentry.SourceComponent),
 	}
-	transaction := sentry.StartTransaction(ctx, transactionName, options...)
-	transaction.Name = "RECONCILE"
-	transaction.Op = "AmaltheaSessionReconciler.Reconcile"
+	transaction := sentry.StartTransaction(ctx, "AmaltheaSessionReconciler.Reconcile", options...)
+	// transaction.Name = "RECONCILE"
+	// transaction.Op = "AmaltheaSessionReconciler.Reconcile"
+	transaction.SetData("controller.request.namespace", req.Namespace)
+	transaction.SetData("controller.request.name", req.Name)
 	reconcileID := controller.ReconcileIDFromContext(ctx)
 	if reconcileID != "" {
 		transaction.SetData("controller.reconcile_id", string(reconcileID))
