@@ -90,16 +90,19 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}()
 
-	txName := fmt.Sprintf("RECONCILE AmaltheaSession %s %s", req.Namespace, req.Name)
+	transactionName := fmt.Sprintf("RECONCILE AmaltheaSession %s %s", req.Namespace, req.Name)
 	options := []sentry.SpanOption{
 		sentry.WithOpName("function"),
-		sentry.WithDescription(txName),
-		sentry.WithTransactionSource("component"),
+		sentry.WithDescription(transactionName),
+		sentry.WithSpanOrigin(sentry.SpanOriginManual),
+		sentry.WithTransactionSource(sentry.SourceComponent),
 	}
-	transaction := sentry.StartTransaction(ctx, txName, options...)
+	transaction := sentry.StartTransaction(ctx, transactionName, options...)
+	transaction.Name = "RECONCILE"
+	transaction.Op = "AmaltheaSessionReconciler.Reconcile"
 	reconcileID := controller.ReconcileIDFromContext(ctx)
 	if reconcileID != "" {
-		transaction.SetTag("controller.reconcile_id", string(reconcileID))
+		transaction.SetData("controller.reconcile_id", string(reconcileID))
 	}
 
 	logr := log.FromContext(ctx)
@@ -107,9 +110,17 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	defer transaction.Finish()
 	res, err := r.reconcileInner(transaction.Context(), req)
-	if err != nil {
+	if err == nil {
+		transaction.Status = sentry.SpanStatusOK
+	} else {
+		transaction.Status = sentry.SpanStatusInternalError
 		hub.CaptureException(err)
 	}
+	transaction.SetData("controller.result.requeue", res.Requeue || res.RequeueAfter > 0)
+	if res.RequeueAfter != 0 {
+		transaction.SetData("controller.result.requeue_after", res.RequeueAfter)
+	}
+	logr.Info("Finished transaction", "tx", transaction)
 	return res, err
 }
 

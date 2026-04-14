@@ -21,11 +21,11 @@ import (
 	"crypto/tls"
 	"errors"
 	"flag"
-	"fmt"
 	"os"
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	sentryhttpclient "github.com/getsentry/sentry-go/httpclient"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -106,6 +107,7 @@ func main() {
 		setupLog.Info("Sentry config",
 			"DSN", sentryDsn,
 			"environment", sentryEnvironment,
+			"release", sentryRelease,
 			"tracesSampleRate", sentryTracesSampleRate,
 		)
 		err := sentry.Init(sentry.ClientOptions{
@@ -130,12 +132,6 @@ func main() {
 		}()
 		defer sentry.Flush(2 * time.Second)
 	}
-
-	// Test error
-	go func() {
-		err := fmt.Errorf("test error")
-		sentry.CurrentHub().CaptureException(err)
-	}()
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -196,6 +192,13 @@ func main() {
 
 	config := ctrl.GetConfigOrDie()
 
+	httpClient, err := rest.HTTPClientFor(config)
+	if err != nil {
+		setupLog.Error(err, "unable to get http client for config")
+		os.Exit(1)
+	}
+	httpClient.Transport = sentryhttpclient.NewSentryRoundTripper(httpClient.Transport)
+
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
@@ -215,6 +218,9 @@ func main() {
 		// after the manager stops then its usage might be unsafe.
 		// LeaderElectionReleaseOnCancel: true,
 		Cache: cacheOptions,
+		Client: client.Options{
+			HTTPClient: httpClient,
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
