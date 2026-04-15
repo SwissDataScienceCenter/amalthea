@@ -110,6 +110,14 @@ func newRenkuAuth(firecrestTokenURI, renkuAuthenticationVersion, renkuAccessToke
 	if renkuAuthenticationVersion != "v2" && renkuClientSecret == "" {
 		return nil, fmt.Errorf("renkuClientSecret is not set")
 	}
+	if renkuAuthenticationVersion == "v2" {
+		parser := jwt.NewParser()
+		claims := jwt.RegisteredClaims{}
+		_, _, err := parser.ParseUnverified(auth.renkuAccessToken, &claims)
+		if err == nil {
+			auth.renkuAccessTokenExpiresAt = claims.ExpiresAt.Time
+		}
+	}
 	// Create httpClient, if not already present
 	if auth.httpClient == nil {
 		auth.httpClient = http.DefaultClient
