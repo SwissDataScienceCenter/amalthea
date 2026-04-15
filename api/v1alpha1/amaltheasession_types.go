@@ -49,6 +49,8 @@ type AmaltheaSessionSpec struct {
 
 	// +optional
 	// A list of data sources that should be added to the session
+	// Note that for rcloneV2 we support only one data source of this kind.
+	// If you need more than one simply combine the configurations into one.
 	DataSources []DataSource `json:"dataSources,omitempty"`
 
 	// +optional
@@ -303,6 +305,9 @@ type DataSource struct {
 	// NOTE: define all values in a single key of the Kubernetes secret.
 	// rclone: any valid rclone configuration for a single remote, see the output of `rclone config providers` for validation and format.
 	SecretRef *SessionSecretRef `json:"secretRef,omitempty"`
+	// +kubebuilder:default:=rclone
+	// The name of the source/remote in the rclone config that should be used to serve
+	RcloneRemoteName string `json:"rcloneRemoteName,omitempty"`
 }
 
 type Culling struct {

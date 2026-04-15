@@ -1024,13 +1024,28 @@ func (cr *AmaltheaSession) childLabelsRclone() map[string]string {
 }
 
 func (cr *AmaltheaSession) RcloneV2ResourceName() string {
-	return cr.Name + "-data"
+	return cr.Name + "-nfs"
 }
 
 const rcloneV2NFSPort int32 = 65535
 const rcloneV2NFSPortName string = "rcloneNFS"
 
-func (cr *AmaltheaSession) RcloneV2Statefulset() appsv1.StatefulSet {
+func (cr *AmaltheaSession) RcloneV2DataSource() (DataSource, bool) {
+	for _, ds := range cr.Spec.DataSources {
+		if ds.Type == RcloneV2 {
+			return ds, true
+		}
+	}
+	return DataSource{}, false
+}
+
+func (cr *AmaltheaSession) RcloneV2Statefulset() (appsv1.StatefulSet, bool) {
+	ds, dsFound := cr.RcloneV2DataSource()
+	if !dsFound {
+		return appsv1.StatefulSet{}, false
+	}
+	args := []string{"serve", "nfs", ds.RcloneRemoteName, fmt.Sprintf("--addr=0.0.0.0:%d", rcloneV2NFSPort)}
+	args = append(args, cr.Spec.DataSourcesConfig.ExtraArgs...)
 	pod := v1.PodSpec{
 		SecurityContext: &v1.PodSecurityContext{RunAsNonRoot: ptr.To(true)},
 		Containers: []v1.Container{
@@ -1047,7 +1062,18 @@ func (cr *AmaltheaSession) RcloneV2Statefulset() appsv1.StatefulSet {
 				Ports: []v1.ContainerPort{
 					{Name: rcloneV2NFSPortName, ContainerPort: rcloneV2NFSPort},
 				},
-				// TODO: Add liveness checks
+				ReadinessProbe: &v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						TCPSocket: &v1.TCPSocketAction{Port: intstr.FromString(rcloneV2NFSPortName)},
+					},
+				},
+				LivenessProbe: &v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						TCPSocket: &v1.TCPSocketAction{Port: intstr.FromString(rcloneV2NFSPortName)},
+					},
+				},
+				Command: []string{"rclone"},
+				Args:    args,
 			},
 		},
 	}
@@ -1074,7 +1100,7 @@ func (cr *AmaltheaSession) RcloneV2Statefulset() appsv1.StatefulSet {
 				Spec: pod,
 			},
 		},
-	}
+	}, true
 }
 
 func (cr *AmaltheaSession) RcloneV2Service() v1.Service {
@@ -1122,5 +1148,17 @@ func (cr *AmaltheaSession) RcloneV2Volume(server string) v1.PersistentVolume {
 				},
 			},
 		},
+	}
+}
+
+func (cr *AmaltheaSession) RcloneV2PVC(server string) v1.PersistentVolumeClaim {
+	return v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        cr.RcloneV2ResourceName(),
+			Namespace:   cr.Namespace,
+			Labels:      cr.childLabelsRclone(),
+			Annotations: cr.Spec.Template.Metadata.Annotations,
+		},
+		Spec: v1.PersistentVolumeClaimSpec{VolumeName: cr.RcloneV2ResourceName()},
 	}
 }

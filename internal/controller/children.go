@@ -21,7 +21,20 @@ import (
 )
 
 type ChildResourceType interface {
-	networkingv1.Ingress | v1.Service | v1.PersistentVolumeClaim | appsv1.StatefulSet | v1.Secret
+	networkingv1.Ingress | v1.Service | v1.PersistentVolumeClaim | appsv1.StatefulSet | v1.Secret | v1.PersistentVolume
+}
+
+type ReconcileFunc[T ChildResourceType] func(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T]
+
+type ChildFuncs[T ChildResourceType] interface {
+	Current() *T
+	Desired() *T
+	Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T]
+}
+
+type sessionStatefulset struct {
+	current *appsv1.StatefulSet
+	desired *appsv1.StatefulSet
 }
 
 type ChildResource[T ChildResourceType] struct {
