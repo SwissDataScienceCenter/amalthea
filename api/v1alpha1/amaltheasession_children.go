@@ -236,7 +236,7 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 			PodManagementPolicy: appsv1.ParallelPodManagement,
 			Replicas:            &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: selectorLabels(cr.Name, cr.Spec.SessionType),
+				MatchLabels: selectorLabels(cr.Name),
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -269,7 +269,7 @@ func (cr *AmaltheaSession) Service() v1.Service {
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: v1.ServiceSpec{
-			Selector: selectorLabels(cr.Name, cr.Spec.SessionType),
+			Selector: selectorLabels(cr.Name),
 			Ports: []v1.ServicePort{
 				{
 					Protocol:   v1.ProtocolTCP,
@@ -429,13 +429,12 @@ func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
 
 // selectorLabels returns the labels for selecting the resources
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
-func selectorLabels(name string, sessionType SessionType) map[string]string {
+func selectorLabels(name string) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name":         "AmaltheaSession",
-		"app.kubernetes.io/instance":     name,
-		"app.kubernetes.io/part-of":      "amaltheasession-operator",
-		"app.kubernetes.io/created-by":   "controller-manager",
-		"app.kubernetes.io/session-type": string(sessionType),
+		"app.kubernetes.io/name":       "AmaltheaSession",
+		"app.kubernetes.io/instance":   name,
+		"app.kubernetes.io/part-of":    "amaltheasession-operator",
+		"app.kubernetes.io/created-by": "controller-manager",
 	}
 }
 
@@ -1111,7 +1110,7 @@ func findConflicts(destination, source map[string]string) []string {
 func (cr *AmaltheaSession) childLabels() map[string]string {
 	labels := map[string]string{}
 	maps.Copy(labels, cr.Spec.Template.Metadata.Labels)
-	selectorLabels := selectorLabels(cr.Name, cr.Spec.SessionType)
+	selectorLabels := selectorLabels(cr.Name)
 	conflicts := findConflicts(labels, selectorLabels)
 	if len(conflicts) > 0 {
 		log.Log.Info(
