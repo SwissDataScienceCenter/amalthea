@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	sentryhttpclient "github.com/getsentry/sentry-go/httpclient"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,6 +70,7 @@ func main() {
 	var sentryDsn string
 	var sentryEnvironment string
 	var sentryTracesSampleRate float64
+	var sentryRelease string
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
@@ -89,6 +92,7 @@ func main() {
 		0,
 		"The sample rate for Sentry performance monitoring.",
 	)
+	flag.StringVar(&sentryRelease, "sentry-release", "", "The release value used for Sentry.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -103,11 +107,14 @@ func main() {
 		setupLog.Info("Sentry config",
 			"DSN", sentryDsn,
 			"environment", sentryEnvironment,
+			"release", sentryRelease,
 			"tracesSampleRate", sentryTracesSampleRate,
 		)
 		err := sentry.Init(sentry.ClientOptions{
 			Dsn:              sentryDsn,
 			SendDefaultPII:   false,
+			Environment:      sentryEnvironment,
+			Release:          sentryRelease,
 			EnableTracing:    sentryTracesSampleRate > 0,
 			TracesSampleRate: sentryTracesSampleRate,
 		})
@@ -115,6 +122,14 @@ func main() {
 			setupLog.Error(err, "failed to initialize Sentry")
 			os.Exit(1)
 		}
+		defer func() {
+			err := recover()
+			if err != nil {
+				sentry.CurrentHub().Recover(err)
+				sentry.Flush(2 * time.Second)
+				panic(err)
+			}
+		}()
 		defer sentry.Flush(2 * time.Second)
 	}
 
@@ -166,16 +181,23 @@ func main() {
 	if releaseNamespace == "" {
 		releaseNamespace = "default"
 	}
+
+	config := ctrl.GetConfigOrDie()
+
+	httpClient, err := rest.HTTPClientFor(config)
+	if err != nil {
+		setupLog.Error(err, "unable to get http client for config")
+		os.Exit(1)
+	}
+	httpClient.Transport = sentryhttpclient.NewSentryRoundTripper(httpClient.Transport)
+
 	cacheOptions := cache.Options{
+		HTTPClient:        httpClient,
 		DefaultNamespaces: map[string]cache.Config{releaseNamespace: {}},
 	}
 	if clusterScoped {
-		cacheOptions = cache.Options{
-			DefaultNamespaces: nil,
-		}
+		cacheOptions.DefaultNamespaces = nil
 	}
-
-	config := ctrl.GetConfigOrDie()
 
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:                 scheme,
@@ -196,6 +218,9 @@ func main() {
 		// after the manager stops then its usage might be unsafe.
 		// LeaderElectionReleaseOnCancel: true,
 		Cache: cacheOptions,
+		Client: client.Options{
+			HTTPClient: httpClient,
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

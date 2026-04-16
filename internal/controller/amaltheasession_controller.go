@@ -19,8 +19,11 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"time"
+
+	"github.com/getsentry/sentry-go"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +35,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -71,6 +75,53 @@ const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// Sentry Trace
+	hub := sentry.GetHubFromContext(ctx)
+	if hub == nil {
+		hub = sentry.CurrentHub().Clone()
+		ctx = sentry.SetHubOnContext(ctx, hub)
+	}
+	// Capture panics
+	defer func() {
+		err := recover()
+		if err != nil {
+			hub.RecoverWithContext(ctx, err)
+			panic(err)
+		}
+	}()
+	// Start Sentry transaction
+	options := []sentry.SpanOption{
+		sentry.WithOpName("function.reconcile"),
+		sentry.WithDescription(fmt.Sprintf("RECONCILE AmaltheaSession %s %s", req.Namespace, req.Name)),
+		sentry.WithSpanOrigin(sentry.SpanOriginManual),
+		sentry.WithTransactionSource(sentry.SourceComponent),
+	}
+	transaction := sentry.StartTransaction(ctx, "AmaltheaSessionReconciler.Reconcile", options...)
+	transaction.SetData("controller.request.namespace", req.Namespace)
+	transaction.SetData("controller.request.name", req.Name)
+	reconcileID := controller.ReconcileIDFromContext(ctx)
+	if reconcileID != "" {
+		transaction.SetData("controller.reconcile_id", string(reconcileID))
+	}
+
+	defer transaction.Finish()
+
+	res, err := r.reconcileInner(transaction.Context(), req)
+	// Set transaction results
+	if err == nil {
+		transaction.Status = sentry.SpanStatusOK
+	} else {
+		transaction.Status = sentry.SpanStatusInternalError
+		hub.CaptureException(err)
+	}
+	transaction.SetData("controller.result.requeue", res.Requeue || res.RequeueAfter > 0)
+	if res.RequeueAfter != 0 {
+		transaction.SetData("controller.result.requeue_after", res.RequeueAfter)
+	}
+	return res, err
+}
+
+func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
 	amaltheasession := &amaltheadevv1alpha1.AmaltheaSession{}
@@ -166,7 +217,8 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	newStatus := updates.Status(ctx, r, amaltheasession)
-	statusChanged := reflect.DeepEqual(amaltheasession.Status, newStatus)
+	statusChanged := !reflect.DeepEqual(amaltheasession.Status, newStatus)
+
 	amaltheasession.Status = newStatus
 	err = r.Status().Update(ctx, amaltheasession)
 	if err != nil {
