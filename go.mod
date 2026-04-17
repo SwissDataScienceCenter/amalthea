@@ -1,6 +1,6 @@
 module github.com/SwissDataScienceCenter/amalthea
 
-go 1.24.3
+go 1.26.2
 
 tool fybrik.io/crdoc
 
