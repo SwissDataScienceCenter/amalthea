@@ -313,7 +313,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			}
 
 			// suspending jobs
-			if current.Spec.Suspend != nil && desired.Spec.Suspend != nil && *current.Spec.Suspend == true && *desired.Spec.Suspend == false {
+			if current.Spec.Suspend != nil && desired.Spec.Suspend != nil && *current.Spec.Suspend && !*desired.Spec.Suspend {
 				// The session is being resumed
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
@@ -321,7 +321,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 					status.HibernatedSince = metav1.Time{}
 				}
 			}
-			if (current.Spec.Suspend == nil || *current.Spec.Suspend == false) && desired.Spec.Suspend != nil && *desired.Spec.Suspend == true {
+			if (current.Spec.Suspend == nil || !*current.Spec.Suspend) && desired.Spec.Suspend != nil && *desired.Spec.Suspend {
 				// The session is being hibernated
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
@@ -346,8 +346,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
 				current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
 				current.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
-				//current.Spec.Selector = desired.Spec.Selector
-				//current.Spec.Template.Labels = desired.Spec.Template.Labels
+				// current.Spec.Selector = desired.Spec.Selector
+				// current.Spec.Template.Labels = desired.Spec.Template.Labels
 				current.Labels = desired.Labels
 				current.Annotations = desired.Annotations
 				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
@@ -506,7 +506,7 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 		return amaltheadevv1alpha1.NotReady, ""
 	case cr.Spec.Hibernated && c.StatefulSet.Manifest != nil && c.StatefulSet.Manifest.Spec.Replicas != nil && *c.StatefulSet.Manifest.Spec.Replicas == 0:
 		return amaltheadevv1alpha1.Hibernated, ""
-	case cr.Spec.Hibernated && c.Job.Manifest != nil && c.Job.Manifest.Spec.Suspend != nil && *c.Job.Manifest.Spec.Suspend == true:
+	case cr.Spec.Hibernated && c.Job.Manifest != nil && c.Job.Manifest.Spec.Suspend != nil && *c.Job.Manifest.Spec.Suspend:
 		return amaltheadevv1alpha1.Hibernated, ""
 	case msg != "":
 		return amaltheadevv1alpha1.Failed, msg
@@ -726,6 +726,7 @@ func checkEventsInferedState(ctx context.Context,
 	return failedSchedulingSince, nextState, err
 }
 
+//gocyclo:ignore
 func (c ChildResourceUpdates) Status(
 	ctx context.Context,
 	r *AmaltheaSessionReconciler,
@@ -790,7 +791,6 @@ func (c ChildResourceUpdates) Status(
 			}
 		} else {
 			log.Error(err, "couldn't list events")
-
 		}
 	}
 

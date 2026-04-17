@@ -34,6 +34,7 @@
         gotools
         go-tools
         gore
+        golangci-lint
         kind
         kubectl
         docker

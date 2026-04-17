@@ -97,40 +97,46 @@ func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 	return volumes, volumeMounts
 }
 
-
 func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.PodSpec, error) {
-	volumes := []v1.Volume{}
-	volumeMounts := []v1.VolumeMount{}
-	initContainers := []v1.Container{}
-	containers := []v1.Container{}
-
 	_, dsVols, dsVolMounts := cr.DataSources()
 	cloneInit := cr.cloneInit()
 	sessionVols, sessionMounts := cr.SessionVolumes()
+
+	auth, err := cr.auth()
+	if err != nil {
+		return nil, err
+	}
+
+	volumes := make([]v1.Volume, 0, len(sessionVols)+len(cloneInit.Volumes)+len(cr.Spec.ExtraVolumes)+len(dsVols)+len(auth.Volumes))
 	volumes = append(volumes, sessionVols...)
 	volumes = append(volumes, cloneInit.Volumes...)
 	volumes = append(volumes, cr.Spec.ExtraVolumes...)
 	volumes = append(volumes, dsVols...)
+	volumes = append(volumes, auth.Volumes...)
+
+	volumeMounts := make([]v1.VolumeMount, 0, len(sessionMounts)+len(cr.Spec.Session.ExtraVolumeMounts)+len(dsVolMounts))
 	volumeMounts = append(volumeMounts, sessionMounts...)
 	volumeMounts = append(volumeMounts, cr.Spec.Session.ExtraVolumeMounts...)
 	volumeMounts = append(volumeMounts, dsVolMounts...)
+
+	initContainers := make([]v1.Container, 0, len(cloneInit.Containers)+len(cr.Spec.ExtraInitContainers))
 	initContainers = append(initContainers, cloneInit.Containers...)
 	initContainers = append(initContainers, cr.Spec.ExtraInitContainers...)
 
 	// Create the main session container
 	sessionContainer := cr.sessionContainer(volumeMounts, cfg)
 
-	auth, err := cr.auth()
-	if err != nil {
-		return nil, err
+	totalContainers := 1 + len(auth.Containers) + len(cr.Spec.ExtraContainers)
+	if cr.Spec.SessionLocation == Remote {
+		totalContainers += 1
 	}
+	containers := make([]v1.Container, 0, totalContainers)
 	containers = append(containers, sessionContainer)
 	containers = append(containers, auth.Containers...)
 	if cr.Spec.SessionLocation == Remote {
 		containers = append(containers, cr.tunnelContainer())
 	}
 	containers = append(containers, cr.Spec.ExtraContainers...)
-	volumes = append(volumes, auth.Volumes...)
 
 	imagePullSecrets := []v1.LocalObjectReference{}
 	for _, sec := range cr.Spec.ImagePullSecrets {
@@ -171,16 +177,16 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 
 	// use MaxAge (amount of time until a session gets terminated) to set maximum job runtime
 	var activeTTL *int64
-	if cr.Spec.Culling.MaxAge.Duration.Seconds() > 0 {
-		vv := int64(cr.Spec.Culling.MaxAge.Duration.Seconds())
+	if cr.Spec.Culling.MaxAge.Seconds() > 0 {
+		vv := int64(cr.Spec.Culling.MaxAge.Seconds())
 		activeTTL = &vv
 	}
 
 	// use MaxHibernatedDuration (amount of time until a hibernated session is deleted) to set the time
 	// after which the job is removed after it has completed
 	var ttlFinish *int32
-	if cr.Spec.Culling.MaxHibernatedDuration.Duration.Seconds() > 0 {
-		vv := int32(cr.Spec.Culling.MaxHibernatedDuration.Duration.Seconds())
+	if cr.Spec.Culling.MaxHibernatedDuration.Seconds() > 0 {
+		vv := int32(cr.Spec.Culling.MaxHibernatedDuration.Seconds())
 		ttlFinish = &vv
 	}
 
