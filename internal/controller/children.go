@@ -8,6 +8,7 @@ import (
 	"time"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -295,12 +296,13 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 	}
 }
 
-func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, clusterType amaltheadevv1alpha1.ClusterType) (ChildResources, error) {
+func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, config config.AmaltheaSessionConfiguration) (ChildResources, error) {
+	// func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, clusterType amaltheadevv1alpha1.ClusterType) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredService := cr.Service()
 	desiredPVC := cr.PVC()
-	desiredStatefulSet, err := cr.StatefulSet(clusterType)
+	desiredStatefulSet, err := cr.StatefulSet(config)
 	if err != nil {
 		return ChildResources{}, err
 	}

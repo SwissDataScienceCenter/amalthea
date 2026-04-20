@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
 )
 
 // AmaltheaSessionReconciler reconciles a AmaltheaSession object
@@ -47,7 +48,8 @@ type AmaltheaSessionReconciler struct {
 	client.Client
 	Scheme        *runtime.Scheme
 	MetricsClient metricsv1beta1.PodMetricsesGetter
-	ClusterType   amaltheadevv1alpha1.ClusterType
+	Configuration config.AmaltheaSessionConfiguration
+	// ClusterType   amaltheadevv1alpha1.ClusterType
 }
 
 // finalizers
@@ -197,7 +199,7 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	children, err := NewChildResources(amaltheasession, r.ClusterType)
+	children, err := NewChildResources(amaltheasession, r.Configuration)
 	if err != nil {
 		log.Error(
 			err,

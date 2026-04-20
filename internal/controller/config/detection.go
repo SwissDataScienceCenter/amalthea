@@ -1,4 +1,4 @@
-package v1alpha1
+package config
 
 import (
 	"k8s.io/client-go/discovery"

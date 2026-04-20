@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -95,7 +96,8 @@ func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 }
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
-func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.StatefulSet, error) {
+func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) (appsv1.StatefulSet, error) {
+	// func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.StatefulSet, error) {
 	replicas := int32(1)
 	if cr.Spec.Hibernated {
 		replicas = 0
@@ -120,7 +122,7 @@ func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.Stateful
 	initContainers = append(initContainers, cr.Spec.ExtraInitContainers...)
 
 	// Create the main session container
-	sessionContainer := cr.sessionContainer(volumeMounts)
+	sessionContainer := cr.sessionContainer(volumeMounts, cfg)
 
 	auth, err := cr.auth()
 	if err != nil {
@@ -154,7 +156,7 @@ func (cr *AmaltheaSession) StatefulSet(clusterType ClusterType) (appsv1.Stateful
 		ImagePullSecrets:             imagePullSecrets,
 	}
 
-	if clusterType == OpenShift {
+	if cfg.ClusterType == config.OpenShift {
 		pod.DeprecatedServiceAccount = pod.ServiceAccountName
 	}
 
@@ -741,21 +743,36 @@ func makeTunnelSecret(length int) (string, error) {
 }
 
 // sessionContainer returns the main session container
-func (cr *AmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount) v1.Container {
+func (cr *AmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount, config config.AmaltheaSessionConfiguration) v1.Container {
 	if cr.Spec.SessionLocation == Local {
-		return cr.sessionContainerLocal(volumeMounts)
+		return cr.sessionContainerLocal(volumeMounts, config)
 	}
 	// cr.Spec.SessionLocation == Remote
 	return cr.sessionContainerRemote(volumeMounts)
 }
 
 // sessionContainer returns the main session container
-func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount) v1.Container {
+func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, config config.AmaltheaSessionConfiguration) v1.Container {
 	session := cr.Spec.Session
+	// Rewrite image
+	image := session.Image
+	if config.ImageRewriter != nil {
+		newImage, err := config.ImageRewriter.Rewrite(image)
+		if err != nil {
+			log.Log.Error(
+				err,
+				"Error re-writting image, using original value",
+				"image",
+				session.Image,
+			)
+		} else {
+			image = newImage
+		}
+	}
 	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
 	// in the CR can point to either the session container or another container.
 	sessionContainer := v1.Container{
-		Image:                    session.Image,
+		Image:                    image,
 		Name:                     SessionContainerName,
 		ImagePullPolicy:          cr.Spec.Session.ImagePullPolicy,
 		Args:                     session.Args,
