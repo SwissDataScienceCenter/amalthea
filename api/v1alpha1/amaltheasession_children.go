@@ -769,13 +769,6 @@ func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, 
 			image = newImage
 		}
 	}
-	if len(cr.Spec.ImagePullSecrets) != 0 {
-		log.Log.Info(
-			"Image has pull secrets, do not rewrite",
-			"image",
-			session.Image,
-		)
-	}
 	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
 	// in the CR can point to either the session container or another container.
 	sessionContainer := v1.Container{
