@@ -100,7 +100,7 @@ func TestParseImageRewriteRules(t *testing.T) {
 		}
 	]`
 
-	err, rules := parseImageRewriteRules(rulesStr)
+	rules, err := parseImageRewriteRules(rulesStr)
 	require.NoError(t, err)
 
 	expectedRules := []imageRewriteRule{
