@@ -77,3 +77,15 @@ useNoneSameSiteSessionCookie: false
 # Regardless of whether a TLS secret or cluster-wide TLS secret is used.
 # This is useful because in many cases TLS can be provided through other means.
 httpsSessionIngress: false
+
+# Rewrite rules for session images.
+# The rewrite rules match source prefixes and substitute them with target prefixes.
+# Example:
+# imageRewriteRules:
+#   - source_prefix: "example.org"
+#	    target_prefix: "my-cache.com/prefix"
+# This rule will rewrite "example.org/repo/image:tag" to "my-cache.com/prefix/repo/image:tag"
+# Note that "docker.io" is a special domain which can be used to rewrite images such as "node", "python:3.13" or "renku/jupyterlab".
+imageRewriteRules:
+  - source_prefix: "docker.io"
+    targer_prefix: "harbor.renkulab.io/dockerhub_cache"

@@ -47,7 +47,6 @@ import (
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller"
 	ctrlConfig "github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
-	"github.com/SwissDataScienceCenter/amalthea/internal/utils"
 	corev1 "k8s.io/api/core/v1"
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 	// +kubebuilder:scaffold:imports
@@ -231,24 +230,19 @@ func main() {
 
 	metricsClient := metricsv.NewForConfigOrDie(config).MetricsV1beta1()
 
-	clusterType, err := ctrlConfig.DetectClusterType(config)
-
+	amaltheaSessionConfiguration, err := ctrlConfig.GetAmaltheaSessionConfiguration(config)
 	if err != nil {
-		setupLog.Error(err, "failed to do cluster detection")
+		setupLog.Error(err, "failed to get controller configuration")
 		os.Exit(1)
 	}
 
-	setupLog.Info("cluster type detected", "type", clusterType)
+	setupLog.Info("cluster type detected", "type", amaltheaSessionConfiguration.ClusterType)
 
 	err = (&controller.AmaltheaSessionReconciler{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
 		MetricsClient: metricsClient,
-		// ClusterType:   clusterType,
-		Configuration: ctrlConfig.AmaltheaSessionConfiguration{
-			ClusterType:   clusterType,
-			ImageRewriter: utils.PoCRewriter{},
-		},
+		Configuration: amaltheaSessionConfiguration,
 	}).SetupWithManager(mgr)
 
 	if err != nil {
