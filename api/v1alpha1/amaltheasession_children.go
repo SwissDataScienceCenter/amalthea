@@ -760,7 +760,7 @@ func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, 
 		if err != nil {
 			log.Log.Error(
 				err,
-				"Error re-writting image, using original value",
+				"Error rewritting image, using original value",
 				"image",
 				session.Image,
 			)
