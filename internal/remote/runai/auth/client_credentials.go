@@ -103,7 +103,7 @@ func (a *RunaiClientCredentialsAuth) GetAccessToken(ctx context.Context) (token 
 	deadline := time.Now().Add(-leeway)
 
 	// Return the current token if it is still valid
-	if token != "" && (expiresAt.IsZero() || expiresAt.Before(deadline)) {
+	if token != "" && (expiresAt.IsZero() || expiresAt.After(deadline)) {
 		return token, nil
 	}
 
@@ -126,7 +126,7 @@ func (a *RunaiClientCredentialsAuth) refreshAccessToken(ctx context.Context) (to
 	deadline := time.Now().Add(-leeway)
 
 	// Return the current token if it is still valid
-	if token != "" && (expiresAt.IsZero() || expiresAt.Before(deadline)) {
+	if token != "" && (expiresAt.IsZero() || expiresAt.After(deadline)) {
 		return token, nil
 	}
 

@@ -149,7 +149,7 @@ func (a *RenkuAuth) GetAccessToken(ctx context.Context) (token string, err error
 	deadline := time.Now().Add(-leeway)
 
 	// Return the current token if it is still valid
-	if token != "" && (expiresAt.IsZero() || expiresAt.Before(deadline)) {
+	if token != "" && (expiresAt.IsZero() || expiresAt.After(deadline)) {
 		return token, nil
 	}
 
@@ -222,11 +222,11 @@ func (a *RenkuAuth) getRenkuAccessToken(ctx context.Context) (token string, err 
 	deadline := time.Now().Add(-leeway)
 
 	// Return the current token if it is still valid
-	if token != "" && (expiresAt.IsZero() || expiresAt.Before(deadline)) {
+	if token != "" && (expiresAt.IsZero() || expiresAt.After(deadline)) {
 		log.Printf("renku access token valid\n")
 		return token, nil
 	} else {
-		log.Printf("renku access token expired\n")
+		log.Printf("renku access token expired, expiresAt = %s, deadline = %s\n", expiresAt.String(), deadline.String())
 	}
 
 	// Refresh the token
@@ -373,6 +373,6 @@ func verifyExpiresAt(claims jwt.RegisteredClaims, leeway time.Duration) (bool, e
 		return false, nil
 	}
 
-	cmp := time.Now().Add(+leeway)
+	cmp := time.Now().Add(leeway)
 	return cmp.Before(exp.Time), nil
 }

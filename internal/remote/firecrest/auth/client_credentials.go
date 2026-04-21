@@ -98,10 +98,10 @@ func (a *FirecrestClientCredentialsAuth) GetAccessToken(ctx context.Context) (to
 	a.accessTokenLock.RUnlock()
 
 	leeway := 10 * time.Second
-	deadline := time.Now().Add(-leeway)
+	deadline := time.Now().Add(leeway)
 
 	// Return the current token if it is still valid
-	if token != "" && (expiresAt.IsZero() || expiresAt.Before(deadline)) {
+	if token != "" && (expiresAt.IsZero() || expiresAt.After(deadline)) {
 		return token, nil
 	}
 

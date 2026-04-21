@@ -191,7 +191,7 @@ func VerifyExpiresAt(claims jwt.RegisteredClaims, leeway time.Duration) (bool, e
 		return false, nil
 	}
 
-	cmp := time.Now().Add(+leeway)
+	cmp := time.Now().Add(leeway)
 	return cmp.Before(exp.Time), nil
 }
 
