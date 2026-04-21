@@ -487,6 +487,7 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	// onlyStatusUpdates := c.AllEqual(controllerutil.OperationResultUpdatedStatusOnly)
 	// noUpdates := c.AllEqual(controllerutil.OperationResultNone)
 
+	//stsReady := c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
 	stsReady := false
 	if c.StatefulSet.Manifest != nil {
 		stsReady = c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
