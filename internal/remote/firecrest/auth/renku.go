@@ -223,7 +223,10 @@ func (a *RenkuAuth) getRenkuAccessToken(ctx context.Context) (token string, err 
 
 	// Return the current token if it is still valid
 	if token != "" && (expiresAt.IsZero() || expiresAt.Before(deadline)) {
+		log.Printf("renku access token valid\n")
 		return token, nil
+	} else {
+		log.Printf("renku access token expired\n")
 	}
 
 	// Refresh the token
@@ -296,6 +299,8 @@ func (a *RenkuAuth) refreshRenkuAccessTokenV2(ctx context.Context) error {
 		return err
 	}
 	a.renkuAccessTokenExpiresAt = claims.ExpiresAt.Time
+
+	log.Printf("refreshed renku access tokens, renkuAccessTokenExpiresAt = %s\n", a.renkuAccessTokenExpiresAt.String())
 
 	return nil
 }
