@@ -297,7 +297,6 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 }
 
 func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, config config.AmaltheaSessionConfiguration) (ChildResources, error) {
-	// func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, clusterType amaltheadevv1alpha1.ClusterType) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredService := cr.Service()

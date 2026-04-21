@@ -86,6 +86,6 @@ httpsSessionIngress: false
 #	    target_prefix: "my-cache.com/prefix"
 # This rule will rewrite "example.org/repo/image:tag" to "my-cache.com/prefix/repo/image:tag"
 # Note that "docker.io" is a special domain which can be used to rewrite images such as "node", "python:3.13" or "renku/jupyterlab".
-imageRewriteRules:
-  - source_prefix: "docker.io"
-    target_prefix: "harbor.renkulab.io/dockerhub_cache"
+imageRewriteRules: []
+  # - source_prefix: "docker.io"
+  #   target_prefix: "harbor.renkulab.io/dockerhub_cache"
