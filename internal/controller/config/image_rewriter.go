@@ -21,18 +21,18 @@ func GetImageRewriter() (rewriter ImageRewriter, err error) {
 	if rulesStr == "" {
 		return nil, nil
 	}
-	err, rules := parseImageRewriteRules(rulesStr)
+	rules, err := parseImageRewriteRules(rulesStr)
 	if err != nil {
 		return nil, err
 	}
 	return &ruleBasedRewriter{rules}, nil
 }
 
-func parseImageRewriteRules(rulesStr string) (err error, rules []imageRewriteRule) {
+func parseImageRewriteRules(rulesStr string) (rules []imageRewriteRule, err error) {
 	if err := json.Unmarshal([]byte(rulesStr), &rules); err != nil {
-		return err, []imageRewriteRule{}
+		return []imageRewriteRule{}, err
 	}
-	return nil, rules
+	return rules, nil
 }
 
 type imageRewriteRule struct {
