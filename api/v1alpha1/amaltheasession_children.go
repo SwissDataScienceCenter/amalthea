@@ -754,9 +754,9 @@ func (cr *AmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount, confi
 // sessionContainer returns the main session container
 func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, config config.AmaltheaSessionConfiguration) v1.Container {
 	session := cr.Spec.Session
-	// Rewrite image
+	// Rewrite image if no pull secrets are configured
 	image := session.Image
-	if config.ImageRewriter != nil {
+	if len(cr.Spec.ImagePullSecrets) == 0 && config.ImageRewriter != nil {
 		newImage, err := config.ImageRewriter.Rewrite(image)
 		if err != nil {
 			log.Log.Error(
@@ -768,6 +768,13 @@ func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, 
 		} else {
 			image = newImage
 		}
+	}
+	if len(cr.Spec.ImagePullSecrets) != 0 {
+		log.Log.Info(
+			"Image has pull secrets, do not rewrite",
+			"image",
+			session.Image,
+		)
 	}
 	// NOTE: ports on a container are for information purposes only, so they are removed because the port specified
 	// in the CR can point to either the session container or another container.

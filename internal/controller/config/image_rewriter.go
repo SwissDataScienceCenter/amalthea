@@ -64,6 +64,10 @@ func (r *ruleBasedRewriter) Rewrite(image string) (newImage string, err error) {
 	tagged, isTagged := named.(reference.Tagged)
 	digested, isDigested := named.(reference.Digested)
 	for _, rule := range r.rules {
+		// Skip malformed rules
+		if rule.SourcePrefix == "" || rule.TargetPrefix == "" {
+			continue
+		}
 		match, result := rule.rewrite(domainAndPath)
 		if match {
 			if isTagged && isDigested {
