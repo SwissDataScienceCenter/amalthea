@@ -144,7 +144,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State != amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
 					return nil
 				}
 				fallthrough
@@ -338,7 +338,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State != amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
 					return nil
 				}
 				fallthrough
