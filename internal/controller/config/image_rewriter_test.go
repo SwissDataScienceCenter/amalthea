@@ -53,6 +53,7 @@ func TestRuleBasedRewriter(t *testing.T) {
 		{input: "node", output: "my-cache.com/prefix/library/node:latest"},
 		{input: "python:3.13", output: "my-cache.com/prefix/library/python:3.13"},
 		{input: "renku/jupyterlab", output: "my-cache.com/prefix/renku/jupyterlab:latest"},
+		{input: "renku/renkulab-r:4.3.1-0.25.0", output: "my-cache.com/prefix/renku/renkulab-r:4.3.1-0.25.0"},
 		{input: "docker.io/node", output: "my-cache.com/prefix/library/node:latest"},
 		{input: "docker.io/python:3.13", output: "my-cache.com/prefix/library/python:3.13"},
 		{input: "docker.io/renku/jupyterlab", output: "my-cache.com/prefix/renku/jupyterlab:latest"},
