@@ -47,6 +47,10 @@ spec:
           value: {{ .Values.useNoneSameSiteSessionCookie | quote }}
         - name: HTTPS_SESSION_INGRESS
           value: {{ .Values.httpsSessionIngress | quote }}
+        {{- with .Values.imageRewriteRules }}
+        - name: AMALTHEA_IMAGE_REWRITE_RULES
+          value: {{ toJson . | quote }}
+        {{- end }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
         livenessProbe:
