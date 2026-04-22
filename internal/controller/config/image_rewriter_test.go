@@ -33,7 +33,7 @@ func TestImageRewriteRuleRewrite(t *testing.T) {
 		name := strings.ReplaceAll(testCase.input, "/", "_")
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			match, result := rule.rewrite(testCase.input)
+			result, match := rule.rewrite(testCase.input)
 			if testCase.expectedMatch {
 				assert.Truef(t, match, "expected rule to match")
 				assert.Equal(t, testCase.extectedResult, result)

@@ -41,12 +41,12 @@ type imageRewriteRule struct {
 }
 
 // rewrite the domain and path part of a container image reference according to the rule
-func (rule *imageRewriteRule) rewrite(domainAndPath string) (match bool, result string) {
+func (rule *imageRewriteRule) rewrite(domainAndPath string) (result string, match bool) {
 	after, found := strings.CutPrefix(domainAndPath, rule.SourcePrefix)
 	if !found || !strings.HasPrefix(after, "/") {
-		return false, domainAndPath
+		return domainAndPath, false
 	}
-	return true, rule.TargetPrefix + after
+	return rule.TargetPrefix + after, true
 }
 
 type ruleBasedRewriter struct {
@@ -68,7 +68,7 @@ func (r *ruleBasedRewriter) Rewrite(image string) (newImage string, err error) {
 		if rule.SourcePrefix == "" || rule.TargetPrefix == "" {
 			continue
 		}
-		match, result := rule.rewrite(domainAndPath)
+		result, match := rule.rewrite(domainAndPath)
 		if match {
 			if isTagged && isDigested {
 				tag := tagged.Tag()
