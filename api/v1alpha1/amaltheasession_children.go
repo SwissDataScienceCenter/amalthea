@@ -119,20 +119,36 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	volumeMounts = append(volumeMounts, cr.Spec.Session.ExtraVolumeMounts...)
 	volumeMounts = append(volumeMounts, dsVolMounts...)
 
-	initContainers := make([]v1.Container, 0, len(cloneInit.Containers)+len(cr.Spec.ExtraInitContainers))
+	totalInits := len(cloneInit.Containers) + len(cr.Spec.ExtraInitContainers)
+	if cr.Spec.GetSessionType() == SessionTypeNonInteractive {
+		totalInits += len(auth.Containers)
+	}
+	initContainers := make([]v1.Container, 0, totalInits)
 	initContainers = append(initContainers, cloneInit.Containers...)
 	initContainers = append(initContainers, cr.Spec.ExtraInitContainers...)
+	if cr.Spec.GetSessionType() == SessionTypeNonInteractive {
+		always := v1.ContainerRestartPolicyAlways
+		for i := range auth.Containers {
+			auth.Containers[i].RestartPolicy = &always
+		}
+		initContainers = append(initContainers, auth.Containers...)
+	}
 
 	// Create the main session container
 	sessionContainer := cr.sessionContainer(volumeMounts, cfg)
 
-	totalContainers := 1 + len(auth.Containers) + len(cr.Spec.ExtraContainers)
+	totalContainers := 1 + len(cr.Spec.ExtraContainers)
+	if cr.Spec.GetSessionType() == SessionTypeInteractive {
+		totalContainers += len(auth.Containers)
+	}
 	if cr.Spec.SessionLocation == Remote {
 		totalContainers += 1
 	}
 	containers := make([]v1.Container, 0, totalContainers)
 	containers = append(containers, sessionContainer)
-	containers = append(containers, auth.Containers...)
+	if cr.Spec.GetSessionType() == SessionTypeInteractive {
+		containers = append(containers, auth.Containers...)
+	}
 	if cr.Spec.SessionLocation == Remote {
 		containers = append(containers, cr.tunnelContainer())
 	}
