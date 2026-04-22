@@ -12,17 +12,10 @@ import (
 func IsNotExpired(expiresAt time.Time, margin time.Duration, required bool) bool {
 	now := time.Now()
 	deadline := now.Add(margin)
-
-	result := false
 	if expiresAt.IsZero() {
-		result = !required
-	} else {
-		result = expiresAt.After(deadline)
+		return !required
 	}
-
-	slog.Info("IsNotExpired", "result", result, "expiresAt", expiresAt.String(), "now", now.String(), "margin", margin.String(), "deadline", deadline.String(), "required", required)
-
-	return result
+	return deadline.Before(expiresAt)
 }
 
 // VerifyExpiresAtClaim returns true is the expiry (claims.GetExpirationTime()) is still in the future, with a given margin.
