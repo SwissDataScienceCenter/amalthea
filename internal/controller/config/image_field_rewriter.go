@@ -25,6 +25,9 @@ func GetImageFieldRewriter() (rewriter ImageFieldRewriter, err error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(rules) == 0 {
+		return nil, nil
+	}
 	return &ruleBasedRewriter{rules}, nil
 }
 
