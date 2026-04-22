@@ -82,10 +82,11 @@ func New(c *config.GitProxyConfig) *TokenStore {
 func (s *TokenStore) GetGitAccessToken(provider string, encode bool) (string, error) {
 	s.gitAccessTokensLock.RLock()
 	tokenSet, accessTokenExists := s.gitAccessTokens[provider]
-	accessTokenExpiresAt := tokenSet.ExpiresAt
+	accessTokenExpiresAt := time.Unix(tokenSet.ExpiresAt, 0).UTC()
 	s.gitAccessTokensLock.RUnlock()
 
-	if !accessTokenExists || (0 < accessTokenExpiresAt && accessTokenExpiresAt < time.Now().Add(s.ExpirationLeeway).Unix()) {
+	// if !accessTokenExists || (0 < accessTokenExpiresAt && accessTokenExpiresAt < time.Now().Add(s.ExpirationLeeway).Unix()) {
+	if !accessTokenExists || !utils.IsNotExpired(accessTokenExpiresAt, s.ExpirationLeeway, false) {
 		log.Printf("Getting a fresh token for git provider: %s", provider)
 		if err := s.refreshGitAccessToken(provider); err != nil {
 			return "", err
