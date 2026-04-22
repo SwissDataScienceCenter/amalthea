@@ -220,16 +220,9 @@ func (a *RenkuAuth) getRenkuAccessToken(ctx context.Context) (token string, err 
 	expiresAt := a.renkuAccessTokenExpiresAt
 	a.renkuAccessTokenLock.RUnlock()
 
-	// leeway := 10 * time.Second
-	// deadline := time.Now().Add(-leeway)
-
 	// Return the current token if it is still valid
-	// if token != "" && (expiresAt.IsZero() || expiresAt.After(deadline)) {
 	if token != "" && (utils.IsNotExpired(expiresAt, 10*time.Second, false)) {
-		log.Printf("renku access token valid, expiresAt = %s\n", expiresAt.String())
 		return token, nil
-	} else {
-		log.Printf("renku access token expired, expiresAt = %s\n", expiresAt.String())
 	}
 
 	// Refresh the token
@@ -317,12 +310,9 @@ type renkuTokenRefreshResponse struct {
 func (a *RenkuAuth) periodicTokenRefresh() {
 	for {
 		<-a.refreshTicker.C
-		// Debug
-		log.Println("tick periodicTokenRefresh()")
 		a.renkuAccessTokenLock.RLock()
 		renkuRefreshToken := a.renkuRefreshToken
 		a.renkuAccessTokenLock.RUnlock()
-		// refreshTokenIsExpired, err := a.isJWTExpired(renkuRefreshToken)
 		refreshTokenIsValid, err := utils.VerifyJWTExpiresAt(renkuRefreshToken, 4*time.Minute, false)
 		if err != nil {
 			log.Printf("Could not check if renku refresh token is expired: %s\n", err.Error())
@@ -338,45 +328,3 @@ func (a *RenkuAuth) periodicTokenRefresh() {
 		}
 	}
 }
-
-// // Checks if the expiry of the token has passed or is coming up soon based on a predefined threshold.
-// // NOTE: no signature validation is performed at all. All of the tokens in the proxy are trusted implicitly
-// // because they come from trusted/controlled sources.
-// func (a *RenkuAuth) isJWTExpired(token string) (bool, error) {
-// 	parser := jwt.NewParser()
-// 	claims := jwt.RegisteredClaims{}
-// 	if _, _, err := parser.ParseUnverified(token, &claims); err != nil {
-// 		log.Printf("Cannot parse token claims, assuming token is expired: %s\n", err.Error())
-// 		return true, err
-// 	}
-
-// 	jwtIsNotExpired, err := verifyExpiresAt(claims, time.Duration(4*60)*time.Second)
-// 	if err != nil {
-// 		return true, err
-// 	}
-
-// 	return !jwtIsNotExpired, err
-// }
-
-// // VerifyExpiresAt implements the same logic as can be found in jwt v4 but
-// // in the style of v5.
-// //
-// // Main difference is that the exp nil check is hard coded to false.
-// //
-// // v4 implementation boils down to comparing the value passed to the expiration time.
-// // v5 changed that: "now" is compared to the expiration time with leeway added.
-// func verifyExpiresAt(claims jwt.RegisteredClaims, leeway time.Duration) (bool, error) {
-// 	exp, err := claims.GetExpirationTime()
-// 	if err != nil {
-// 		return true, err
-// 	}
-
-// 	// Here we have it setup so that if the exp claim is not defined we assume the token is not expired.
-// 	// Keycloak does not set the `exp` claim on tokens that have the offline access grant - because they do not expire.
-// 	if exp == nil {
-// 		return false, nil
-// 	}
-
-// 	cmp := time.Now().Add(leeway)
-// 	return cmp.Before(exp.Time), nil
-// }

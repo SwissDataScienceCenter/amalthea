@@ -67,11 +67,6 @@ func New(c *config.GitProxyConfig) *TokenStore {
 		gitAccessTokensLock:  &sync.RWMutex{},
 	}
 
-	// Debug
-	log.Printf("RenkuAuthenticationVersion = %s\n", store.Config.RenkuAuthenticationVersion)
-	log.Printf("RenkuTokenURL = %s\n", store.Config.RenkuTokenURL)
-	log.Printf("RefreshCheckPeriodSeconds = %d\n", store.Config.RefreshCheckPeriodSeconds)
-
 	// Start a go routine to keep the refresh token valid
 	go store.periodicTokenRefresh()
 	return &store
@@ -85,7 +80,6 @@ func (s *TokenStore) GetGitAccessToken(provider string, encode bool) (string, er
 	accessTokenExpiresAt := time.Unix(tokenSet.ExpiresAt, 0).UTC()
 	s.gitAccessTokensLock.RUnlock()
 
-	// if !accessTokenExists || (0 < accessTokenExpiresAt && accessTokenExpiresAt < time.Now().Add(s.ExpirationLeeway).Unix()) {
 	if !accessTokenExists || !utils.IsNotExpired(accessTokenExpiresAt, s.ExpirationLeeway, false) {
 		log.Printf("Getting a fresh token for git provider: %s", provider)
 		if err := s.refreshGitAccessToken(provider); err != nil {
@@ -155,7 +149,6 @@ func (s *TokenStore) refreshGitAccessToken(provider string) error {
 
 // Returns a valid renku access token. If the token is expired, the token will be refreshed first.
 func (s *TokenStore) getValidRenkuAccessToken() (string, error) {
-	// isExpired, err := s.isJWTExpired(s.getRenkuAccessToken())
 	isValid, err := utils.VerifyJWTExpiresAt(s.getRenkuAccessToken(), s.ExpirationLeeway, false)
 
 	if err != nil {
@@ -174,48 +167,6 @@ func (s *TokenStore) getRenkuAccessToken() string {
 	defer s.renkuAccessTokenLock.RUnlock()
 	return s.renkuAccessToken
 }
-
-// // VerifyExpiresAt implements the same logic as can be found in jwt v4 but
-// // in the style of v5.
-// //
-// // Main difference is that the exp nil check is hard coded to false.
-// //
-// // v4 implementation boils down to comparing the value passed to the expiration time.
-// // v5 changed that: "now" is compared to the expiration time with leeway added.
-// func VerifyExpiresAt(claims jwt.RegisteredClaims, leeway time.Duration) (bool, error) {
-// 	exp, err := claims.GetExpirationTime()
-// 	if err != nil {
-// 		return true, err
-// 	}
-
-// 	// Here we have it setup so that if the exp claim is not defined we assume the token is not expired.
-// 	// Keycloak does not set the `exp` claim on tokens that have the offline access grant - because they do not expire.
-// 	if exp == nil {
-// 		return false, nil
-// 	}
-
-// 	cmp := time.Now().Add(leeway)
-// 	return cmp.Before(exp.Time), nil
-// }
-
-// // Checks if the expiry of the token has passed or is coming up soon based on a predefined threshold.
-// // NOTE: no signature validation is performed at all. All of the tokens in the proxy are trusted implicitly
-// // because they come from trusted/controlled sources.
-// func (s *TokenStore) isJWTExpired(token string) (bool, error) {
-// 	parser := jwt.NewParser()
-// 	claims := jwt.RegisteredClaims{}
-// 	if _, _, err := parser.ParseUnverified(token, &claims); err != nil {
-// 		log.Printf("Cannot parse token claims, assuming token is expired: %s\n", err.Error())
-// 		return true, err
-// 	}
-
-// 	jwtIsNotExpired, err := VerifyExpiresAt(claims, s.ExpirationLeeway)
-// 	if err != nil {
-// 		return true, err
-// 	}
-
-// 	return !jwtIsNotExpired, err
-// }
 
 type renkuTokenRefreshResponse struct {
 	AccessToken  string `json:"access_token"`
@@ -297,12 +248,9 @@ func (s *TokenStore) refreshRenkuAccessTokenV2() error {
 func (s *TokenStore) periodicTokenRefresh() {
 	for {
 		<-s.refreshTicker.C
-		// Debug
-		log.Println("tick periodicTokenRefresh()")
 		s.renkuAccessTokenLock.RLock()
 		renkuRefreshToken := s.renkuRefreshToken
 		s.renkuAccessTokenLock.RUnlock()
-		// refreshTokenIsExpired, err := s.isJWTExpired(renkuRefreshToken)
 		refreshTokenIsValid, err := utils.VerifyJWTExpiresAt(renkuRefreshToken, s.ExpirationLeeway, false)
 		if err != nil {
 			log.Printf("Could not check if renku refresh token is expired: %s\n", err.Error())
