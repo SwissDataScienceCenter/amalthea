@@ -11,7 +11,7 @@ import (
 // When expiresAt is zero, returns !required.
 func IsNotExpired(expiresAt time.Time, margin time.Duration, required bool) bool {
 	now := time.Now()
-	deadline := now.Add(-margin)
+	deadline := now.Add(margin)
 
 	result := false
 	if expiresAt.IsZero() {
