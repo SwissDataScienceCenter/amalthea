@@ -487,18 +487,7 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 }
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
-	switch cr.Spec.SessionType {
-	case SessionTypeInteractive:
-		pod := v1.Pod{}
-		podName := cr.PodName()
-		key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
-		err := clnt.Get(ctx, key, &pod)
-		if err != nil {
-			return nil, err
-		}
-		return &pod, err
-
-	case SessionTypeNonInteractive:
+	if cr.Spec.SessionType == SessionTypeNonInteractive {
 		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
 		podList := &v1.PodList{}
 		listOpts := &client.ListOptions{Namespace: cr.Namespace, LabelSelector: selector}
@@ -509,8 +498,15 @@ func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.
 			return &podList.Items[0], nil
 		}
 		return nil, nil
-	default:
-		return nil, nil
+	} else {
+		pod := v1.Pod{}
+		podName := cr.PodName()
+		key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
+		err := clnt.Get(ctx, key, &pod)
+		if err != nil {
+			return nil, err
+		}
+		return &pod, err
 	}
 }
 
