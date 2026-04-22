@@ -9,7 +9,7 @@ type AmaltheaSessionConfiguration struct {
 	ImageFieldRewriter ImageFieldRewriter
 }
 
-// GetImageRewriter loads the configuration
+// GetAmaltheaSessionConfiguration loads the configuration
 func GetAmaltheaSessionConfiguration(config *rest.Config) (cfg AmaltheaSessionConfiguration, err error) {
 	clusterType, err := DetectClusterType(config)
 	if err != nil {

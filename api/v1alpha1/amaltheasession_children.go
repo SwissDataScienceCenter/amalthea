@@ -755,7 +755,7 @@ func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, 
 	session := cr.Spec.Session
 	// Rewrite image if no pull secrets are configured
 	image := session.Image
-	if len(cr.Spec.ImagePullSecrets) == 0 && config.ImageRewriter != nil {
+	if len(cr.Spec.ImagePullSecrets) == 0 && config.ImageFieldRewriter != nil {
 		newImage, err := config.ImageFieldRewriter.Rewrite(image)
 		if err != nil {
 			log.Log.Error(
