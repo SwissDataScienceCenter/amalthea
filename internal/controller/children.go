@@ -492,7 +492,7 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	}
 	jobReady := false
 	if c.Job.Manifest != nil {
-		jobReady = c.Job.Manifest.Status.Ready != nil && *c.Job.Manifest.Status.Ready == 1
+		jobReady = (c.Job.Manifest.Status.Ready != nil && *c.Job.Manifest.Status.Ready == 1) || c.Job.Manifest.Status.Active == 1
 	}
 	podExists := pod != nil
 	podReady := podExists && podIsReady(pod)
