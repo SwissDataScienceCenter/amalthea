@@ -26,6 +26,7 @@ import (
 	"time"
 
 	sharedAuth "github.com/SwissDataScienceCenter/amalthea/internal/remote/auth/shared"
+	"github.com/SwissDataScienceCenter/amalthea/internal/utils"
 )
 
 // RunaiClientCredentialsAuth implements the "Client Credentials Grant"
@@ -99,11 +100,12 @@ func (a *RunaiClientCredentialsAuth) GetAccessToken(ctx context.Context) (token 
 	expiresAt := a.accessTokenExpiresAt
 	a.accessTokenLock.RUnlock()
 
-	leeway := 10 * time.Second
-	deadline := time.Now().Add(-leeway)
+	// leeway := 10 * time.Second
+	// deadline := time.Now().Add(-leeway)
 
 	// Return the current token if it is still valid
-	if token != "" && (expiresAt.IsZero() || expiresAt.After(deadline)) {
+	// if token != "" && (expiresAt.IsZero() || expiresAt.After(deadline)) {
+	if token != "" && (utils.IsNotExpired(expiresAt, 10*time.Second, false)) {
 		return token, nil
 	}
 
@@ -122,11 +124,12 @@ func (a *RunaiClientCredentialsAuth) refreshAccessToken(ctx context.Context) (to
 	// Re-check if another goroutine has already refreshed the token
 	token = a.accessToken
 	expiresAt := a.accessTokenExpiresAt
-	leeway := 10 * time.Second
-	deadline := time.Now().Add(-leeway)
+	// leeway := 10 * time.Second
+	// deadline := time.Now().Add(-leeway)
 
 	// Return the current token if it is still valid
-	if token != "" && (expiresAt.IsZero() || expiresAt.After(deadline)) {
+	// if token != "" && (expiresAt.IsZero() || expiresAt.After(deadline)) {
+	if token != "" && (utils.IsNotExpired(expiresAt, 10*time.Second, false)) {
 		return token, nil
 	}
 

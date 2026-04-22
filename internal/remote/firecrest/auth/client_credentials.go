@@ -24,6 +24,7 @@ import (
 	"time"
 
 	sharedAuth "github.com/SwissDataScienceCenter/amalthea/internal/remote/auth/shared"
+	"github.com/SwissDataScienceCenter/amalthea/internal/utils"
 )
 
 // FirecrestClientCredentialsAuth implements the "Client Credentials Grant"
@@ -97,11 +98,12 @@ func (a *FirecrestClientCredentialsAuth) GetAccessToken(ctx context.Context) (to
 	expiresAt := a.accessTokenExpiresAt
 	a.accessTokenLock.RUnlock()
 
-	leeway := 10 * time.Second
-	deadline := time.Now().Add(leeway)
+	// leeway := 10 * time.Second
+	// deadline := time.Now().Add(leeway)
 
 	// Return the current token if it is still valid
-	if token != "" && (expiresAt.IsZero() || expiresAt.After(deadline)) {
+	// if token != "" && (expiresAt.IsZero() || expiresAt.After(deadline)) {
+	if token != "" && (utils.IsNotExpired(expiresAt, 10*time.Second, false)) {
 		return token, nil
 	}
 
