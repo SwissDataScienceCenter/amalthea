@@ -5,7 +5,7 @@ import (
 )
 
 type AmaltheaSessionConfiguration struct {
-	ClusterType   ClusterType
+	ClusterType        ClusterType
 	ImageFieldRewriter ImageFieldRewriter
 }
 
