@@ -66,7 +66,6 @@ func New(c *config.GitProxyConfig) *TokenStore {
 		gitAccessTokens:      make(map[string]TokenSet, len(c.Providers)),
 		gitAccessTokensLock:  &sync.RWMutex{},
 	}
-
 	// Start a go routine to keep the refresh token valid
 	go store.periodicTokenRefresh()
 	return &store
