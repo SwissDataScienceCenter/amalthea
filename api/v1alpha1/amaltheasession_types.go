@@ -159,6 +159,14 @@ type AmaltheaSessionSpec struct {
 	SessionType SessionType `json:"sessionType,omitempty"`
 }
 
+// Return the sessionType or - if empty - the default SessionTypeInteractive.
+func (c *AmaltheaSessionSpec) GetSessionType() SessionType {
+	if c.SessionType == "" {
+		return SessionTypeInteractive
+	}
+	return c.SessionType
+}
+
 type Session struct {
 	Image string `json:"image"`
 	// +optional

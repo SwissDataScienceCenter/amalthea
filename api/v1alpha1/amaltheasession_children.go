@@ -465,7 +465,7 @@ func NewConditions() []AmaltheaSessionCondition {
 }
 
 func (cr *AmaltheaSession) NeedsDeletion() bool {
-	switch cr.Spec.SessionType {
+	switch cr.Spec.GetSessionType() {
 	case SessionTypeNonInteractive:
 		// delete if session is a job and it has been completed for longer than maxHibernatedDuration
 		doneSince := cr.Status.IdleSince
@@ -487,7 +487,7 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 }
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
-	if cr.Spec.SessionType == SessionTypeNonInteractive {
+	if cr.Spec.GetSessionType() == SessionTypeNonInteractive {
 		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
 		podList := &v1.PodList{}
 		listOpts := &client.ListOptions{Namespace: cr.Namespace, LabelSelector: selector}

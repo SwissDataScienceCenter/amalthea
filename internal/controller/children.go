@@ -375,15 +375,14 @@ func (e *SessionTypeError) Error() string {
 }
 
 func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.AmaltheaSessionConfiguration) (ChildResources, error) {
-	switch cr.Spec.SessionType {
+	switch cr.Spec.GetSessionType() {
 	case amaltheadevv1alpha1.SessionTypeInteractive:
 		return NewInteractiveChildResources(cr, cfg)
 	case amaltheadevv1alpha1.SessionTypeNonInteractive:
 		return NewNonInteractiveChildResources(cr, cfg)
-	case "":
+	default:
 		return NewInteractiveChildResources(cr, cfg)
 	}
-	return ChildResources{}, &SessionTypeError{SessionType: cr.Spec.SessionType}
 }
 
 func NewNonInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.AmaltheaSessionConfiguration) (ChildResources, error) {
