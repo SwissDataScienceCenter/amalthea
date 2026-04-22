@@ -487,17 +487,17 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	// onlyStatusUpdates := c.AllEqual(controllerutil.OperationResultUpdatedStatusOnly)
 	// noUpdates := c.AllEqual(controllerutil.OperationResultNone)
 
-	//stsReady := c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
 	stsReady := false
 	if c.StatefulSet.Manifest != nil {
 		stsReady = c.StatefulSet.Manifest.Status.ReadyReplicas == 1 && c.StatefulSet.Manifest.Status.Replicas == 1
 	}
+	jobReady := false
 	if c.Job.Manifest != nil {
-		stsReady = c.Job.Manifest.Status.Ready != nil && *c.Job.Manifest.Status.Ready == 1
+		jobReady = c.Job.Manifest.Status.Ready != nil && *c.Job.Manifest.Status.Ready == 1
 	}
 	podExists := pod != nil
 	podReady := podExists && podIsReady(pod)
-	return stsReady && podReady
+	return (stsReady || jobReady) && podReady
 }
 
 func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
