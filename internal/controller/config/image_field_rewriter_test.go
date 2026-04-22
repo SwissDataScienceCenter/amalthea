@@ -64,7 +64,7 @@ func TestRuleBasedRewriter(t *testing.T) {
 		{input: "example.orgu/repo/image", output: "example.orgu/repo/image"},
 	}
 
-	var rewriter ImageRewriter = &ruleBasedRewriter{
+	var rewriter ImageFieldRewriter = &ruleBasedRewriter{
 		rules: []imageRewriteRule{
 			{
 				SourcePrefix: "docker.io",

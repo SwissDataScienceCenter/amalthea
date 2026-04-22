@@ -6,7 +6,7 @@ import (
 
 type AmaltheaSessionConfiguration struct {
 	ClusterType   ClusterType
-	ImageRewriter ImageRewriter
+	ImageRewriter ImageFieldRewriter
 }
 
 // GetImageRewriter loads the configuration
@@ -15,7 +15,7 @@ func GetAmaltheaSessionConfiguration(config *rest.Config) (cfg AmaltheaSessionCo
 	if err != nil {
 		return AmaltheaSessionConfiguration{}, err
 	}
-	imageRewriter, err := GetImageRewriter()
+	imageRewriter, err := GetImageFieldRewriter()
 	if err != nil {
 		return AmaltheaSessionConfiguration{}, err
 	}

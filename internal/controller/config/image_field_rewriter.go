@@ -9,14 +9,14 @@ import (
 	"github.com/distribution/reference"
 )
 
-// ImageRewriter rewrites container image references
-type ImageRewriter interface {
-	// Rewrite returns a new container image reference
+// ImageFieldRewriter rewrites the "image" field for sessions
+type ImageFieldRewriter interface {
+	// Rewrite returns a new value for the "image" field
 	Rewrite(image string) (newImage string, err error)
 }
 
-// GetImageRewriter returns the image rewriter configured by the env var "AMALTHEA_IMAGE_REWRITE_RULES"
-func GetImageRewriter() (rewriter ImageRewriter, err error) {
+// GetImageFieldRewriter returns the image rewriter configured by the env var "AMALTHEA_IMAGE_REWRITE_RULES"
+func GetImageFieldRewriter() (rewriter ImageFieldRewriter, err error) {
 	rulesStr := os.Getenv("AMALTHEA_IMAGE_REWRITE_RULES")
 	if rulesStr == "" {
 		return nil, nil
