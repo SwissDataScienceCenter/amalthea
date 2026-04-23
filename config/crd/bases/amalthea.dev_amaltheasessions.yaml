@@ -6451,11 +6451,18 @@ spec:
                 - image
                 type: object
               sessionType:
+                default: Interactive
                 description: |-
                   The session type, it is "Interactive" by default, but can be set to "NonInteractive". Non-interactive
                   sessions are handled differently in that the main process is expected to be run-once and once it
                   terminates, the resources are cleaned up.
+                enum:
+                - Interactive
+                - NonInteractive
                 type: string
+                x-kubernetes-validations:
+                - message: sesion type is immutable
+                  rule: self == oldSelf
               template:
                 description: Template for the fields that should be added to all children
                   (and their children if applicable).

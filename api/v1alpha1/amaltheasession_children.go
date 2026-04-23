@@ -120,13 +120,13 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	volumeMounts = append(volumeMounts, dsVolMounts...)
 
 	totalInits := len(cloneInit.Containers) + len(cr.Spec.ExtraInitContainers)
-	if cr.Spec.GetSessionType() == SessionTypeNonInteractive {
+	if cr.Spec.SessionType == SessionTypeNonInteractive {
 		totalInits += len(auth.Containers)
 	}
 	initContainers := make([]v1.Container, 0, totalInits)
 	initContainers = append(initContainers, cloneInit.Containers...)
 	initContainers = append(initContainers, cr.Spec.ExtraInitContainers...)
-	if cr.Spec.GetSessionType() == SessionTypeNonInteractive {
+	if cr.Spec.SessionType == SessionTypeNonInteractive {
 		always := v1.ContainerRestartPolicyAlways
 		for i := range auth.Containers {
 			auth.Containers[i].RestartPolicy = &always
@@ -138,7 +138,7 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	sessionContainer := cr.sessionContainer(volumeMounts, cfg)
 
 	totalContainers := 1 + len(cr.Spec.ExtraContainers)
-	if cr.Spec.GetSessionType() == SessionTypeInteractive {
+	if cr.Spec.SessionType == SessionTypeInteractive {
 		totalContainers += len(auth.Containers)
 	}
 	if cr.Spec.SessionLocation == Remote {
@@ -146,7 +146,7 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	}
 	containers := make([]v1.Container, 0, totalContainers)
 	containers = append(containers, sessionContainer)
-	if cr.Spec.GetSessionType() == SessionTypeInteractive {
+	if cr.Spec.SessionType == SessionTypeInteractive {
 		containers = append(containers, auth.Containers...)
 	}
 	if cr.Spec.SessionLocation == Remote {
@@ -188,9 +188,6 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 
 	pod.RestartPolicy = v1.RestartPolicyNever
 
-	parallel := int32(1)
-	zero := int32(0)
-
 	// use MaxAge (amount of time until a session gets terminated) to set maximum job runtime
 	var activeTTL *int64
 	if cr.Spec.Culling.MaxAge.Seconds() > 0 {
@@ -214,9 +211,9 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: batchv1.JobSpec{
-			Parallelism:             &parallel,
-			Completions:             &parallel,
-			BackoffLimit:            &zero,
+			Parallelism:             ptr.To(int32(1)),
+			Completions:             ptr.To(int32(1)),
+			BackoffLimit:            ptr.To(int32(0)),
 			ActiveDeadlineSeconds:   activeTTL,
 			TTLSecondsAfterFinished: ttlFinish,
 			Suspend:                 &cr.Spec.Hibernated,
@@ -481,7 +478,7 @@ func NewConditions() []AmaltheaSessionCondition {
 }
 
 func (cr *AmaltheaSession) NeedsDeletion() bool {
-	switch cr.Spec.GetSessionType() {
+	switch cr.Spec.SessionType {
 	case SessionTypeNonInteractive:
 		// delete if session is a job and it has been completed for longer than maxHibernatedDuration
 		doneSince := cr.Status.IdleSince
@@ -503,7 +500,7 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 }
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
-	if cr.Spec.GetSessionType() == SessionTypeNonInteractive {
+	if cr.Spec.SessionType == SessionTypeNonInteractive {
 		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
 		podList := &v1.PodList{}
 		listOpts := &client.ListOptions{Namespace: cr.Namespace, LabelSelector: selector}
