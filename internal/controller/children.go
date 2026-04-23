@@ -346,8 +346,6 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
 				current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
 				current.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
-				// current.Spec.Selector = desired.Spec.Selector
-				// current.Spec.Template.Labels = desired.Spec.Template.Labels
 				current.Labels = desired.Labels
 				current.Annotations = desired.Annotations
 				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
