@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -507,7 +508,11 @@ func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.
 		if err := clnt.List(ctx, podList, listOpts); err != nil {
 			return nil, err
 		}
-		if len(podList.Items) > 0 {
+		itemLength := len(podList.Items)
+		if itemLength > 1 {
+			return nil, errors.New("more than one pod found for job")
+		}
+		if itemLength > 0 {
 			return &podList.Items[0], nil
 		}
 		return nil, nil
