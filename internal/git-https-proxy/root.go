@@ -92,11 +92,11 @@ func gitproxy(cmd *cobra.Command, args []string) error {
 	cmd.Println("SIGTERM received. Shutting down servers.")
 	err = healthServer.Shutdown(ctx)
 	if err != nil {
-		return err
+		log.Println("Graceful shutdown healthserver with errors:", err)
 	}
 	err = proxyServer.Shutdown(ctx)
 	if err != nil {
-		return err
+		log.Println("Graceful shutdown proxyserver with errors:", err)
 	}
 
 	return nil
