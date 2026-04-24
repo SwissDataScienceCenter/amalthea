@@ -3,6 +3,8 @@ run:
   allow-parallel-runners: true
 linters:
   default: none
+  disable:
+    - prealloc
   enable:
     - dupl
     - errcheck

@@ -132,7 +132,8 @@ type AmaltheaSessionSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="sesion type is immutable"
 	// The session type, it is "Interactive" by default, but can be set to "NonInteractive". Non-interactive
 	// sessions are handled differently in that the main process is expected to be run-once and once it
-	// terminates, the resources are cleaned up.
+	// terminates, the resources are cleaned up. Non-interactive sessions are implemented as jobs and won't
+	// have ingress or authentication enabled.
 	SessionType SessionType `json:"sessionType,omitempty"`
 }
 
@@ -345,10 +346,13 @@ type Culling struct {
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	MaxFailedDuration metav1.Duration `json:"maxFailedDuration,omitempty"`
+
 	// +kubebuilder:validation:Format:=duration
 	// How long can a session be in hibernated state before
-	// it gets completely deleted. A value of zero indicates that hibernated servers or jobs
-	// will not be automatically be deleted by Amalthea after a period of time.
+	// it gets completely deleted. Or how long a Non-Interactive session
+	// will be kept around once it has completed.
+	// A value of zero indicates that hibernated servers or jobs
+	// will not be automatically deleted by Amalthea after a period of time.
 	// Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
 	// valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	MaxHibernatedDuration metav1.Duration `json:"maxHibernatedDuration,omitempty"`

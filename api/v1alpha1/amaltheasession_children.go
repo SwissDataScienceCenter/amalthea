@@ -102,54 +102,41 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	_, dsVols, dsVolMounts := cr.DataSources()
 	cloneInit := cr.cloneInit()
 	sessionVols, sessionMounts := cr.SessionVolumes()
+	isNonInteractive := cr.Spec.SessionType == SessionTypeNonInteractive
+	isInteractive := !isNonInteractive
 
-	auth, err := cr.auth()
-	if err != nil {
-		return nil, err
+	var auth = manifests{}
+	// auth containers are only for interactive sessions
+	if isInteractive {
+		var err error
+		auth, err = cr.auth()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	volumes := make([]v1.Volume, 0, len(sessionVols)+len(cloneInit.Volumes)+len(cr.Spec.ExtraVolumes)+len(dsVols)+len(auth.Volumes))
+	volumes := []v1.Volume{}
 	volumes = append(volumes, sessionVols...)
 	volumes = append(volumes, cloneInit.Volumes...)
 	volumes = append(volumes, cr.Spec.ExtraVolumes...)
 	volumes = append(volumes, dsVols...)
 	volumes = append(volumes, auth.Volumes...)
 
-	volumeMounts := make([]v1.VolumeMount, 0, len(sessionMounts)+len(cr.Spec.Session.ExtraVolumeMounts)+len(dsVolMounts))
+	volumeMounts := []v1.VolumeMount{}
 	volumeMounts = append(volumeMounts, sessionMounts...)
 	volumeMounts = append(volumeMounts, cr.Spec.Session.ExtraVolumeMounts...)
 	volumeMounts = append(volumeMounts, dsVolMounts...)
 
-	totalInits := len(cloneInit.Containers) + len(cr.Spec.ExtraInitContainers)
-	if cr.Spec.SessionType == SessionTypeNonInteractive {
-		totalInits += len(auth.Containers)
-	}
-	initContainers := make([]v1.Container, 0, totalInits)
+	initContainers := []v1.Container{}
 	initContainers = append(initContainers, cloneInit.Containers...)
 	initContainers = append(initContainers, cr.Spec.ExtraInitContainers...)
-	if cr.Spec.SessionType == SessionTypeNonInteractive {
-		always := v1.ContainerRestartPolicyAlways
-		for i := range auth.Containers {
-			auth.Containers[i].RestartPolicy = &always
-		}
-		initContainers = append(initContainers, auth.Containers...)
-	}
 
 	// Create the main session container
 	sessionContainer := cr.sessionContainer(volumeMounts, cfg)
 
-	totalContainers := 1 + len(cr.Spec.ExtraContainers)
-	if cr.Spec.SessionType == SessionTypeInteractive {
-		totalContainers += len(auth.Containers)
-	}
-	if cr.Spec.SessionLocation == Remote {
-		totalContainers += 1
-	}
-	containers := make([]v1.Container, 0, totalContainers)
+	containers := []v1.Container{}
 	containers = append(containers, sessionContainer)
-	if cr.Spec.SessionType == SessionTypeInteractive {
-		containers = append(containers, auth.Containers...)
-	}
+	containers = append(containers, auth.Containers...)
 	if cr.Spec.SessionLocation == Remote {
 		containers = append(containers, cr.tunnelContainer())
 	}
