@@ -36,10 +36,7 @@ func (c *Cloner) proxyURL() string {
 func (c *Cloner) execute(repository Repository) error {
 	log.Println("Checking if the repo already exists.")
 	if repository.Exists() {
-		err := c.setupProxy(repository)
-		if err != nil {
-			return err
-		}
+		return c.setupProxy(repository)
 	}
 
 	gitUser := "oauth2"

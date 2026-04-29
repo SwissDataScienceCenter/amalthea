@@ -74,11 +74,12 @@ func (r *Repository) DefaultBranch(remoteName string) (string, error) {
 		return "", err
 	}
 	rx := regexp.MustCompile(fmt.Sprintf(`refs/remotes/%v/(?P<branch>.*)`, remoteName))
-	branch := rx.FindString(ref)
-
-	if branch == "" {
-		return "", fmt.Errorf("branch does not exist")
+	match := rx.FindStringSubmatch(ref)
+	if match == nil {
+		// TODO: is this correct? check with an empty git repository
+		return "", fmt.Errorf("default branch does not exist")
 	}
+	branch := match[1]
 	log.Println("Default branch is", branch)
 	return branch, nil
 }
