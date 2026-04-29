@@ -485,20 +485,24 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 }
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
+	log := log.FromContext(ctx)
 	if cr.Spec.SessionType.IsNonInteractive() {
 		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
 		podList := &v1.PodList{}
 		listOpts := &client.ListOptions{Namespace: cr.Namespace, LabelSelector: selector}
 		if err := clnt.List(ctx, podList, listOpts); err != nil {
+			log.Info("cannot list pods for batch job", "job-name", cr.JobName(), "error", err)
 			return nil, err
 		}
 		itemLength := len(podList.Items)
 		if itemLength > 1 {
+			log.Info("Too many pods returned for batch job", "job-name", cr.JobName(), "num_pods", itemLength)
 			return nil, errors.New("more than one pod found for job")
 		}
 		if itemLength > 0 {
 			return &podList.Items[0], nil
 		}
+		log.Info("No pod found for batch job", "job-name", cr.JobName())
 		return nil, nil
 	} else {
 		pod := v1.Pod{}
