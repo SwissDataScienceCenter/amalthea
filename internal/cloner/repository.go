@@ -67,7 +67,9 @@ func (r *Repository) Exists() bool {
 func (r *Repository) DefaultBranch(remoteName string) (string, error) {
 	_, err := r.Cli.Remote([]string{"set-head", remoteName, "--auto"})
 	if err != nil {
-		return "", err
+		// Cannot determine remote HEAD: the repository is likely empty
+		log.Printf("Could not get remote HEAD: %s.\n", err.Error())
+		return "", nil
 	}
 	ref, err := r.Cli.SymbolicRef([]string{fmt.Sprintf("refs/remotes/%v/HEAD", remoteName)})
 	if err != nil {

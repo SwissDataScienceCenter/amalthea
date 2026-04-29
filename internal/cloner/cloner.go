@@ -19,6 +19,11 @@ type Cloner struct {
 }
 
 func (c *Cloner) Run() error {
+	globalCli := NewGitCli("")
+	_, err := globalCli.Config([]string{"--global", "init.defaultBranch", "main"})
+	if err != nil {
+		log.Printf("Could not set global init.defaultBranch config: %s\n.", err.Error())
+	}
 	for _, repository := range c.config.Repositories {
 		log.Println("Processing", repository.URL)
 		err := c.execute(repository)
@@ -206,10 +211,12 @@ func (c *Cloner) clone(repository Repository) error {
 	} else {
 		branch = *repository.Branch
 	}
-	log.Println("Checking out branch", branch)
-	_, err = repository.Cli.Checkout([]string{branch})
-	if err != nil {
-		return err
+	if branch != "" {
+		log.Println("Checking out branch", branch)
+		_, err = repository.Cli.Checkout([]string{branch})
+		if err != nil {
+			return err
+		}
 	}
 
 	if c.config.LfsAutoFetch {
