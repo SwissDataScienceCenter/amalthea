@@ -34,10 +34,11 @@ func (c *Cloner) proxyURL() string {
 }
 
 func (c *Cloner) execute(repository Repository) error {
-	log.Println("Checking if the repo already exists.")
 	if repository.Exists() {
+		log.Println("Repository exists, skipping cloning.")
 		return c.setupProxy(repository)
 	}
+	log.Println("Setting up repository.")
 
 	gitUser := "oauth2"
 	var gitAccessToken string
