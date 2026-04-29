@@ -67,18 +67,20 @@ func (r *Repository) Exists() bool {
 func (r *Repository) DefaultBranch(remoteName string) (string, error) {
 	_, err := r.Cli.Remote([]string{"set-head", remoteName, "--auto"})
 	if err != nil {
-		return "", err
+		// Cannot determine remote HEAD: the repository is likely empty
+		log.Printf("Could not get remote HEAD: %s.\n", err.Error())
+		return "", nil
 	}
 	ref, err := r.Cli.SymbolicRef([]string{fmt.Sprintf("refs/remotes/%v/HEAD", remoteName)})
 	if err != nil {
 		return "", err
 	}
 	rx := regexp.MustCompile(fmt.Sprintf(`refs/remotes/%v/(?P<branch>.*)`, remoteName))
-	branch := rx.FindString(ref)
-
-	if branch == "" {
-		return "", fmt.Errorf("branch does not exist")
+	match := rx.FindStringSubmatch(ref)
+	if match == nil {
+		return "", fmt.Errorf("default branch does not exist")
 	}
+	branch := match[1]
 	log.Println("Default branch is", branch)
 	return branch, nil
 }

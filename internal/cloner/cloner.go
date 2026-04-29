@@ -34,13 +34,11 @@ func (c *Cloner) proxyURL() string {
 }
 
 func (c *Cloner) execute(repository Repository) error {
-	log.Println("Checking if the repo already exists.")
 	if repository.Exists() {
-		err := c.setupProxy(repository)
-		if err != nil {
-			return err
-		}
+		log.Println("Repository exists, skipping cloning.")
+		return c.setupProxy(repository)
 	}
+	log.Println("Setting up repository.")
 
 	gitUser := "oauth2"
 	var gitAccessToken string
@@ -151,7 +149,7 @@ func (c *Cloner) getAccessToken(providerId string) (string, error) {
 func (c *Cloner) initializeRepository(repository Repository) error {
 	log.Println("Initializing repo")
 
-	_, err := repository.Cli.Init([]string{})
+	_, err := repository.Cli.Init([]string{"--initial-branch", "main"})
 	if err != nil {
 		return err
 	}
@@ -208,10 +206,12 @@ func (c *Cloner) clone(repository Repository) error {
 	} else {
 		branch = *repository.Branch
 	}
-	log.Println("Checking out branch", branch)
-	_, err = repository.Cli.Checkout([]string{branch})
-	if err != nil {
-		return err
+	if branch != "" {
+		log.Println("Checking out branch", branch)
+		_, err = repository.Cli.Checkout([]string{branch})
+		if err != nil {
+			return err
+		}
 	}
 
 	if c.config.LfsAutoFetch {
