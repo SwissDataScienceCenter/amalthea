@@ -102,8 +102,7 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	_, dsVols, dsVolMounts := cr.DataSources()
 	cloneInit := cr.cloneInit()
 	sessionVols, sessionMounts := cr.SessionVolumes()
-	isNonInteractive := cr.Spec.SessionType == SessionTypeNonInteractive
-	isInteractive := !isNonInteractive
+	isInteractive := cr.Spec.SessionType.IsInteractive()
 
 	var auth = manifests{}
 	// auth containers are only for interactive sessions
@@ -179,16 +178,14 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 	// use MaxAge (amount of time until a session gets terminated) to set maximum job runtime
 	var activeTTL *int64
 	if cr.Spec.Culling.MaxAge.Seconds() > 0 {
-		vv := int64(cr.Spec.Culling.MaxAge.Seconds())
-		activeTTL = &vv
+		activeTTL = ptr.To(int64(cr.Spec.Culling.MaxAge.Seconds()))
 	}
 
 	// use MaxHibernatedDuration (amount of time until a hibernated session is deleted) to set the time
 	// after which the job is removed after it has completed
 	var ttlFinish *int32
 	if cr.Spec.Culling.MaxHibernatedDuration.Seconds() > 0 {
-		vv := int32(cr.Spec.Culling.MaxHibernatedDuration.Seconds())
-		ttlFinish = &vv
+		ttlFinish = ptr.To(int32(cr.Spec.Culling.MaxHibernatedDuration.Seconds()))
 	}
 
 	job := batchv1.Job{
@@ -488,7 +485,7 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 }
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
-	if cr.Spec.SessionType == SessionTypeNonInteractive {
+	if cr.Spec.SessionType.IsNonInteractive() {
 		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
 		podList := &v1.PodList{}
 		listOpts := &client.ListOptions{Namespace: cr.Namespace, LabelSelector: selector}

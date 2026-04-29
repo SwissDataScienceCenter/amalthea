@@ -350,7 +350,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Annotations = desired.Annotations
 				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
 			default:
-				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile batchjob with unknown stategy %s", strategy)
 			}
 			return nil
 		})
@@ -762,7 +762,7 @@ func (c ChildResourceUpdates) Status(
 		if state == amaltheadevv1alpha1.Running && oldEnough {
 			idleSince, idle = getIdleState(ctx, r, cr)
 		}
-		if cr.Spec.SessionType == amaltheadevv1alpha1.SessionTypeNonInteractive {
+		if cr.Spec.SessionType.IsNonInteractive() {
 			if (state == amaltheadevv1alpha1.Succeeded || state == amaltheadevv1alpha1.Failed) && idleSince.IsZero() {
 				// set idle time when containers exited
 				idleSince = metav1.NewTime(time.Now())
