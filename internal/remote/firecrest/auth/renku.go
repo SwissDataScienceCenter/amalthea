@@ -18,12 +18,18 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
 	sharedAuth "github.com/SwissDataScienceCenter/amalthea/internal/remote/auth/shared"
+	"github.com/SwissDataScienceCenter/amalthea/internal/utils"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // RenkuAuth implements authentication as used in Renku:
@@ -35,6 +41,8 @@ type RenkuAuth struct {
 	// firecrestTokenURI the URI used to request new access tokens
 	firecrestTokenURI string
 
+	// renkuAuthenticationVersion is equal to "v2" when using internal tokens
+	renkuAuthenticationVersion string
 	// renkuAccessToken the current renku access token
 	renkuAccessToken string
 	// renkuAccessTokenExpiresAt is when the renku access token expires
@@ -57,6 +65,8 @@ type RenkuAuth struct {
 	// accessTokenLock ensures that we do not try to refresh
 	// the accessToken twice at the same time.
 	accessTokenLock *sync.RWMutex
+	// refreshTicker to automate renku access token refresh
+	refreshTicker *time.Ticker
 
 	// httpClient is the HTTP client used to obtain access tokens
 	httpClient *http.Client
@@ -65,19 +75,20 @@ type RenkuAuth struct {
 // Check that RenkuAuth satisfies the FirecrestAuth interface
 var _ FirecrestAuth = (*RenkuAuth)(nil)
 
-func newRenkuAuth(firecrestTokenURI, renkuAccessToken, renkuRefreshToken, renkuTokenURI, renkuClientID, renkuClientSecret string, options ...RenkuAuthOption) (auth *RenkuAuth, err error) {
+func newRenkuAuth(firecrestTokenURI, renkuAuthenticationVersion, renkuAccessToken, renkuRefreshToken, renkuTokenURI, renkuClientID, renkuClientSecret string, options ...RenkuAuthOption) (auth *RenkuAuth, err error) {
 	auth = &RenkuAuth{
-		firecrestTokenURI:         firecrestTokenURI,
-		renkuAccessToken:          renkuAccessToken,
-		renkuAccessTokenExpiresAt: time.Time{},
-		renkuRefreshToken:         renkuRefreshToken,
-		renkuTokenURI:             renkuTokenURI,
-		renkuClientID:             renkuClientID,
-		renkuClientSecret:         renkuClientSecret,
-		renkuAccessTokenLock:      &sync.RWMutex{},
-		accessToken:               "",
-		accessTokenExpiresAt:      time.Time{},
-		accessTokenLock:           &sync.RWMutex{},
+		firecrestTokenURI:          firecrestTokenURI,
+		renkuAuthenticationVersion: renkuAuthenticationVersion,
+		renkuAccessToken:           renkuAccessToken,
+		renkuAccessTokenExpiresAt:  time.Time{},
+		renkuRefreshToken:          renkuRefreshToken,
+		renkuTokenURI:              renkuTokenURI,
+		renkuClientID:              renkuClientID,
+		renkuClientSecret:          renkuClientSecret,
+		renkuAccessTokenLock:       &sync.RWMutex{},
+		accessToken:                "",
+		accessTokenExpiresAt:       time.Time{},
+		accessTokenLock:            &sync.RWMutex{},
 	}
 	for _, opt := range options {
 		if err := opt(auth); err != nil {
@@ -94,16 +105,29 @@ func newRenkuAuth(firecrestTokenURI, renkuAccessToken, renkuRefreshToken, renkuT
 	if renkuTokenURI == "" {
 		return nil, fmt.Errorf("renkuTokenURI is not set")
 	}
-	if renkuClientID == "" {
+	if renkuAuthenticationVersion != "v2" && renkuClientID == "" {
 		return nil, fmt.Errorf("renkuClientID is not set")
 	}
-	if renkuClientSecret == "" {
+	if renkuAuthenticationVersion != "v2" && renkuClientSecret == "" {
 		return nil, fmt.Errorf("renkuClientSecret is not set")
+	}
+	if renkuAuthenticationVersion == "v2" {
+		parser := jwt.NewParser()
+		claims := jwt.RegisteredClaims{}
+		_, _, err := parser.ParseUnverified(auth.renkuAccessToken, &claims)
+		if err == nil {
+			auth.renkuAccessTokenExpiresAt = claims.ExpiresAt.Time
+		}
 	}
 	// Create httpClient, if not already present
 	if auth.httpClient == nil {
 		auth.httpClient = http.DefaultClient
 	}
+
+	auth.refreshTicker = time.NewTicker(time.Duration(60) * time.Second)
+	// Start a go routine to keep the refresh token valid
+	go auth.periodicTokenRefresh()
+
 	return auth, nil
 }
 
@@ -122,11 +146,8 @@ func (a *RenkuAuth) GetAccessToken(ctx context.Context) (token string, err error
 	expiresAt := a.accessTokenExpiresAt
 	a.accessTokenLock.RUnlock()
 
-	leeway := 10 * time.Second
-	deadline := time.Now().Add(-leeway)
-
 	// Return the current token if it is still valid
-	if token != "" && (expiresAt.IsZero() || expiresAt.Before(deadline)) {
+	if token != "" && (utils.IsNotExpired(expiresAt, 10*time.Second, false)) {
 		return token, nil
 	}
 
@@ -195,11 +216,8 @@ func (a *RenkuAuth) getRenkuAccessToken(ctx context.Context) (token string, err 
 	expiresAt := a.renkuAccessTokenExpiresAt
 	a.renkuAccessTokenLock.RUnlock()
 
-	leeway := 10 * time.Second
-	deadline := time.Now().Add(-leeway)
-
 	// Return the current token if it is still valid
-	if token != "" && (expiresAt.IsZero() || expiresAt.Before(deadline)) {
+	if token != "" && (utils.IsNotExpired(expiresAt, 10*time.Second, false)) {
 		return token, nil
 	}
 
@@ -213,6 +231,10 @@ func (a *RenkuAuth) getRenkuAccessToken(ctx context.Context) (token string, err 
 }
 
 func (a *RenkuAuth) refreshRenkuAccessToken(ctx context.Context) error {
+	if a.renkuAuthenticationVersion == "v2" {
+		return a.refreshRenkuAccessTokenV2(ctx)
+	}
+
 	a.renkuAccessTokenLock.Lock()
 	defer a.renkuAccessTokenLock.Unlock()
 
@@ -228,4 +250,77 @@ func (a *RenkuAuth) refreshRenkuAccessToken(ctx context.Context) error {
 	a.renkuAccessToken = result.AccessToken
 	a.renkuAccessTokenExpiresAt = result.ExpiresAt
 	return nil
+}
+
+func (a *RenkuAuth) refreshRenkuAccessTokenV2(ctx context.Context) error {
+	a.renkuAccessTokenLock.Lock()
+	defer a.renkuAccessTokenLock.Unlock()
+
+	renkuTokenURL, err := url.Parse(a.renkuTokenURI)
+	if err != nil {
+		return err
+	}
+	payload := url.Values{}
+	payload.Set("grant_type", "refresh_token")
+	payload.Set("refresh_token", a.renkuRefreshToken)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, renkuTokenURL.String(), strings.NewReader(payload.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err != nil {
+		return err
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if res.StatusCode != 200 {
+		err = fmt.Errorf("cannot refresh renku access token, failed with status code: %d", res.StatusCode)
+		return err
+	}
+	var resParsed renkuTokenRefreshResponse
+	err = json.NewDecoder(res.Body).Decode(&resParsed)
+	if err != nil {
+		return err
+	}
+	a.renkuAccessToken = resParsed.AccessToken
+	a.renkuRefreshToken = resParsed.RefreshToken
+
+	parser := jwt.NewParser()
+	claims := jwt.RegisteredClaims{}
+	if _, _, err := parser.ParseUnverified(a.renkuAccessToken, &claims); err != nil {
+		log.Printf("cannot parse token claims: %s\n", err.Error())
+		return err
+	}
+	a.renkuAccessTokenExpiresAt = claims.ExpiresAt.Time
+
+	log.Printf("refreshed renku access tokens, renkuAccessTokenExpiresAt = %s\n", a.renkuAccessTokenExpiresAt.String())
+
+	return nil
+}
+
+type renkuTokenRefreshResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+// Periodically refreshes the renku access token. Used to make sure the refresh token does not expire.
+func (a *RenkuAuth) periodicTokenRefresh() {
+	for {
+		<-a.refreshTicker.C
+		a.renkuAccessTokenLock.RLock()
+		renkuRefreshToken := a.renkuRefreshToken
+		a.renkuAccessTokenLock.RUnlock()
+		refreshTokenIsValid, err := utils.VerifyJWTExpiresAt(renkuRefreshToken, 4*time.Minute, false)
+		if err != nil {
+			log.Printf("Could not check if renku refresh token is expired: %s\n", err.Error())
+		}
+		if !refreshTokenIsValid {
+			log.Println("Getting a new renku refresh token from automatic checks")
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(60)*time.Second)
+			err = a.refreshRenkuAccessToken(ctx)
+			cancel()
+			if err != nil {
+				log.Printf("Could not refresh renku token: %s\n", err.Error())
+			}
+		}
+	}
 }
