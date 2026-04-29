@@ -19,11 +19,6 @@ type Cloner struct {
 }
 
 func (c *Cloner) Run() error {
-	globalCli := GitCli{"", "", ""}
-	_, err := globalCli.Config([]string{"--global", "init.defaultBranch", "main"})
-	if err != nil {
-		log.Printf("Could not set global init.defaultBranch config: %s\n.", err.Error())
-	}
 	for _, repository := range c.config.Repositories {
 		log.Println("Processing", repository.URL)
 		err := c.execute(repository)
@@ -154,7 +149,7 @@ func (c *Cloner) getAccessToken(providerId string) (string, error) {
 func (c *Cloner) initializeRepository(repository Repository) error {
 	log.Println("Initializing repo")
 
-	_, err := repository.Cli.Init([]string{})
+	_, err := repository.Cli.Init([]string{"--initial-branch", "main"})
 	if err != nil {
 		return err
 	}
