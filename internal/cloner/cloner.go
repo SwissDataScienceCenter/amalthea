@@ -19,7 +19,7 @@ type Cloner struct {
 }
 
 func (c *Cloner) Run() error {
-	globalCli := NewGitCli("")
+	globalCli := GitCli{"", "", ""}
 	_, err := globalCli.Config([]string{"--global", "init.defaultBranch", "main"})
 	if err != nil {
 		log.Printf("Could not set global init.defaultBranch config: %s\n.", err.Error())
