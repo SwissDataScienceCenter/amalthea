@@ -457,7 +457,7 @@ func (c ChildResources) Reconcile(ctx context.Context, clnt client.Client, cr *a
 		Job:         c.Job.Reconcile(ctx, clnt, cr),
 	}
 
-	dataSourceUpdates := []ChildResourceUpdate[v1.PersistentVolumeClaim]{}
+	dataSourceUpdates := []ChildResourceUpdate[v1.PersistentVolumeClaim]{} //nolint:prealloc
 	for _, pvc := range c.DataSourcesPVCs {
 		dataSourceUpdates = append(dataSourceUpdates, pvc.Reconcile(ctx, clnt, cr))
 	}

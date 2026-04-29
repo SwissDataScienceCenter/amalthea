@@ -115,19 +115,19 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 		}
 	}
 
-	volumes := []v1.Volume{}
+	volumes := []v1.Volume{} //nolint:prealloc
 	volumes = append(volumes, sessionVols...)
 	volumes = append(volumes, cloneInit.Volumes...)
 	volumes = append(volumes, cr.Spec.ExtraVolumes...)
 	volumes = append(volumes, dsVols...)
 	volumes = append(volumes, auth.Volumes...)
 
-	volumeMounts := []v1.VolumeMount{}
+	volumeMounts := []v1.VolumeMount{} //nolint:prealloc
 	volumeMounts = append(volumeMounts, sessionMounts...)
 	volumeMounts = append(volumeMounts, cr.Spec.Session.ExtraVolumeMounts...)
 	volumeMounts = append(volumeMounts, dsVolMounts...)
 
-	initContainers := []v1.Container{}
+	initContainers := []v1.Container{} //nolint:prealloc
 	initContainers = append(initContainers, cloneInit.Containers...)
 	initContainers = append(initContainers, cr.Spec.ExtraInitContainers...)
 
