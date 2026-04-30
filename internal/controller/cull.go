@@ -40,7 +40,7 @@ func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, a
 			if err != nil {
 				return err
 			}
-			log.Info("statefulSet scaled down")
+			log.Info("statefulSet scaled down or job suspended")
 		}
 	}
 	return nil

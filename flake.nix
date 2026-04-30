@@ -34,6 +34,7 @@
         gotools
         go-tools
         gore
+        golangci-lint
         kind
         kubectl
         docker
@@ -42,6 +43,7 @@
         chartpress
         azure-cli
         kubernetes-helm
+        gcc
       ];
     in {
       formatter = pkgs.alejandra;

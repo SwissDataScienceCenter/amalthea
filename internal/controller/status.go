@@ -49,6 +49,25 @@ func podIsReady(pod *v1.Pod) bool {
 	return initCounts.Ok() && counts.Ok() && phaseOk
 }
 
+func podIsCompleted(pod *v1.Pod) bool {
+	if pod == nil || pod.GetDeletionTimestamp() != nil {
+		// A missing pod or a pod being deleted is not completed
+		return false
+	}
+
+	phaseCompleted := pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed
+	totalCnt := 0
+	completedCnt := 0
+	for _, container := range pod.Status.ContainerStatuses {
+		totalCnt += 1
+		if container.State.Terminated != nil {
+			completedCnt += 1
+		}
+	}
+
+	return phaseCompleted && totalCnt == completedCnt
+}
+
 func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *amaltheadevv1alpha1.AmaltheaSession) (v1.ResourceList, error) {
 	podName := fmt.Sprintf("%s-0", cr.Name)
 	podMetricses, err := clnt.PodMetricses(cr.Namespace).List(

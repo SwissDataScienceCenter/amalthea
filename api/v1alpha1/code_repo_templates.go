@@ -15,7 +15,7 @@ func (as *AmaltheaSession) cloneInit() manifests {
 	envVars := []v1.EnvVar{}
 	volMounts := []v1.VolumeMount{{Name: sessionVolumeName, MountPath: as.Spec.Session.Storage.MountPath}}
 	vols := []v1.Volume{}
-	containers := []v1.Container{}
+	containers := []v1.Container{} //nolint:prealloc
 
 	for irepo, repo := range as.Spec.CodeRepositories {
 		args := []string{

@@ -78,11 +78,17 @@ func gitproxy(cmd *cobra.Command, args []string) error {
 	// INFO: Run servers in the background
 	go func() {
 		cmd.Printf("Health server active on port %d\n", config.HealthPort)
-		log.Fatalln(healthServer.ListenAndServe())
+		err := healthServer.ListenAndServe()
+		if err != nil {
+			cmd.Printf("An error occurred running the git proxy health server: %v", err)
+		}
 	}()
 	go func() {
 		cmd.Printf("Git proxy active on port %d\n", config.ProxyPort)
-		log.Fatalln(proxyServer.ListenAndServe())
+		err := proxyServer.ListenAndServe()
+		if err != nil {
+			cmd.Printf("An error occurred running the git proxy: %v", err)
+		}
 	}()
 
 	// INFO: Block until you receive sigTerm to shutdown. All of this is necessary
@@ -92,11 +98,11 @@ func gitproxy(cmd *cobra.Command, args []string) error {
 	cmd.Println("SIGTERM received. Shutting down servers.")
 	err = healthServer.Shutdown(ctx)
 	if err != nil {
-		return err
+		log.Println("Graceful shutdown healthserver with errors:", err)
 	}
 	err = proxyServer.Shutdown(ctx)
 	if err != nil {
-		return err
+		log.Println("Graceful shutdown proxyserver with errors:", err)
 	}
 
 	return nil
