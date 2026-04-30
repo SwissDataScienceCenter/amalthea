@@ -44,7 +44,7 @@ func podFailureReason(pod *v1.Pod) string {
 		"PodInitializing",
 	}
 
-	allStatuses := []v1.ContainerStatus{}
+	allStatuses := []v1.ContainerStatus{} //nolint:prealloc
 	allStatuses = append(allStatuses, pod.Status.InitContainerStatuses...)
 	allStatuses = append(allStatuses, pod.Status.ContainerStatuses...)
 	for _, contStatus := range allStatuses {
