@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	childutils "github.com/SwissDataScienceCenter/amalthea/internal/controller/children"
 )
 
 // AmaltheaSessionReconciler reconciles a AmaltheaSession object
@@ -159,6 +160,12 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	rcloneV2Res := childutils.NewRcloneV2Resources(amaltheasession)
+	err = rcloneV2Res.Reconcile(ctx, r.Client)
+	if err != nil {
+		log.Error(err, "Failed when reconciling rclone data sources")
+		return ctrl.Result{}, err
+	}
 	updates, err := children.Reconcile(ctx, r.Client, amaltheasession)
 	if err != nil {
 		log.Error(err, "Failed when reconciling children")

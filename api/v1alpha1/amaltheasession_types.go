@@ -304,6 +304,7 @@ type DataSource struct {
 	// The format of the configuration that is expected depends on the storage type.
 	// NOTE: define all values in a single key of the Kubernetes secret.
 	// rclone: any valid rclone configuration for a single remote, see the output of `rclone config providers` for validation and format.
+	// rcloneV2: same as rclone but the secret key has to be defined - we cannot guess it
 	SecretRef *SessionSecretRef `json:"secretRef,omitempty"`
 	// +kubebuilder:default:=rclone
 	// The name of the source/remote in the rclone config that should be used to serve

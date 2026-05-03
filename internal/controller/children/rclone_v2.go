@@ -16,30 +16,176 @@ limitations under the License.
 
 package children
 
-func (cr *AmaltheaSession) RcloneV2ResourceName() string {
+import (
+	"context"
+	"fmt"
+	"log"
+	"maps"
+
+	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	rcloneV2NFSPort           int32  = 65535
+	rcloneV2NFSPortName       string = "rcloneNFS"
+	rcloneConfigMountPath     string = "/"
+	rcloneConfigProjectedPath string = "rclone_config"
+	rcloneConfigFullPath      string = "/rclone_config" // combination of the mount path and the projected path
+	rcloneConfigVolumeName    string = "rclone-config"
+)
+
+func rcloneV2ResourceName(cr *amaltheadevv1alpha1.AmaltheaSession) string {
 	return cr.Name + "-nfs"
 }
 
-const rcloneV2NFSPort int32 = 65535
-const rcloneV2NFSPortName string = "rcloneNFS"
+func childLabelsRclone(cr *amaltheadevv1alpha1.AmaltheaSession) map[string]string {
+	labels := map[string]string{}
+	maps.Copy(labels, cr.Spec.Template.Metadata.Labels)
+	selectorLabels := amaltheadevv1alpha1.SelectorLabels(rcloneV2ResourceName(cr))
+	conflicts := amaltheadevv1alpha1.FindConflicts(labels, selectorLabels)
+	if len(conflicts) > 0 {
+		log.Println(
+			"Found conflicts in template labels and selector labels for Rclone, the selector labels will take precedence",
+			"template labels",
+			labels,
+			"selector labels",
+			selectorLabels,
+			"conflicting keys",
+			conflicts,
+		)
+	}
+	// NOTE: stuff from selectorLabels will overwrite conflicts in labels (if there are any)
+	// This is the desired behaviour, we do not want to overwrite the selector labels.
+	maps.Copy(labels, selectorLabels)
+	return labels
+}
 
-func (cr *AmaltheaSession) RcloneV2DataSource() (DataSource, bool) {
+type RcloneV2Resources struct {
+	resources []ChildResourcer
+}
+
+func (r *RcloneV2Resources) Reconcile(ctx context.Context, clnt client.Client) error {
+	for _, res := range r.resources {
+		err := res.Reconcile(ctx, clnt)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *RcloneV2Resources) StatusCallback(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+}
+
+func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourcer {
+	_, found := cr.RcloneV2DataSource()
+	if !found {
+		return &RcloneV2Resources{}
+	}
+	ss := NewChildResource(
+		WithName[*appsv1.StatefulSet](rcloneV2ResourceName(cr)),
+		WithNamespace[*appsv1.StatefulSet](cr.Namespace),
+		WithMutateFn(func(obj *appsv1.StatefulSet) error {
+			desired, err := rcloneV2Statefulset(cr)
+			if err != nil {
+				return err
+			}
+			obj.ObjectMeta = desired.ObjectMeta
+			obj.Spec = desired.Spec
+			return nil
+		}),
+	)
+	service := NewChildResource(
+		WithName[*v1.Service](rcloneV2ResourceName(cr)),
+		WithNamespace[*v1.Service](cr.Namespace),
+		WithMutateFn(func(obj *v1.Service) error {
+			desired := rcloneV2Service(cr)
+			obj.ObjectMeta = desired.ObjectMeta
+			obj.Spec = desired.Spec
+			return nil
+		}),
+	)
+	pv := NewChildResource(
+		WithName[*v1.PersistentVolume](rcloneV2ResourceName(cr)),
+		WithNamespace[*v1.PersistentVolume](cr.Namespace),
+		WithMutateFn(func(obj *v1.PersistentVolume) error {
+			if len(service.obj.Spec.ClusterIP) == 0 {
+				return fmt.Errorf("cannot create volume for rclone dataset because host is not known from the Service")
+			}
+			desired := rcloneV2Volume(cr, service.obj.Spec.ClusterIP)
+			obj.ObjectMeta = desired.ObjectMeta
+			obj.Spec = desired.Spec
+			return nil
+		}),
+	)
+	pvc := NewChildResource(
+		WithName[*v1.PersistentVolumeClaim](rcloneV2ResourceName(cr)),
+		WithNamespace[*v1.PersistentVolumeClaim](cr.Namespace),
+		WithMutateFn(func(obj *v1.PersistentVolumeClaim) error {
+			desired := rcloneV2PVC(cr)
+			obj.ObjectMeta = desired.ObjectMeta
+			obj.Spec = desired.Spec
+			return nil
+		}),
+	)
+	// NOTE: The pv must be reconciled after the service, because the ClusterIP
+	// is populated by Kubernetes only after the resource has been created.
+	output := RcloneV2Resources{resources: []ChildResourcer{&ss, &service, &pv, &pvc}}
+	return &output
+}
+
+func rcloneV2DataSource(cr amaltheadevv1alpha1.AmaltheaSession) (amaltheadevv1alpha1.DataSource, bool) {
 	for _, ds := range cr.Spec.DataSources {
-		if ds.Type == RcloneV2 {
+		if ds.Type == amaltheadevv1alpha1.RcloneV2 {
 			return ds, true
 		}
 	}
-	return DataSource{}, false
+	return amaltheadevv1alpha1.DataSource{}, false
 }
 
-func (cr *AmaltheaSession) RcloneV2Statefulset() (appsv1.StatefulSet, bool) {
+func rcloneV2Statefulset(cr *amaltheadevv1alpha1.AmaltheaSession) (appsv1.StatefulSet, error) {
 	ds, dsFound := cr.RcloneV2DataSource()
 	if !dsFound {
-		return appsv1.StatefulSet{}, false
+		return appsv1.StatefulSet{}, fmt.Errorf("data source of rclonev2 is not defined")
 	}
-	args := []string{"serve", "nfs", ds.RcloneRemoteName, fmt.Sprintf("--addr=0.0.0.0:%d", rcloneV2NFSPort)}
+	if ds.SecretRef == nil {
+		return appsv1.StatefulSet{}, fmt.Errorf("the secret for the data source has to be defined")
+	}
+	if len(ds.SecretRef.Key) == 0 {
+		return appsv1.StatefulSet{}, fmt.Errorf("the secret for the data source has to have a key")
+	}
+	args := []string{"serve", "nfs", ds.RcloneRemoteName, fmt.Sprintf("--addr=0.0.0.0:%d", rcloneV2NFSPort), "--config"}
 	args = append(args, cr.Spec.DataSourcesConfig.ExtraArgs...)
+	volumes := []v1.Volume{}
+	volumeMounts := []v1.VolumeMount{}
+	volumes = append(
+		volumes,
+		v1.Volume{
+			Name: rcloneConfigVolumeName,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: ds.SecretRef.Name,
+					Items:      []v1.KeyToPath{{Key: ds.SecretRef.Key, Path: rcloneConfigProjectedPath}},
+				},
+			},
+		},
+	)
+	volumeMounts = append(
+		volumeMounts,
+		v1.VolumeMount{
+			Name:      rcloneConfigVolumeName,
+			MountPath: rcloneConfigMountPath,
+		},
+	)
+	args = append(args, "--config", rcloneConfigFullPath)
 	pod := v1.PodSpec{
+		Volumes:         volumes,
 		SecurityContext: &v1.PodSecurityContext{RunAsNonRoot: ptr.To(true)},
 		Containers: []v1.Container{
 			{
@@ -65,16 +211,17 @@ func (cr *AmaltheaSession) RcloneV2Statefulset() (appsv1.StatefulSet, bool) {
 						TCPSocket: &v1.TCPSocketAction{Port: intstr.FromString(rcloneV2NFSPortName)},
 					},
 				},
-				Command: []string{"rclone"},
-				Args:    args,
+				Command:      []string{"rclone"},
+				Args:         args,
+				VolumeMounts: volumeMounts,
 			},
 		},
 	}
 	return appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        cr.RcloneV2ResourceName(),
+			Name:        rcloneV2ResourceName(cr),
 			Namespace:   cr.Namespace,
-			Labels:      cr.childLabelsRclone(),
+			Labels:      childLabelsRclone(cr),
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: appsv1.StatefulSetSpec{
@@ -83,37 +230,37 @@ func (cr *AmaltheaSession) RcloneV2Statefulset() (appsv1.StatefulSet, bool) {
 			PodManagementPolicy: appsv1.ParallelPodManagement,
 			Replicas:            ptr.To(int32(1)),
 			Selector: &metav1.LabelSelector{
-				MatchLabels: selectorLabels(cr.RcloneV2ResourceName()),
+				MatchLabels: amaltheadevv1alpha1.SelectorLabels(rcloneV2ResourceName(cr)),
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      cr.childLabelsRclone(),
+					Labels:      childLabelsRclone(cr),
 					Annotations: cr.Spec.Template.Metadata.Annotations,
 				},
 				Spec: pod,
 			},
 		},
-	}, true
+	}, nil
 }
 
-func (cr *AmaltheaSession) RcloneV2Service() v1.Service {
+func rcloneV2Service(cr *amaltheadevv1alpha1.AmaltheaSession) v1.Service {
 	return v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        cr.RcloneV2ResourceName(),
+			Name:        rcloneV2ResourceName(cr),
 			Namespace:   cr.Namespace,
-			Labels:      cr.childLabelsRclone(),
+			Labels:      childLabelsRclone(cr),
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{Name: rcloneV2NFSPortName, Port: rcloneV2NFSPort},
 			},
-			Selector: selectorLabels(cr.RcloneV2ResourceName()),
+			Selector: amaltheadevv1alpha1.SelectorLabels(rcloneV2ResourceName(cr)),
 		},
 	}
 }
 
-func (cr *AmaltheaSession) RcloneV2Volume(server string) v1.PersistentVolume {
+func rcloneV2Volume(cr *amaltheadevv1alpha1.AmaltheaSession, server string) v1.PersistentVolume {
 	// TODO: check which args take precedence for rclone if duplicated
 	mountOptions := []string{
 		// NOTE: Rclone has not implemented NFS v4 and some/most clusters will default to NFS v4 for NFS PVs.
@@ -127,9 +274,9 @@ func (cr *AmaltheaSession) RcloneV2Volume(server string) v1.PersistentVolume {
 	mountOptions = append(mountOptions, cr.Spec.DataSourcesConfig.MountOptions...)
 	return v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        cr.RcloneV2ResourceName(),
+			Name:        rcloneV2ResourceName(cr),
 			Namespace:   cr.Namespace,
-			Labels:      cr.childLabelsRclone(),
+			Labels:      childLabelsRclone(cr),
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -144,14 +291,14 @@ func (cr *AmaltheaSession) RcloneV2Volume(server string) v1.PersistentVolume {
 	}
 }
 
-func (cr *AmaltheaSession) RcloneV2PVC(server string) v1.PersistentVolumeClaim {
+func rcloneV2PVC(cr *amaltheadevv1alpha1.AmaltheaSession) v1.PersistentVolumeClaim {
 	return v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        cr.RcloneV2ResourceName(),
+			Name:        rcloneV2ResourceName(cr),
 			Namespace:   cr.Namespace,
-			Labels:      cr.childLabelsRclone(),
+			Labels:      childLabelsRclone(cr),
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
-		Spec: v1.PersistentVolumeClaimSpec{VolumeName: cr.RcloneV2ResourceName()},
+		Spec: v1.PersistentVolumeClaimSpec{VolumeName: rcloneV2ResourceName(cr)},
 	}
 }
