@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"os"
 	"reflect"
 	"time"
 
@@ -26,9 +27,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,6 +56,7 @@ type AmaltheaSessionReconciler struct {
 
 // finalizers
 const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
+const rclonePVFinalizer = "amalthea.dev/rclone-pv-finalizer"
 
 // +kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions/status,verbs=get;update;patch
@@ -56,6 +64,7 @@ const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=list;watch;delete;create;patch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch
@@ -115,6 +124,13 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				return ctrl.Result{}, err
 			}
 		}
+
+		if _, finalizerNeeded := amaltheasession.RcloneV2DataSource(); finalizerNeeded && !controllerutil.ContainsFinalizer(amaltheasession, rclonePVFinalizer) {
+			controllerutil.AddFinalizer(amaltheasession, rclonePVFinalizer)
+			if err := r.Update(ctx, amaltheasession); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	} else {
 		amaltheasession.Status.State = amaltheadevv1alpha1.NotReady
 		err := r.Status().Update(ctx, amaltheasession)
@@ -139,6 +155,20 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 			// remove our finalizer from the list and update it.
 			controllerutil.RemoveFinalizer(amaltheasession, secretCleanupFinalizerName)
+			if err := r.Update(ctx, amaltheasession); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		if controllerutil.ContainsFinalizer(amaltheasession, rclonePVFinalizer) {
+			// We don't need the whole PV to delete, just the name
+			pvStub := corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: childutils.RcloneV2ResourceName(amaltheasession)}}
+			err := r.Client.Delete(ctx, &pvStub)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return ctrl.Result{}, err
+			}
+
+			// remove our finalizer from the list and update it.
+			controllerutil.RemoveFinalizer(amaltheasession, rclonePVFinalizer)
 			if err := r.Update(ctx, amaltheasession); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -235,6 +265,21 @@ func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amalt
 	return error_list
 }
 
+func operatorNamespace() string {
+	return os.Getenv("OPERATOR_NAMESPACE")
+}
+
+func allowedToActOnPV(labels map[string]string) bool {
+	clusterScoped := len(operatorNamespace()) == 0
+	ns, nsFound := labels[childutils.RclonePVLabelSessionNamespaceKey]
+	_, nameFound := labels[childutils.RclonePVLabelSessionNameKey]
+	if clusterScoped {
+		return nsFound && nameFound
+	} else {
+		return nsFound && nameFound && operatorNamespace() == ns
+	}
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -244,5 +289,28 @@ func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&networkingv1.Ingress{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&corev1.Secret{}).
+		Watches(
+			// Since PVs are cluster scoped we filter to only watch PVs with the specific labels.
+			// The labels indicate which name and namespace the session belongs to.
+			// We only act on PVs where the namespace label matches the namespace the operator is deployed for.
+			// If the OPERATOR_NAMESPACE env var is not set we assume the operator is cluster scoped and we act on all PVs
+			// that have the name and namespace labels regardless of what namespace the operator is in.
+			&corev1.PersistentVolume{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+				labels := obj.GetLabels()
+				if !allowedToActOnPV(labels) {
+					return nil
+				}
+				ns := labels[childutils.RclonePVLabelSessionNamespaceKey]
+				name := labels[childutils.RclonePVLabelSessionNameKey]
+				return []reconcile.Request{
+					{NamespacedName: types.NamespacedName{Namespace: ns, Name: name}},
+				}
+			}),
+			builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+				labels := obj.GetLabels()
+				return allowedToActOnPV(labels)
+			})),
+		).
 		Complete(r)
 }

@@ -1237,7 +1237,10 @@ spec:
                     type: string
                 type: object
               dataSources:
-                description: A list of data sources that should be added to the session
+                description: |-
+                  A list of data sources that should be added to the session
+                  Note that for rcloneV2 we support only one data source of this kind.
+                  If you need more than one simply combine the configurations into one.
                 items:
                   properties:
                     accessMode:
@@ -1250,12 +1253,18 @@ spec:
                         where the data should be mounted
                       example: data/storages
                       type: string
+                    rcloneRemoteName:
+                      default: rclone
+                      description: The name of the source/remote in the rclone config
+                        that should be used to serve
+                      type: string
                     secretRef:
                       description: |-
                         The secret containing the configuration or credentials needed for access to the data.
                         The format of the configuration that is expected depends on the storage type.
                         NOTE: define all values in a single key of the Kubernetes secret.
                         rclone: any valid rclone configuration for a single remote, see the output of `rclone config providers` for validation and format.
+                        rcloneV2: same as rclone but the secret key has to be defined - we cannot guess it
                       properties:
                         adopt:
                           description: If the secret is adopted then the operator
@@ -1275,12 +1284,135 @@ spec:
                       type: object
                     type:
                       default: rclone
-                      description: The data source type
+                      description: |-
+                        The data source type
+                        rclone requires the csi-rclone driver
+                        rcloneV2 does not require a CSI driver, will provision a separate statefulset to run NFS server
                       enum:
                       - rclone
+                      - rcloneV2
                       type: string
                   type: object
                 type: array
+              dataSourcesConfig:
+                default: {}
+                description: |-
+                  Common configuration for rcloneV2 data sources, ignored for rclone data sources.
+                  Can be used to configure caching and resource requirements for the server.
+                properties:
+                  cache:
+                    default: {}
+                    description: Caching configuration
+                    properties:
+                      className:
+                        description: The name of the storage class that should be
+                          used for the cache, only valid if PVC is used.
+                        type: string
+                      createPVC:
+                        description: |-
+                          If set to true a dedicated PVC for the cache will not be created
+                          If set to false then the cache will be located at /tmp
+                        type: boolean
+                      size:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        default: 1Gi
+                        description: |-
+                          The size of the cache, if using PVC it will be the size of the PVC.
+                          If using /tmp then it will only be used to inform rclone of the size constraints
+                          Setting the value to zero means the cache is unlimited.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                    type: object
+                  extraArgs:
+                    description: |-
+                      Extra arguments to be passed to `rclone nfs serve`
+                      Can be used to configure caching
+                    items:
+                      type: string
+                    type: array
+                  image:
+                    default: rclone/rclone:latest
+                    description: The rclone image to use to run the NFS server.
+                    type: string
+                  mountOptions:
+                    description: Mount options to pass to the PV
+                    items:
+                      type: string
+                    type: array
+                  resources:
+                    default:
+                      limits:
+                        memory: 500Mi
+                      requests:
+                        cpu: 500m
+                        memory: 500Mi
+                    description: The resources requests and limits for the statefulset
+                      that runs rclone
+                    properties:
+                      claims:
+                        description: |-
+                          Claims lists the names of resources, defined in spec.resourceClaims,
+                          that are used by this container.
+
+                          This is an alpha field and requires enabling the
+                          DynamicResourceAllocation feature gate.
+
+                          This field is immutable. It can only be set for containers.
+                        items:
+                          description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                          properties:
+                            name:
+                              description: |-
+                                Name must match the name of one entry in pod.spec.resourceClaims of
+                                the Pod where this field is used. It makes that resource available
+                                inside a container.
+                              type: string
+                            request:
+                              description: |-
+                                Request is the name chosen for a request in the referenced claim.
+                                If empty, everything from the claim is made available, otherwise
+                                only the result of this request.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                    type: object
+                  skipNetworkPolicies:
+                    description: |-
+                      If set to true Amalthea will not make network policies to limit access
+                      to the NFS server. Beware that this has security implications if set to true.
+                    type: boolean
+                type: object
               extraContainers:
                 description: |-
                   Additional containers to add to the session statefulset.

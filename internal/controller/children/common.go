@@ -18,6 +18,7 @@ package children
 
 import (
 	"context"
+	"reflect"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/labstack/gommon/log"
@@ -25,7 +26,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type ChildResourceType interface {
@@ -41,10 +44,15 @@ type ChildResource[T ChildResourceType] struct {
 	mutateFn       MutateFn[T]
 	obj            T
 	statusCallback StatusCallback
+	parent         metav1.Object
 }
 
-func NewChildResource[T ChildResourceType](opts ...ChildResourceOption[T]) ChildResource[T] {
-	obj := *new(T)
+func NewChildResource[T ChildResourceType](pt T, opts ...ChildResourceOption[T]) ChildResource[T] {
+	t := reflect.TypeOf(pt)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	obj := reflect.New(t).Interface().(T)
 	output := ChildResource[T]{
 		obj: obj,
 	}
@@ -80,12 +88,31 @@ func WithStatusCallback[T ChildResourceType](statusCallback StatusCallback) Chil
 	}
 }
 
+func WithParent[T ChildResourceType](parent metav1.Object) ChildResourceOption[T] {
+	return func(cr *ChildResource[T]) {
+		cr.parent = parent
+	}
+}
+
 func (cr *ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client) error {
 	if cr.mutateFn == nil {
 		log.Warnf("Mutate function not set for type %s with name %s, namespace: %s", cr.obj.GetName(), cr.obj.GetNamespace(), cr.obj.GetObjectKind().GroupVersionKind().String())
 		return nil
 	}
-	return cr.mutateFn(cr.obj)
+	_, err := controllerutil.CreateOrPatch(ctx, clnt, cr.obj, func() error {
+		err := cr.mutateFn(cr.obj)
+		if err != nil {
+			return err
+		}
+		if cr.parent != nil && !reflect.ValueOf(cr.parent).IsZero() {
+			err := ctrl.SetControllerReference(cr.parent, cr.obj, clnt.Scheme())
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return err
 }
 
 func (cr *ChildResource[T]) StatusCallback(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {

@@ -1,0 +1,53 @@
+apiVersion: amalthea.dev/v1alpha1
+kind: AmaltheaSession
+metadata:
+  name: test-rclone
+spec:
+  dataSources:
+    - accessMode: ReadOnlyMany
+      mountPath: /home/renku/work/giab
+      secretRef:
+        adopt: false
+        name: secret-config-pvc
+        key: "rclone.conf"
+      type: rcloneV2
+      rcloneRemoteName: giab-s3
+  location: local
+  reconcileStrategy: always
+  session:
+    image: ghcr.io/swissdatasciencecenter/renku/py-datascience-jupyterlab:2.15.0
+    imagePullPolicy: Always
+    port: 8888
+    readinessProbe:
+      type: none
+    resources:
+      limits:
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+    runAsGroup: 1000
+    runAsUser: 1000
+    shmSize: 1G
+    storage:
+      mountPath: /home/renku/work
+      size: 1G
+    stripURLPath: false
+    urlPath: /sessions/tasko-olevsk-90d3b1ac1cd6/lab
+    workingDir: /home/renku/work
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret-config-pvc
+type: Opaque
+stringData:
+  rclone.conf: |
+    [giab-s3]
+    type = s3
+    provider = AWS
+    env_auth = false
+    region = us-east-1
+    no_check_bucket = true
+    access_key_id =
+    secret_access_key =

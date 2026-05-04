@@ -584,6 +584,29 @@ func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 					MountPath: ds.MountPath,
 				},
 			)
+		case RcloneV2:
+			volName := "rclone-v2-volume"
+			readOnly := ds.AccessMode == v1.ReadOnlyMany
+			vols = append(
+				vols,
+				v1.Volume{
+					Name: volName,
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: as.RcloneV2ResourceName(),
+							ReadOnly:  readOnly,
+						},
+					},
+				},
+			)
+			volMounts = append(
+				volMounts,
+				v1.VolumeMount{
+					Name:      volName,
+					ReadOnly:  readOnly,
+					MountPath: ds.MountPath,
+				},
+			)
 		default:
 			continue
 		}
@@ -1008,4 +1031,8 @@ func (cr *AmaltheaSession) RcloneV2DataSource() (DataSource, bool) {
 		}
 	}
 	return DataSource{}, false
+}
+
+func (cr *AmaltheaSession) RcloneV2ResourceName() string {
+	return cr.Name + "-nfs"
 }
