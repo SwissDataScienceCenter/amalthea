@@ -762,7 +762,7 @@ func (c ChildResourceUpdates) Status(
 		if state == amaltheadevv1alpha1.Running && oldEnough {
 			idleSince, idle = getIdleState(ctx, r, cr)
 		}
-		if cr.Spec.SessionType.IsNonInteractive() {
+		if cr.Spec.SessionType == amaltheadevv1alpha1.SessionTypeNonInteractive {
 			if (state == amaltheadevv1alpha1.Succeeded || state == amaltheadevv1alpha1.Failed) && idleSince.IsZero() {
 				// set idle time when containers exited
 				idleSince = metav1.NewTime(time.Now())

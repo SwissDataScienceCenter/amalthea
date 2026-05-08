@@ -102,11 +102,10 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	_, dsVols, dsVolMounts := cr.DataSources()
 	cloneInit := cr.cloneInit()
 	sessionVols, sessionMounts := cr.SessionVolumes()
-	isInteractive := cr.Spec.SessionType.IsInteractive()
 
 	var auth = manifests{}
 	// auth containers are only for interactive sessions
-	if isInteractive {
+	if cr.Spec.SessionType != SessionTypeNonInteractive {
 		var err error
 		auth, err = cr.auth()
 		if err != nil {
@@ -486,7 +485,7 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
 	log := log.FromContext(ctx)
-	if cr.Spec.SessionType.IsNonInteractive() {
+	if cr.Spec.SessionType == SessionTypeNonInteractive {
 		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
 		podList := &v1.PodList{}
 		listOpts := &client.ListOptions{Namespace: cr.Namespace, LabelSelector: selector}
