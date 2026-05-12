@@ -927,6 +927,9 @@ func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, 
 		RunAsNonRoot: ptr.To(true),
 		RunAsUser:    ptr.To(session.RunAsUser),
 		RunAsGroup:   ptr.To(session.RunAsGroup),
+		Capabilities: &v1.Capabilities{
+			Drop: []v1.Capability{"ALL"},
+		},
 	}
 	if session.RunAsUser == 0 {
 		securityContext.RunAsNonRoot = ptr.To(false)
@@ -953,6 +956,9 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
 			RunAsNonRoot:             ptr.To(true),
+			Capabilities: &v1.Capabilities{
+				Drop: []v1.Capability{"ALL"},
+			},
 		},
 		Args: []string{
 			"remote-session-controller",

@@ -57,6 +57,9 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 			SecurityContext: &v1.SecurityContext{
 				AllowPrivilegeEscalation: ptr.To(false),
 				RunAsNonRoot:             ptr.To(true),
+				Capabilities: &v1.Capabilities{
+					Drop: []v1.Capability{"ALL"},
+				},
 			},
 			Args: []string{
 				fmt.Sprintf("--upstream=%s", fmt.Sprintf("http://127.0.0.1:%d", secondProxyPort)),
@@ -161,6 +164,9 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 			SecurityContext: &v1.SecurityContext{
 				AllowPrivilegeEscalation: ptr.To(false),
 				RunAsNonRoot:             ptr.To(true),
+				Capabilities: &v1.Capabilities{
+					Drop: []v1.Capability{"ALL"},
+				},
 			},
 			Args: []string{
 				"--silence-ping-logging",
@@ -230,6 +236,9 @@ func (as *AmaltheaSession) get_rewrite_authn_proxy(listenPort int32, metaListenP
 			RunAsNonRoot:             ptr.To(true),
 			RunAsUser:                ptr.To(int64(1000)),
 			RunAsGroup:               ptr.To(int64(1000)),
+			Capabilities: &v1.Capabilities{
+				Drop: []v1.Capability{"ALL"},
+			},
 		},
 		Args: []string{
 			"proxy",
