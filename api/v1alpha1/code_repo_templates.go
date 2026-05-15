@@ -61,6 +61,9 @@ func (as *AmaltheaSession) cloneInit() manifests {
 			SecurityContext: &v1.SecurityContext{
 				RunAsUser:  &as.Spec.Session.RunAsUser,
 				RunAsGroup: &as.Spec.Session.RunAsGroup,
+				Capabilities: &v1.Capabilities{
+					Drop: []v1.Capability{"ALL"},
+				},
 			},
 			Args: args,
 		})
