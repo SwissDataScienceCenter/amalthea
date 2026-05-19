@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # NOTE FOR AMALTHEA MAINTAINERS:
 #   This script contains template strings in the following form:
 #     `#{{NAME}}`
