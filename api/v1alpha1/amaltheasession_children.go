@@ -102,11 +102,10 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	_, dsVols, dsVolMounts := cr.DataSources()
 	cloneInit := cr.cloneInit()
 	sessionVols, sessionMounts := cr.SessionVolumes()
-	isInteractive := cr.Spec.SessionType.IsInteractive()
 
 	var auth = manifests{}
 	// auth containers are only for interactive sessions
-	if isInteractive {
+	if cr.Spec.SessionType != SessionTypeNonInteractive {
 		var err error
 		auth, err = cr.auth()
 		if err != nil {
@@ -486,7 +485,7 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
 	log := log.FromContext(ctx)
-	if cr.Spec.SessionType.IsNonInteractive() {
+	if cr.Spec.SessionType == SessionTypeNonInteractive {
 		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
 		podList := &v1.PodList{}
 		listOpts := &client.ListOptions{Namespace: cr.Namespace, LabelSelector: selector}
@@ -928,6 +927,9 @@ func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, 
 		RunAsNonRoot: ptr.To(true),
 		RunAsUser:    ptr.To(session.RunAsUser),
 		RunAsGroup:   ptr.To(session.RunAsGroup),
+		Capabilities: &v1.Capabilities{
+			Drop: []v1.Capability{"ALL"},
+		},
 	}
 	if session.RunAsUser == 0 {
 		securityContext.RunAsNonRoot = ptr.To(false)
@@ -954,6 +956,9 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
 			RunAsNonRoot:             ptr.To(true),
+			Capabilities: &v1.Capabilities{
+				Drop: []v1.Capability{"ALL"},
+			},
 		},
 		Args: []string{
 			"remote-session-controller",
