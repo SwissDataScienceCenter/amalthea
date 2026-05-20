@@ -1,10 +1,10 @@
+#!/bin/bash
 # NOTE FOR AMALTHEA MAINTAINERS:
 #   This script contains template strings in the following form:
 #     `#{{NAME}}`
 #   These strings should be added or removed according to code changes
 #   in the remote session controller.
 # END NOTE
-#!/bin/bash
 #{{SBATCH_DIRECTIVES_PLACEHOLDER}}
 
 set -e -o pipefail
