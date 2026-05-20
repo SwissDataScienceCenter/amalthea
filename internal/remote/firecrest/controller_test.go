@@ -54,8 +54,8 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 	matches := mountsRegExp.FindStringSubmatch(sessionScriptFinal)
 	assert.Len(t, matches, 2)
 	foundMounts := matches[1]
-	assert.Contains(t, foundMounts, "\"/scratch\"")
-	assert.Contains(t, foundMounts, "\"/store\"")
-	assert.Contains(t, foundMounts, "\"/users:/home/users:ro\"")
+	assert.Contains(t, foundMounts, "\"/scratch:/scratch\"")
+	assert.Contains(t, foundMounts, "\"/store:/store\"")
+	assert.Contains(t, foundMounts, "\"/users/${USER}:/home/users/${USER}:ro\"")
 	assert.Contains(t, foundMounts, "\"/secrets:/secrets:ro\"")
 }
