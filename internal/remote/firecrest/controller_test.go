@@ -51,6 +51,11 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 			DefaultWorkDir: ptr.To(false),
 			Path:           "/users",
 		},
+		{
+			DataType:       "custom-not-part-of-enum",
+			DefaultWorkDir: ptr.To(false),
+			Path:           "/cluster-specific",
+		},
 	}
 	secretsPath := "/secrets"
 
@@ -76,4 +81,5 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 	assert.Contains(t, foundMounts, "\"/store:/store\"")
 	assert.Contains(t, foundMounts, "\"/users/${USER}:/home/users/${USER}:ro\"")
 	assert.Contains(t, foundMounts, "\"/secrets:/secrets:ro\"")
+	assert.Contains(t, foundMounts, "\"/cluster-specific:/cluster-specific\"")
 }
