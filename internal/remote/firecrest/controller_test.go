@@ -22,6 +22,21 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 	partition := "my-partition"
 	fileSystems := []FileSystem{
 		{
+			DataType:       "apps",
+			DefaultWorkDir: ptr.To(true),
+			Path:           "/apps",
+		},
+		{
+			DataType:       "archive",
+			DefaultWorkDir: ptr.To(false),
+			Path:           "/archive",
+		},
+		{
+			DataType:       "project",
+			DefaultWorkDir: ptr.To(false),
+			Path:           "/project",
+		},
+		{
 			DataType:       "scratch",
 			DefaultWorkDir: ptr.To(true),
 			Path:           "/scratch",
@@ -54,6 +69,9 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 	matches := mountsRegExp.FindStringSubmatch(sessionScriptFinal)
 	assert.Len(t, matches, 2)
 	foundMounts := matches[1]
+	assert.Contains(t, foundMounts, "\"/apps:/apps\"")
+	assert.Contains(t, foundMounts, "\"/archive:/archive\"")
+	assert.Contains(t, foundMounts, "\"/project:/project\"")
 	assert.Contains(t, foundMounts, "\"/scratch:/scratch\"")
 	assert.Contains(t, foundMounts, "\"/store:/store\"")
 	assert.Contains(t, foundMounts, "\"/users/${USER}:/home/users/${USER}:ro\"")
