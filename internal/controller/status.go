@@ -45,8 +45,9 @@ func podIsReady(pod *v1.Pod) bool {
 		return false
 	}
 	phaseOk := pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodRunning
-	initCounts, counts := containerCounts(pod)
-	return initCounts.Ok() && counts.Ok() && phaseOk
+	// initCounts, counts := containerCounts(pod)
+	// return initCounts.Ok() && counts.Ok() && phaseOk
+	return phaseOk
 }
 
 func podIsCompleted(pod *v1.Pod) bool {
