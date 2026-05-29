@@ -68,7 +68,7 @@ func isContainerSidecar(status v1.ContainerStatus, pod v1.Pod) bool {
 	return false
 }
 
-func podIsReady(pod *v1.Pod) bool {
+func podIsReady_n(pod *v1.Pod) bool {
 	if pod == nil || pod.GetDeletionTimestamp() != nil {
 		return false
 	}
@@ -82,7 +82,7 @@ func podIsReady(pod *v1.Pod) bool {
 	return phaseOk && condOk
 }
 
-func podIsReady_prev(pod *v1.Pod) bool {
+func podIsReady(pod *v1.Pod) bool {
 	if pod == nil || pod.GetDeletionTimestamp() != nil {
 		// A missing pod or a pod being deleted is not considered ready
 		return false
