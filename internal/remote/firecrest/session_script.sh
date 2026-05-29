@@ -9,9 +9,16 @@
 
 set -e -o pipefail
 
+: ${ARCH:=$(uname -m)}
 : ${GIT_PROXY_WAIT_SLEEP_SECONDS:=10}
 : ${GIT_PROXY_WAIT_RETRIES:=10}
 : ${RCLONE_VERSION:="1.70.2"}
+
+: ${WSTUNNEL_VERSION_x86_64:="10.4.4"}
+: ${WSTUNNEL_VERSION_aarch64:="10.1.10"}
+: ${d:="WSTUNNEL_VERSION_${ARCH}"}
+: ${WSTUNNEL_VERSION:="${!d}"}
+unset d
 
 # Installs rclone
 #
@@ -69,26 +76,21 @@ function install_rclone() {
 # Installs wstunnel
 #
 # Usage:
-#     wstunnel="$(install_wstunnel)"
+#     wstunnel="$(install_wstunnel $version)"
 #     "$wstunnel" --version
 function install_wstunnel() {
+    wstunnel_version=${1:?"wstunnel_version: Version missing"}
     RENKU_DIR="${HOME}/.renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
-    WSTUNNEL_VERSION="10.4.4"
-    WSTUNNEL_PKG="${RENKU_PKG}/wstunnel/v${WSTUNNEL_VERSION}"
+    WSTUNNEL_PKG="${RENKU_PKG}/wstunnel/v${wstunnel_version}"
     WSTUNNEL_BIN="${WSTUNNEL_PKG}/wstunnel"
 
-    arch="$(uname -m)"
-    if [ "${arch}" = "aarch64" ]; then
-        WSTUNNEL_VERSION_FORCED="10.1.10"
-        >&2 echo "Warning: using wstunnel v${WSTUNNEL_VERSION_FORCED} instead of ${WSTUNNEL_VERSION}"
-        WSTUNNEL_VERSION="${WSTUNNEL_VERSION_FORCED}"
-    fi
+    >&2 echo "Info: using wstunnel v${wstunnel_version}"
 
     skip_install="0"
     if [ -f "${WSTUNNEL_BIN}" ]; then
         version="$("${WSTUNNEL_BIN}" --version || echo "bad executable")"
-        expected="wstunnel-cli ${WSTUNNEL_VERSION}"
+        expected="wstunnel-cli ${wstunnel_version}"
         if [ "${version}" = "${expected}" ]; then
             skip_install="1"
         else
@@ -103,9 +105,9 @@ function install_wstunnel() {
 
     arch="$(uname -m)"
     if [ "${arch}" = "x86_64" ]; then
-        WSTUNNEL_URL="https://github.com/erebe/wstunnel/releases/download/v${WSTUNNEL_VERSION}/wstunnel_${WSTUNNEL_VERSION}_linux_amd64.tar.gz"
+        WSTUNNEL_URL="https://github.com/erebe/wstunnel/releases/download/v${wstunnel_version}/wstunnel_${wstunnel_version}_linux_amd64.tar.gz"
     elif [ "${arch}" = "aarch64" ]; then
-        WSTUNNEL_URL="https://github.com/erebe/wstunnel/releases/download/v${WSTUNNEL_VERSION}/wstunnel_${WSTUNNEL_VERSION}_linux_arm64.tar.gz"
+        WSTUNNEL_URL="https://github.com/erebe/wstunnel/releases/download/v${wstunnel_version}/wstunnel_${wstunnel_version}_linux_arm64.tar.gz"
     else
         >&2 echo "Unsupported platform: ${arch}"
         exit 1
@@ -145,7 +147,7 @@ mkdir -p "${LOGS_DIR}"
 # echo "rclone: ${rclone}"
 
 # Install wstunnel
-wstunnel=$(install_wstunnel)
+wstunnel="$(install_wstunnel "${WSTUNNEL_VERSION}")"
 echo "wstunnel: ${wstunnel}"
 
 # Ensure NVIDIA_VISIBLE_DEVICES is set to void 
