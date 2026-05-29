@@ -32,7 +32,7 @@ esac
 # Installs rclone
 #
 # Usage:
-#     rclone="$(install_rclone $version $gh_arch)"
+#     rclone="$(install_rclone "$version" "$gh_arch")"
 #     "$rclone" version
 function install_rclone() {
     rclone_version=${1:?"install_rclone: Version missing"}
@@ -56,12 +56,13 @@ function install_rclone() {
 
     mkdir -p "${rclone_pkg}"
     tmp="$(mktemp -d)"
-    cwd="$(pwd)"
-    cd "${tmp}"
-    curl -Lo "rclone.zip" "${rclone_url}"
-    >&2 unzip "rclone.zip"
-    rm -r "${rclone_pkg}"
-    mv ./rclone-v"${rclone_version}"-* "${rclone_pkg}"
+    (# Run in a subshell to prevent changing the working directory of the caller
+        cd "${tmp}"
+        curl -Lo "rclone.zip" "${rclone_url}"
+        >&2 unzip "rclone.zip"
+        rm -rf "${rclone_pkg}"
+        mv ./rclone-v"${rclone_version}"-* "${rclone_pkg}"
+    )
     rm -r "${tmp}"
     chmod a+x "${rclone_bin}"
 
