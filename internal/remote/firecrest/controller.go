@@ -651,7 +651,7 @@ func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, s
 	}
 
 	// Add the secrets mount
-	if len(secretsPath) > 0 {
+	if secretsPath != "" {
 		mounts = append(mounts, fmt.Sprintf("%s:/secrets:ro", secretsPath))
 	}
 
