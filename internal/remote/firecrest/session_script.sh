@@ -77,7 +77,7 @@ function install_rclone() {
 # Installs wstunnel
 #
 # Usage:
-#     wstunnel="$(install_wstunnel $version $gh_arch)"
+#     wstunnel="$(install_wstunnel "$version" "$gh_arch")"
 #     "$wstunnel" --version
 function install_wstunnel() {
     wstunnel_version=${1:?"wstunnel_version: Version missing"}
@@ -102,11 +102,12 @@ function install_wstunnel() {
 
     mkdir -p "${wstunnel_pkg}"
     tmp="$(mktemp -d)"
-    cwd="$(pwd)"
-    cd "${tmp}"
-    curl -Lo "wstunnel.tar.gz" "${wstunnel_url}"
-    tar xf "wstunnel.tar.gz" -C "${wstunnel_pkg}"
-    cd "${cwd}"
+    (# Run in a sub shell to prevent changing the working directory of the caller
+        cd "${tmp}"
+        curl -Lo "wstunnel.tar.gz" "${wstunnel_url}"
+        rm -rf "${wstunnel_pkg}"
+        tar xf "wstunnel.tar.gz" -C "${wstunnel_pkg}"
+    )
     rm -r "${tmp}"
     chmod a+x "${wstunnel_bin}"
 
