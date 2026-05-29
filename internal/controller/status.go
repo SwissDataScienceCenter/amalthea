@@ -21,10 +21,17 @@ func containerCounts(pod *v1.Pod) (amaltheadevv1alpha1.ContainerCounts, amalthea
 	if pod == nil {
 		return initCounts, counts
 	}
+
 	for _, container := range pod.Status.InitContainerStatuses {
-		containerCompleted := container.State.Terminated != nil && container.State.Terminated.ExitCode == 0 && container.State.Terminated.Reason == "Completed"
+		var containerOk bool
+		if isContainerSidecar(container, *pod) {
+			containerOk = container.Ready && container.State.Running != nil
+		} else {
+			containerOk = container.State.Terminated != nil && container.State.Terminated.ExitCode == 0 && container.State.Terminated.Reason == "Completed"
+		}
+
 		initCounts.Total += 1
-		if containerCompleted {
+		if containerOk {
 			initCounts.Ready += 1
 		}
 	}
@@ -39,15 +46,34 @@ func containerCounts(pod *v1.Pod) (amaltheadevv1alpha1.ContainerCounts, amalthea
 	return initCounts, counts
 }
 
+func containerRestartPolicy(status v1.ContainerStatus, pod v1.Pod) *v1.ContainerRestartPolicy {
+	for _, c := range pod.Spec.Containers {
+		if c.Name == status.Name {
+			return c.RestartPolicy
+		}
+	}
+	return nil
+}
+
+func isContainerSidecar(status v1.ContainerStatus, pod v1.Pod) bool {
+	restartPolicy := containerRestartPolicy(status, pod)
+	if restartPolicy != nil {
+		switch *restartPolicy {
+		case v1.ContainerRestartPolicyAlways:
+			return true
+		}
+	}
+	return false
+}
+
 func podIsReady(pod *v1.Pod) bool {
 	if pod == nil || pod.GetDeletionTimestamp() != nil {
 		// A missing pod or a pod being deleted is not considered ready
 		return false
 	}
 	phaseOk := pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodRunning
-	// initCounts, counts := containerCounts(pod)
-	// return initCounts.Ok() && counts.Ok() && phaseOk
-	return phaseOk
+	initCounts, counts := containerCounts(pod)
+	return initCounts.Ok() && counts.Ok() && phaseOk
 }
 
 func podIsCompleted(pod *v1.Pod) bool {
