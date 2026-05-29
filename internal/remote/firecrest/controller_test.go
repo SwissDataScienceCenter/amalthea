@@ -79,7 +79,7 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 	assert.Contains(t, foundMounts, "\"/project:/project\"")
 	assert.Contains(t, foundMounts, "\"/scratch:/scratch\"")
 	assert.Contains(t, foundMounts, "\"/store:/store\"")
-	assert.Contains(t, foundMounts, "\"/users/${USER}:/home/users/${USER}:ro\"")
+	assert.Contains(t, foundMounts, "\"/users:/home/users:ro\"")
 	assert.Contains(t, foundMounts, "\"/secrets:/secrets:ro\"")
 	assert.Contains(t, foundMounts, "\"/cluster-specific:/cluster-specific\"")
 }

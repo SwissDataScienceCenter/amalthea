@@ -643,7 +643,7 @@ func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, s
 		case Users:
 			// TODO: Try to mount home at its location (need to handle ~/.bashrc)
 			// TODO: Alternatively, copy the contents in the container
-			mounts = append(mounts, fmt.Sprintf("%s/${USER}:/home%s/${USER}:ro", fs.Path, fs.Path))
+			mounts = append(mounts, fmt.Sprintf("%s:/home%s:ro", fs.Path, fs.Path))
 		default:
 			// Identity mapping of the host mounts
 			mounts = append(mounts, fmt.Sprintf("%s:%s", fs.Path, fs.Path))
