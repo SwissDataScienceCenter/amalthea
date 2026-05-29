@@ -86,20 +86,15 @@ function install_wstunnel() {
 
     >&2 echo "Info: using wstunnel v${wstunnel_version}"
 
-    skip_install="0"
     if [ -f "${wstunnel_bin}" ]; then
         version="$("${wstunnel_bin}" --version || echo "bad executable")"
         expected="wstunnel-cli ${wstunnel_version}"
-        if [ "${version}" = "${expected}" ]; then
-            skip_install="1"
+        if [ "x${version}" = "x${expected}" ]; then
+            echo "${wstunnel_bin}"
+            return 0
         else
             >&2 echo "WARNING: found mismatching wstunnel version ${version}"
         fi
-    fi
-
-    if [ "${skip_install}" != "0" ]; then
-        echo "${wstunnel_bin}"
-        return 0
     fi
 
     wstunnel_url="https://github.com/SwissDataScienceCenter/wstunnel/releases/download/v${wstunnel_version}/wstunnel_${wstunnel_version}_linux_${gh_arch}.tar.gz"
