@@ -70,7 +70,13 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 	assert.Contains(t, sessionScriptFinal, "#SBATCH --partition=my-partition")
 
 	// Check the mounts
-	mountsRegExp := regexp.MustCompile(`mounts(?:\s*)=(?:\s*)[[]([^]]*)]`)
+	// From `srun --help`:
+	//      --container-mounts=SRC:DST[:FLAGS][,SRC:DST...]
+	//                              [pyxis] bind mount[s] inside the container. Mount
+	//                              flags are separated with "+", e.g. "ro+rprivate"
+	flagsRegExp := `:(?:ro|rprivate)(?:[+](?:ro|rprivate))*`
+	mountRegExp := `"[^:,"]+:[^:,"]+(?:` + flagsRegExp + `)?"`
+	mountsRegExp := regexp.MustCompile(`--container-mounts=(` + mountRegExp + `(?:,` + mountRegExp + `)*)`)
 	matches := mountsRegExp.FindStringSubmatch(sessionScriptFinal)
 	assert.Len(t, matches, 2)
 	foundMounts := matches[1]
