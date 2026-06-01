@@ -120,12 +120,11 @@ function install_wstunnel() {
     echo "${wstunnel_bin}"
 }
 
-echo "SESSION_DIR: ${SESSION_DIR}"
-echo "SESSION_WORK_DIR: ${SESSION_WORK_DIR}"
-
-mkdir -p "${SESSION_WORK_DIR}"
-mkdir -p "${SECRETS_DIR}"
-mkdir -p "${LOGS_DIR}"
+for d in SESSION_WORK_DIR SECRETS_DIR LOGS_DIR
+do
+    echo "${d}: ${!d}"
+    mkdir -p "${!d}"
+done
 
 # # Install rclone
 # rclone="$(install_rclone "${RCLONE_VERSION}" "${gh_arch}")"
@@ -135,7 +134,7 @@ mkdir -p "${LOGS_DIR}"
 wstunnel="$(install_wstunnel "${WSTUNNEL_VERSION}" "${gh_arch}")"
 echo "wstunnel: ${wstunnel}"
 
-# Ensure NVIDIA_VISIBLE_DEVICES is set to void 
+# Ensure NVIDIA_VISIBLE_DEVICES is set to void
 # so that cuda enabled images work on eiger
 if !(nvidia-smi 2>&1 >/dev/null); then
     export NVIDIA_VISIBLE_DEVICES=void
