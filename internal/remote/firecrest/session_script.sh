@@ -147,8 +147,6 @@ fi
 # Create the environment.toml file to run the session
 EDF_FILE="${SESSION_DIR}/environment.toml"
 cat <<EOF >"${EDF_FILE}"
-image = "${REMOTE_SESSION_IMAGE}"
-
 #{{SESSION_MOUNTS_PLACEHOLDER}}
 
 workdir = "${SESSION_WORK_DIR}"
@@ -156,6 +154,8 @@ workdir = "${SESSION_WORK_DIR}"
 [annotations]
 com.hooks.cxi.enabled = "false"
 EOF
+
+srun_param_container_image="--container-image ${REMOTE_SESSION_IMAGE}"
 
 export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
 export RENKU_WORKING_DIR="${SESSION_WORK_DIR}"
@@ -253,6 +253,10 @@ echo "Starting session..."
 # Start session while listening to EXIT signals
 pid=
 trap 'exit_script && [[ $pid ]] && kill -TERM "$pid" && exit_script' EXIT
-srun --environment "${EDF_FILE}" --no-container-entrypoint sh /etc/rc & pid=$!
+srun \
+    --environment "${EDF_FILE}" \
+    ${srun_param_container_image} \
+    --no-container-entrypoint sh /etc/rc \
+    & pid=$!
 wait
 pid=
