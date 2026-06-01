@@ -147,14 +147,13 @@ fi
 # Create the environment.toml file to run the session
 EDF_FILE="${SESSION_DIR}/environment.toml"
 cat <<EOF >"${EDF_FILE}"
-#{{SESSION_MOUNTS_PLACEHOLDER}}
-
 [annotations]
 com.hooks.cxi.enabled = "false"
 EOF
 
 srun_param_container_image="--container-image ${REMOTE_SESSION_IMAGE}"
 srun_param_workdir="--container-workdir ${SESSION_WORK_DIR}"
+srun_param_mounts=#{{SESSION_MOUNTS_PLACEHOLDER}}
 
 export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
 export RENKU_WORKING_DIR="${SESSION_WORK_DIR}"
@@ -256,6 +255,7 @@ srun \
     --environment "${EDF_FILE}" \
     ${srun_param_container_image} \
     ${srun_param_workdir} \
+    ${srun_param_mounts} \
     --no-container-entrypoint sh /etc/rc \
     & pid=$!
 wait
