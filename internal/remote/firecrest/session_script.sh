@@ -9,12 +9,17 @@
 
 set -e -o pipefail
 
+: ${REMOTE_SESSION_IMAGE:?'not set, aborting!'}
+
 : ${ARCH:=$(uname -m)}
 : ${RENKU_PKG:="${HOME}/.renku/${ARCH}/pkg"}
+: ${GIT_PROXY_PORT:=65480}
+: ${GIT_PROXY_HEALTH_PORT:=65481}
 : ${GIT_PROXY_WAIT_SLEEP_SECONDS:=10}
 : ${GIT_PROXY_WAIT_RETRIES:=10}
 : ${RCLONE_VERSION:="1.70.2"}
 
+: ${WSTUNNEL_PATH_PREFIX:="sessions/my-session/wstunnel"}
 : ${WSTUNNEL_VERSION_x86_64:="10.4.4"}
 : ${WSTUNNEL_VERSION_aarch64:="10.1.10"}
 : ${d:="WSTUNNEL_VERSION_${ARCH}"}
@@ -33,6 +38,11 @@ case ${ARCH} in
         exit 1
         ;;
 esac
+
+: ${SESSION_DIR:="${PWD}"}
+: ${SESSION_WORK_DIR:="${SESSION_DIR}/work"}
+: ${SECRETS_DIR:="${SESSION_DIR}/secrets"}
+: ${LOGS_DIR:="${SESSION_DIR}/logs"}
 
 # Installs rclone
 #
@@ -114,15 +124,6 @@ function install_wstunnel() {
     echo "${wstunnel_bin}"
 }
 
-if [ -z "${REMOTE_SESSION_IMAGE}" ]; then
-    echo "REMOTE_SESSION_IMAGE is not set, aborting!"
-    exit 1
-fi
-
-SESSION_DIR="$(pwd)"
-SESSION_WORK_DIR="${SESSION_DIR}/work"
-SECRETS_DIR="${SESSION_DIR}/secrets"
-LOGS_DIR="${SESSION_DIR}/logs"
 echo "SESSION_DIR: ${SESSION_DIR}"
 echo "SESSION_WORK_DIR: ${SESSION_WORK_DIR}"
 
@@ -180,9 +181,6 @@ echo "TODO: setup rclone mounts..."
 # "${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
 
 # echo "Starting tunnel..."
-GIT_PROXY_PORT="${GIT_PROXY_PORT:-65480}"
-GIT_PROXY_HEALTH_PORT="${GIT_PROXY_HEALTH_PORT:-65481}"
-WSTUNNEL_PATH_PREFIX="${WSTUNNEL_PATH_PREFIX:-sessions/my-session/wstunnel}"
 echo "wstunnel client \
   -R tcp://0.0.0.0:${RENKU_SESSION_PORT}:localhost:${RENKU_SESSION_PORT} \
   -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT} \
