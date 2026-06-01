@@ -140,12 +140,17 @@ if !(nvidia-smi 2>&1 >/dev/null); then
     export NVIDIA_VISIBLE_DEVICES=void
 fi
 
-# Create the environment.toml file to run the session
-EDF_FILE="${SESSION_DIR}/environment.toml"
-cat <<EOF >"${EDF_FILE}"
+if srun --help | grep -q -- --environment; then
+    # Create the environment.toml file to run the session
+    EDF_FILE="${SESSION_DIR}/environment.toml"
+    cat <<EOF >"${EDF_FILE}"
 [annotations]
 com.hooks.cxi.enabled = "false"
 EOF
+    srun_param_environment="--environment ${EDF_FILE}"
+else
+    srun_param_environment=""
+fi
 
 srun_param_container_image="--container-image ${REMOTE_SESSION_IMAGE}"
 srun_param_workdir="--container-workdir ${SESSION_WORK_DIR}"
@@ -248,7 +253,7 @@ echo "Starting session..."
 pid=
 trap 'exit_script && [[ $pid ]] && kill -TERM "$pid" && exit_script' EXIT
 srun \
-    --environment "${EDF_FILE}" \
+    ${srun_param_environment} \
     ${srun_param_container_image} \
     ${srun_param_workdir} \
     ${srun_param_mounts} \
