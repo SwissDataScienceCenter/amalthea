@@ -149,13 +149,12 @@ EDF_FILE="${SESSION_DIR}/environment.toml"
 cat <<EOF >"${EDF_FILE}"
 #{{SESSION_MOUNTS_PLACEHOLDER}}
 
-workdir = "${SESSION_WORK_DIR}"
-
 [annotations]
 com.hooks.cxi.enabled = "false"
 EOF
 
 srun_param_container_image="--container-image ${REMOTE_SESSION_IMAGE}"
+srun_param_workdir="--container-workdir ${SESSION_WORK_DIR}"
 
 export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
 export RENKU_WORKING_DIR="${SESSION_WORK_DIR}"
@@ -256,6 +255,7 @@ trap 'exit_script && [[ $pid ]] && kill -TERM "$pid" && exit_script' EXIT
 srun \
     --environment "${EDF_FILE}" \
     ${srun_param_container_image} \
+    ${srun_param_workdir} \
     --no-container-entrypoint sh /etc/rc \
     & pid=$!
 wait
