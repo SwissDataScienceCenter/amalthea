@@ -44,6 +44,15 @@ esac
 : ${SECRETS_DIR:="${SESSION_DIR}/secrets"}
 : ${LOGS_DIR:="${SESSION_DIR}/logs"}
 
+# Setup session environment
+export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
+export RENKU_WORKING_DIR="${SESSION_WORK_DIR}"
+# Force the frontend to listen on 127.0.0.1
+export RENKU_SESSION_IP="127.0.0.1"
+
+# Load the wstunnel secret
+export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
+
 # Installs rclone
 #
 # Usage:
@@ -159,14 +168,6 @@ fi
 srun_param_container_image="--container-image ${REMOTE_SESSION_IMAGE}"
 srun_param_workdir="--container-workdir ${SESSION_WORK_DIR}"
 srun_param_mounts=#{{SESSION_MOUNTS_PLACEHOLDER}}
-
-export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
-export RENKU_WORKING_DIR="${SESSION_WORK_DIR}"
-# Force the frontend to listen on 127.0.0.1
-export RENKU_SESSION_IP="127.0.0.1"
-
-# Load the wstunnel secret
-export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
 
 echo "TODO: setup rclone mounts..."
 
