@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -760,15 +761,22 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		StringData: map[string]string{},
 	}
 
-	// Secret used to secure the tunnel for remote sessions
 	if as.Spec.SessionLocation == Remote {
+		// Secret used to secure the tunnel for remote sessions
 		tunnelSecret, err := makeTunnelSecret(16)
 		if err != nil {
 			panic(err)
 		}
-
 		secret.StringData["WSTUNNEL_SECRET"] = tunnelSecret
+
+		// Add the Datasources Specifications so that the proxy container can write them out to the HPC cluster
+		ds, dsErr := json.Marshal(as.Spec.DataSources)
+		if dsErr != nil {
+			panic(dsErr)
+		}
+		secret.StringData["DATA_SOURCES"] = string(ds)
 	}
+
 	// Skip the 'oidc' configuration if it is not needed
 	if as.Spec.Authentication.Type == Oidc {
 		pathPrefix := as.ingressPathPrefix()
@@ -994,6 +1002,15 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 				SecretKeyRef: ptr.To(v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
 					Key:                  "WSTUNNEL_SECRET",
+				}),
+			}),
+		},
+		v1.EnvVar{ //TODO: simplify the container secret handling, why put some values in the env instead of secrets mounts?
+			Name: "RSC_DATA_SOURCES",
+			ValueFrom: ptr.To(v1.EnvVarSource{
+				SecretKeyRef: ptr.To(v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
+					Key:                  "DATA_SOURCES",
 				}),
 			}),
 		},
