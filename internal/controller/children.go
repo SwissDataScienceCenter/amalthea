@@ -334,6 +334,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			current.Spec.Template.Spec.NodeSelector = desired.Spec.Template.Spec.NodeSelector
 			current.Spec.Template.Spec.PriorityClassName = desired.Spec.Template.Spec.PriorityClassName
 			current.Spec.Suspend = desired.Spec.Suspend
+			current.Spec.ActiveDeadlineSeconds = desired.Spec.ActiveDeadlineSeconds
+			current.Spec.TTLSecondsAfterFinished = desired.Spec.TTLSecondsAfterFinished
 			switch strategy := cr.Spec.ReconcileStrategy; strategy {
 			case amaltheadevv1alpha1.Never:
 				return nil
