@@ -311,6 +311,10 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				}
 				return err
 			}
+			// finished jobs or those that are terminating are not updated
+			if current.Status.Terminating != nil || current.Status.Failed > 0 || current.Status.Succeeded > 0 {
+				return nil
+			}
 
 			// suspending jobs
 			if current.Spec.Suspend != nil && desired.Spec.Suspend != nil && *current.Spec.Suspend && !*desired.Spec.Suspend {
@@ -537,6 +541,10 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
 		return msg
 	}
 	msg = ingressFailureReason(c.Ingress.Manifest)
+	if msg != "" {
+		return msg
+	}
+	msg = jobFailureReason(c.Job.Manifest)
 	if msg != "" {
 		return msg
 	}
