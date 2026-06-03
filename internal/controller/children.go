@@ -302,7 +302,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return fmt.Errorf("could not cast when reconciling")
 			}
 			// finished jobs are not updated
-			if jobIsCompleted(current.Status) {
+			if jobIsFinished(current.Status) {
 				log.Info("Job is terminated, not reconciling", "job", current.Name)
 				return nil
 			}

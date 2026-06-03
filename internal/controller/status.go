@@ -100,7 +100,7 @@ func podIsCompleted(pod *v1.Pod) bool {
 	return phaseCompleted && totalCnt == completedCnt
 }
 
-func jobIsCompleted(job batchv1.JobStatus) bool {
+func jobIsFinished(job batchv1.JobStatus) bool {
 	for _, c := range job.Conditions {
 		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == v1.ConditionTrue {
 			return true
