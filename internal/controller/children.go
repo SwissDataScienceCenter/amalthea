@@ -311,8 +311,9 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				}
 				return err
 			}
-			// finished jobs or those that are terminating are not updated
-			if current.Status.Terminating != nil || current.Status.Failed > 0 || current.Status.Succeeded > 0 {
+			// finished jobs are not updated
+			if jobIsCompleted(current.Status) {
+				log.Info("Job is terminated, not reconciling", "job", current.Name)
 				return nil
 			}
 

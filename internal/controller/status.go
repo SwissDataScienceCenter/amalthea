@@ -6,6 +6,7 @@ import (
 	"time"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,6 +98,15 @@ func podIsCompleted(pod *v1.Pod) bool {
 	}
 
 	return phaseCompleted && totalCnt == completedCnt
+}
+
+func jobIsCompleted(job batchv1.JobStatus) bool {
+	for _, c := range job.Conditions {
+		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *amaltheadevv1alpha1.AmaltheaSession) (v1.ResourceList, error) {
