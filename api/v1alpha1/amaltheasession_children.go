@@ -759,23 +759,15 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		},
 		StringData: map[string]string{},
 	}
+
 	// Secret used to secure the tunnel for remote sessions
-	tunnelSecret := ""
 	if as.Spec.SessionLocation == Remote {
-		var err error
-		tunnelSecret, err = makeTunnelSecret(16)
+		tunnelSecret, err := makeTunnelSecret(16)
 		if err != nil {
 			panic(err)
 		}
-	}
 
-	if as.Spec.Authentication == nil || as.Spec.Authentication.Type != Oidc {
-		// In this case we do not need the 'oidc' configuration in the secret,
-		// we just return an empty one, or one populated with the tunnel secret.
-		if tunnelSecret != "" {
-			secret.StringData["WSTUNNEL_SECRET"] = tunnelSecret
-		}
-		return secret
+		secret.StringData["WSTUNNEL_SECRET"] = tunnelSecret
 	}
 
 	// Add the 'oidc' configuration if requested
@@ -842,9 +834,6 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		secret.StringData["oauth2-proxy-config.yaml"] = strings.Join(oldConfigLines, "\n")
 	}
 
-	if tunnelSecret != "" {
-		secret.StringData["WSTUNNEL_SECRET"] = tunnelSecret
-	}
 	return secret
 }
 
