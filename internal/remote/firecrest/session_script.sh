@@ -140,9 +140,9 @@ do
     mkdir -p "${!d}"
 done
 
-# # Install rclone
-# rclone="$(install_rclone "${RCLONE_VERSION}" "${gh_arch}")"
-# echo "rclone: ${rclone}"
+# Install rclone
+rclone="$(install_rclone "${RCLONE_VERSION}" "${gh_arch}")"
+echo "rclone: ${rclone}"
 
 # Install wstunnel
 wstunnel="$(install_wstunnel "${WSTUNNEL_VERSION}" "${gh_arch}")"
