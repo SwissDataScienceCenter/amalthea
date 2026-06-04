@@ -706,7 +706,11 @@ func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, s
 
 	// Add the secrets mount
 	if secretsPath != "" {
-		mounts = append(mounts, fmt.Sprintf("%s:/secrets:ro", secretsPath))
+		containerSecretsPath, ok := os.LookupEnv("RENKU_SECRETS_PATH")
+		if !ok {
+			containerSecretsPath = "/secrets" // default value
+		}
+		mounts = append(mounts, fmt.Sprintf("%s:%s:ro", secretsPath, containerSecretsPath))
 	}
 
 	// Format mount list
