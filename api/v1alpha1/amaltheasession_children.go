@@ -11,6 +11,7 @@ import (
 	"maps"
 	"net/url"
 	"os"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -643,11 +644,61 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 // Assuming that the csi-rclone driver from https://github.com/SwissDataScienceCenter/csi-rclone
 // is installed, this will generate PVCs for the data sources that have the rclone type.
 func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
-	// TODO: Configure this for remote sessions
-	if as.Spec.SessionLocation == Remote {
-		return []v1.PersistentVolumeClaim{}, []v1.Volume{}, []v1.VolumeMount{}
+	switch as.Spec.SessionLocation {
+	case Remote:
+		return as.RemoteSessionDataSources()
+	case Local:
+		return as.LocalSessionDataSources()
+	default:
+		panic("invalid session location")
+	}
+}
+
+func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
+	pvcs := []v1.PersistentVolumeClaim{}
+	vols := []v1.Volume{}
+	volMounts := []v1.VolumeMount{}
+
+	// Generate a short list of secrets names, will be used to also get indices.
+	var secrets []string
+	for _, pv := range as.Spec.DataSources {
+		if pv.SecretRef.isAdopted() {
+			secrets = append(secrets, pv.SecretRef.Name)
+		}
 	}
 
+	proxySecretsFolder, exists := os.LookupEnv("RENKU_SECRETS_PATH")
+	if !exists {
+		proxySecretsFolder = "/secrets"
+	}
+	proxySecretsFolder = fmt.Sprintf("%s-dcs", proxySecretsFolder)
+	for ids, secret := range secrets {
+		volName := fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)
+		vols = append(
+			vols,
+			v1.Volume{
+				Name: volName,
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName:  secret,
+						DefaultMode: ptr.To(int32(256)), // decimal value of 0400 for the access flags (chmod-like)
+					},
+				},
+			},
+		)
+		volMounts = append(
+			volMounts,
+			v1.VolumeMount{
+				Name:      volName,
+				ReadOnly:  true,
+				MountPath: path.Join(proxySecretsFolder, volName),
+			},
+		)
+	}
+	return pvcs, vols, volMounts
+}
+
+func (as *AmaltheaSession) LocalSessionDataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
 	pvcs := []v1.PersistentVolumeClaim{}
 	vols := []v1.Volume{}
 	volMounts := []v1.VolumeMount{}
