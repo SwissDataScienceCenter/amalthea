@@ -126,25 +126,37 @@ func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state mo
 	return c.currentStatus, c.currentStatusError
 }
 
-func (c *FirecrestRemoteSessionController) uploadSecrets(ctx context.Context, remoteSecretsPath string) error {
+func walkIfExists(root string, filter func(dir os.DirEntry) bool, process func(dir os.DirEntry) error, onceBefore ...func() error) error {
 	var err error
 
-	localSessionSecretsFolder, exists := os.LookupEnv("RENKU_SECRETS_PATH")
-	if !exists {
-		localSessionSecretsFolder = "/secrets"
-	}
-
-	files, err := os.ReadDir(localSessionSecretsFolder)
+	dirEntries, err := os.ReadDir(root)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// The folder does not exist if there are no secrets slots defined.
 			return nil
 		}
 		return err
 	}
 
+	if onceBefore != nil && onceBefore[0] != nil {
+		if err = onceBefore[0](); err != nil {
+			return err
+		}
+	}
+
+	for _, dirEntry := range dirEntries {
+		if filter(dirEntry) {
+			if err = process(dirEntry); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func ensurePrivateFolder(c *FirecrestRemoteSessionController, ctx context.Context, remoteSecretsPath string) error {
 	// Ensure the remote folder exists
-	err = c.mkdir(ctx, remoteSecretsPath, true)
+	err := c.mkdir(ctx, remoteSecretsPath, true)
 	if err != nil {
 		return err
 	}
@@ -153,29 +165,70 @@ func (c *FirecrestRemoteSessionController) uploadSecrets(ctx context.Context, re
 	if err != nil {
 		return err
 	}
+	return err
+}
 
-	for _, file := range files {
-		if file.IsDir() {
-			// Ignore hierarchies for now, this will also skip "." and ".." as both are folders
-			continue
-		}
-		var content []byte
-		name := file.Name()
-		content, err = os.ReadFile(path.Join(localSessionSecretsFolder, name))
-		if err != nil {
-			return err
-		}
-		err = c.uploadFile(ctx, remoteSecretsPath, name, content)
-		if err != nil {
-			return err
-		}
-		err = c.chmod(ctx, path.Join(remoteSecretsPath, name), "400")
-		if err != nil {
-			return err
-		}
+func (c *FirecrestRemoteSessionController) uploadSecret(ctx context.Context, localSessionSecretsFolder, remoteSecretsPath, filename string) error {
+	var err error
+	var content []byte
+
+	if content, err = os.ReadFile(path.Join(localSessionSecretsFolder, filename)); err != nil {
+		return err
 	}
 
-	return nil
+	// ignore errors, we want this just to make sure we can write to it if the files exists
+	_ = c.chmod(ctx, path.Join(remoteSecretsPath, filename), "700")
+
+	if err = c.uploadFile(ctx, remoteSecretsPath, filename, content); err != nil {
+		return err
+	}
+
+	if err = c.chmod(ctx, path.Join(remoteSecretsPath, filename), "400"); err != nil {
+		return err
+	}
+
+	return err
+}
+
+func isFile(dir os.DirEntry) bool {
+	return !dir.IsDir()
+}
+
+func isDir(dir os.DirEntry) bool {
+	return dir.IsDir()
+}
+
+func (c *FirecrestRemoteSessionController) uploadSecrets(ctx context.Context, localSessionSecretsFolder, remoteSecretsPath string) error {
+	return walkIfExists(
+		localSessionSecretsFolder,
+		func(dir os.DirEntry) bool {
+			return isFile(dir) && !strings.HasPrefix(dir.Name(), "..")
+		},
+		func(a os.DirEntry) error {
+			filename := a.Name()
+			return c.uploadSecret(ctx, localSessionSecretsFolder, remoteSecretsPath, filename)
+		},
+		func() error {
+			return ensurePrivateFolder(c, ctx, remoteSecretsPath)
+		},
+	)
+}
+
+func (c *FirecrestRemoteSessionController) uploadDCSecrets(ctx context.Context, localSessionSecretsFolder, remoteSecretsPath string) error {
+	return walkIfExists(
+		localSessionSecretsFolder,
+		isDir,
+		func(dir os.DirEntry) error {
+			return c.uploadSecrets(
+				ctx,
+				path.Join(localSessionSecretsFolder, dir.Name()),
+				path.Join(remoteSecretsPath, dir.Name()),
+			)
+		},
+		func() error {
+			return ensurePrivateFolder(c, ctx, remoteSecretsPath)
+		},
+	)
 }
 
 // Start sets up and starts the remote session using the FirecREST API
@@ -246,33 +299,67 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	slog.Info("determined session path", "sessionPath", srunSessionPath)
 
 	// Setup secrets
-	srunSecretsPath := path.Join(srunSessionPath, "secrets")
-	err = c.mkdir(startCtx, srunSecretsPath, true /* createParents */)
-	if err != nil {
-		return err
+	containerSecretsPath, exists := os.LookupEnv("RENKU_SECRETS_PATH")
+	if !exists {
+		containerSecretsPath = "/secrets"
 	}
+
 	// Makes sure that only the session owner can read session files
-	err = c.chmod(startCtx, srunSessionPath, "700")
-	if err != nil {
+	if err = ensurePrivateFolder(c, startCtx, srunSessionPath); err != nil {
 		return err
 	}
+
+	srunSecretsPath := path.Join(srunSessionPath, "secrets")
+	if err = ensurePrivateFolder(c, startCtx, srunSecretsPath); err != nil {
+		return err
+	}
+
 	// TODO: get wstunnel_secret as a config value
 	wstunnel_secret := os.Getenv("RSC_WSTUNNEL_SECRET")
 	if wstunnel_secret != "" {
-		err = c.uploadFile(startCtx, srunSecretsPath, "wstunnel_secret", []byte(wstunnel_secret))
-		if err != nil {
+		content := []byte(wstunnel_secret)
+		filename := "wstunnel_secret"
+
+		// ignore errors, we want this just to make sure we can write to it if the files exists
+		_ = c.chmod(startCtx, path.Join(srunSecretsPath, filename), "700")
+
+		if err = c.uploadFile(startCtx, srunSecretsPath, filename, content); err != nil {
 			return err
 		}
-		err = c.chmod(startCtx, path.Join(srunSecretsPath, "wstunnel_secret"), "400")
-		if err != nil {
+
+		if err = c.chmod(startCtx, path.Join(srunSecretsPath, filename), "400"); err != nil {
 			return err
 		}
 	}
+
 	// Upload user secrets into secretsPath
-	secretSlotsPath := path.Join(srunSecretsPath, "slots")
-	err = c.uploadSecrets(startCtx, containerSecretsPath, secretSlotsPath)
-	if err != nil {
+	srunSecretSlotsPath := path.Join(srunSecretsPath, "slots")
+	containerSecretSlotsPath := containerSecretsPath // the secrets are stored directly, as is
+
+	var dirEntries []os.DirEntry
+	if dirEntries, err = os.ReadDir(containerSecretSlotsPath); err != nil && !os.IsNotExist(err) {
 		return err
+	}
+	if len(dirEntries) == 0 {
+		// There are no secrets to mount
+		srunSecretSlotsPath = ""
+	} else {
+		if err = c.uploadSecrets(startCtx, containerSecretSlotsPath, srunSecretSlotsPath); err != nil {
+			return err
+		}
+	}
+
+	srunDCsPath := path.Join(srunSecretsPath, "dcs")
+	// Can't put them under /secrets as we can't create the "dcs" folder as the volume is RO. "/" seems fine :shrug:
+	containerDCsPath := fmt.Sprintf("%s-dcs", containerSecretsPath)
+	if dirEntries, err = os.ReadDir(containerDCsPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if len(dirEntries) > 0 {
+		// Upload data source secrets
+		if err = c.uploadDCSecrets(startCtx, containerDCsPath, srunDCsPath); err != nil {
+			return err
+		}
 	}
 
 	// Setup git repositories
@@ -352,8 +439,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
 	// Upload the session script
-	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, secretSlotsPath)
-	err = c.uploadFile(ctx, srunSessionPath, "session_script.sh", []byte(sessionScriptFinal))
+	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, srunSecretSlotsPath)
+	err = c.uploadFile(startCtx, srunSessionPath, "session_script.sh", []byte(sessionScriptFinal))
 	if err != nil {
 		return err
 	}
@@ -526,6 +613,25 @@ func (c *FirecrestRemoteSessionController) uploadFile(ctx context.Context, direc
 		return fmt.Errorf("could not run uploadFile: HTTP %d", res.StatusCode())
 	}
 	return nil
+}
+
+func (c *FirecrestRemoteSessionController) ls(ctx context.Context, path string) (*[]File, error) {
+	body := &GetLsFilesystemSystemNameOpsLsGetParams{
+		Path: path,
+	}
+	res, err := c.client.GetLsFilesystemSystemNameOpsLsGetWithResponse(ctx, c.systemName, body)
+	if err != nil {
+		return nil, err
+	}
+	if res.JSON200 == nil {
+		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
+		if message != "" {
+			return nil, fmt.Errorf("could not run ls: %s", message)
+		}
+		return nil, fmt.Errorf("could not run ls: HTTP %d", res.StatusCode())
+	}
+
+	return res.JSON200.Output, nil
 }
 
 func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path string, createParents bool) error {
