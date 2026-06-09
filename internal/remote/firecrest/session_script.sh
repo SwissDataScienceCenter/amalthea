@@ -36,16 +36,23 @@ esac
 
 : ${SESSION_DIR:="${PWD}"}
 : ${SESSION_WORK_DIR:="${SESSION_DIR}/work"}
-: ${SECRETS_DIR:="${SESSION_DIR}/secrets"}
+: ${SECRETS_DIR:="$(mktemp -d)"}
 : ${SECRETS_USER_DIR:="${SECRETS_DIR}/user/"}
 : ${SECRETS_DATA_CONNECTORS_DIR:="${SECRETS_DIR}/data_connectors"}
 : ${LOGS_DIR:="${SESSION_DIR}/logs"}
+: ${CACHE_DIR:="${SECRETS_DIR}/cache"}
 
 # Setup session environment
 export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
 export RENKU_WORKING_DIR="${SESSION_WORK_DIR}"
 # Force the frontend to listen on 127.0.0.1
 export RENKU_SESSION_IP="127.0.0.1"
+
+# Do not leave secrets on a shared fs, move it to the node where the session runs.
+mkdir -p "${SECRETS_DIR}"
+chmod 700 "${SECRETS_DIR}"
+mv "${SESSION_DIR}/secrets/*" "${SECRETS_DIR}"
+rmdir "${SESSION_DIR}/secrets"
 
 # Load the wstunnel secret
 export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
@@ -173,19 +180,36 @@ srun_param_container_image="--container-image ${REMOTE_SESSION_IMAGE}"
 srun_param_workdir="--container-workdir ${SESSION_WORK_DIR}"
 srun_param_mounts=#{{SESSION_MOUNTS_PLACEHOLDER}}
 
-echo "TODO: setup rclone mounts..."
+# Mount DataSources, if any
+if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
+    (# Run in a sub shell to scope the temporary variables
+        for dc in "${SECRETS_DATA_CONNECTORS_DIR}"/*; do
+            n=$(echo ${dc}|sed -e 's,.*-,,')
+            mount="$(cat "${dc}/remote")"
+            remotePath="$(cat "${dc}/remotePath")"
+            log_file="${LOGS_DIR}/rclone-dc-${n}.log"
+            # TODO Manage caching options
+            # TODO Manage flags
+            # TODO Manage mountOpt options
+            readonly="--read-only" # force readonly for now
 
-# echo "Setting up example rclone mount..."
-# fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
-# rm -rf "${SESSION_WORK_DIR}/era5"
-# mkdir -p "${SESSION_WORK_DIR}/era5"
-# RCLONE_CONFIG="${SESSION_DIR}/rclone.conf"
-# cat <<EOF >"${RCLONE_CONFIG}"
-# [era5]
-# type = doi
-# doi = 10.5281/zenodo.3831980
-# EOF
-# "${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
+            echo >> "${log_file}"
+            echo "--- Starting $(date)" >> "${log_file}"
+
+            mkdir -p "${SESSION_WORK_DIR}/${mount}"
+            mkdir -p "${CACHE_DIR}/${n}"
+
+            ${rclone} mount \
+                --daemon \
+                ${readonly} \
+                --log-file="${log_file}" \
+                --cache-dir="${CACHE_DIR}/$n" \
+                --config="${dc}/configData" \
+                "${mount}:${remotePath}" \
+                "//${SESSION_WORK_DIR}/${mount}"
+        done
+    )
+fi
 
 # echo "Starting tunnel..."
 echo "wstunnel client \
@@ -257,7 +281,30 @@ function exit_script() {
     # Make sure we have a valid pid before attempting to kill it
     (test -n "${pid}" && ps "${pid}" > /dev/null && kill -TERM "${pid}") || true
 
-    # fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
+    # kill rclone to unmount DCs, but only the ones of the current session
+    # which we figure out by their log file
+    ps -u "${USER}" -o pid=,cmd= | grep "${LOGS_DIR}/rclone-dc-" | grep -v grep | sed -e 's,^ *,,' | cut -d ' ' -f 1 | while read rclone_pid; do
+        test -n "${rclone_pid}" | kill -TERM "${rclone_pid}" || true
+    done
+
+    # Cleanup Data Source mount points
+    if [ -d "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
+        for dc in "${SECRETS_DATA_CONNECTORS_DIR}"/*; do
+            rmdir "${SESSION_WORK_DIR}/$(cat "${dc}/remote")" || true
+        done
+    fi
+
+    # Remove the secrets from the node, leaving them generates problem in case
+    # of suppression of Data Connectors/user secrets from the project, for example.
+    # Same thing for the caches, as they will be renumbered.
+    for d in \
+        CACHE_DIR \
+        SECRETS_DATA_CONNECTORS_DIR \
+        SECRETS_USER_DIR \
+        SECRETS_DIR
+    do
+        rm -rf "${!d}" || true
+    done
 
     # Sometimes the job continues to run...
     scancel "${SLURM_JOB_ID}" || true
