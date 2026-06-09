@@ -45,6 +45,7 @@ esac
 : ${SECRETS_SLOTS_DIR:="${SECRETS_DIR}/slots/"}
 : ${SECRETS_DCS_DIR:="${SECRETS_DIR}/dcs/"}
 : ${LOGS_DIR:="${SESSION_DIR}/logs"}
+: ${CACHE_DIR:="${SESSION_DIR}/cache"}
 
 # Setup session environment
 export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
@@ -174,19 +175,35 @@ srun_param_container_image="--container-image ${REMOTE_SESSION_IMAGE}"
 srun_param_workdir="--container-workdir ${SESSION_WORK_DIR}"
 srun_param_mounts=#{{SESSION_MOUNTS_PLACEHOLDER}}
 
-echo "TODO: setup rclone mounts..."
+# Mount DataSources, if any
+(# Run in a sub shell to prevent changing the working directory of the caller
+    for dc in ${SECRETS_DCS_DIR}/*
+    do
+        n=$(echo ${dc}|sed -e 's,.*-,,')
+        mount="$(cat "${dc}/remote")"
+        remotePath="$(cat "${dc}/remotePath")"
+        log_file="${LOGS_DIR}/rclone-dc-${n}.log"
+        # TODO Manage caching options
+        # TODO Manage flags
+        # TODO Manage mountOpt options
+        readonly="--read-only" # force readonly for now
 
-# echo "Setting up example rclone mount..."
-# fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
-# rm -rf "${SESSION_WORK_DIR}/era5"
-# mkdir -p "${SESSION_WORK_DIR}/era5"
-# RCLONE_CONFIG="${SESSION_DIR}/rclone.conf"
-# cat <<EOF >"${RCLONE_CONFIG}"
-# [era5]
-# type = doi
-# doi = 10.5281/zenodo.3831980
-# EOF
-# "${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
+        echo >> "${log_file}"
+        echo "--- Starting $(date)" >> "${log_file}"
+
+        mkdir -p "${SESSION_WORK_DIR}/${mount}"
+        mkdir -p "${CACHE_DIR}/${n}"
+
+        ${rclone} mount \
+            --daemon \
+            $readonly \
+            --log-file="${log_file}" \
+            --cache-dir="${CACHE_DIR}/$n" \
+            --config="${dc}/configData" \
+            "${mount}:${remotePath}" \
+            "//${SESSION_WORK_DIR}/${mount}"
+    done
+)
 
 # echo "Starting tunnel..."
 echo "wstunnel client \
@@ -257,6 +274,19 @@ function exit_script() {
     echo "Cleaning up session..."
     # Make sure we have a valid pid before attempting to kill it
     (test -n "${pid}" && ps "${pid}" > /dev/null && kill -TERM "${pid}") || true
+
+    # kill rclone to unmount DCs, but only the ones of the current session
+    # which we figure out by their log file
+    ps -u "${USER}" -o pid=,cmd=|grep "${LOGS_DIR}/rclone-dc-" |grep -v grep | sed -e 's,^ *,,' |cut -d ' ' -f 1 |while read rclone_pid
+    do
+        test -n "${rclone_pid}" | kill -TERM "${rclone_pid}" || true
+    done
+
+    # Cleanup Data Source mount points
+    for dc in ${SECRETS_DCS_DIR}/*
+    do
+        rmdir "${SESSION_WORK_DIR}/$(cat "${dc}/remote")" || true
+    done
 
     # TODO input validation + enabling this
     #/bin/rm -rf "${SECRETS_DIR}" || true # ignore errors in cleanup
