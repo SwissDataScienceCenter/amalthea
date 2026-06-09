@@ -36,10 +36,11 @@ esac
 
 : ${SESSION_DIR:="${PWD}"}
 : ${SESSION_WORK_DIR:="${SESSION_DIR}/work"}
-: ${SECRETS_DIR:="${SESSION_DIR}/secrets"}
+: ${SECRETS_DIR:="$(mktemp -d)"}
 : ${SECRETS_USER_DIR:="${SECRETS_DIR}/user/"}
 : ${SECRETS_DATA_CONNECTORS_DIR:="${SECRETS_DIR}/data_connectors"}
 : ${LOGS_DIR:="${SESSION_DIR}/logs"}
+: ${CACHE_DIR:="${SECRETS_DIR}/cache"}
 
 # Setup session environment
 export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
@@ -47,8 +48,50 @@ export RENKU_WORKING_DIR="${SESSION_WORK_DIR}"
 # Force the frontend to listen on 127.0.0.1
 export RENKU_SESSION_IP="127.0.0.1"
 
+# Do not leave secrets on a shared fs, move it to the node where the session runs.
+mkdir -p "${SECRETS_DIR}"
+chmod 700 "${SECRETS_DIR}"
+mv "${SESSION_DIR}/secrets"/* "${SECRETS_DIR}"
+rmdir "${SESSION_DIR}/secrets"
+
 # Load the wstunnel secret
 export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
+
+# Send the given signal to the listed PIDs
+#
+# Usage:
+#     send_signals $SIGNAL $pid_list
+function send_signals() {
+    local signal=${1:?"send_signals: missing signal name"}
+    shift
+    local pids=${@}
+
+    echo ${pids} | while read pid; do
+        (test -n "${pid}" && kill  -${signal} "${pid}") || true
+    done
+}
+
+# CamelCase to kebab-case conversion
+#
+# Usage:
+#     kebab_cased="$(to_kebab_case "[cC]amelCaseInput")"
+to_kebab_case() {
+    echo "${1:?"to_kebab_case: input string missing"}" | sed 's/\([A-Z]\)/-\1/g' | tr '[:upper:]' '[:lower:]'
+}
+
+# Convert camelCased key - value pairs stored in a flat json struct to command line arguments.
+#
+# WARNING: Whitespace and json reserved characters are stripped, so they cannot appear in keys nor values.
+#
+# Usage:
+#     arguments_string="$(to_rclone_mount_arguments "file_path" ["argument_prefix"])"
+to_rclone_mount_arguments() {
+    local filename=${1:?"to_rclone_mount_arguments: input file missing"}
+    local prefix=${2}
+    cat "${filename}" | tr -d '{} \t\r\n' | sed -e 's/","/"\n"/g' -e 's/":"/": "/g' | while IFS=': ' read -r key value; do
+        printf "%s%s=%s " "${prefix}" "$(to_kebab_case "${key}")" "${value}"
+    done
+}
 
 # Installs rclone
 #
@@ -135,8 +178,6 @@ for d in \
     SESSION_DIR \
     SESSION_WORK_DIR \
     SECRETS_DIR \
-    SECRETS_USER_DIR \
-    SECRETS_DATA_CONNECTORS_DIR \
     LOGS_DIR
 do
     echo "${d}: ${!d}"
@@ -172,20 +213,57 @@ fi
 srun_param_container_image="--container-image ${REMOTE_SESSION_IMAGE}"
 srun_param_workdir="--container-workdir ${SESSION_WORK_DIR}"
 srun_param_mounts=#{{SESSION_MOUNTS_PLACEHOLDER}}
+# We cannot generate directly the local secrets path from the proxy as the final path is only known after ${SECRETS_DIR} as been set.
+srun_param_mounts=$(echo ${srun_param_mounts} | sed -e "s,${SESSION_DIR}/secrets,${SECRETS_DIR},g")
 
-echo "TODO: setup rclone mounts..."
+# Mount DataSources, if any
+if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
+    (# Run in a sub shell to scope the temporary variables
+        for dc in "${SECRETS_DATA_CONNECTORS_DIR}"/*; do
+            n=$(echo ${dc}|sed -e 's,.*-,,')
+            mount="$(cat "${dc}/remote")"
+            remotePath="$(cat "${dc}/remotePath")"
+            log_file="${LOGS_DIR}/rclone-dc-${n}.log"
+            config_file="${dc}/configData"
+            pass="${dc}/pass"
 
-# echo "Setting up example rclone mount..."
-# fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
-# rm -rf "${SESSION_WORK_DIR}/era5"
-# mkdir -p "${SESSION_WORK_DIR}/era5"
-# RCLONE_CONFIG="${SESSION_DIR}/rclone.conf"
-# cat <<EOF >"${RCLONE_CONFIG}"
-# [era5]
-# type = doi
-# doi = 10.5281/zenodo.3831980
-# EOF
-# "${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
+            if [ -f "${pass}" ]; then
+                pass_content="$(cat "${pass}" | ${rclone} obscure -)"
+                cat "${config_file}" | sed -e "s,pass *= <sensitive>,pass = ${pass_content}," > "${config_file}.tmp" && mv "${config_file}.tmp" "${config_file}"
+                rm -f "${pass}" || true
+            fi
+
+            if [ -f "${dc}/vfsOpt" ]; then
+                vfsOptions="$(to_rclone_mount_arguments "${dc}/vfsOpt" "--vfs")"
+            fi
+
+            if [ -f "${dc}/mountOpt" ]; then
+                mountOptions="$(to_rclone_mount_arguments "${dc}/mountOpt" "-")"
+            fi
+
+            if [ -f "${dc}/extraArgs" ]; then
+                extraArgs="$(cat "${dc}/extraArgs")"
+            fi
+
+            echo >> "${log_file}"
+            echo "--- Starting $(date)" >> "${log_file}"
+
+            mkdir -p "${SESSION_WORK_DIR}/${mount}"
+            mkdir -p "${CACHE_DIR}/${n}"
+
+            ${rclone} mount \
+                --daemon \
+                ${mountOptions} \
+                --log-file="${log_file}" \
+                --cache-dir="${CACHE_DIR}/$n" \
+                ${vfsOptions} \
+                --config="${config_file}" \
+                ${extraArgs} \
+                "${mount}:${remotePath}" \
+                "//${SESSION_WORK_DIR}/${mount}"
+        done
+    )
+fi
 
 # echo "Starting tunnel..."
 echo "wstunnel client \
@@ -257,7 +335,34 @@ function exit_script() {
     # Make sure we have a valid pid before attempting to kill it
     (test -n "${pid}" && ps "${pid}" > /dev/null && kill -TERM "${pid}") || true
 
-    # fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
+    # kill rclone to unmount DCs, but only the ones of the current session
+    # which we figure out by their log file
+    rclone_pids=$(ps -u "${USER}" -o pid=,cmd= | grep "${LOGS_DIR}/rclone-dc-" | grep -v grep | sed -e 's,^ *,,' | cut -d ' ' -f 1)
+    send_signals TERM ${rclone_pids}
+
+    if [ -n "${rclone_pids}" ]; then
+        sleep 1
+        send_signals KILL ${rclone_pids}
+    fi
+
+    # Cleanup Data Source mount points
+    if [ -d "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
+        for dc in "${SECRETS_DATA_CONNECTORS_DIR}"/*; do
+            rmdir "${SESSION_WORK_DIR}/$(cat "${dc}/remote")" || true
+        done
+    fi
+
+    # Remove the secrets from the node, leaving them generates problem in case
+    # of suppression of Data Connectors/user secrets from the project, for example.
+    # Same thing for the caches, as they will be renumbered.
+    for d in \
+        CACHE_DIR \
+        SECRETS_DATA_CONNECTORS_DIR \
+        SECRETS_USER_DIR \
+        SECRETS_DIR
+    do
+        rm -rf "${!d}" || true
+    done
 
     # Sometimes the job continues to run...
     scancel "${SLURM_JOB_ID}" || true
