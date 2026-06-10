@@ -992,6 +992,18 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 			Value: fmt.Sprintf("%d", RemoteSessionControllerPort),
 		},
 		v1.EnvVar{
+			Name:  "RSC_SESSION_PORT",
+			Value: fmt.Sprintf("%d", cr.Spec.Session.Port),
+		},
+		v1.EnvVar{
+			Name:  "RSC_SESSION_URL_PATH",
+			Value: cr.Spec.Session.URLPath,
+		},
+		v1.EnvVar{
+			Name:  "RSC_READINESS_PROBE_TYPE",
+			Value: string(cr.Spec.Session.ReadinessProbe.Type),
+		},
+		v1.EnvVar{
 			Name: "RSC_WSTUNNEL_SECRET",
 			ValueFrom: ptr.To(v1.EnvVarSource{
 				SecretKeyRef: ptr.To(v1.SecretKeySelector{

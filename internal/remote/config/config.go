@@ -18,6 +18,8 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
+
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -35,8 +37,11 @@ const (
 )
 
 const (
-	serverPortFlag = "server-port"
-	fakeStartFlag  = "fake-start"
+	serverPortFlag         = "server-port"
+	fakeStartFlag          = "fake-start"
+	sessionPortFlag        = "session-port"
+	sessionURLPathFlag     = "session-url-path"
+	readinessProbeTypeFlag = "readiness-probe-type"
 )
 
 type RemoteSessionControllerConfig struct {
@@ -53,6 +58,15 @@ type RemoteSessionControllerConfig struct {
 
 	// FakeStart if true, do not start the remote session and print debug information
 	FakeStart bool
+
+	// SessionPort is the port where the remote session is expected to be serving
+	SessionPort int32
+
+	// SessionURLPath is the URL path for the HTTP readiness probe
+	SessionURLPath string
+
+	// ReadinessProbeType is "none", "tcp", or "http"
+	ReadinessProbeType string
 }
 
 func SetFlags(cmd *cobra.Command) error {
@@ -69,6 +83,30 @@ func SetFlags(cmd *cobra.Command) error {
 		return err
 	}
 	if err := viper.BindEnv(fakeStartFlag, configUtils.AsEnvVarFlag(fakeStartFlag)); err != nil {
+		return err
+	}
+
+	cmd.Flags().Int32(sessionPortFlag, 0, "port the remote session is expected to be serving on")
+	if err := viper.BindPFlag(sessionPortFlag, cmd.Flags().Lookup(sessionPortFlag)); err != nil {
+		return err
+	}
+	if err := viper.BindEnv(sessionPortFlag, configUtils.AsEnvVarFlag(sessionPortFlag)); err != nil {
+		return err
+	}
+
+	cmd.Flags().String(sessionURLPathFlag, "/", "URL path for the HTTP readiness probe")
+	if err := viper.BindPFlag(sessionURLPathFlag, cmd.Flags().Lookup(sessionURLPathFlag)); err != nil {
+		return err
+	}
+	if err := viper.BindEnv(sessionURLPathFlag, configUtils.AsEnvVarFlag(sessionURLPathFlag)); err != nil {
+		return err
+	}
+
+	cmd.Flags().String(readinessProbeTypeFlag, "", "readiness probe type: none, tcp, or http")
+	if err := viper.BindPFlag(readinessProbeTypeFlag, cmd.Flags().Lookup(readinessProbeTypeFlag)); err != nil {
+		return err
+	}
+	if err := viper.BindEnv(readinessProbeTypeFlag, configUtils.AsEnvVarFlag(readinessProbeTypeFlag)); err != nil {
 		return err
 	}
 
@@ -97,6 +135,9 @@ func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
 
 	cfg.ServerPort = viper.GetInt32(serverPortFlag)
 	cfg.FakeStart = viper.GetBool(fakeStartFlag)
+	cfg.SessionPort = viper.GetInt32(sessionPortFlag)
+	cfg.SessionURLPath = viper.GetString(sessionURLPathFlag)
+	cfg.ReadinessProbeType = viper.GetString(readinessProbeTypeFlag)
 
 	return cfg, nil
 }
