@@ -43,7 +43,7 @@ esac
 : ${SESSION_WORK_DIR:="${SESSION_DIR}/work"}
 : ${SECRETS_DIR:="${SESSION_DIR}/secrets"}
 : ${SECRETS_SLOTS_DIR:="${SECRETS_DIR}/slots/"}
-: ${SECRETS_DCS_DIR:="${SECRETS_DIR}/dcs/"}
+: ${SECRETS_DCS_DIR:="${SECRETS_DIR}/dcs"}
 : ${LOGS_DIR:="${SESSION_DIR}/logs"}
 : ${CACHE_DIR:="${SESSION_DIR}/cache"}
 
@@ -178,7 +178,7 @@ srun_param_mounts=#{{SESSION_MOUNTS_PLACEHOLDER}}
 # Mount DataSources, if any
 if test -d  "${SECRETS_DCS_DIR}"; then
     (# Run in a sub shell to prevent changing the working directory of the caller
-        for dc in ${SECRETS_DCS_DIR}/*
+        for dc in "${SECRETS_DCS_DIR}"/*
         do
             n=$(echo ${dc}|sed -e 's,.*-,,')
             mount="$(cat "${dc}/remote")"
@@ -286,7 +286,7 @@ function exit_script() {
 
     # Cleanup Data Source mount points
     if test -d "${SECRETS_DCS_DIR}"; then
-        for dc in ${SECRETS_DCS_DIR}/*
+        for dc in "${SECRETS_DCS_DIR}"/*
         do
             rmdir "${SESSION_WORK_DIR}/$(cat "${dc}/remote")" || true
         done
