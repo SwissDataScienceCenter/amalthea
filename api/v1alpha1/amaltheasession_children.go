@@ -284,6 +284,7 @@ func (cr *AmaltheaSession) Service() v1.Service {
 		},
 	}
 	if cr.Spec.SessionLocation == Remote {
+		svc.Spec.PublishNotReadyAddresses = true
 		svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
 			Protocol:   v1.ProtocolTCP,
 			Name:       tunnelServiceName,
