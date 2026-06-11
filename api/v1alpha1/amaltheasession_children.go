@@ -282,6 +282,10 @@ func (cr *AmaltheaSession) Service() v1.Service {
 		},
 	}
 	if cr.Spec.SessionLocation == Remote {
+		// NOTE: In order to connect through the reverse tunnel,
+		// we need to have the tunnel established so we publish
+		// the service without the pod being ready
+		svc.Spec.PublishNotReadyAddresses = true
 		svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
 			Protocol:   v1.ProtocolTCP,
 			Name:       tunnelServiceName,
