@@ -182,13 +182,6 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 		activeTTL = ptr.To(int64(cr.Spec.Culling.MaxAge.Seconds()))
 	}
 
-	// use MaxHibernatedDuration (amount of time until a hibernated session is deleted) to set the time
-	// after which the job is removed after it has completed
-	var ttlFinish *int32
-	if cr.Spec.Culling.MaxHibernatedDuration.Seconds() > 0 {
-		ttlFinish = ptr.To(int32(cr.Spec.Culling.MaxHibernatedDuration.Seconds()))
-	}
-
 	job := batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cr.JobName(),
@@ -197,12 +190,11 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: batchv1.JobSpec{
-			Parallelism:             ptr.To(int32(1)),
-			Completions:             ptr.To(int32(1)),
-			BackoffLimit:            ptr.To(int32(0)),
-			ActiveDeadlineSeconds:   activeTTL,
-			TTLSecondsAfterFinished: ttlFinish,
-			Suspend:                 &cr.Spec.Hibernated,
+			Parallelism:           ptr.To(int32(1)),
+			Completions:           ptr.To(int32(1)),
+			BackoffLimit:          ptr.To(int32(0)),
+			ActiveDeadlineSeconds: activeTTL,
+			Suspend:               &cr.Spec.Hibernated,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      cr.childLabels(),
@@ -1046,6 +1038,18 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 		v1.EnvVar{
 			Name:  "RSC_SERVER_PORT",
 			Value: fmt.Sprintf("%d", RemoteSessionControllerPort),
+		},
+		v1.EnvVar{
+			Name:  "RSC_SESSION_PORT",
+			Value: fmt.Sprintf("%d", cr.Spec.Session.Port),
+		},
+		v1.EnvVar{
+			Name:  "RSC_SESSION_URL_PATH",
+			Value: cr.Spec.Session.URLPath,
+		},
+		v1.EnvVar{
+			Name:  "RSC_READINESS_PROBE_TYPE",
+			Value: string(cr.Spec.Session.ReadinessProbe.Type),
 		},
 		v1.EnvVar{
 			Name: "RSC_WSTUNNEL_SECRET",
