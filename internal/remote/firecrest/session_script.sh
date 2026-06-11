@@ -16,9 +16,9 @@ set -e -o pipefail
 
 : ${WSTUNNEL_VERSION_x86_64:="10.4.4"}
 : ${WSTUNNEL_VERSION_aarch64:="10.1.10"}
-: ${d:="WSTUNNEL_VERSION_${ARCH}"}
-: ${WSTUNNEL_VERSION:="${!d}"}
-unset d
+: ${varname:="WSTUNNEL_VERSION_${ARCH}"}
+: ${WSTUNNEL_VERSION:="${!varname}"}
+unset varname
 
 # Installs rclone
 #
