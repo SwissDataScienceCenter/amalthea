@@ -176,34 +176,36 @@ srun_param_workdir="--container-workdir ${SESSION_WORK_DIR}"
 srun_param_mounts=#{{SESSION_MOUNTS_PLACEHOLDER}}
 
 # Mount DataSources, if any
-(# Run in a sub shell to prevent changing the working directory of the caller
-    for dc in ${SECRETS_DCS_DIR}/*
-    do
-        n=$(echo ${dc}|sed -e 's,.*-,,')
-        mount="$(cat "${dc}/remote")"
-        remotePath="$(cat "${dc}/remotePath")"
-        log_file="${LOGS_DIR}/rclone-dc-${n}.log"
-        # TODO Manage caching options
-        # TODO Manage flags
-        # TODO Manage mountOpt options
-        readonly="--read-only" # force readonly for now
+if test -d  "${SECRETS_DCS_DIR}"; then
+    (# Run in a sub shell to prevent changing the working directory of the caller
+        for dc in ${SECRETS_DCS_DIR}/*
+        do
+            n=$(echo ${dc}|sed -e 's,.*-,,')
+            mount="$(cat "${dc}/remote")"
+            remotePath="$(cat "${dc}/remotePath")"
+            log_file="${LOGS_DIR}/rclone-dc-${n}.log"
+            # TODO Manage caching options
+            # TODO Manage flags
+            # TODO Manage mountOpt options
+            readonly="--read-only" # force readonly for now
 
-        echo >> "${log_file}"
-        echo "--- Starting $(date)" >> "${log_file}"
+            echo >> "${log_file}"
+            echo "--- Starting $(date)" >> "${log_file}"
 
-        mkdir -p "${SESSION_WORK_DIR}/${mount}"
-        mkdir -p "${CACHE_DIR}/${n}"
+            mkdir -p "${SESSION_WORK_DIR}/${mount}"
+            mkdir -p "${CACHE_DIR}/${n}"
 
-        ${rclone} mount \
-            --daemon \
-            $readonly \
-            --log-file="${log_file}" \
-            --cache-dir="${CACHE_DIR}/$n" \
-            --config="${dc}/configData" \
-            "${mount}:${remotePath}" \
-            "//${SESSION_WORK_DIR}/${mount}"
-    done
-)
+            ${rclone} mount \
+                --daemon \
+                $readonly \
+                --log-file="${log_file}" \
+                --cache-dir="${CACHE_DIR}/$n" \
+                --config="${dc}/configData" \
+                "${mount}:${remotePath}" \
+                "//${SESSION_WORK_DIR}/${mount}"
+        done
+    )
+fi
 
 # echo "Starting tunnel..."
 echo "wstunnel client \
@@ -283,10 +285,12 @@ function exit_script() {
     done
 
     # Cleanup Data Source mount points
-    for dc in ${SECRETS_DCS_DIR}/*
-    do
-        rmdir "${SESSION_WORK_DIR}/$(cat "${dc}/remote")" || true
-    done
+    if test -d "${SECRETS_DCS_DIR}"; then
+        for dc in ${SECRETS_DCS_DIR}/*
+        do
+            rmdir "${SESSION_WORK_DIR}/$(cat "${dc}/remote")" || true
+        done
+    fi
 
     # TODO input validation + enabling this
     #/bin/rm -rf "${SECRETS_DIR}" || true # ignore errors in cleanup
