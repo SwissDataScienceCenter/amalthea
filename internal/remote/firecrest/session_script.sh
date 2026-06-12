@@ -128,6 +128,7 @@ function install_wstunnel() {
         cd "${tmp}"
         curl -Lo "wstunnel.tar.gz" "${wstunnel_url}"
         rm -rf "${wstunnel_pkg}"
+        mkdir -p ${wstunnel_pkg} # the folder has to exist for tar -C
         tar xf "wstunnel.tar.gz" -C "${wstunnel_pkg}"
     )
     rm -r "${tmp}"
