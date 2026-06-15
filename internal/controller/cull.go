@@ -30,6 +30,12 @@ import (
 )
 
 func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, amaltheasession *amaltheadevv1alpha1.AmaltheaSession) error {
+	if amaltheasession.Spec.SessionType == amaltheadevv1alpha1.SessionTypeNonInteractive {
+		// non-interactive sessions (jobs) never get auto-scaled down by amalthea;
+		// this is managed by k8s via the activeDeadlineSeconds setting for jobs
+		return nil
+	}
+
 	status := amaltheasession.Status
 	log := log.FromContext(ctx)
 	if !amaltheasession.Spec.Hibernated {
@@ -40,7 +46,7 @@ func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, a
 			if err != nil {
 				return err
 			}
-			log.Info("statefulSet scaled down or job suspended")
+			log.Info("statefulSet scaled down")
 		}
 	}
 	return nil
