@@ -849,11 +849,11 @@ func makeTunnelSecret(length int) (string, error) {
 
 // sessionContainer returns the main session container
 func (cr *AmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount, config config.AmaltheaSessionConfiguration) v1.Container {
-	if cr.Spec.SessionLocation == Local {
-		return cr.sessionContainerLocal(volumeMounts, config)
+	if cr.Spec.SessionLocation == Remote {
+		return cr.sessionContainerRemote(volumeMounts)
 	}
-	// cr.Spec.SessionLocation == Remote
-	return cr.sessionContainerRemote(volumeMounts)
+	// cr.Spec.SessionLocation == Local
+	return cr.sessionContainerLocal(volumeMounts, config)
 }
 
 // sessionContainer returns the main session container
