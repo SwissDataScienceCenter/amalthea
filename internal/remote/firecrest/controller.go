@@ -479,8 +479,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	slog.Info("submitted job", "jobID", c.jobID)
 
 	// After submission, construct the log file paths that Slurm will create on the cluster.
-	c.stdoutPath = path.Join(sessionPath, fmt.Sprintf("slurm-%s.out", c.jobID))
-	c.stderrPath = path.Join(sessionPath, fmt.Sprintf("slurm-%s.err", c.jobID))
+	c.stdoutPath = path.Join(srunSessionPath, fmt.Sprintf("slurm-%s.out", c.jobID))
+	c.stderrPath = path.Join(srunSessionPath, fmt.Sprintf("slurm-%s.err", c.jobID))
 
 	// Save the state for recovery
 	if err := c.saveState(); err != nil {
