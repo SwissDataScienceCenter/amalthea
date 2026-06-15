@@ -67,6 +67,16 @@ type FirecrestRemoteSessionController struct {
 
 	// fakeStart if true, do not start the remote session and print debug information
 	fakeStart bool
+
+	// stdoutPath and stderrPath are the paths to the Slurm stdout/stderr files on the cluster filesystem.
+	stdoutPath string
+	stderrPath string
+	// stdoutOffset and stderrOffset track how many bytes have been consumed from each log file.
+	stdoutOffset int
+	stderrOffset int
+	// stdoutBuf and stderrBuf hold partial lines between fetches.
+	stdoutBuf bytes.Buffer
+	stderrBuf bytes.Buffer
 }
 
 func NewFirecrestRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c *FirecrestRemoteSessionController, err error) {
@@ -238,7 +248,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	// Start a go routine to update the session status
 	go c.periodicSessionStatus(ctx)
 
-	if err := c.recoverJobID(); err != nil {
+	if err := c.recoverState(); err != nil {
 		return err
 	}
 	// We recovered an existing job ID, do nothing
@@ -468,8 +478,12 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 
 	slog.Info("submitted job", "jobID", c.jobID)
 
-	// Save the job ID for recovery
-	if err := c.saveJobID(); err != nil {
+	// After submission, construct the log file paths that Slurm will create on the cluster.
+	c.stdoutPath = path.Join(sessionPath, fmt.Sprintf("slurm-%s.out", c.jobID))
+	c.stderrPath = path.Join(sessionPath, fmt.Sprintf("slurm-%s.err", c.jobID))
+
+	// Save the state for recovery
+	if err := c.saveState(); err != nil {
 		return err
 	}
 
@@ -721,6 +735,14 @@ func (c *FirecrestRemoteSessionController) periodicSessionStatus(ctx context.Con
 				} else {
 					slog.Error("getCurrentStatus failed", "status", state, "error", err)
 				}
+				// Fetch any new session logs from the cluster filesystem.
+				c.fetchSessionLogs(childCtx)
+				// Persist offsets so we can resume after a restart.
+				if c.jobID != "" {
+					if err := c.saveState(); err != nil {
+						slog.Warn("failed to save controller state", "error", err)
+					}
+				}
 			}()
 		}
 	}
@@ -757,6 +779,61 @@ func (c *FirecrestRemoteSessionController) getCurrentStatus(ctx context.Context)
 		return models.Failed, err
 	}
 	return state, nil
+}
+
+// fetchSessionLogs retrieves any new lines from the remote Slurm stdout/stderr files
+// via FirecREST and writes them to this container's stdout so they appear in kubectl logs.
+func (c *FirecrestRemoteSessionController) fetchSessionLogs(ctx context.Context) {
+	if c.jobID == "" || c.stdoutPath == "" || c.stderrPath == "" {
+		return
+	}
+
+	c.fetchLogStream(ctx, "stdout", c.stdoutPath, &c.stdoutOffset, &c.stdoutBuf)
+	c.fetchLogStream(ctx, "stderr", c.stderrPath, &c.stderrOffset, &c.stderrBuf)
+}
+
+func (c *FirecrestRemoteSessionController) fetchLogStream(ctx context.Context, stream string, filePath string, offset *int, buf *bytes.Buffer) {
+	size := 524288 // 512KB
+	params := GetViewFilesystemSystemNameOpsViewGetParams{
+		Path:   filePath,
+		Offset: offset,
+		Size:   &size,
+	}
+
+	res, err := c.client.GetViewFilesystemSystemNameOpsViewGetWithResponse(ctx, c.systemName, &params)
+	if err != nil {
+		slog.Warn("failed to fetch session log", "stream", stream, "error", err)
+		return
+	}
+	if res.JSON200 == nil || res.JSON200.Output == nil {
+		// File not available yet or empty — this is expected early in the job lifecycle.
+		return
+	}
+
+	content := *res.JSON200.Output
+	if content == "" {
+		return
+	}
+
+	*offset += len(content)
+
+	// Append new content and flush any complete lines.
+	if _, err := buf.WriteString(content); err != nil {
+		slog.Warn("failed to buffer session log content", "stream", stream, "error", err)
+		return
+	}
+	for {
+		data := buf.Bytes()
+		idx := bytes.IndexByte(data, '\n')
+		if idx == -1 {
+			break
+		}
+		line := string(data[:idx])
+		if _, err := fmt.Fprintf(os.Stdout, "[session/%s] %s\n", stream, line); err != nil {
+			slog.Warn("failed to write session log", "stream", stream, "error", err)
+		}
+		buf.Next(idx + 1)
+	}
 }
 
 func (c *FirecrestRemoteSessionController) renderSessionScript(sessionScript string, fileSystems *[]FileSystem, secretsPath string) string {
@@ -827,7 +904,7 @@ func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, s
 	return strings.Replace(sessionScript, "#{{SESSION_MOUNTS_PLACEHOLDER}}", mountsStr, 1)
 }
 
-func (c *FirecrestRemoteSessionController) saveJobID() error {
+func (c *FirecrestRemoteSessionController) saveState() error {
 	if c.jobID == "" {
 		return fmt.Errorf("cannot save, job ID is not defined")
 	}
@@ -838,7 +915,11 @@ func (c *FirecrestRemoteSessionController) saveJobID() error {
 	savePath := c.getSavePath()
 
 	state := savedState{
-		JobID: c.jobID,
+		JobID:        c.jobID,
+		StdoutPath:   c.stdoutPath,
+		StderrPath:   c.stderrPath,
+		StdoutOffset: c.stdoutOffset,
+		StderrOffset: c.stderrOffset,
 	}
 	contents, err := json.Marshal(state)
 	if err != nil {
@@ -853,7 +934,7 @@ func (c *FirecrestRemoteSessionController) deleteSavedState() error {
 	return os.Remove(savePath)
 }
 
-func (c *FirecrestRemoteSessionController) recoverJobID() error {
+func (c *FirecrestRemoteSessionController) recoverState() error {
 	contents, err := os.ReadFile(c.getSavePath())
 	if err != nil {
 		return nil
@@ -868,11 +949,19 @@ func (c *FirecrestRemoteSessionController) recoverJobID() error {
 		c.jobID = state.JobID
 		slog.Info("recovered job ID", "jobID", c.jobID)
 	}
+	c.stdoutPath = state.StdoutPath
+	c.stderrPath = state.StderrPath
+	c.stdoutOffset = state.StdoutOffset
+	c.stderrOffset = state.StderrOffset
 	return nil
 }
 
 type savedState struct {
-	JobID string `json:"job_id"`
+	JobID        string `json:"job_id"`
+	StdoutPath   string `json:"stdout_path,omitempty"`
+	StderrPath   string `json:"stderr_path,omitempty"`
+	StdoutOffset int    `json:"stdout_offset,omitempty"`
+	StderrOffset int    `json:"stderr_offset,omitempty"`
 }
 
 func (c *FirecrestRemoteSessionController) getSaveDirPath() string {
