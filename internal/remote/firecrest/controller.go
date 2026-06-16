@@ -651,11 +651,29 @@ func (c *FirecrestRemoteSessionController) fetchSessionLogs(ctx context.Context)
 		return
 	}
 
-	c.fetchLogStream(ctx, "stdout", c.stdoutPath, &c.stdoutOffset, &c.stdoutBuf)
-	c.fetchLogStream(ctx, "stderr", c.stderrPath, &c.stderrOffset, &c.stderrBuf)
+	c.fetchLogStream(ctx, "stdout")
+	c.fetchLogStream(ctx, "stderr")
 }
 
-func (c *FirecrestRemoteSessionController) fetchLogStream(ctx context.Context, stream string, filePath string, offset *int, buf *bytes.Buffer) {
+func (c *FirecrestRemoteSessionController) fetchLogStream(ctx context.Context, stream string) {
+	var filePath string
+	var offset *int
+	var buf *bytes.Buffer
+
+	switch stream {
+	case "stdout":
+		filePath = c.stdoutPath
+		offset = &c.stdoutOffset
+		buf = &c.stdoutBuf
+	case "stderr":
+		filePath = c.stderrPath
+		offset = &c.stderrOffset
+		buf = &c.stderrBuf
+	default:
+		slog.Warn("unknown stream type", "stream", stream)
+		return
+	}
+
 	size := 524288 // 512KB
 	params := GetViewFilesystemSystemNameOpsViewGetParams{
 		Path:   filePath,
