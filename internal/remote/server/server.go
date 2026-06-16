@@ -123,7 +123,11 @@ func newServer(controller controller.RemoteSessionController, cfg config.RemoteS
 			if cfg.SessionPort == 0 {
 				return c.NoContent(http.StatusOK)
 			}
-			conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", cfg.SessionPort), 5*time.Second)
+            dialer := net.Dialer{}
+			dialCtx, dialCtxCancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+			defer dialCtxCancel()
+			conn, err := dialer.DialContext(dialCtx, "tcp", fmt.Sprintf("127.0.0.1:%d", cfg.SessionPort))
+
 			if err != nil {
 				return c.NoContent(http.StatusServiceUnavailable)
 			}
@@ -142,7 +146,11 @@ func newServer(controller controller.RemoteSessionController, cfg config.RemoteS
 				},
 			}
 			url := fmt.Sprintf("http://127.0.0.1:%d%s", cfg.SessionPort, cfg.SessionURLPath)
-			resp, err := client.Get(url)
+			req, err := http.NewRequestWithContext(c.Request().Context(), "GET", url, nil)
+			if err != nil {
+				return c.NoContent(http.StatusServiceUnavailable)
+			}
+			resp, err := client.Do(req)
 			if err != nil {
 				return c.NoContent(http.StatusServiceUnavailable)
 			}
