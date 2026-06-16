@@ -675,9 +675,10 @@ func (c *FirecrestRemoteSessionController) fetchLogStream(ctx context.Context, s
 	}
 
 	size := 524288 // 512KB
+	apiOffset := *offset + buf.Len()
 	params := GetViewFilesystemSystemNameOpsViewGetParams{
 		Path:   filePath,
-		Offset: offset,
+		Offset: &apiOffset,
 		Size:   &size,
 	}
 
@@ -696,8 +697,6 @@ func (c *FirecrestRemoteSessionController) fetchLogStream(ctx context.Context, s
 		return
 	}
 
-	*offset += len(content)
-
 	// Append new content and flush any complete lines.
 	if _, err := buf.WriteString(content); err != nil {
 		slog.Warn("failed to buffer session log content", "stream", stream, "error", err)
@@ -714,6 +713,7 @@ func (c *FirecrestRemoteSessionController) fetchLogStream(ctx context.Context, s
 			slog.Warn("failed to write session log", "stream", stream, "error", err)
 		}
 		buf.Next(idx + 1)
+		*offset += idx + 1
 	}
 }
 
