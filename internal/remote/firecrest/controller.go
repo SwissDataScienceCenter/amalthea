@@ -337,9 +337,32 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 
 	slog.Info("submitted job", "jobID", c.jobID)
 
-	// After submission, construct the log file paths that Slurm will create on the cluster.
+	// After submission, determine the log file paths from the job metadata.
 	c.stdoutPath = path.Join(sessionPath, fmt.Sprintf("slurm-%s.out", c.jobID))
 	c.stderrPath = path.Join(sessionPath, fmt.Sprintf("slurm-%s.err", c.jobID))
+
+	metaRes, err := c.client.GetJobMetadataComputeSystemNameJobsJobIdMetadataGetWithResponse(startCtx, c.systemName, c.jobID)
+	if err != nil {
+		slog.Warn("could not get job metadata, falling back to default log paths", "error", err)
+	} else if metaRes.JSON200 == nil || metaRes.JSON200.Jobs == nil || len(*metaRes.JSON200.Jobs) == 0 {
+		slog.Warn("job metadata response empty, falling back to default log paths")
+	} else {
+		meta := (*metaRes.JSON200.Jobs)[0]
+		if meta.StandardOutput != nil && *meta.StandardOutput != "" {
+			p := *meta.StandardOutput
+			if !path.IsAbs(p) {
+				p = path.Join(sessionPath, p)
+			}
+			c.stdoutPath = p
+		}
+		if meta.StandardError != nil && *meta.StandardError != "" {
+			p := *meta.StandardError
+			if !path.IsAbs(p) {
+				p = path.Join(sessionPath, p)
+			}
+			c.stderrPath = p
+		}
+	}
 
 	// Save the state for recovery
 	if err := c.saveState(); err != nil {
