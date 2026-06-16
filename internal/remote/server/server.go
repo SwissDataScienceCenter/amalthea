@@ -117,12 +117,7 @@ func newServer(controller controller.RemoteSessionController, cfg config.RemoteS
 	// Readiness endpoint
 	e.GET("/ready", func(c echo.Context) error {
 		switch cfg.ReadinessProbeType {
-		case string(amaltheadevv1alpha1.None):
-			return c.NoContent(http.StatusOK)
 		case string(amaltheadevv1alpha1.TCP):
-			if cfg.SessionPort == 0 {
-				return c.NoContent(http.StatusOK)
-			}
             dialer := net.Dialer{}
 			dialCtx, dialCtxCancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
 			defer dialCtxCancel()

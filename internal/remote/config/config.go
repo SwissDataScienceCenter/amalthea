@@ -102,7 +102,7 @@ func SetFlags(cmd *cobra.Command) error {
 		return err
 	}
 
-	cmd.Flags().String(readinessProbeTypeFlag, "", "readiness probe type: none, tcp, or http")
+	cmd.Flags().String(readinessProbeTypeFlag, "none", "readiness probe type: none, tcp, or http")
 	if err := viper.BindPFlag(readinessProbeTypeFlag, cmd.Flags().Lookup(readinessProbeTypeFlag)); err != nil {
 		return err
 	}
@@ -143,8 +143,7 @@ func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
 }
 
 func (cfg *RemoteSessionControllerConfig) Validate() error {
-	if cfg.ReadinessProbeType != "" &&
-		cfg.ReadinessProbeType != string(amaltheadevv1alpha1.None) &&
+	if cfg.ReadinessProbeType != string(amaltheadevv1alpha1.None) &&
 		cfg.ReadinessProbeType != string(amaltheadevv1alpha1.TCP) &&
 		cfg.ReadinessProbeType != string(amaltheadevv1alpha1.HTTP) {
 		return fmt.Errorf("invalid readiness probe type: %s", cfg.ReadinessProbeType)
