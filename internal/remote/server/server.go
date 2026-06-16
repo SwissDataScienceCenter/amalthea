@@ -118,7 +118,7 @@ func newServer(controller controller.RemoteSessionController, cfg config.RemoteS
 	e.GET("/ready", func(c echo.Context) error {
 		switch cfg.ReadinessProbeType {
 		case string(amaltheadevv1alpha1.TCP):
-            dialer := net.Dialer{}
+			dialer := net.Dialer{}
 			dialCtx, dialCtxCancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
 			defer dialCtxCancel()
 			conn, err := dialer.DialContext(dialCtx, "tcp", fmt.Sprintf("127.0.0.1:%d", cfg.SessionPort))
