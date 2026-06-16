@@ -108,7 +108,7 @@ func TestConfigNewFlags(t *testing.T) {
 				"--auth-firecrest-client-id=my-client",
 				"--auth-firecrest-client-secret=my-secret",
 			},
-			wantProbeType:   "",
+			wantProbeType:   string(amaltheadevv1alpha1.None),
 			wantSessionPort: 0,
 			wantURLPath:     "/",
 		},

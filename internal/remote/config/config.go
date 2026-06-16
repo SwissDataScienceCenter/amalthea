@@ -103,6 +103,7 @@ func SetFlags(cmd *cobra.Command) error {
 	}
 
 	cmd.Flags().String(readinessProbeTypeFlag, "", "readiness probe type: none, tcp, or http")
+	cmd.Flags().String(readinessProbeTypeFlag, "none", "readiness probe type: none, tcp, or http")
 	if err := viper.BindPFlag(readinessProbeTypeFlag, cmd.Flags().Lookup(readinessProbeTypeFlag)); err != nil {
 		return err
 	}

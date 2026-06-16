@@ -284,6 +284,9 @@ func (cr *AmaltheaSession) Service() v1.Service {
 		},
 	}
 	if cr.Spec.SessionLocation == Remote {
+		// NOTE: In order to connect through the reverse tunnel,
+		// we need to have the tunnel established so we publish
+		// the service without the pod being ready
 		svc.Spec.PublishNotReadyAddresses = true
 		svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
 			Protocol:   v1.ProtocolTCP,
@@ -898,11 +901,11 @@ func makeTunnelSecret(length int) (string, error) {
 
 // sessionContainer returns the main session container
 func (cr *AmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount, config config.AmaltheaSessionConfiguration) v1.Container {
-	if cr.Spec.SessionLocation == Local {
-		return cr.sessionContainerLocal(volumeMounts, config)
+	if cr.Spec.SessionLocation == Remote {
+		return cr.sessionContainerRemote(volumeMounts)
 	}
-	// cr.Spec.SessionLocation == Remote
-	return cr.sessionContainerRemote(volumeMounts)
+	// cr.Spec.SessionLocation == Local
+	return cr.sessionContainerLocal(volumeMounts, config)
 }
 
 // sessionContainer returns the main session container
