@@ -492,14 +492,14 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		if meta.StandardOutput != nil && *meta.StandardOutput != "" {
 			p := *meta.StandardOutput
 			if !path.IsAbs(p) {
-				p = path.Join(sessionPath, p)
+				p = path.Join(srunSessionPath, p)
 			}
 			c.stdoutPath = p
 		}
 		if meta.StandardError != nil && *meta.StandardError != "" {
 			p := *meta.StandardError
 			if !path.IsAbs(p) {
-				p = path.Join(sessionPath, p)
+				p = path.Join(srunSessionPath, p)
 			}
 			c.stderrPath = p
 		}
