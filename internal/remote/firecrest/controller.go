@@ -482,6 +482,29 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	c.stdoutPath = path.Join(srunSessionPath, fmt.Sprintf("slurm-%s.out", c.jobID))
 	c.stderrPath = path.Join(srunSessionPath, fmt.Sprintf("slurm-%s.err", c.jobID))
 
+	metaRes, err := c.client.GetJobMetadataComputeSystemNameJobsJobIdMetadataGetWithResponse(startCtx, c.systemName, c.jobID)
+	if err != nil {
+		slog.Warn("could not get job metadata, falling back to default log paths", "error", err)
+	} else if metaRes.JSON200 == nil || metaRes.JSON200.Jobs == nil || len(*metaRes.JSON200.Jobs) == 0 {
+		slog.Warn("job metadata response empty, falling back to default log paths")
+	} else {
+		meta := (*metaRes.JSON200.Jobs)[0]
+		if meta.StandardOutput != nil && *meta.StandardOutput != "" {
+			p := *meta.StandardOutput
+			if !path.IsAbs(p) {
+				p = path.Join(sessionPath, p)
+			}
+			c.stdoutPath = p
+		}
+		if meta.StandardError != nil && *meta.StandardError != "" {
+			p := *meta.StandardError
+			if !path.IsAbs(p) {
+				p = path.Join(sessionPath, p)
+			}
+			c.stderrPath = p
+		}
+	}
+
 	// Save the state for recovery
 	if err := c.saveState(); err != nil {
 		return err
@@ -788,15 +811,34 @@ func (c *FirecrestRemoteSessionController) fetchSessionLogs(ctx context.Context)
 		return
 	}
 
-	c.fetchLogStream(ctx, "stdout", c.stdoutPath, &c.stdoutOffset, &c.stdoutBuf)
-	c.fetchLogStream(ctx, "stderr", c.stderrPath, &c.stderrOffset, &c.stderrBuf)
+	c.fetchLogStream(ctx, "stdout")
+	c.fetchLogStream(ctx, "stderr")
 }
 
-func (c *FirecrestRemoteSessionController) fetchLogStream(ctx context.Context, stream string, filePath string, offset *int, buf *bytes.Buffer) {
+func (c *FirecrestRemoteSessionController) fetchLogStream(ctx context.Context, stream string) {
+	var filePath string
+	var offset *int
+	var buf *bytes.Buffer
+
+	switch stream {
+	case "stdout":
+		filePath = c.stdoutPath
+		offset = &c.stdoutOffset
+		buf = &c.stdoutBuf
+	case "stderr":
+		filePath = c.stderrPath
+		offset = &c.stderrOffset
+		buf = &c.stderrBuf
+	default:
+		slog.Warn("unknown stream type", "stream", stream)
+		return
+	}
+
 	size := 524288 // 512KB
+	apiOffset := *offset + buf.Len()
 	params := GetViewFilesystemSystemNameOpsViewGetParams{
 		Path:   filePath,
-		Offset: offset,
+		Offset: &apiOffset,
 		Size:   &size,
 	}
 
@@ -815,8 +857,6 @@ func (c *FirecrestRemoteSessionController) fetchLogStream(ctx context.Context, s
 		return
 	}
 
-	*offset += len(content)
-
 	// Append new content and flush any complete lines.
 	if _, err := buf.WriteString(content); err != nil {
 		slog.Warn("failed to buffer session log content", "stream", stream, "error", err)
@@ -833,6 +873,7 @@ func (c *FirecrestRemoteSessionController) fetchLogStream(ctx context.Context, s
 			slog.Warn("failed to write session log", "stream", stream, "error", err)
 		}
 		buf.Next(idx + 1)
+		*offset += idx + 1
 	}
 }
 
