@@ -94,7 +94,7 @@ func TestConfigNewFlags(t *testing.T) {
 		args            []string
 		env             map[string]string
 		wantProbeType   string
-		wantSessionPort int
+		wantSessionPort int32
 		wantURLPath     string
 		wantErr         bool
 	}{
