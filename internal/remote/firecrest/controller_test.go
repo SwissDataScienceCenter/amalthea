@@ -59,3 +59,26 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 	assert.Contains(t, foundMounts, "\"/users:/home/users:ro\"")
 	assert.Contains(t, foundMounts, "\"/secrets:/secrets:ro\"")
 }
+
+func TestStreamsToFetch(t *testing.T) {
+	tests := []struct {
+		name       string
+		stdoutPath string
+		stderrPath string
+		want       []string
+	}{
+		{"different paths", "/out", "/err", []string{"stdout", "stderr"}},
+		{"same path", "/out", "/out", []string{"stdout"}},
+		{"empty stderr", "/out", "", []string{"stdout"}},
+		{"stderr explicitly eq stdout", "/out", "/out", []string{"stdout"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &FirecrestRemoteSessionController{
+				stdoutPath: tt.stdoutPath,
+				stderrPath: tt.stderrPath,
+			}
+			assert.Equal(t, tt.want, c.streamsToFetch())
+		})
+	}
+}

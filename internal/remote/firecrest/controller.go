@@ -361,6 +361,9 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 				p = path.Join(sessionPath, p)
 			}
 			c.stderrPath = p
+		} else {
+			// Slurm writes stderr to stdout when StandardError is not explicitly set.
+			c.stderrPath = c.stdoutPath
 		}
 	}
 
@@ -647,12 +650,21 @@ func (c *FirecrestRemoteSessionController) getCurrentStatus(ctx context.Context)
 // fetchSessionLogs retrieves any new lines from the remote Slurm stdout/stderr files
 // via FirecREST and writes them to this container's stdout so they appear in kubectl logs.
 func (c *FirecrestRemoteSessionController) fetchSessionLogs(ctx context.Context) {
-	if c.jobID == "" || c.stdoutPath == "" || c.stderrPath == "" {
+	if c.jobID == "" || c.stdoutPath == "" {
 		return
 	}
 
-	c.fetchLogStream(ctx, "stdout")
-	c.fetchLogStream(ctx, "stderr")
+	for _, stream := range c.streamsToFetch() {
+		c.fetchLogStream(ctx, stream)
+	}
+}
+
+func (c *FirecrestRemoteSessionController) streamsToFetch() []string {
+	streams := []string{"stdout"}
+	if c.stderrPath != "" && c.stderrPath != c.stdoutPath {
+		streams = append(streams, "stderr")
+	}
+	return streams
 }
 
 func (c *FirecrestRemoteSessionController) fetchLogStream(ctx context.Context, stream string) {
