@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -21,6 +22,25 @@ func (m *mockController) Status(ctx context.Context) (models.RemoteSessionState,
 func (m *mockController) Start(ctx context.Context) error { return nil }
 func (m *mockController) Stop(ctx context.Context) error  { return nil }
 
+func getFreePortOrDie() int {
+	var a *net.TCPAddr
+	var err error
+	if a, err = net.ResolveTCPAddr("tcp", "localhost:0"); err == nil {
+		var l *net.TCPListener
+		if l, err = net.ListenTCP("tcp", a); err == nil {
+			defer func() {
+				err := l.Close()
+				if err != nil {
+					panic(err)
+				}
+			}()
+			return l.Addr().(*net.TCPAddr).Port
+		}
+		panic(err)
+	}
+	panic(err)
+}
+
 func TestReadyEndpoint(t *testing.T) {
 	baseCfg := config.RemoteSessionControllerConfig{
 		ServerPort:         65532,
@@ -31,29 +51,29 @@ func TestReadyEndpoint(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		cfg          config.RemoteSessionControllerConfig
-		setupBackend func() (cleanup func())
+		makeCfg      func(port int) config.RemoteSessionControllerConfig
+		setupBackend func(port int) (cleanup func())
 		wantStatus   int
 	}{
 		{
 			name: "none probe returns 200",
-			cfg: func() config.RemoteSessionControllerConfig {
+			makeCfg: func(int) config.RemoteSessionControllerConfig {
 				c := baseCfg
 				c.ReadinessProbeType = string(amaltheadevv1alpha1.None)
 				return c
-			}(),
+			},
 			wantStatus: http.StatusOK,
 		},
 		{
 			name: "interactive tcp open port returns 200",
-			cfg: func() config.RemoteSessionControllerConfig {
+			makeCfg: func(port int) config.RemoteSessionControllerConfig {
 				c := baseCfg
 				c.ReadinessProbeType = string(amaltheadevv1alpha1.TCP)
-				c.SessionPort = 18000
+				c.SessionPort = port
 				return c
-			}(),
-			setupBackend: func() func() {
-				ln, err := net.Listen("tcp", "127.0.0.1:18000")
+			},
+			setupBackend: func(port int) func() {
+				ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 				if err != nil {
 					panic(err)
 				}
@@ -63,25 +83,25 @@ func TestReadyEndpoint(t *testing.T) {
 		},
 		{
 			name: "interactive tcp closed port returns 503",
-			cfg: func() config.RemoteSessionControllerConfig {
+			makeCfg: func(port int) config.RemoteSessionControllerConfig {
 				c := baseCfg
 				c.ReadinessProbeType = string(amaltheadevv1alpha1.TCP)
-				c.SessionPort = 18001
+				c.SessionPort = port
 				return c
-			}(),
+			},
 			wantStatus: http.StatusServiceUnavailable,
 		},
 		{
 			name: "interactive http serving 200 returns 200",
-			cfg: func() config.RemoteSessionControllerConfig {
+			makeCfg: func(port int) config.RemoteSessionControllerConfig {
 				c := baseCfg
 				c.ReadinessProbeType = string(amaltheadevv1alpha1.HTTP)
-				c.SessionPort = 18002
+				c.SessionPort = port
 				c.SessionURLPath = "/lab"
 				return c
-			}(),
-			setupBackend: func() func() {
-				ln, err := net.Listen("tcp", "127.0.0.1:18002")
+			},
+			setupBackend: func(port int) func() {
+				ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 				if err != nil {
 					panic(err)
 				}
@@ -101,15 +121,15 @@ func TestReadyEndpoint(t *testing.T) {
 		},
 		{
 			name: "interactive http redirect 302 returns 200",
-			cfg: func() config.RemoteSessionControllerConfig {
+			makeCfg: func(port int) config.RemoteSessionControllerConfig {
 				c := baseCfg
 				c.ReadinessProbeType = string(amaltheadevv1alpha1.HTTP)
-				c.SessionPort = 18003
+				c.SessionPort = port
 				c.SessionURLPath = "/"
 				return c
-			}(),
-			setupBackend: func() func() {
-				ln, err := net.Listen("tcp", "127.0.0.1:18003")
+			},
+			setupBackend: func(port int) func() {
+				ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 				if err != nil {
 					panic(err)
 				}
@@ -125,15 +145,15 @@ func TestReadyEndpoint(t *testing.T) {
 		},
 		{
 			name: "interactive http serving 500 returns 503",
-			cfg: func() config.RemoteSessionControllerConfig {
+			makeCfg: func(port int) config.RemoteSessionControllerConfig {
 				c := baseCfg
 				c.ReadinessProbeType = string(amaltheadevv1alpha1.HTTP)
-				c.SessionPort = 18004
+				c.SessionPort = port
 				c.SessionURLPath = "/"
 				return c
-			}(),
-			setupBackend: func() func() {
-				ln, err := net.Listen("tcp", "127.0.0.1:18004")
+			},
+			setupBackend: func(port int) func() {
+				ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 				if err != nil {
 					panic(err)
 				}
@@ -149,25 +169,28 @@ func TestReadyEndpoint(t *testing.T) {
 		},
 		{
 			name: "interactive http connection refused returns 503",
-			cfg: func() config.RemoteSessionControllerConfig {
+			makeCfg: func(port int) config.RemoteSessionControllerConfig {
 				c := baseCfg
 				c.ReadinessProbeType = string(amaltheadevv1alpha1.HTTP)
-				c.SessionPort = 18005
+				c.SessionPort = port
 				c.SessionURLPath = "/"
 				return c
-			}(),
+			},
 			wantStatus: http.StatusServiceUnavailable,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			port := getFreePortOrDie()
+			cfg := tt.makeCfg(port)
+
 			if tt.setupBackend != nil {
-				cleanup := tt.setupBackend()
+				cleanup := tt.setupBackend(port)
 				defer cleanup()
 			}
 
-			e := newServer(&mockController{}, tt.cfg)
+			e := newServer(&mockController{}, cfg)
 			req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 			rec := httptest.NewRecorder()
 			e.ServeHTTP(rec, req)
