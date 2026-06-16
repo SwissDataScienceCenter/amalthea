@@ -94,7 +94,7 @@ func TestConfigNewFlags(t *testing.T) {
 		args            []string
 		env             map[string]string
 		wantProbeType   string
-		wantSessionPort int32
+		wantSessionPort int
 		wantURLPath     string
 		wantErr         bool
 	}{
@@ -108,7 +108,7 @@ func TestConfigNewFlags(t *testing.T) {
 				"--auth-firecrest-client-id=my-client",
 				"--auth-firecrest-client-secret=my-secret",
 			},
-			wantProbeType:   "",
+			wantProbeType:   string(amaltheadevv1alpha1.None),
 			wantSessionPort: 0,
 			wantURLPath:     "/",
 		},

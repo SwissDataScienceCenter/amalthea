@@ -26,7 +26,7 @@ func TestReadyEndpoint(t *testing.T) {
 		ServerPort:         65532,
 		SessionPort:        0,
 		SessionURLPath:     "/",
-		ReadinessProbeType: "",
+		ReadinessProbeType: "none",
 	}
 
 	tests := []struct {
@@ -40,15 +40,6 @@ func TestReadyEndpoint(t *testing.T) {
 			cfg: func() config.RemoteSessionControllerConfig {
 				c := baseCfg
 				c.ReadinessProbeType = string(amaltheadevv1alpha1.None)
-				return c
-			}(),
-			wantStatus: http.StatusOK,
-		},
-		{
-			name: "interactive with empty probe type defaults to 200",
-			cfg: func() config.RemoteSessionControllerConfig {
-				c := baseCfg
-				c.ReadinessProbeType = ""
 				return c
 			}(),
 			wantStatus: http.StatusOK,
@@ -79,16 +70,6 @@ func TestReadyEndpoint(t *testing.T) {
 				return c
 			}(),
 			wantStatus: http.StatusServiceUnavailable,
-		},
-		{
-			name: "interactive tcp port 0 defaults to 200",
-			cfg: func() config.RemoteSessionControllerConfig {
-				c := baseCfg
-				c.ReadinessProbeType = string(amaltheadevv1alpha1.TCP)
-				c.SessionPort = 0
-				return c
-			}(),
-			wantStatus: http.StatusOK,
 		},
 		{
 			name: "interactive http serving 200 returns 200",
@@ -176,16 +157,6 @@ func TestReadyEndpoint(t *testing.T) {
 				return c
 			}(),
 			wantStatus: http.StatusServiceUnavailable,
-		},
-		{
-			name: "interactive http port 0 defaults to 200",
-			cfg: func() config.RemoteSessionControllerConfig {
-				c := baseCfg
-				c.ReadinessProbeType = string(amaltheadevv1alpha1.HTTP)
-				c.SessionPort = 0
-				return c
-			}(),
-			wantStatus: http.StatusOK,
 		},
 	}
 

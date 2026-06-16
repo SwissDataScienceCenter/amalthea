@@ -54,13 +54,13 @@ type RemoteSessionControllerConfig struct {
 	Runai     runaiConfig.RunaiConfig
 
 	// The port the server will listen to
-	ServerPort int32
+	ServerPort int
 
 	// FakeStart if true, do not start the remote session and print debug information
 	FakeStart bool
 
 	// SessionPort is the port where the remote session is expected to be serving
-	SessionPort int32
+	SessionPort int
 
 	// SessionURLPath is the URL path for the HTTP readiness probe
 	SessionURLPath string
@@ -133,9 +133,9 @@ func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
 	cfg.Firecrest = firecrestConfig.GetConfig()
 	cfg.Runai = runaiConfig.GetConfig()
 
-	cfg.ServerPort = viper.GetInt32(serverPortFlag)
+	cfg.ServerPort = viper.GetInt(serverPortFlag)
 	cfg.FakeStart = viper.GetBool(fakeStartFlag)
-	cfg.SessionPort = viper.GetInt32(sessionPortFlag)
+	cfg.SessionPort = viper.GetInt(sessionPortFlag)
 	cfg.SessionURLPath = viper.GetString(sessionURLPathFlag)
 	cfg.ReadinessProbeType = viper.GetString(readinessProbeTypeFlag)
 
