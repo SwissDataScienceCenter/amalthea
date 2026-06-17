@@ -81,14 +81,14 @@ function install_rclone() {
 function install_wstunnel() {
     wstunnel_version=${1:?"wstunnel_version: Version missing"}
     gh_arch=${2:?"wstunnel_version: Architecture missing"}
-    WSTUNNEL_PKG="${RENKU_PKG}/wstunnel/v${wstunnel_version}"
-    WSTUNNEL_BIN="${WSTUNNEL_PKG}/wstunnel"
+    wstunnel_pkg="${RENKU_PKG}/wstunnel/v${wstunnel_version}"
+    wstunnel_bin="${wstunnel_pkg}/wstunnel"
 
     >&2 echo "Info: using wstunnel v${wstunnel_version}"
 
     skip_install="0"
-    if [ -f "${WSTUNNEL_BIN}" ]; then
-        version="$("${WSTUNNEL_BIN}" --version || echo "bad executable")"
+    if [ -f "${wstunnel_bin}" ]; then
+        version="$("${wstunnel_bin}" --version || echo "bad executable")"
         expected="wstunnel-cli ${wstunnel_version}"
         if [ "${version}" = "${expected}" ]; then
             skip_install="1"
@@ -98,23 +98,23 @@ function install_wstunnel() {
     fi
 
     if [ "${skip_install}" != "0" ]; then
-        echo "${WSTUNNEL_BIN}"
+        echo "${wstunnel_bin}"
         return 0
     fi
 
-    WSTUNNEL_URL="https://github.com/SwissDataScienceCenter/wstunnel/releases/download/v${wstunnel_version}/wstunnel_${wstunnel_version}_linux_${gh_arch}.tar.gz"
+    wstunnel_url="https://github.com/SwissDataScienceCenter/wstunnel/releases/download/v${wstunnel_version}/wstunnel_${wstunnel_version}_linux_${gh_arch}.tar.gz"
 
-    mkdir -p "${WSTUNNEL_PKG}"
+    mkdir -p "${wstunnel_pkg}"
     tmp="$(mktemp -d)"
     cwd="$(pwd)"
     cd "${tmp}"
-    curl -Lo "wstunnel.tar.gz" "${WSTUNNEL_URL}"
-    tar xf "wstunnel.tar.gz" -C "${WSTUNNEL_PKG}"
+    curl -Lo "wstunnel.tar.gz" "${wstunnel_url}"
+    tar xf "wstunnel.tar.gz" -C "${wstunnel_pkg}"
     cd "${cwd}"
     rm -r "${tmp}"
-    chmod a+x "${WSTUNNEL_BIN}"
+    chmod a+x "${wstunnel_bin}"
 
-    echo "${WSTUNNEL_BIN}"
+    echo "${wstunnel_bin}"
 }
 
 if [ -z "${REMOTE_SESSION_IMAGE}" ]; then
