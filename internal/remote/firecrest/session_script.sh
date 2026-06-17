@@ -10,6 +10,7 @@
 set -e -o pipefail
 
 : ${ARCH:=$(uname -m)}
+: ${RENKU_PKG:="${HOME}/.renku/${ARCH}/pkg"}
 : ${GIT_PROXY_WAIT_SLEEP_SECONDS:=10}
 : ${GIT_PROXY_WAIT_RETRIES:=10}
 : ${RCLONE_VERSION:="1.70.2"}
@@ -36,8 +37,6 @@ esac
 function install_rclone() {
     rclone_version=${1:?"install_rclone: Version missing"}
     gh_arch=${2:?"install_rclone: Architecture missing"}
-    RENKU_DIR="${HOME}/.renku/$(uname -m)"
-    RENKU_PKG="${RENKU_DIR}/pkg"
     RCLONE_PKG="${RENKU_PKG}/rclone/v${rclone_version}"
     RCLONE_BIN="${RCLONE_PKG}/rclone"
 
@@ -82,8 +81,6 @@ function install_rclone() {
 function install_wstunnel() {
     wstunnel_version=${1:?"wstunnel_version: Version missing"}
     gh_arch=${2:?"wstunnel_version: Architecture missing"}
-    RENKU_DIR="${HOME}/.renku/$(uname -m)"
-    RENKU_PKG="${RENKU_DIR}/pkg"
     WSTUNNEL_PKG="${RENKU_PKG}/wstunnel/v${wstunnel_version}"
     WSTUNNEL_BIN="${WSTUNNEL_PKG}/wstunnel"
 
