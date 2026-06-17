@@ -131,9 +131,6 @@ func newServer(controller controller.RemoteSessionController, cfg config.RemoteS
 			}
 			return c.NoContent(http.StatusOK)
 		case string(amaltheadevv1alpha1.HTTP):
-			if cfg.SessionPort == 0 {
-				return c.NoContent(http.StatusOK)
-			}
 			client := &http.Client{
 				Timeout: 5 * time.Second,
 				CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -159,7 +156,7 @@ func newServer(controller controller.RemoteSessionController, cfg config.RemoteS
 			}
 			return c.NoContent(http.StatusServiceUnavailable)
 		default:
-			// Unconfigured / unknown: preserve old behavior for backward compatibility
+			// Case None or unset: preserve old behavior for backward compatibility
 			return c.NoContent(http.StatusOK)
 		}
 	})
