@@ -37,12 +37,12 @@ esac
 function install_rclone() {
     rclone_version=${1:?"install_rclone: Version missing"}
     gh_arch=${2:?"install_rclone: Architecture missing"}
-    RCLONE_PKG="${RENKU_PKG}/rclone/v${rclone_version}"
-    RCLONE_BIN="${RCLONE_PKG}/rclone"
+    rclone_pkg="${RENKU_PKG}/rclone/v${rclone_version}"
+    rclone_bin="${rclone_pkg}/rclone"
 
     skip_install="0"
-    if [ -f "${RCLONE_BIN}" ]; then
-        version="$("${RCLONE_BIN}" version || echo "bad executable")"
+    if [ -f "${rclone_bin}" ]; then
+        version="$("${rclone_bin}" version || echo "bad executable")"
         version="$(echo "${version}" | head -n 1)"
         expected="rclone v${rclone_version}"
         if [ "${version}" = "${expected}" ]; then
@@ -53,24 +53,24 @@ function install_rclone() {
     fi
 
     if [ "${skip_install}" != "0" ]; then
-        echo "${RCLONE_BIN}"
+        echo "${rclone_bin}"
         return 0
     fi
 
-    RCLONE_URL="https://github.com/rclone/rclone/releases/download/v${rclone_version}/rclone-v${rclone_version}-linux-${gh_arch}.zip"
+    rclone_url="https://github.com/rclone/rclone/releases/download/v${rclone_version}/rclone-v${rclone_version}-linux-${gh_arch}.zip"
 
-    mkdir -p "${RCLONE_PKG}"
+    mkdir -p "${rclone_pkg}"
     tmp="$(mktemp -d)"
     cwd="$(pwd)"
     cd "${tmp}"
-    curl -Lo "rclone.zip" "${RCLONE_URL}"
+    curl -Lo "rclone.zip" "${rclone_url}"
     >&2 unzip "rclone.zip"
-    rm -r "${RCLONE_PKG}"
-    mv ./rclone-v"${rclone_version}"-* "${RCLONE_PKG}"
+    rm -r "${rclone_pkg}"
+    mv ./rclone-v"${rclone_version}"-* "${rclone_pkg}"
     rm -r "${tmp}"
-    chmod a+x "${RCLONE_BIN}"
+    chmod a+x "${rclone_bin}"
 
-    echo "${RCLONE_BIN}"
+    echo "${rclone_bin}"
 }
 
 # Installs wstunnel
