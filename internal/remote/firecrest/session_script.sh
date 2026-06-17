@@ -9,18 +9,33 @@
 
 set -e -o pipefail
 
+: ${ARCH:=$(uname -m)}
 : ${GIT_PROXY_WAIT_SLEEP_SECONDS:=10}
 : ${GIT_PROXY_WAIT_RETRIES:=10}
 : ${RCLONE_VERSION:="1.70.2"}
 : ${WSTUNNEL_VERSION:="10.5.5"}
 
+case ${ARCH} in
+    "x86_64")
+        gh_arch=amd64
+        ;;
+    "aarch64")
+        gh_arch=arm64
+        ;;
+    *)
+        >&2 echo "Unsupported platform: ${ARCH}"
+        exit 1
+        ;;
+esac
+
 # Installs rclone
 #
 # Usage:
-#     rclone="$(install_rclone $version)"
+#     rclone="$(install_rclone $version $gh_arch)"
 #     "$rclone" version
 function install_rclone() {
     rclone_version=${1:?"install_rclone: Version missing"}
+    gh_arch=${2:?"install_rclone: Architecture missing"}
     RENKU_DIR="${HOME}/.renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
     RCLONE_PKG="${RENKU_PKG}/rclone/v${rclone_version}"
@@ -43,15 +58,7 @@ function install_rclone() {
         return 0
     fi
 
-    arch="$(uname -m)"
-    if [ "${arch}" = "x86_64" ]; then
-        RCLONE_URL="https://github.com/rclone/rclone/releases/download/v${rclone_version}/rclone-v${rclone_version}-linux-amd64.zip"
-    elif [ "${arch}" = "aarch64" ]; then
-        RCLONE_URL="https://github.com/rclone/rclone/releases/download/v${rclone_version}/rclone-v${rclone_version}-linux-arm64.zip"
-    else
-        >&2 echo "Unsupported platform: ${arch}"
-        exit 1
-    fi
+    RCLONE_URL="https://github.com/rclone/rclone/releases/download/v${rclone_version}/rclone-v${rclone_version}-linux-${gh_arch}.zip"
 
     mkdir -p "${RCLONE_PKG}"
     tmp="$(mktemp -d)"
@@ -70,10 +77,11 @@ function install_rclone() {
 # Installs wstunnel
 #
 # Usage:
-#     wstunnel="$(install_wstunnel $version)"
+#     wstunnel="$(install_wstunnel $version $gh_arch)"
 #     "$wstunnel" --version
 function install_wstunnel() {
     wstunnel_version=${1:?"wstunnel_version: Version missing"}
+    gh_arch=${2:?"wstunnel_version: Architecture missing"}
     RENKU_DIR="${HOME}/.renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
     WSTUNNEL_PKG="${RENKU_PKG}/wstunnel/v${wstunnel_version}"
@@ -97,15 +105,7 @@ function install_wstunnel() {
         return 0
     fi
 
-    arch="$(uname -m)"
-    if [ "${arch}" = "x86_64" ]; then
-        WSTUNNEL_URL="https://github.com/SwissDataScienceCenter/wstunnel/releases/download/v${wstunnel_version}/wstunnel_${wstunnel_version}_linux_amd64.tar.gz"
-    elif [ "${arch}" = "aarch64" ]; then
-        WSTUNNEL_URL="https://github.com/SwissDataScienceCenter/wstunnel/releases/download/v${wstunnel_version}/wstunnel_${wstunnel_version}_linux_arm64.tar.gz"
-    else
-        >&2 echo "Unsupported platform: ${arch}"
-        exit 1
-    fi
+    WSTUNNEL_URL="https://github.com/SwissDataScienceCenter/wstunnel/releases/download/v${wstunnel_version}/wstunnel_${wstunnel_version}_linux_${gh_arch}.tar.gz"
 
     mkdir -p "${WSTUNNEL_PKG}"
     tmp="$(mktemp -d)"
@@ -137,11 +137,11 @@ mkdir -p "${SECRETS_DIR}"
 mkdir -p "${LOGS_DIR}"
 
 # # Install rclone
-# rclone="$(install_rclone "${RCLONE_VERSION}")"
+# rclone="$(install_rclone "${RCLONE_VERSION}" "${gh_arch}")"
 # echo "rclone: ${rclone}"
 
 # Install wstunnel
-wstunnel="$(install_wstunnel "${WSTUNNEL_VERSION}")"
+wstunnel="$(install_wstunnel "${WSTUNNEL_VERSION}" "${gh_arch}")"
 echo "wstunnel: ${wstunnel}"
 
 # Ensure NVIDIA_VISIBLE_DEVICES is set to void 
