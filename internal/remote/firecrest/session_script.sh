@@ -120,12 +120,11 @@ function install_wstunnel() {
     echo "${wstunnel_bin}"
 }
 
-echo "SESSION_DIR: ${SESSION_DIR}"
-echo "SESSION_WORK_DIR: ${SESSION_WORK_DIR}"
-
-mkdir -p "${SESSION_WORK_DIR}"
-mkdir -p "${SECRETS_DIR}"
-mkdir -p "${LOGS_DIR}"
+for d in SESSION_WORK_DIR SECRETS_DIR LOGS_DIR
+do
+    echo "${d}: ${!d}"
+    mkdir -p "${!d}"
+done
 
 # # Install rclone
 # rclone="$(install_rclone "${RCLONE_VERSION}" "${gh_arch}")"
