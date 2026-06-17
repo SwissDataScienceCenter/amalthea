@@ -20,11 +20,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
+	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/SwissDataScienceCenter/amalthea/internal/common"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/controller"
@@ -56,7 +58,7 @@ func Start() {
 		os.Exit(1)
 	}
 
-	server := newServer(controller)
+	server := newServer(controller, cfg)
 
 	address := fmt.Sprintf(":%d", cfg.ServerPort)
 
@@ -95,7 +97,7 @@ func Start() {
 var logLevel *slog.LevelVar = new(slog.LevelVar)
 var jsonLogger *slog.Logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 
-func newServer(controller controller.RemoteSessionController) (server *echo.Echo) {
+func newServer(controller controller.RemoteSessionController, cfg config.RemoteSessionControllerConfig) (server *echo.Echo) {
 	e := echo.New()
 
 	e.HideBanner = true
@@ -114,7 +116,49 @@ func newServer(controller controller.RemoteSessionController) (server *echo.Echo
 
 	// Readiness endpoint
 	e.GET("/ready", func(c echo.Context) error {
-		return c.NoContent(http.StatusOK)
+		switch cfg.ReadinessProbeType {
+		case string(amaltheadevv1alpha1.TCP):
+			dialer := net.Dialer{}
+			dialCtx, dialCtxCancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+			defer dialCtxCancel()
+			conn, err := dialer.DialContext(dialCtx, "tcp", fmt.Sprintf("127.0.0.1:%d", cfg.SessionPort))
+
+			if err != nil {
+				return c.NoContent(http.StatusServiceUnavailable)
+			}
+			if err := conn.Close(); err != nil {
+				slog.Error("failed to close readiness probe connection", "error", err)
+			}
+			return c.NoContent(http.StatusOK)
+		case string(amaltheadevv1alpha1.HTTP):
+			client := &http.Client{
+				Timeout: 5 * time.Second,
+				CheckRedirect: func(req *http.Request, via []*http.Request) error {
+					return http.ErrUseLastResponse
+				},
+			}
+			url := fmt.Sprintf("http://127.0.0.1:%d%s", cfg.SessionPort, cfg.SessionURLPath)
+			req, err := http.NewRequestWithContext(c.Request().Context(), "GET", url, nil)
+			if err != nil {
+				return c.NoContent(http.StatusServiceUnavailable)
+			}
+			resp, err := client.Do(req)
+			if err != nil {
+				return c.NoContent(http.StatusServiceUnavailable)
+			}
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					slog.Error("failed to close readiness probe response body", "error", err)
+				}
+			}()
+			if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+				return c.NoContent(http.StatusOK)
+			}
+			return c.NoContent(http.StatusServiceUnavailable)
+		default:
+			// Case None or unset: preserve old behavior for backward compatibility
+			return c.NoContent(http.StatusOK)
+		}
 	})
 
 	// Status endpoint

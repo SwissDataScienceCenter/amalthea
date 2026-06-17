@@ -282,6 +282,10 @@ func (cr *AmaltheaSession) Service() v1.Service {
 		},
 	}
 	if cr.Spec.SessionLocation == Remote {
+		// NOTE: In order to connect through the reverse tunnel,
+		// we need to have the tunnel established so we publish
+		// the service without the pod being ready
+		svc.Spec.PublishNotReadyAddresses = true
 		svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
 			Protocol:   v1.ProtocolTCP,
 			Name:       tunnelServiceName,
@@ -990,6 +994,18 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 		v1.EnvVar{
 			Name:  "RSC_SERVER_PORT",
 			Value: fmt.Sprintf("%d", RemoteSessionControllerPort),
+		},
+		v1.EnvVar{
+			Name:  "RSC_SESSION_PORT",
+			Value: fmt.Sprintf("%d", cr.Spec.Session.Port),
+		},
+		v1.EnvVar{
+			Name:  "RSC_SESSION_URL_PATH",
+			Value: cr.Spec.Session.URLPath,
+		},
+		v1.EnvVar{
+			Name:  "RSC_READINESS_PROBE_TYPE",
+			Value: string(cr.Spec.Session.ReadinessProbe.Type),
 		},
 		v1.EnvVar{
 			Name: "RSC_WSTUNNEL_SECRET",
