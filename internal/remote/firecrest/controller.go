@@ -648,11 +648,11 @@ func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, s
 		mounts = append(mounts, fmt.Sprintf("%s:/secrets:ro", secretsPath))
 	}
 
-	// Format mount list for the environment.toml file
+	// Format mount list
 	for i := range mounts {
-		mounts[i] = fmt.Sprintf("    \"%s\",", mounts[i])
+		mounts[i] = fmt.Sprintf("\"%s\"", mounts[i])
 	}
-	mountsStr := fmt.Sprintf("mounts = [\n%s\n]", strings.Join(mounts, "\n"))
+	mountsStr := fmt.Sprintf("--container-mounts=%s", strings.Join(mounts, ","))
 	return strings.Replace(sessionScript, "#{{SESSION_MOUNTS_PLACEHOLDER}}", mountsStr, 1)
 }
 
