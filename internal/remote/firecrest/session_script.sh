@@ -11,24 +11,25 @@ set -e -o pipefail
 
 : ${GIT_PROXY_WAIT_SLEEP_SECONDS:=10}
 : ${GIT_PROXY_WAIT_RETRIES:=10}
+: ${RCLONE_VERSION:="1.70.2"}
 
 # Installs rclone
 #
 # Usage:
-#     rclone="$(install_rclone)"
+#     rclone="$(install_rclone $version)"
 #     "$rclone" version
 function install_rclone() {
+    rclone_version=${1:?"install_rclone: Version missing"}
     RENKU_DIR="${HOME}/.renku/$(uname -m)"
     RENKU_PKG="${RENKU_DIR}/pkg"
-    RCLONE_VERSION="1.70.2"
-    RCLONE_PKG="${RENKU_PKG}/rclone/v${RCLONE_VERSION}"
+    RCLONE_PKG="${RENKU_PKG}/rclone/v${rclone_version}"
     RCLONE_BIN="${RCLONE_PKG}/rclone"
 
     skip_install="0"
     if [ -f "${RCLONE_BIN}" ]; then
         version="$("${RCLONE_BIN}" version || echo "bad executable")"
         version="$(echo "${version}" | head -n 1)"
-        expected="rclone v${RCLONE_VERSION}"
+        expected="rclone v${rclone_version}"
         if [ "${version}" = "${expected}" ]; then
             skip_install="1"
         else
@@ -43,9 +44,9 @@ function install_rclone() {
 
     arch="$(uname -m)"
     if [ "${arch}" = "x86_64" ]; then
-        RCLONE_URL="https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-amd64.zip"
+        RCLONE_URL="https://github.com/rclone/rclone/releases/download/v${rclone_version}/rclone-v${rclone_version}-linux-amd64.zip"
     elif [ "${arch}" = "aarch64" ]; then
-        RCLONE_URL="https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-arm64.zip"
+        RCLONE_URL="https://github.com/rclone/rclone/releases/download/v${rclone_version}/rclone-v${rclone_version}-linux-arm64.zip"
     else
         >&2 echo "Unsupported platform: ${arch}"
         exit 1
@@ -58,7 +59,7 @@ function install_rclone() {
     curl -Lo "rclone.zip" "${RCLONE_URL}"
     >&2 unzip "rclone.zip"
     rm -r "${RCLONE_PKG}"
-    mv ./rclone-v"${RCLONE_VERSION}"-* "${RCLONE_PKG}"
+    mv ./rclone-v"${rclone_version}"-* "${RCLONE_PKG}"
     rm -r "${tmp}"
     chmod a+x "${RCLONE_BIN}"
 
@@ -140,7 +141,7 @@ mkdir -p "${SECRETS_DIR}"
 mkdir -p "${LOGS_DIR}"
 
 # # Install rclone
-# rclone=$(install_rclone)
+# rclone="$(install_rclone "${RCLONE_VERSION}")"
 # echo "rclone: ${rclone}"
 
 # Install wstunnel
