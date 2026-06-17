@@ -16,7 +16,6 @@ set -e -o pipefail
 : ${RCLONE_VERSION:="1.70.2"}
 : ${WSTUNNEL_VERSION:="10.5.5"}
 
-
 case ${ARCH} in
     "x86_64")
         gh_arch=amd64
