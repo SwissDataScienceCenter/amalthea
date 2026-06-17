@@ -89,7 +89,7 @@ function install_wstunnel() {
     if [ -f "${wstunnel_bin}" ]; then
         version="$("${wstunnel_bin}" --version || echo "bad executable")"
         expected="wstunnel-cli ${wstunnel_version}"
-        if [ "x${version}" = "x${expected}" ]; then
+        if [ "${version}" = "${expected}" ]; then
             echo "${wstunnel_bin}"
             return 0
         else
