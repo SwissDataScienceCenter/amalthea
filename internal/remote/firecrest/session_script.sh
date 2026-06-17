@@ -14,12 +14,8 @@ set -e -o pipefail
 : ${GIT_PROXY_WAIT_SLEEP_SECONDS:=10}
 : ${GIT_PROXY_WAIT_RETRIES:=10}
 : ${RCLONE_VERSION:="1.70.2"}
+: ${WSTUNNEL_VERSION:="10.5.5"}
 
-: ${WSTUNNEL_VERSION_x86_64:="10.4.4"}
-: ${WSTUNNEL_VERSION_aarch64:="10.1.10"}
-: ${d:="WSTUNNEL_VERSION_${ARCH}"}
-: ${WSTUNNEL_VERSION:="${!d}"}
-unset d
 
 case ${ARCH} in
     "x86_64")
@@ -107,7 +103,7 @@ function install_wstunnel() {
         return 0
     fi
 
-    WSTUNNEL_URL="https://github.com/erebe/wstunnel/releases/download/v${wstunnel_version}/wstunnel_${wstunnel_version}_linux_${gh_arch}.tar.gz"
+    WSTUNNEL_URL="https://github.com/SwissDataScienceCenter/wstunnel/releases/download/v${wstunnel_version}/wstunnel_${wstunnel_version}_linux_${gh_arch}.tar.gz"
 
     mkdir -p "${WSTUNNEL_PKG}"
     tmp="$(mktemp -d)"
