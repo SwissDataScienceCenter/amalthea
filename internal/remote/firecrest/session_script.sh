@@ -40,21 +40,16 @@ function install_rclone() {
     rclone_pkg="${RENKU_PKG}/rclone/v${rclone_version}"
     rclone_bin="${rclone_pkg}/rclone"
 
-    skip_install="0"
     if [ -f "${rclone_bin}" ]; then
         version="$("${rclone_bin}" version || echo "bad executable")"
         version="$(echo "${version}" | head -n 1)"
         expected="rclone v${rclone_version}"
         if [ "${version}" = "${expected}" ]; then
-            skip_install="1"
+            echo "${rclone_bin}"
+            return 0
         else
             >&2 echo "WARNING: found mismatching rclone version ${version}"
         fi
-    fi
-
-    if [ "${skip_install}" != "0" ]; then
-        echo "${rclone_bin}"
-        return 0
     fi
 
     rclone_url="https://github.com/rclone/rclone/releases/download/v${rclone_version}/rclone-v${rclone_version}-linux-${gh_arch}.zip"
