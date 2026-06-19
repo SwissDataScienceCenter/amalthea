@@ -520,7 +520,7 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	case jobIsSuccess(job):
 		return amaltheadevv1alpha1.Succeeded, ""
 	case jobIsFailed(job):
-		return amaltheadevv1alpha1.Failed, "The job failed."
+		return amaltheadevv1alpha1.Failed, "The job has finished with a failure status."
 	default:
 		return amaltheadevv1alpha1.NotReady, ""
 	}
