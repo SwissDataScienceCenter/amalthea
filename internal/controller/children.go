@@ -516,7 +516,7 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	case c.IsRunning(pod):
 		return amaltheadevv1alpha1.Running, ""
 	case podIsCompleted(pod):
-		return amaltheadevv1alpha1.Succeeded, ""
+		fallthrough
 	case jobIsSuccess(job):
 		return amaltheadevv1alpha1.Succeeded, ""
 	case jobIsFailed(job):
@@ -755,7 +755,7 @@ func (c ChildResourceUpdates) Status(
 	job, err := cr.GetJob(ctx, r.Client)
 	if err != nil {
 		job = nil
-		if !apierrors.IsNotFound(err) && cr.Spec.SessionType != amaltheadevv1alpha1.SessionTypeInteractive {
+		if !apierrors.IsNotFound(err) {
 			log.Error(err, "Could not read the session job when updating the status")
 		}
 	}
