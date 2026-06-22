@@ -149,7 +149,7 @@ if !(nvidia-smi 2>&1 >/dev/null); then
     export NVIDIA_VISIBLE_DEVICES=void
 fi
 
-if srun --help |grep -q -- --environment; then
+if srun --help | grep -q -- --environment; then
     # Create the environment.toml file to run the session
     EDF_FILE="${SESSION_DIR}/environment.toml"
     cat <<EOF >"${EDF_FILE}"
@@ -248,6 +248,8 @@ function exit_script() {
     echo "Cleaning up session..."
     # Make sure we have a valid pid before attempting to kill it
     (test -n "${pid}" && ps "${pid}" > /dev/null && kill -TERM "${pid}") || true
+
+    # fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
 
     # Sometimes the job continues to run...
     scancel "${SLURM_JOB_ID}" || true
