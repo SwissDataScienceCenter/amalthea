@@ -248,6 +248,8 @@ function exit_script() {
     # Make sure we have a valid pid before attempting to kill it
     (test -n "${pid}" && ps "${pid}" > /dev/null && kill -TERM "${pid}") || true
 
+    # fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
+
     # Sometimes the job continues to run...
     scancel "${SLURM_JOB_ID}" || true
 }
