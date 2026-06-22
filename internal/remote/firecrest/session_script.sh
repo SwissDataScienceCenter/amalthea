@@ -37,8 +37,8 @@ esac
 : ${SESSION_DIR:="${PWD}"}
 : ${SESSION_WORK_DIR:="${SESSION_DIR}/work"}
 : ${SECRETS_DIR:="${SESSION_DIR}/secrets"}
-: ${SECRETS_SLOTS_DIR:="${SECRETS_DIR}/slots/"}
-: ${SECRETS_DCS_DIR:="${SECRETS_DIR}/dcs"}
+: ${SECRETS_USER_DIR:="${SECRETS_DIR}/user/"}
+: ${SECRETS_DATA_CONNECTORS_DIR:="${SECRETS_DIR}/data_connectors"}
 : ${LOGS_DIR:="${SESSION_DIR}/logs"}
 
 # Setup session environment
