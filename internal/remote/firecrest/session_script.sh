@@ -243,15 +243,21 @@ if [ -n "${GIT_REPOSITORIES}" ]; then
     fi
 fi
 
-exit_script() {
+function exit_script() {
     echo "Cleaning up session..."
+    # Make sure we have a valid pid before attempting to kill it
+    (test -n "${pid}" && ps "${pid}" > /dev/null && kill -TERM "${pid}") || true
+
     # fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
+
+    # Sometimes the job continues to run...
+    scancel "${SLURM_JOB_ID}" || true
 }
 
 echo "Starting session..."
 # Start session while listening to EXIT signals
 pid=
-trap 'exit_script && [[ $pid ]] && kill -TERM "$pid" && exit_script' EXIT
+trap 'exit_script' EXIT
 srun \
     ${srun_param_environment} \
     ${srun_param_container_image} \
