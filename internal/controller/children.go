@@ -547,7 +547,7 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod, job *batchv1.Job) stri
 	if msg != "" {
 		return msg
 	}
-	msg = jobFailureReason(c.Job.Manifest)
+	msg = jobFailureReason(job)
 	if msg != "" {
 		return msg
 	}
