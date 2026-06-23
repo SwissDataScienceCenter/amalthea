@@ -93,16 +93,17 @@ func jobIsSuccess(job *batchv1.Job) bool {
 	return false
 }
 
-func jobIsFailed(job *batchv1.Job) bool {
+func jobIsFailed(job *batchv1.Job) (bool, string) {
 	if job == nil {
-		return false
+		return false, ""
 	}
 	for _, c := range job.Status.Conditions {
 		if c.Type == batchv1.JobFailed && c.Status == v1.ConditionTrue {
-			return true
+
+			return true, c.Message
 		}
 	}
-	return false
+	return false, ""
 }
 
 func podIsCompleted(pod *v1.Pod) bool {
