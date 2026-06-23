@@ -552,15 +552,6 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod, job *batchv1.Job) stri
 		return msg
 	}
 
-	jobFailed, jobMsg := jobIsFailed(job)
-	if jobFailed {
-		if jobMsg == "" {
-			return "The job has finished with a failure status."
-		} else {
-			return jobMsg
-		}
-	}
-
 	return ""
 }
 
