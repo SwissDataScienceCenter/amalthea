@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/oklog/ulid/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -200,6 +201,18 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 
 		return ctrl.Result{Requeue: true}, nil
 	}
+
+	// NEW
+	// We need to handle run ID before generating children resources
+	runID := amaltheasession.Status.RunId
+	if amaltheasession.Spec.Hibernated {
+		// The session is getting hibernated, unset the run ID
+		runID = ""
+	} else if runID == "" {
+		// The session just got created or is being resumed, set the new run ID
+		runID = ulid.Make().String()
+	}
+	amaltheasession.Status.RunId = runID
 
 	children, err := NewChildResources(amaltheasession, r.Configuration)
 	if err != nil {

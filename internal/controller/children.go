@@ -9,7 +9,6 @@ import (
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
-	"github.com/oklog/ulid/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -824,14 +823,15 @@ func (c ChildResourceUpdates) Status(
 
 	hibernationDate := calculateHibernationDate(log, cr.GetCreationTimestamp(), cr.Status, cr.Spec.Culling)
 
-	runID := cr.Status.RunId
-	if cr.Spec.Hibernated {
-		// The session is getting hibernated, unset the run ID
-		runID = ""
-	} else if runID == "" {
-		// The session just got created or is being resumed, set the new run ID
-		runID = ulid.Make().String()
-	}
+	// NEW
+	// runID := cr.Status.RunId
+	// if cr.Spec.Hibernated {
+	// 	// The session is getting hibernated, unset the run ID
+	// 	runID = ""
+	// } else if runID == "" {
+	// 	// The session just got created or is being resumed, set the new run ID
+	// 	runID = ulid.Make().String()
+	// }
 
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
 		Conditions:            Conditions(state, ctx, r, cr),
