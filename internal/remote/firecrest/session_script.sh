@@ -134,6 +134,9 @@ function install_wstunnel() {
 for d in \
     SESSION_DIR \
     SESSION_WORK_DIR \
+    SECRETS_DIR \
+    SECRETS_USER_DIR \
+    SECRETS_DATA_CONNECTORS_DIR \
     LOGS_DIR
 do
     echo "${d}: ${!d}"
