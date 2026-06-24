@@ -144,6 +144,8 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		if reflect.DeepEqual(amaltheasession.Status, amaltheadevv1alpha1.AmaltheaSessionStatus{State: amaltheadevv1alpha1.NotReady, Idle: false}) {
 			// First status update/render
 			amaltheasession.Status.URL = amaltheasession.GetURLString()
+			// NEW, do we need this here?
+			// amaltheasession.Status.RunId = ulid.Make().String()
 			err := r.Status().Update(ctx, amaltheasession)
 			if err != nil {
 				err = r.Get(ctx, req.NamespacedName, amaltheasession)

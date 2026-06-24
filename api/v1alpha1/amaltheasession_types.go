@@ -485,6 +485,10 @@ type AmaltheaSessionStatus struct {
 	// The date-time when the session is hibernated.
 	WillHibernateAt metav1.Time `json:"willHibernateAt,omitempty"`
 
+	// The ID of the current run of the workload. A run is a continuous execution of the workload;
+	// every time a session gets resumed from hibernation, it gets a new runID.
+	RunId string `json:"runID,omitempty"`
+
 	// If the state is failed then the message will contain information about what went wrong, otherwise it is empty
 	// +optional
 	Error string `json:"error,omitempty"`

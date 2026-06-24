@@ -218,12 +218,22 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 		return appsv1.StatefulSet{}, err
 	}
 
+	labels := cr.childLabels()
+	annotations := map[string]string{}
+	for key := range cr.Spec.Template.Metadata.Annotations {
+		annotations[key] = cr.Spec.Template.Metadata.Annotations[key]
+	}
+	// Add the annotation for the runID
+	if cr.Status.RunId != "" {
+		annotations["renku.io/run_id"] = cr.Status.RunId
+	}
+
 	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cr.Name,
 			Namespace:   cr.Namespace,
-			Labels:      cr.childLabels(),
-			Annotations: cr.Spec.Template.Metadata.Annotations,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			// NOTE: Parallel pod management policy is important
@@ -235,8 +245,8 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      cr.childLabels(),
-					Annotations: cr.Spec.Template.Metadata.Annotations,
+					Labels:      labels,
+					Annotations: annotations,
 				},
 				Spec: *pod,
 			},
