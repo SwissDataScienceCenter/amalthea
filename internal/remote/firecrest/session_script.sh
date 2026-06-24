@@ -37,6 +37,8 @@ esac
 : ${SESSION_DIR:="${PWD}"}
 : ${SESSION_WORK_DIR:="${SESSION_DIR}/work"}
 : ${SECRETS_DIR:="${SESSION_DIR}/secrets"}
+: ${SECRETS_USER_DIR:="${SECRETS_DIR}/user/"}
+: ${SECRETS_DATA_CONNECTORS_DIR:="${SECRETS_DIR}/data_connectors"}
 : ${LOGS_DIR:="${SESSION_DIR}/logs"}
 
 # Setup session environment
@@ -129,7 +131,13 @@ function install_wstunnel() {
     echo "${wstunnel_bin}"
 }
 
-for d in SESSION_WORK_DIR SECRETS_DIR LOGS_DIR
+for d in \
+    SESSION_DIR \
+    SESSION_WORK_DIR \
+    SECRETS_DIR \
+    SECRETS_USER_DIR \
+    SECRETS_DATA_CONNECTORS_DIR \
+    LOGS_DIR
 do
     echo "${d}: ${!d}"
     mkdir -p "${!d}"
