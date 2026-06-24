@@ -6590,6 +6590,11 @@ spec:
                   total:
                     type: integer
                 type: object
+              runID:
+                description: |-
+                  The ID of the current run of the workload. A run is a continuous execution of the workload;
+                  every time a session gets resumed from hibernation, it gets a new runID.
+                type: string
               state:
                 default: NotReady
                 enum:
