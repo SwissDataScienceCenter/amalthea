@@ -57,6 +57,26 @@ rmdir "${SESSION_DIR}/secrets"
 # Load the wstunnel secret
 export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
 
+# CamelCase to kebab-case conversion
+#
+# Usage:
+#     kebab_cased="$(to_kebab_case "[cC]amelCaseInput")"
+to_kebab_case() {
+    echo "${1:?"to_kebab_case: input string missing"}" | sed 's/\([A-Z]\)/-\1/g' | tr '[:upper:]' '[:lower:]'
+}
+
+# Convert camelCased key - value pairs stored in a flat json struct to command line arguments.
+#
+# Usage:
+#     arguments_string="$(to_rclone_mount_arguments "file_path" ["argument_prefix"])"
+to_rclone_mount_arguments() {
+    local filename=${1:?"to_arguments: input file missing"}
+    local prefix=${2}
+    cat "${filename}" | tr '{},"' '\n' | grep ':' | while IFS=': ' read -r key value; do
+        printf "--%s%s=%s " "${prefix}" "$(to_kebab_case "${key}")" "{$value}"
+    done
+}
+
 # Installs rclone
 #
 # Usage:
@@ -188,10 +208,21 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             mount="$(cat "${dc}/remote")"
             remotePath="$(cat "${dc}/remotePath")"
             log_file="${LOGS_DIR}/rclone-dc-${n}.log"
+            config_file="${dc}/configData"
+            secret_key="${dc}/secretKey"
+
+            if [ -f "${secret_key}" ]; then
+                local secret_key_content="$(cat "${secret_key}")"
+                cat "${config_file}" | sed -e "s,pass = <sensitive>,pass = ${secret_key_content}," > "${config_file}.tmp" && mv "${config_file}.tmp" "${config_file}"
+            fi
+
             # TODO Manage caching options
+            vfsOptions="$(to_rclone_mount_arguments "${dc}/vfsOpt" "vfs-")"
+
             # TODO Manage flags
             # TODO Manage mountOpt options
-            readonly="--read-only" # force readonly for now
+            mountOptions="$(to_rclone_mount_arguments "${dc}/mountOpt")"
+            #readonly="--read-only" # force readonly for now
 
             echo >> "${log_file}"
             echo "--- Starting $(date)" >> "${log_file}"
@@ -201,10 +232,12 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
 
             ${rclone} mount \
                 --daemon \
+                ${mountOptions} \
                 ${readonly} \
                 --log-file="${log_file}" \
                 --cache-dir="${CACHE_DIR}/$n" \
-                --config="${dc}/configData" \
+                ${vfsOptions} \
+                --config="${config_file}" \
                 "${mount}:${remotePath}" \
                 "//${SESSION_WORK_DIR}/${mount}"
         done
