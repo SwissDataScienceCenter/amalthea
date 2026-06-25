@@ -73,6 +73,9 @@ to_rclone_mount_arguments() {
     local filename=${1:?"to_arguments: input file missing"}
     local prefix=${2}
     cat "${filename}" | tr '{},"' '\n' | grep ':' | while IFS=': ' read -r key value; do
+        echo "DEBUG: to_rclone_mount_arguments: " "${key}" "{$value}"
+    done
+    cat "${filename}" | tr '{},"' '\n' | grep ':' | while IFS=': ' read -r key value; do
         printf "%s%s=%s " "${prefix}" "$(to_kebab_case "${key}")" "{$value}"
     done
 }
