@@ -502,8 +502,8 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	return (stsReady || jobReady) && podReady
 }
 
-func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
-	msg := c.failureMessage(pod)
+func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod, job *batchv1.Job) (amaltheadevv1alpha1.State, string) {
+	msg := c.failureMessage(pod, job)
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
 		return amaltheadevv1alpha1.NotReady, ""
@@ -516,13 +516,15 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	case c.IsRunning(pod):
 		return amaltheadevv1alpha1.Running, ""
 	case podIsCompleted(pod):
+		fallthrough
+	case jobIsSuccess(job):
 		return amaltheadevv1alpha1.Succeeded, ""
 	default:
 		return amaltheadevv1alpha1.NotReady, ""
 	}
 }
 
-func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
+func (c ChildResourceUpdates) failureMessage(pod *v1.Pod, job *batchv1.Job) string {
 	msg := podFailureReason(pod)
 	if msg != "" {
 		return msg
@@ -545,7 +547,7 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
 	if msg != "" {
 		return msg
 	}
-	msg = jobFailureReason(c.Job.Manifest)
+	msg = jobFailureReason(job)
 	if msg != "" {
 		return msg
 	}
@@ -748,10 +750,17 @@ func (c ChildResourceUpdates) Status(
 			log.Error(err, "Could not read the session pod when updating the status")
 		}
 	}
+	job, err := cr.GetJob(ctx, r.Client)
+	if err != nil {
+		job = nil
+		if !apierrors.IsNotFound(err) {
+			log.Error(err, "Could not read the session job when updating the status")
+		}
+	}
 
 	idle := false
 	idleSince := cr.Status.IdleSince
-	state, failMsg := c.State(cr, pod)
+	state, failMsg := c.State(cr, pod, job)
 
 	failedSchedulingSince, nextState, err := checkEventsInferedState(ctx, r, cr, state)
 	state = nextState
