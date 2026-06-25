@@ -51,7 +51,7 @@ export RENKU_SESSION_IP="127.0.0.1"
 # Do not leave secrets on a shared fs, move it to the node where the session runs.
 mkdir -p "${SECRETS_DIR}"
 chmod 700 "${SECRETS_DIR}"
-mv "${SESSION_DIR}/secrets/*" "${SECRETS_DIR}"
+mv "${SESSION_DIR}/secrets"/* "${SECRETS_DIR}"
 rmdir "${SESSION_DIR}/secrets"
 
 # Load the wstunnel secret
