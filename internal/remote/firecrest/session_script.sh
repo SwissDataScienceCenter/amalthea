@@ -178,7 +178,7 @@ srun_param_container_image="--container-image ${REMOTE_SESSION_IMAGE}"
 srun_param_workdir="--container-workdir ${SESSION_WORK_DIR}"
 srun_param_mounts=#{{SESSION_MOUNTS_PLACEHOLDER}}
 # We cannot generate directly the local secrets path from the proxy as the final path is only known after ${SECRETS_DIR} as been set.
-srun_param_mounts=$(echo ${srun_param_mounts} | sed -e "s,${SESSION_DIR}/secrets,${SECRETS_DIR},g')
+srun_param_mounts=$(echo ${srun_param_mounts} | sed -e "s,${SESSION_DIR}/secrets,${SECRETS_DIR},g")
 
 # Mount DataSources, if any
 if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
