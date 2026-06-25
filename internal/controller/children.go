@@ -832,6 +832,16 @@ func (c ChildResourceUpdates) Status(
 
 	hibernationDate := calculateHibernationDate(log, cr.GetCreationTimestamp(), cr.Status, cr.Spec.Culling)
 
+	// NEW
+	// runID := cr.Status.RunId
+	// if cr.Spec.Hibernated {
+	// 	// The session is getting hibernated, unset the run ID
+	// 	runID = ""
+	// } else if runID == "" {
+	// 	// The session just got created or is being resumed, set the new run ID
+	// 	runID = ulid.Make().String()
+	// }
+
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
 		Conditions:            Conditions(state, ctx, r, cr),
 		State:                 state,
@@ -842,6 +852,7 @@ func (c ChildResourceUpdates) Status(
 		FailingSince:          failingSince,
 		HibernatedSince:       hibernatedSince,
 		WillHibernateAt:       hibernationDate,
+		RunId:                 cr.Status.RunId,
 		Error:                 failMsg,
 	}
 	warning := c.warningMessage(pod)
