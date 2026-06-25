@@ -73,7 +73,7 @@ to_rclone_mount_arguments() {
     local filename=${1:?"to_arguments: input file missing"}
     local prefix=${2}
     cat "${filename}" | tr '{},"' '\n' | grep ':' | while IFS=': ' read -r key value; do
-        printf "--%s%s=%s " "${prefix}" "$(to_kebab_case "${key}")" "{$value}"
+        printf "%s%s=%s " "${prefix}" "$(to_kebab_case "${key}")" "{$value}"
     done
 }
 
@@ -217,11 +217,11 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             fi
 
             # TODO Manage caching options
-            vfsOptions="$(to_rclone_mount_arguments "${dc}/vfsOpt" "vfs-")"
+            vfsOptions="$(to_rclone_mount_arguments "${dc}/vfsOpt" "--vfs-")"
 
             # TODO Manage flags
             # TODO Manage mountOpt options
-            mountOptions="$(to_rclone_mount_arguments "${dc}/mountOpt")"
+            mountOptions="$(to_rclone_mount_arguments "${dc}/mountOpt" "--")"
             #readonly="--read-only" # force readonly for now
 
             echo >> "${log_file}"
