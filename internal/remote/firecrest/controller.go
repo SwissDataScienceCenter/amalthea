@@ -164,36 +164,36 @@ func walkIfExists(root string, filter func(dir os.DirEntry) bool, process func(d
 	return nil
 }
 
-func ensurePrivateFolder(c *FirecrestRemoteSessionController, ctx context.Context, remoteSecretsPath string) error {
+func ensurePrivateFolder(c *FirecrestRemoteSessionController, ctx context.Context, remotePath string) error {
 	// Ensure the remote folder exists
-	err := c.mkdir(ctx, remoteSecretsPath, true)
+	err := c.mkdir(ctx, remotePath, true)
 	if err != nil {
 		return err
 	}
 
-	err = c.chmod(ctx, remoteSecretsPath, "700")
+	err = c.chmod(ctx, remotePath, "700")
 	if err != nil {
 		return err
 	}
 	return err
 }
 
-func (c *FirecrestRemoteSessionController) uploadSecret(ctx context.Context, localSessionSecretsFolder, remoteSecretsPath, filename string) error {
+func (c *FirecrestRemoteSessionController) uploadSecret(ctx context.Context, localPath, remotePath, filename string) error {
 	var err error
 	var content []byte
 
-	if content, err = os.ReadFile(path.Join(localSessionSecretsFolder, filename)); err != nil {
+	if content, err = os.ReadFile(path.Join(localPath, filename)); err != nil {
 		return err
 	}
 
 	// ignore errors, we want this just to make sure we can write to it if the files exists
-	_ = c.chmod(ctx, path.Join(remoteSecretsPath, filename), "700")
+	_ = c.chmod(ctx, path.Join(remotePath, filename), "700")
 
-	if err = c.uploadFile(ctx, remoteSecretsPath, filename, content); err != nil {
+	if err = c.uploadFile(ctx, remotePath, filename, content); err != nil {
 		return err
 	}
 
-	if err = c.chmod(ctx, path.Join(remoteSecretsPath, filename), "400"); err != nil {
+	if err = c.chmod(ctx, path.Join(remotePath, filename), "400"); err != nil {
 		return err
 	}
 
@@ -208,35 +208,35 @@ func isDir(dir os.DirEntry) bool {
 	return dir.IsDir()
 }
 
-func (c *FirecrestRemoteSessionController) uploadSecrets(ctx context.Context, localSessionSecretsFolder, remoteSecretsPath string) error {
+func (c *FirecrestRemoteSessionController) uploadSecrets(ctx context.Context, localPath, remotePath string) error {
 	return walkIfExists(
-		localSessionSecretsFolder,
+		localPath,
 		func(dir os.DirEntry) bool {
 			return isFile(dir) && !strings.HasPrefix(dir.Name(), "..")
 		},
 		func(a os.DirEntry) error {
 			filename := a.Name()
-			return c.uploadSecret(ctx, localSessionSecretsFolder, remoteSecretsPath, filename)
+			return c.uploadSecret(ctx, localPath, remotePath, filename)
 		},
 		func() error {
-			return ensurePrivateFolder(c, ctx, remoteSecretsPath)
+			return ensurePrivateFolder(c, ctx, remotePath)
 		},
 	)
 }
 
-func (c *FirecrestRemoteSessionController) uploadDCSecrets(ctx context.Context, localSessionSecretsFolder, remoteSecretsPath string) error {
+func (c *FirecrestRemoteSessionController) uploadDataConnectorSecrets(ctx context.Context, localPath, remotePath string) error {
 	return walkIfExists(
-		localSessionSecretsFolder,
+		localPath,
 		isDir,
 		func(dir os.DirEntry) error {
 			return c.uploadSecrets(
 				ctx,
-				path.Join(localSessionSecretsFolder, dir.Name()),
-				path.Join(remoteSecretsPath, dir.Name()),
+				path.Join(localPath, dir.Name()),
+				path.Join(remotePath, dir.Name()),
 			)
 		},
 		func() error {
-			return ensurePrivateFolder(c, ctx, remoteSecretsPath)
+			return ensurePrivateFolder(c, ctx, remotePath)
 		},
 	)
 }
@@ -303,15 +303,15 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		slog.Warn("RENKU_BASE_URL_PATH is not defined", "defaultValue", renkuBaseURLPath)
 	}
 
-	srunPathRenku := path.Join(scratch.Path, userName, "renku")
-	srunSessionPath := path.Join(srunPathRenku, "sessions", renkuProjectPath, strings.TrimPrefix(renkuBaseURLPath, "/sessions"))
+	srunRenkuPath := path.Join(scratch.Path, userName, "renku")
+	srunSessionPath := path.Join(srunRenkuPath, "sessions", renkuProjectPath, strings.TrimPrefix(renkuBaseURLPath, "/sessions"))
 
 	slog.Info("determined session path", "sessionPath", srunSessionPath)
 
 	// Setup secrets
-	containerSecretsPath, exists := os.LookupEnv("RENKU_SECRETS_PATH")
+	proxyContainerSecretsPath, exists := os.LookupEnv("RENKU_SECRETS_PATH")
 	if !exists {
-		containerSecretsPath = "/secrets"
+		proxyContainerSecretsPath = "/secrets"
 	}
 
 	// Makes sure that only the session owner can read session files
@@ -342,32 +342,32 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		}
 	}
 
-	// Upload user secrets into secretsPath
-	srunSecretSlotsPath := path.Join(srunSecretsPath, "slots")
-	containerSecretSlotsPath := containerSecretsPath // the secrets are stored directly, as is
+	// Upload user secrets
+	srunUserSecretsPath := path.Join(srunSecretsPath, "user")
+	proxyContainerUserSecretsPath := proxyContainerSecretsPath // the secrets are stored directly, as is
 
 	var dirEntries []os.DirEntry
-	if dirEntries, err = os.ReadDir(containerSecretSlotsPath); err != nil && !os.IsNotExist(err) {
+	if dirEntries, err = os.ReadDir(proxyContainerUserSecretsPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	if len(dirEntries) == 0 {
 		// There are no secrets to mount
-		srunSecretSlotsPath = ""
+		srunUserSecretsPath = ""
 	} else {
-		if err = c.uploadSecrets(startCtx, containerSecretSlotsPath, srunSecretSlotsPath); err != nil {
+		if err = c.uploadSecrets(startCtx, proxyContainerUserSecretsPath, srunUserSecretsPath); err != nil {
 			return err
 		}
 	}
 
-	srunDCsPath := path.Join(srunSecretsPath, "dcs")
-	// Can't put them under /secrets as we can't create the "dcs" folder as the volume is RO. "/" seems fine :shrug:
-	containerDCsPath := fmt.Sprintf("%s-dcs", containerSecretsPath)
-	if dirEntries, err = os.ReadDir(containerDCsPath); err != nil && !os.IsNotExist(err) {
+	srunDataConnectorsPath := path.Join(srunSecretsPath, "data_connectors")
+	// Can't put them under /secrets as we can't create a subfolder in it as the volume is RO, so we put them at the root
+	proxyContainerDataConnectorsPath := fmt.Sprintf("%s-dcs", proxyContainerSecretsPath)
+	if dirEntries, err = os.ReadDir(proxyContainerDataConnectorsPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	if len(dirEntries) > 0 {
 		// Upload data source secrets
-		if err = c.uploadDCSecrets(startCtx, containerDCsPath, srunDCsPath); err != nil {
+		if err = c.uploadDataConnectorSecrets(startCtx, proxyContainerDataConnectorsPath, srunDataConnectorsPath); err != nil {
 			return err
 		}
 	}
@@ -449,7 +449,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
 	// Upload the session script
-	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, srunSecretSlotsPath)
+	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, srunUserSecretsPath)
 	err = c.uploadFile(startCtx, srunSessionPath, "session_script.sh", []byte(sessionScriptFinal))
 	if err != nil {
 		return err
