@@ -216,12 +216,15 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
                 cat "${config_file}" | sed -e "s,pass = <sensitive>,pass = ${secret_key_content}," > "${config_file}.tmp" && mv "${config_file}.tmp" "${config_file}"
             fi
 
-            # TODO Manage caching options
-            vfsOptions="$(to_rclone_mount_arguments "${dc}/vfsOpt" "--vfs-")"
+            if [ -f "${dc}/vfsOpt" ]; then
+                vfsOptions="$(to_rclone_mount_arguments "${dc}/vfsOpt" "--vfs-")"
+            fi
 
             # TODO Manage flags
-            # TODO Manage mountOpt options
-            mountOptions="$(to_rclone_mount_arguments "${dc}/mountOpt" "--")"
+            if [ -f "${dc}/mountOpt" ]; then
+                mountOptions="$(to_rclone_mount_arguments "${dc}/mountOpt" "--")"
+            fi
+
             #readonly="--read-only" # force readonly for now
 
             echo >> "${log_file}"
