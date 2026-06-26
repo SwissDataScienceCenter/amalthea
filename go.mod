@@ -7,6 +7,7 @@ tool fybrik.io/crdoc
 require (
 	github.com/distribution/reference v0.6.0
 	github.com/elazarl/goproxy v1.7.2
+	github.com/fernet/fernet-go v0.0.0-20240119011108-303da6aec611
 	github.com/getkin/kin-openapi v0.132.0
 	github.com/getsentry/sentry-go v0.45.1
 	github.com/go-git/go-git/v5 v5.16.0

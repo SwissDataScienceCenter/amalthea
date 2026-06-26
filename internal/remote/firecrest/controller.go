@@ -39,6 +39,7 @@ import (
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest/auth"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
 	"github.com/SwissDataScienceCenter/amalthea/internal/utils"
+	"github.com/fernet/fernet-go"
 	"k8s.io/utils/ptr"
 )
 
@@ -184,6 +185,15 @@ func (c *FirecrestRemoteSessionController) uploadSecret(ctx context.Context, loc
 
 	if content, err = os.ReadFile(path.Join(localPath, filename)); err != nil {
 		return err
+	}
+
+	if filename == "secretKey" {
+		// We need to decrypt the wrapping layer here as we won't be able to talk to secret storage from the remote
+		fernetKey, decodeErr := fernet.DecodeKey(string(content))
+		if decodeErr != nil {
+			return decodeErr
+		}
+		content = fernetKey[:]
 	}
 
 	// ignore errors, we want this just to make sure we can write to it if the files exists
