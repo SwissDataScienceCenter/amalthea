@@ -212,7 +212,7 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             secret_key="${dc}/secretKey"
 
             if [ -f "${secret_key}" ]; then
-                secret_key_content="$(cat "${secret_key}" | base64)"
+                secret_key_content="$(cat "${secret_key}" | rclone obscure -)"
                 cat "${config_file}" | sed -e "s,pass = <sensitive>,pass = ${secret_key_content}," > "${config_file}.tmp" && mv "${config_file}.tmp" "${config_file}"
             fi
 
