@@ -1,0 +1,12 @@
+{{- if .Values.deploy.priorityClass -}}
+---
+apiVersion: scheduling.k8s.io/v1
+description: Renku default resource quota priority class
+kind: PriorityClass
+metadata:
+  labels:
+    app: renku
+  name: renku-user-sessions-priority
+preemptionPolicy: Never
+value: 100
+{{- end }}
