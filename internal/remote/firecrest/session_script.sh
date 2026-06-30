@@ -209,18 +209,11 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             remotePath="$(cat "${dc}/remotePath")"
             log_file="${LOGS_DIR}/rclone-dc-${n}.log"
             config_file="${dc}/configData"
-            secret_key="${dc}/secretKey"
-
-            if [ -f "${secret_key}" ]; then
-                secret_key_content="$(cat "${secret_key}" | rclone obscure -)"
-                cat "${config_file}" | sed -e "s,pass = <sensitive>,pass = ${secret_key_content}," > "${config_file}.tmp" && mv "${config_file}.tmp" "${config_file}"
-            fi
 
             if [ -f "${dc}/vfsOpt" ]; then
                 vfsOptions="$(to_rclone_mount_arguments "${dc}/vfsOpt" "--vfs")"
             fi
 
-            # TODO Manage flags
             if [ -f "${dc}/mountOpt" ]; then
                 mountOptions="$(to_rclone_mount_arguments "${dc}/mountOpt" "-")"
             fi

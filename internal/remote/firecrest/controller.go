@@ -35,11 +35,11 @@ import (
 	"time"
 
 	"github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	"github.com/SwissDataScienceCenter/amalthea/internal/common"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest/auth"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
 	"github.com/SwissDataScienceCenter/amalthea/internal/utils"
-	"github.com/fernet/fernet-go"
 	"k8s.io/utils/ptr"
 )
 
@@ -179,23 +179,8 @@ func ensurePrivateFolder(c *FirecrestRemoteSessionController, ctx context.Contex
 	return err
 }
 
-func (c *FirecrestRemoteSessionController) uploadSecret(ctx context.Context, localPath, remotePath, filename string) error {
+func (c *FirecrestRemoteSessionController) uploadSecretFromBuffer(ctx context.Context, remotePath, filename string, content []byte) error {
 	var err error
-	var content []byte
-
-	if content, err = os.ReadFile(path.Join(localPath, filename)); err != nil {
-		return err
-	}
-
-	if filename == "secretKey" {
-		// We need to decrypt the wrapping layer here as we won't be able to talk to secret storage from the remote
-		fernetKey, decodeErr := fernet.DecodeKey(string(content))
-		if decodeErr != nil {
-			return decodeErr
-		}
-		content = fernetKey[:]
-	}
-
 	// ignore errors, we want this just to make sure we can write to it if the files exists
 	_ = c.chmod(ctx, path.Join(remotePath, filename), "700")
 
@@ -208,6 +193,49 @@ func (c *FirecrestRemoteSessionController) uploadSecret(ctx context.Context, loc
 	}
 
 	return err
+}
+
+func (c *FirecrestRemoteSessionController) uploadSecret(ctx context.Context, localPath, remotePath, filename string) error {
+	var err error
+	var content []byte
+
+	if content, err = os.ReadFile(path.Join(localPath, filename)); err != nil {
+		return err
+	}
+
+	return c.uploadSecretFromBuffer(ctx, remotePath, filename, content)
+}
+
+func (c *FirecrestRemoteSessionController) uploadDataSource(ctx context.Context, remotePath string, dataSource *common.DataConnector) error {
+	var err error
+
+	if err = c.uploadSecretFromBuffer(ctx, remotePath, "remote", []byte(dataSource.Remote)); err != nil {
+		return err
+	}
+
+	if err = c.uploadSecretFromBuffer(ctx, remotePath, "remotePath", []byte(dataSource.RemotePath)); err != nil {
+		return err
+	}
+
+	if err = c.uploadSecretFromBuffer(ctx, remotePath, "mountOpt", []byte(dataSource.MountOpt)); err != nil {
+		return err
+	}
+
+	if err = c.uploadSecretFromBuffer(ctx, remotePath, "vfsOpt", []byte(dataSource.VfsOpt)); err != nil {
+		return err
+	}
+
+	var configData *string
+	if configData, err = dataSource.ConfigData(ctx); err != nil {
+		return err
+	}
+
+	if err = c.uploadSecretFromBuffer(ctx, remotePath, "configData", []byte(*configData)); err != nil {
+		return err
+	}
+
+	// TODO: Write read-only extra flag from "DATA_SOURCES"
+	return nil
 }
 
 func isFile(dir os.DirEntry) bool {
@@ -239,11 +267,11 @@ func (c *FirecrestRemoteSessionController) uploadDataConnectorSecrets(ctx contex
 		localPath,
 		isDir,
 		func(dir os.DirEntry) error {
-			return c.uploadSecrets(
-				ctx,
-				path.Join(localPath, dir.Name()),
-				path.Join(remotePath, dir.Name()),
-			)
+			ds, err := common.LoadDataSource(localPath, dir.Name())
+			if err != nil {
+				return err
+			}
+			return c.uploadDataSource(ctx, remotePath, ds)
 		},
 		func() error {
 			return ensurePrivateFolder(c, ctx, remotePath)
@@ -334,22 +362,9 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		return err
 	}
 
-	// TODO: get wstunnel_secret as a config value
-	wstunnel_secret := os.Getenv("RSC_WSTUNNEL_SECRET")
-	if wstunnel_secret != "" {
-		content := []byte(wstunnel_secret)
-		filename := "wstunnel_secret"
-
-		// ignore errors, we want this just to make sure we can write to it if the files exists
-		_ = c.chmod(startCtx, path.Join(srunSecretsPath, filename), "700")
-
-		if err = c.uploadFile(startCtx, srunSecretsPath, filename, content); err != nil {
-			return err
-		}
-
-		if err = c.chmod(startCtx, path.Join(srunSecretsPath, filename), "400"); err != nil {
-			return err
-		}
+	err = c.uploadSecret(startCtx, common.UserSecretProxyFolder, srunSecretsPath, "wstunnel_secret")
+	if err != nil {
+		return err
 	}
 
 	// Upload user secrets
@@ -371,7 +386,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 
 	srunDataConnectorsPath := path.Join(srunSecretsPath, "data_connectors")
 	// Can't put them under /secrets as we can't create a subfolder in it as the volume is RO, so we put them at the root
-	proxyContainerDataConnectorsPath := fmt.Sprintf("%s-dcs", proxyContainerSecretsPath)
+	proxyContainerDataConnectorsPath := common.DataConnectorSecretsProxyFolder
 	if dirEntries, err = os.ReadDir(proxyContainerDataConnectorsPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -459,7 +474,9 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
 	// Upload the session script
-	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, srunUserSecretsPath)
+	// We mirror the RENKU_SECRETS_PATH in the proxy and container final container, as it contains the user secrets, at
+	// the user secrets lcoaltion (configurable by end-user)
+	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, srunUserSecretsPath, proxyContainerSecretsPath)
 	err = c.uploadFile(startCtx, srunSessionPath, "session_script.sh", []byte(sessionScriptFinal))
 	if err != nil {
 		return err
@@ -663,25 +680,6 @@ func (c *FirecrestRemoteSessionController) uploadFile(ctx context.Context, direc
 		return fmt.Errorf("could not run uploadFile: HTTP %d", res.StatusCode())
 	}
 	return nil
-}
-
-func (c *FirecrestRemoteSessionController) ls(ctx context.Context, path string) (*[]File, error) {
-	body := &GetLsFilesystemSystemNameOpsLsGetParams{
-		Path: path,
-	}
-	res, err := c.client.GetLsFilesystemSystemNameOpsLsGetWithResponse(ctx, c.systemName, body)
-	if err != nil {
-		return nil, err
-	}
-	if res.JSON200 == nil {
-		message := getErrorMessage(res.JSON4XX, res.JSON5XX)
-		if message != "" {
-			return nil, fmt.Errorf("could not run ls: %s", message)
-		}
-		return nil, fmt.Errorf("could not run ls: HTTP %d", res.StatusCode())
-	}
-
-	return res.JSON200.Output, nil
 }
 
 func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path string, createParents bool) error {
@@ -899,14 +897,14 @@ func (c *FirecrestRemoteSessionController) fetchLogStream(ctx context.Context, s
 	}
 }
 
-func (c *FirecrestRemoteSessionController) renderSessionScript(sessionScript string, fileSystems *[]FileSystem, secretsPath string) string {
-	return renderSessionScriptStatic(sessionScript, c.partition, fileSystems, secretsPath)
+func (c *FirecrestRemoteSessionController) renderSessionScript(sessionScript string, fileSystems *[]FileSystem, nodeSecretsPath, containerSecretsPath string) string {
+	return renderSessionScriptStatic(sessionScript, c.partition, fileSystems, nodeSecretsPath, containerSecretsPath)
 }
 
-func renderSessionScriptStatic(sessionScript, partition string, fileSystems *[]FileSystem, secretsPath string) string {
+func renderSessionScriptStatic(sessionScript, partition string, fileSystems *[]FileSystem, nodeSecretsPath, containerSecretsPath string) string {
 	sessionScriptFinal := removeMaintainersNotesFromScript(sessionScript)
 	sessionScriptFinal = addSbatchDirectivesToScript(sessionScriptFinal, partition)
-	sessionScriptFinal = addSessionMountsToScript(sessionScriptFinal, fileSystems, secretsPath)
+	sessionScriptFinal = addSessionMountsToScript(sessionScriptFinal, fileSystems, nodeSecretsPath, containerSecretsPath)
 	return sessionScriptFinal
 }
 
@@ -931,7 +929,7 @@ func addSbatchDirectivesToScript(sessionScript, partition string) string {
 	return strings.Replace(sessionScript, "#{{SBATCH_DIRECTIVES_PLACEHOLDER}}", directivesStr, 1)
 }
 
-func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, secretsPath string) string {
+func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, nodeSecretPath, containerSecretPath string) string {
 	if fileSystems == nil {
 		return strings.Replace(sessionScript, "#{{SESSION_MOUNTS_PLACEHOLDER}}", "", 1)
 	}
@@ -951,12 +949,8 @@ func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, s
 	}
 
 	// Add the secrets mount
-	if secretsPath != "" {
-		containerSecretsPath, ok := os.LookupEnv("RENKU_SECRETS_PATH")
-		if !ok {
-			containerSecretsPath = "/secrets" // default value
-		}
-		mounts = append(mounts, fmt.Sprintf("%s:%s:ro", secretsPath, containerSecretsPath))
+	if nodeSecretPath != "" && containerSecretPath != "" {
+		mounts = append(mounts, fmt.Sprintf("%s:%s:ro", nodeSecretPath, containerSecretPath))
 	}
 
 	// Format mount list
