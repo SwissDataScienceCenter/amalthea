@@ -216,19 +216,24 @@ func (c *FirecrestRemoteSessionController) uploadOptionalSecretFromBuffer(ctx co
 func (c *FirecrestRemoteSessionController) uploadDataSource(ctx context.Context, remotePath string, dataSource *common.DataConnector) error {
 	var err error
 
-	if err = c.uploadSecretFromBuffer(ctx, remotePath, "remote", []byte(dataSource.Remote)); err != nil {
+	remoteDataConnectorPath := path.Join(remotePath, dataSource.Name)
+	if err = ensurePrivateFolder(c, ctx, remoteDataConnectorPath); err != nil {
 		return err
 	}
 
-	if err = c.uploadSecretFromBuffer(ctx, remotePath, "remotePath", []byte(dataSource.RemotePath)); err != nil {
+	if err = c.uploadSecretFromBuffer(ctx, remoteDataConnectorPath, "remote", []byte(dataSource.Remote)); err != nil {
 		return err
 	}
 
-	if err = c.uploadOptionalSecretFromBuffer(ctx, remotePath, "mountOpt", []byte(dataSource.MountOpt)); err != nil {
+	if err = c.uploadSecretFromBuffer(ctx, remoteDataConnectorPath, "remotePath", []byte(dataSource.RemotePath)); err != nil {
 		return err
 	}
 
-	if err = c.uploadOptionalSecretFromBuffer(ctx, remotePath, "vfsOpt", []byte(dataSource.VfsOpt)); err != nil {
+	if err = c.uploadOptionalSecretFromBuffer(ctx, remoteDataConnectorPath, "mountOpt", []byte(dataSource.MountOpt)); err != nil {
+		return err
+	}
+
+	if err = c.uploadOptionalSecretFromBuffer(ctx, remoteDataConnectorPath, "vfsOpt", []byte(dataSource.VfsOpt)); err != nil {
 		return err
 	}
 
@@ -237,7 +242,7 @@ func (c *FirecrestRemoteSessionController) uploadDataSource(ctx context.Context,
 		return err
 	}
 
-	if err = c.uploadSecretFromBuffer(ctx, remotePath, "configData", []byte(*configData)); err != nil {
+	if err = c.uploadSecretFromBuffer(ctx, remoteDataConnectorPath, "configData", []byte(*configData)); err != nil {
 		return err
 	}
 
@@ -278,7 +283,8 @@ func (c *FirecrestRemoteSessionController) uploadDataConnectorSecrets(ctx contex
 			if err != nil {
 				return err
 			}
-			return c.uploadDataSource(ctx, path.Join(remotePath, ds.Name), ds)
+
+			return c.uploadDataSource(ctx, remotePath, ds)
 		},
 		func() error {
 			return ensurePrivateFolder(c, ctx, remotePath)
