@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path"
 
@@ -109,12 +110,12 @@ func LoadDataSource(root, name string) (*DataConnector, error) {
 	}
 	remotePath := string(content)
 
-	if content, err = os.ReadFile(path.Join(root, name, "mountOpt")); err != nil {
+	if content, err = os.ReadFile(path.Join(root, name, "mountOpt")); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
 	mountOpt := string(content)
 
-	if content, err = os.ReadFile(path.Join(root, name, "vfsOpt")); err != nil {
+	if content, err = os.ReadFile(path.Join(root, name, "vfsOpt")); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
 	vfsOpt := string(content)

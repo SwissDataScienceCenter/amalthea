@@ -206,6 +206,13 @@ func (c *FirecrestRemoteSessionController) uploadSecret(ctx context.Context, loc
 	return c.uploadSecretFromBuffer(ctx, remotePath, filename, content)
 }
 
+func (c *FirecrestRemoteSessionController) uploadOptionalSecretFromBuffer(ctx context.Context, remotePath, filename string, content []byte) error {
+	if len(content) > 0 {
+		return c.uploadSecretFromBuffer(ctx, remotePath, filename, content)
+	}
+	return nil
+}
+
 func (c *FirecrestRemoteSessionController) uploadDataSource(ctx context.Context, remotePath string, dataSource *common.DataConnector) error {
 	var err error
 
@@ -217,11 +224,11 @@ func (c *FirecrestRemoteSessionController) uploadDataSource(ctx context.Context,
 		return err
 	}
 
-	if err = c.uploadSecretFromBuffer(ctx, remotePath, "mountOpt", []byte(dataSource.MountOpt)); err != nil {
+	if err = c.uploadOptionalSecretFromBuffer(ctx, remotePath, "mountOpt", []byte(dataSource.MountOpt)); err != nil {
 		return err
 	}
 
-	if err = c.uploadSecretFromBuffer(ctx, remotePath, "vfsOpt", []byte(dataSource.VfsOpt)); err != nil {
+	if err = c.uploadOptionalSecretFromBuffer(ctx, remotePath, "vfsOpt", []byte(dataSource.VfsOpt)); err != nil {
 		return err
 	}
 
