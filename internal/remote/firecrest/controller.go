@@ -278,7 +278,7 @@ func (c *FirecrestRemoteSessionController) uploadDataConnectorSecrets(ctx contex
 			if err != nil {
 				return err
 			}
-			return c.uploadDataSource(ctx, remotePath, ds)
+			return c.uploadDataSource(ctx, path.Join(remotePath, ds.Name), ds)
 		},
 		func() error {
 			return ensurePrivateFolder(c, ctx, remotePath)
