@@ -9,6 +9,7 @@ import (
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/kube"
 	"github.com/fernet/fernet-go"
+	"github.com/labstack/gommon/log"
 	"gopkg.in/ini.v1"
 	v1 "k8s.io/api/core/v1"
 )
@@ -73,21 +74,30 @@ func (dc *DataConnector) ConfigData(ctx context.Context) (*string, error) {
 
 	var userSecrets map[string]string
 	userSecrets, err = dc.userSecrets(ctx)
+	if err != nil {
+		log.Warnf("#### UserSecrets returned %v", err)
+	}
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
 	// Override values with secrets
 	for k, v := range userSecrets {
+		log.Warnf("#### ConfigData key %v => %v", k, v)
+
 		section.Key(k).SetValue(v)
 	}
 
 	buffer := new(bytes.Buffer)
 	if _, err = iniData.WriteTo(buffer); err != nil {
+		log.Warnf("#### WriteTo returned %v '%v'", err, buffer)
+
 		return nil, err
 	}
 
 	// So we can take the address...
 	b := buffer.String()
+	log.Warnf("#### Patched ConfigData '%v'", b)
+
 	return &b, err
 }
 
