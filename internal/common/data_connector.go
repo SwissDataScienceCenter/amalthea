@@ -122,8 +122,8 @@ func LoadDataSource(root, name string) (*DataConnector, error) {
 
 	ds := &DataConnector{
 		root,
-		name,
 		secretName,
+		name,
 		remote,
 		remotePath,
 		mountOpt,
