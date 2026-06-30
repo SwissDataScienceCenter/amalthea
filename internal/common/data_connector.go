@@ -29,7 +29,7 @@ type DataConnector struct {
 
 func (dc *DataConnector) fernetKey() (*fernet.Key, error) {
 	// the fernet key is mounted as part of the data source secret
-	if encodedKey, err := os.ReadFile(path.Join(dc.root, dc.name, "secretKey")); err == nil {
+	if encodedKey, err := os.ReadFile(path.Join(dc.root, dc.Name, "secretKey")); err == nil {
 		return fernet.DecodeKey(string(encodedKey))
 	} else {
 		return nil, err
@@ -59,7 +59,7 @@ func (dc *DataConnector) userSecrets(ctx context.Context) (map[string]string, er
 
 func (dc *DataConnector) ConfigData(ctx context.Context) (*string, error) {
 	// name is generated with fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)] and maps to pv.SecretRef.Name
-	content, err := os.ReadFile(path.Join(dc.root, dc.name, "configData"))
+	content, err := os.ReadFile(path.Join(dc.root, dc.Name, "configData"))
 	if err != nil {
 		return nil, err
 	}
