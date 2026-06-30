@@ -75,14 +75,13 @@ func (dc *DataConnector) ConfigData(ctx context.Context) (*string, error) {
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-
 	// Override values with secrets
 	for k, v := range userSecrets {
 		section.Key(k).SetValue(v)
 	}
 
 	buffer := new(bytes.Buffer)
-	if _, err := iniData.WriteTo(buffer); err != nil {
+	if _, err = iniData.WriteTo(buffer); err != nil {
 		return nil, err
 	}
 
