@@ -17,7 +17,6 @@ import (
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
-	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -558,87 +557,6 @@ func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*
 		})
 		return &events, nil
 	}
-}
-
-// Return the auto-scaler resource that is associated to the session
-func (as *AmaltheaSession) GetAutoScaler(ctx context.Context, c client.Reader) (*autoscalingv2.HorizontalPodAutoscaler, error) {
-	hpaList := &autoscalingv2.HorizontalPodAutoscalerList{}
-	err := c.List(ctx, hpaList, client.InNamespace(as.Namespace))
-	if err != nil {
-		return nil, err
-	}
-
-	var targetHPA *autoscalingv2.HorizontalPodAutoscaler
-	for i := range hpaList.Items {
-		hpa := &hpaList.Items[i]
-		if hpa.Spec.ScaleTargetRef.Kind == "StatefulSet" &&
-			hpa.Spec.ScaleTargetRef.Name == as.Name &&
-			hpa.Namespace == as.Namespace {
-			targetHPA = hpa
-			break
-		}
-	}
-	return targetHPA, nil
-}
-
-// Return the statefulset of the session
-func (as *AmaltheaSession) GetStatefulSet(ctx context.Context, c client.Reader) (*appsv1.StatefulSet, error) {
-	if as.Spec.SessionType == SessionTypeNonInteractive {
-		return nil, nil
-	}
-	ss := appsv1.StatefulSet{}
-	key := types.NamespacedName{Name: as.Name, Namespace: as.Namespace}
-	err := c.Get(ctx, key, &ss)
-	if err != nil {
-		return nil, err
-	}
-	return &ss, err
-}
-
-func getAutoScaleError(hpa *autoscalingv2.HorizontalPodAutoscaler, ss *appsv1.StatefulSet, scaleTimeout time.Duration) string {
-	for _, cond := range hpa.Status.Conditions {
-		switch cond.Type {
-		case autoscalingv2.AbleToScale:
-			if cond.Status == v1.ConditionFalse {
-				// Backoff limit hit, scale request rejected, or policy violation
-				return fmt.Sprintf("%s: %s", cond.Reason, cond.Message)
-			}
-		case autoscalingv2.ScalingLimited:
-			if cond.Status == v1.ConditionTrue {
-				// Blocked by min/max replicas, quota, or resource limits
-				return fmt.Sprintf("%s: %s", cond.Reason, cond.Message)
-			}
-		case autoscalingv2.ScalingActive:
-			if cond.Status == v1.ConditionFalse {
-				// Metrics unavailable or HPA paused
-				return fmt.Sprintf("%s: %s", cond.Reason, cond.Message)
-			}
-		}
-	}
-
-	desired := hpa.Status.DesiredReplicas
-	ready := ss.Status.ReadyReplicas
-	if desired > ready &&
-		hpa.Status.LastScaleTime != nil &&
-		time.Since(hpa.Status.LastScaleTime.Time) > scaleTimeout {
-		return fmt.Sprintf("Autoscaling timeout of %s exceeded", scaleTimeout)
-	}
-
-	return ""
-}
-
-func (as *AmaltheaSession) AutoScaleFailed(ctx context.Context, c client.Reader, scaleTimeout time.Duration) (string, error) {
-	ss, err := as.GetStatefulSet(ctx, c)
-	if ss == nil || err != nil {
-		return "", err
-	}
-	scaler, err := as.GetAutoScaler(ctx, c)
-	if err != nil || scaler == nil {
-		return "", err
-	}
-
-	msg := getAutoScaleError(scaler, ss, scaleTimeout)
-	return msg, nil
 }
 
 // Returns the list of all the secrets used in this CR

@@ -62,7 +62,7 @@ type ChildResourceUpdates struct {
 // https://github.com/kubernetes-sigs/metrics-server/blob/9ebbad973db2a54193712c4d9292bbe3eaa849dc/pkg/storage/pod.go#L31
 const freshContainerMinimalAge = 15 * time.Second
 
-const maxWaitForClearFailedScheduling = 5 * time.Minute
+const maxWaitForClearFailedScheduling = 10 * time.Minute
 
 func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
 	log := log.FromContext(ctx)
@@ -561,7 +561,6 @@ const (
 	EisrInitiallyFailed EventsInferedStateResult = "Initially Failed"
 	EisrTemporaryFailed EventsInferedStateResult = "Temporary Failed"
 	EisrFinallyFailed   EventsInferedStateResult = "Finally Failed"
-	EisrAutoScheduling  EventsInferedStateResult = "Auto Scheduling"
 )
 
 // eventsInferedFailure looks into the events of the session pod to
@@ -579,8 +578,6 @@ const (
 // - none of the above
 func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, client client.Reader) (EventsInferedStateResult, error) {
 	const failedScheduling = "FailedScheduling"
-	const scheduled = "Scheduled"
-	const triggeredScaleUp = "TriggeredScaleUp"
 	log := log.FromContext(ctx)
 
 	events, err := cr.GetPodEvents(ctx, client)
@@ -589,14 +586,6 @@ func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSes
 	}
 	if events == nil {
 		return EisrNone, nil
-	}
-	autoScaleFailed, err := cr.AutoScaleFailed(ctx, client, maxWaitForClearFailedScheduling)
-	if err != nil {
-		return EisrNone, fmt.Errorf("%v", err)
-	}
-	if autoScaleFailed != "" {
-		log.Info("Autoscale failed, finally failing", "message", autoScaleFailed)
-		return EisrFinallyFailed, fmt.Errorf("failed scheduling due to autoscaling failed: %s", autoScaleFailed)
 	}
 
 	var waitedTime time.Duration
@@ -618,12 +607,6 @@ func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSes
 					return EisrTemporaryFailed, nil
 				}
 			}
-		}
-	}
-	for _, v := range events.Items {
-		if v.Reason == scheduled || v.Reason == triggeredScaleUp {
-			log.Info("Found a Scheduled or TriggeredScaleUp event", "event", v.Message)
-			return EisrAutoScheduling, nil
 		}
 	}
 	return EisrNone, nil
@@ -737,9 +720,6 @@ func checkEventsInferedState(ctx context.Context,
 		case EisrInitiallyFailed:
 			failedSchedulingSince = metav1.NewTime(time.Now())
 
-		case EisrAutoScheduling:
-			// reset the failedSchedulingSince when a scheduling/trigger-scaleup event occurs
-			failedSchedulingSince = metav1.Time{}
 		default:
 			if err != nil {
 				log.Error(err, "Error obtaining state from pod events")
