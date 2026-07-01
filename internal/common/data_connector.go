@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/fernet/fernet-go"
 	"github.com/labstack/gommon/log"
@@ -51,7 +52,7 @@ func (dc *DataConnector) userSecrets() (map[string]string, error) {
 	decodedSecrets := make(map[string]string)
 	for _, dir := range dirEntries {
 		// TODO: Add support for hierarchies ?
-		if dir.IsDir() {
+		if dir.IsDir() || strings.HasPrefix(dir.Name(), "..") {
 			continue
 		}
 
