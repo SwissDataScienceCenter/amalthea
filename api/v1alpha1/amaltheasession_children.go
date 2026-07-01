@@ -705,9 +705,9 @@ func (as *AmaltheaSession) RemoteSessionDataSources(ctx context.Context) ([]v1.P
 		)
 
 		// If there is a user secret linked to the data connector, mount it as it contains required credentials
-		userSecretName := fmt.Sprintf("%s-secret", secret)
+		userSecretName := fmt.Sprintf("%s-secrets", secret)
 		if _, err := kube.Secret(ctx, userSecretName); err == nil {
-			volNameSecret := fmt.Sprintf("%s-secret", volName)
+			volNameSecret := fmt.Sprintf("%s-secrets", volName)
 			vols = append(
 				vols,
 				v1.Volume{
