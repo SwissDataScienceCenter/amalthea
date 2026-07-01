@@ -2,24 +2,20 @@ package common
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"os"
 	"path"
 
-	"github.com/SwissDataScienceCenter/amalthea/internal/kube"
 	"github.com/fernet/fernet-go"
 	"github.com/labstack/gommon/log"
 	"gopkg.in/ini.v1"
-	v1 "k8s.io/api/core/v1"
 )
 
 const UserSecretProxyFolder = "/secrets-user"
 const DataConnectorSecretsProxyFolder = "/secrets-dcs"
 
 type DataConnector struct {
-	root       string
-	secretName string
+	root string
 
 	Name       string
 	Remote     string
@@ -37,7 +33,7 @@ func (dc *DataConnector) fernetKey() (*fernet.Key, error) {
 	}
 }
 
-func (dc *DataConnector) userSecrets(ctx context.Context) (map[string]string, error) {
+func (dc *DataConnector) userSecrets() (map[string]string, error) {
 	var err error
 
 	var fernetKey *fernet.Key
@@ -46,19 +42,30 @@ func (dc *DataConnector) userSecrets(ctx context.Context) (map[string]string, er
 		return nil, err
 	}
 
-	var secret *v1.Secret
-	if secret, err = kube.Secret(ctx, dc.secretName); err != nil {
+	var dirEntries []os.DirEntry
+	userSecretMountPoint := path.Join(UserSecretProxyFolder, dc.Name)
+	if dirEntries, err = os.ReadDir(userSecretMountPoint); err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
 
 	decodedSecrets := make(map[string]string)
-	for k, v := range secret.Data {
-		decodedSecrets[k] = string(fernet.VerifyAndDecrypt(v, 0, []*fernet.Key{fernetKey}))
+	for _, dir := range dirEntries {
+		// TODO: Add support for hierarchies ?
+		if dir.IsDir() {
+			continue
+		}
+
+		var content []byte
+		if content, err = os.ReadFile(path.Join(userSecretMountPoint, dir.Name())); err != nil {
+			return nil, err
+		}
+		decodedSecrets[dir.Name()] = string(fernet.VerifyAndDecrypt(content, 0, []*fernet.Key{fernetKey}))
 	}
+
 	return decodedSecrets, nil
 }
 
-func (dc *DataConnector) ConfigData(ctx context.Context) (*string, error) {
+func (dc *DataConnector) ConfigData() (*string, error) {
 	// name is generated with fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)] and maps to pv.SecretRef.Name
 	content, err := os.ReadFile(path.Join(dc.root, dc.Name, "configData"))
 	if err != nil {
@@ -73,7 +80,7 @@ func (dc *DataConnector) ConfigData(ctx context.Context) (*string, error) {
 	section := iniData.Section(dc.Remote)
 
 	var userSecrets map[string]string
-	userSecrets, err = dc.userSecrets(ctx)
+	userSecrets, err = dc.userSecrets()
 	if err != nil {
 		log.Warnf("#### UserSecrets returned %v", err)
 	}
@@ -105,11 +112,6 @@ func LoadDataSource(root, name string) (*DataConnector, error) {
 	var content []byte
 	var err error
 
-	if content, err = os.ReadFile(path.Join(UserSecretProxyFolder, name)); err != nil {
-		return nil, err
-	}
-	secretName := string(content)
-
 	if content, err = os.ReadFile(path.Join(root, name, "remote")); err != nil {
 		return nil, err
 	}
@@ -132,7 +134,6 @@ func LoadDataSource(root, name string) (*DataConnector, error) {
 
 	ds := &DataConnector{
 		root,
-		secretName,
 		name,
 		remote,
 		remotePath,

@@ -199,7 +199,7 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	children, err := NewChildResources(amaltheasession, r.Configuration)
+	children, err := NewChildResources(ctx, amaltheasession, r.Configuration)
 	if err != nil {
 		log.Error(
 			err,

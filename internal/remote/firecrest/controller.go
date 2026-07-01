@@ -238,7 +238,7 @@ func (c *FirecrestRemoteSessionController) uploadDataSource(ctx context.Context,
 	}
 
 	var configData *string
-	if configData, err = dataSource.ConfigData(ctx); err != nil {
+	if configData, err = dataSource.ConfigData(); err != nil {
 		return err
 	}
 

@@ -18,6 +18,7 @@ import (
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/common"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
+	"github.com/SwissDataScienceCenter/amalthea/internal/kube"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -101,8 +102,8 @@ func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 	return volumes, volumeMounts
 }
 
-func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.PodSpec, error) {
-	_, dsVols, dsVolMounts := cr.DataSources()
+func (cr *AmaltheaSession) Pod(ctx context.Context, cfg config.AmaltheaSessionConfiguration) (*v1.PodSpec, error) {
+	_, dsVols, dsVolMounts := cr.DataSources(ctx)
 	cloneInit := cr.cloneInit()
 	sessionVols, sessionMounts := cr.SessionVolumes()
 
@@ -169,8 +170,8 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	return &pod, nil
 }
 
-func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1.Job, error) {
-	pod, err := cr.Pod(cfg)
+func (cr *AmaltheaSession) Job(ctx context.Context, cfg config.AmaltheaSessionConfiguration) (batchv1.Job, error) {
+	pod, err := cr.Pod(ctx, cfg)
 	if err != nil {
 		return batchv1.Job{}, err
 	}
@@ -210,13 +211,13 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 }
 
 // StatefulSet returns a AmaltheaSession StatefulSet object
-func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) (appsv1.StatefulSet, error) {
+func (cr *AmaltheaSession) StatefulSet(ctx context.Context, cfg config.AmaltheaSessionConfiguration) (appsv1.StatefulSet, error) {
 	replicas := int32(1)
 	if cr.Spec.Hibernated {
 		replicas = 0
 	}
 
-	pod, err := cr.Pod(cfg)
+	pod, err := cr.Pod(ctx, cfg)
 	if err != nil {
 		return appsv1.StatefulSet{}, err
 	}
@@ -640,10 +641,10 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 
 // Assuming that the csi-rclone driver from https://github.com/SwissDataScienceCenter/csi-rclone
 // is installed, this will generate PVCs for the data sources that have the rclone type.
-func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
+func (as *AmaltheaSession) DataSources(ctx context.Context) ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
 	switch as.Spec.SessionLocation {
 	case Remote:
-		return as.RemoteSessionDataSources()
+		return as.RemoteSessionDataSources(ctx)
 	case Local:
 		return as.LocalSessionDataSources()
 	default:
@@ -651,7 +652,7 @@ func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 	}
 }
 
-func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
+func (as *AmaltheaSession) RemoteSessionDataSources(ctx context.Context) ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
 	pvcs := []v1.PersistentVolumeClaim{}
 	vols := []v1.Volume{
 		{
@@ -702,6 +703,32 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 				MountPath: path.Join(common.DataConnectorSecretsProxyFolder, volName),
 			},
 		)
+
+		// If there is a user secret linked to the data connector, mount it as it contains required credentials
+		userSecretName := fmt.Sprintf("%s-secret", secrets)
+		if _, err := kube.Secret(ctx, userSecretName); err == nil {
+			volNameSecret := fmt.Sprintf("%s-secret", volName)
+			vols = append(
+				vols,
+				v1.Volume{
+					Name: volNameSecret,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName:  userSecretName,
+							DefaultMode: ptr.To(int32(256)), // decimal value of 0400 for the access flags (chmod-like)
+						},
+					},
+				},
+			)
+			volMounts = append(
+				volMounts,
+				v1.VolumeMount{
+					Name:      volNameSecret,
+					ReadOnly:  true,
+					MountPath: path.Join(common.UserSecretProxyFolder, volName),
+				},
+			)
+		}
 	}
 	return pvcs, vols, volMounts
 }

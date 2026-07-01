@@ -379,20 +379,20 @@ func (e *SessionTypeError) Error() string {
 	return fmt.Sprintf("Unsupported session type: '%v'", e.SessionType)
 }
 
-func NewChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.AmaltheaSessionConfiguration) (ChildResources, error) {
+func NewChildResources(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.AmaltheaSessionConfiguration) (ChildResources, error) {
 	switch cr.Spec.SessionType {
 	case amaltheadevv1alpha1.SessionTypeNonInteractive:
-		return NewNonInteractiveChildResources(cr, cfg)
+		return NewNonInteractiveChildResources(ctx, cr, cfg)
 	default:
-		return NewInteractiveChildResources(cr, cfg)
+		return NewInteractiveChildResources(ctx, cr, cfg)
 	}
 }
 
-func NewNonInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.AmaltheaSessionConfiguration) (ChildResources, error) {
+func NewNonInteractiveChildResources(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.AmaltheaSessionConfiguration) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredPVC := cr.PVC()
-	desiredJob, err := cr.Job(cfg)
+	desiredJob, err := cr.Job(ctx, cfg)
 	if err != nil {
 		return ChildResources{}, err
 	}
@@ -403,7 +403,7 @@ func NewNonInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cf
 		Job:    ChildResource[batchv1.Job]{&batchv1.Job{ObjectMeta: metadata}, &desiredJob},
 	}
 	desiredDataSourcesPVCs := []ChildResource[v1.PersistentVolumeClaim]{}
-	specPVCs, _, _ := cr.DataSources()
+	specPVCs, _, _ := cr.DataSources(ctx)
 	for i := range specPVCs {
 		desiredPVC := &specPVCs[i]
 		childRes := ChildResource[v1.PersistentVolumeClaim]{
@@ -417,12 +417,12 @@ func NewNonInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cf
 	return output, nil
 }
 
-func NewInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, config config.AmaltheaSessionConfiguration) (ChildResources, error) {
+func NewInteractiveChildResources(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, config config.AmaltheaSessionConfiguration) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredService := cr.Service()
 	desiredPVC := cr.PVC()
-	desiredStatefulSet, err := cr.StatefulSet(config)
+	desiredStatefulSet, err := cr.StatefulSet(ctx, config)
 	if err != nil {
 		return ChildResources{}, err
 	}
@@ -440,7 +440,7 @@ func NewInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, confi
 	}
 
 	desiredDataSourcesPVCs := []ChildResource[v1.PersistentVolumeClaim]{}
-	specPVCs, _, _ := cr.DataSources()
+	specPVCs, _, _ := cr.DataSources(ctx)
 	for i := range specPVCs {
 		desiredPVC := &specPVCs[i]
 		childRes := ChildResource[v1.PersistentVolumeClaim]{
