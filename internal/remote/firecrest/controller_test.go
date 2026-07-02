@@ -22,6 +22,21 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 	partition := "my-partition"
 	fileSystems := []FileSystem{
 		{
+			DataType:       "apps",
+			DefaultWorkDir: ptr.To(true),
+			Path:           "/apps",
+		},
+		{
+			DataType:       "archive",
+			DefaultWorkDir: ptr.To(false),
+			Path:           "/archive",
+		},
+		{
+			DataType:       "project",
+			DefaultWorkDir: ptr.To(false),
+			Path:           "/project",
+		},
+		{
 			DataType:       "scratch",
 			DefaultWorkDir: ptr.To(true),
 			Path:           "/scratch",
@@ -35,6 +50,11 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 			DataType:       "users",
 			DefaultWorkDir: ptr.To(false),
 			Path:           "/users",
+		},
+		{
+			DataType:       "custom-not-part-of-enum",
+			DefaultWorkDir: ptr.To(false),
+			Path:           "/cluster-specific",
 		},
 	}
 	secretsPath := "/secrets"
@@ -50,14 +70,24 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 	assert.Contains(t, sessionScriptFinal, "#SBATCH --partition=my-partition")
 
 	// Check the mounts
-	mountsRegExp := regexp.MustCompile(`mounts(?:\s*)=(?:\s*)[[]([^]]*)]`)
+	// From `srun --help`:
+	//      --container-mounts=SRC:DST[:FLAGS][,SRC:DST...]
+	//                              [pyxis] bind mount[s] inside the container. Mount
+	//                              flags are separated with "+", e.g. "ro+rprivate"
+	flagsRegExp := `:(?:ro|rprivate)(?:[+](?:ro|rprivate))*`
+	mountRegExp := `"[^:,"]+:[^:,"]+(?:` + flagsRegExp + `)?"`
+	mountsRegExp := regexp.MustCompile(`--container-mounts=(` + mountRegExp + `(?:,` + mountRegExp + `)*)`)
 	matches := mountsRegExp.FindStringSubmatch(sessionScriptFinal)
 	assert.Len(t, matches, 2)
 	foundMounts := matches[1]
-	assert.Contains(t, foundMounts, "\"/scratch\"")
-	assert.Contains(t, foundMounts, "\"/store\"")
+	assert.Contains(t, foundMounts, "\"/apps:/apps\"")
+	assert.Contains(t, foundMounts, "\"/archive:/archive\"")
+	assert.Contains(t, foundMounts, "\"/project:/project\"")
+	assert.Contains(t, foundMounts, "\"/scratch:/scratch\"")
+	assert.Contains(t, foundMounts, "\"/store:/store\"")
 	assert.Contains(t, foundMounts, "\"/users:/home/users:ro\"")
 	assert.Contains(t, foundMounts, "\"/secrets:/secrets:ro\"")
+	assert.Contains(t, foundMounts, "\"/cluster-specific:/cluster-specific\"")
 }
 
 func TestStreamsToFetch(t *testing.T) {

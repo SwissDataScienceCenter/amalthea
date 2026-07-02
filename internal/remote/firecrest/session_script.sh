@@ -1,171 +1,47 @@
+#!/bin/bash
 # NOTE FOR AMALTHEA MAINTAINERS:
 #   This script contains template strings in the following form:
 #     `#{{NAME}}`
 #   These strings should be added or removed according to code changes
 #   in the remote session controller.
 # END NOTE
-#!/bin/bash
 #{{SBATCH_DIRECTIVES_PLACEHOLDER}}
 
 set -e -o pipefail
 
-GIT_PROXY_WAIT_SLEEP_SECONDS=10
-GIT_PROXY_WAIT_RETRIES=10
+: ${REMOTE_SESSION_IMAGE:?'not set, aborting!'}
 
-# Installs rclone
-#
-# Usage:
-#     rclone="$(install_rclone)"
-#     "$rclone" version
-function install_rclone() {
-    RENKU_DIR="${HOME}/.renku/$(uname -m)"
-    RENKU_PKG="${RENKU_DIR}/pkg"
-    RCLONE_VERSION="1.70.2"
-    RCLONE_PKG="${RENKU_PKG}/rclone/v${RCLONE_VERSION}"
-    RCLONE_BIN="${RCLONE_PKG}/rclone"
+: ${ARCH:=$(uname -m)}
+: ${RENKU_PKG:="${HOME}/.renku/${ARCH}/pkg"}
+: ${GIT_PROXY_PORT:=65480}
+: ${GIT_PROXY_HEALTH_PORT:=65481}
+: ${GIT_PROXY_WAIT_SLEEP_SECONDS:=10}
+: ${GIT_PROXY_WAIT_RETRIES:=10}
+: ${RCLONE_VERSION:="1.70.2"}
+: ${WSTUNNEL_PATH_PREFIX:="sessions/my-session/wstunnel"}
+: ${WSTUNNEL_VERSION:="10.5.5"}
 
-    skip_install="0"
-    if [ -f "${RCLONE_BIN}" ]; then
-        version="$("${RCLONE_BIN}" version || echo "bad executable")"
-        version="$(echo "${version}" | head -n 1)"
-        expected="rclone v${RCLONE_VERSION}"
-        if [ "${version}" = "${expected}" ]; then
-            skip_install="1"
-        else
-            >&2 echo "WARNING: found mismatching rclone version ${version}"
-        fi
-    fi
-
-    if [ "${skip_install}" != "0" ]; then
-        echo "${RCLONE_BIN}"
-        return 0
-    fi
-
-    arch="$(uname -m)"
-    if [ "${arch}" = "x86_64" ]; then
-        RCLONE_URL="https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-amd64.zip"
-    elif [ "${arch}" = "aarch64" ]; then
-        RCLONE_URL="https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-arm64.zip"
-    else
-        >&2 echo "Unsupported platform: ${arch}"
+case ${ARCH} in
+    "x86_64")
+        gh_arch=amd64
+        ;;
+    "aarch64")
+        gh_arch=arm64
+        ;;
+    *)
+        >&2 echo "Unsupported platform: ${ARCH}"
         exit 1
-    fi
+        ;;
+esac
 
-    mkdir -p "${RCLONE_PKG}"
-    tmp="$(mktemp -d)"
-    cwd="$(pwd)"
-    cd "${tmp}"
-    curl -Lo "rclone.zip" "${RCLONE_URL}"
-    >&2 unzip "rclone.zip"
-    rm -r "${RCLONE_PKG}"
-    mv ./rclone-v"${RCLONE_VERSION}"-* "${RCLONE_PKG}"
-    rm -r "${tmp}"
-    chmod a+x "${RCLONE_BIN}"
+: ${SESSION_DIR:="${PWD}"}
+: ${SESSION_WORK_DIR:="${SESSION_DIR}/work"}
+: ${SECRETS_DIR:="${SESSION_DIR}/secrets"}
+: ${SECRETS_USER_DIR:="${SECRETS_DIR}/user/"}
+: ${SECRETS_DATA_CONNECTORS_DIR:="${SECRETS_DIR}/data_connectors"}
+: ${LOGS_DIR:="${SESSION_DIR}/logs"}
 
-    echo "${RCLONE_BIN}"
-}
-
-# Installs wstunnel
-#
-# Usage:
-#     wstunnel="$(install_wstunnel)"
-#     "$wstunnel" --version
-function install_wstunnel() {
-    RENKU_DIR="${HOME}/.renku/$(uname -m)"
-    RENKU_PKG="${RENKU_DIR}/pkg"
-    WSTUNNEL_VERSION="10.4.4"
-    WSTUNNEL_PKG="${RENKU_PKG}/wstunnel/v${WSTUNNEL_VERSION}"
-    WSTUNNEL_BIN="${WSTUNNEL_PKG}/wstunnel"
-
-    arch="$(uname -m)"
-    if [ "${arch}" = "aarch64" ]; then
-        WSTUNNEL_VERSION_FORCED="10.1.10"
-        >&2 echo "Warning: using wstunnel v${WSTUNNEL_VERSION_FORCED} instead of ${WSTUNNEL_VERSION}"
-        WSTUNNEL_VERSION="${WSTUNNEL_VERSION_FORCED}"
-    fi
-
-    skip_install="0"
-    if [ -f "${WSTUNNEL_BIN}" ]; then
-        version="$("${WSTUNNEL_BIN}" --version || echo "bad executable")"
-        expected="wstunnel-cli ${WSTUNNEL_VERSION}"
-        if [ "${version}" = "${expected}" ]; then
-            skip_install="1"
-        else
-            >&2 echo "WARNING: found mismatching wstunnel version ${version}"
-        fi
-    fi
-
-    if [ "${skip_install}" != "0" ]; then
-        echo "${WSTUNNEL_BIN}"
-        return 0
-    fi
-
-    arch="$(uname -m)"
-    if [ "${arch}" = "x86_64" ]; then
-        WSTUNNEL_URL="https://github.com/erebe/wstunnel/releases/download/v${WSTUNNEL_VERSION}/wstunnel_${WSTUNNEL_VERSION}_linux_amd64.tar.gz"
-    elif [ "${arch}" = "aarch64" ]; then
-        WSTUNNEL_URL="https://github.com/erebe/wstunnel/releases/download/v${WSTUNNEL_VERSION}/wstunnel_${WSTUNNEL_VERSION}_linux_arm64.tar.gz"
-    else
-        >&2 echo "Unsupported platform: ${arch}"
-        exit 1
-    fi
-
-    mkdir -p "${WSTUNNEL_PKG}"
-    tmp="$(mktemp -d)"
-    cwd="$(pwd)"
-    cd "${tmp}"
-    curl -Lo "wstunnel.tar.gz" "${WSTUNNEL_URL}"
-    tar xf "wstunnel.tar.gz" -C "${WSTUNNEL_PKG}"
-    cd "${cwd}"
-    rm -r "${tmp}"
-    chmod a+x "${WSTUNNEL_BIN}"
-
-    echo "${WSTUNNEL_BIN}"
-}
-
-if [ -z "${REMOTE_SESSION_IMAGE}" ]; then
-    echo "REMOTE_SESSION_IMAGE is not set, aborting!"
-    exit 1
-fi
-
-SESSION_DIR="$(pwd)"
-SESSION_WORK_DIR="${SESSION_DIR}/work"
-SECRETS_DIR="${SESSION_DIR}/secrets"
-LOGS_DIR="${SESSION_DIR}/logs"
-echo "SESSION_DIR: ${SESSION_DIR}"
-echo "SESSION_WORK_DIR: ${SESSION_WORK_DIR}"
-
-mkdir -p "${SESSION_WORK_DIR}"
-mkdir -p "${SECRETS_DIR}"
-mkdir -p "${LOGS_DIR}"
-
-# # Install rclone
-# rclone=$(install_rclone)
-# echo "rclone: ${rclone}"
-
-# Install wstunnel
-wstunnel=$(install_wstunnel)
-echo "wstunnel: ${wstunnel}"
-
-# Ensure NVIDIA_VISIBLE_DEVICES is set to void 
-# so that cuda enabled images work on eiger
-if !(nvidia-smi 2>&1 >/dev/null); then
-    export NVIDIA_VISIBLE_DEVICES=void
-fi
-
-# Create the environment.toml file to run the session
-EDF_FILE="${SESSION_DIR}/environment.toml"
-cat <<EOF >"${EDF_FILE}"
-image = "${REMOTE_SESSION_IMAGE}"
-
-#{{SESSION_MOUNTS_PLACEHOLDER}}
-
-workdir = "${SESSION_WORK_DIR}"
-
-[annotations]
-com.hooks.cxi.enabled = "false"
-EOF
-
+# Setup session environment
 export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
 export RENKU_WORKING_DIR="${SESSION_WORK_DIR}"
 # Force the frontend to listen on 127.0.0.1
@@ -173,6 +49,129 @@ export RENKU_SESSION_IP="127.0.0.1"
 
 # Load the wstunnel secret
 export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
+
+# Installs rclone
+#
+# Usage:
+#     rclone="$(install_rclone "$version" "$gh_arch")"
+#     "$rclone" version
+function install_rclone() {
+    rclone_version=${1:?"install_rclone: Version missing"}
+    gh_arch=${2:?"install_rclone: Architecture missing"}
+    rclone_pkg="${RENKU_PKG}/rclone/v${rclone_version}"
+    rclone_bin="${rclone_pkg}/rclone"
+
+    if [ -f "${rclone_bin}" ]; then
+        version="$("${rclone_bin}" version || echo "bad executable")"
+        version="$(echo "${version}" | head -n 1)"
+        expected="rclone v${rclone_version}"
+        if [ "${version}" = "${expected}" ]; then
+            echo "${rclone_bin}"
+            return 0
+        else
+            >&2 echo "WARNING: found mismatching rclone version ${version}"
+        fi
+    fi
+
+    rclone_url="https://github.com/rclone/rclone/releases/download/v${rclone_version}/rclone-v${rclone_version}-linux-${gh_arch}.zip"
+
+    mkdir -p "${rclone_pkg}"
+    tmp="$(mktemp -d)"
+    (# Run in a subshell to prevent changing the working directory of the caller
+        cd "${tmp}"
+        curl -Lo "rclone.zip" "${rclone_url}"
+        >&2 unzip "rclone.zip"
+        rm -rf "${rclone_pkg}"
+        mv ./rclone-v"${rclone_version}"-* "${rclone_pkg}"
+    )
+    rm -r "${tmp}"
+    chmod a+x "${rclone_bin}"
+
+    echo "${rclone_bin}"
+}
+
+# Installs wstunnel
+#
+# Usage:
+#     wstunnel="$(install_wstunnel "$version" "$gh_arch")"
+#     "$wstunnel" --version
+function install_wstunnel() {
+    wstunnel_version=${1:?"wstunnel_version: Version missing"}
+    gh_arch=${2:?"wstunnel_version: Architecture missing"}
+    wstunnel_pkg="${RENKU_PKG}/wstunnel/v${wstunnel_version}"
+    wstunnel_bin="${wstunnel_pkg}/wstunnel"
+
+    >&2 echo "Info: using wstunnel v${wstunnel_version}"
+
+    if [ -f "${wstunnel_bin}" ]; then
+        version="$("${wstunnel_bin}" --version || echo "bad executable")"
+        expected="wstunnel-cli ${wstunnel_version}"
+        if [ "${version}" = "${expected}" ]; then
+            echo "${wstunnel_bin}"
+            return 0
+        else
+            >&2 echo "WARNING: found mismatching wstunnel version ${version}"
+        fi
+    fi
+
+    wstunnel_url="https://github.com/SwissDataScienceCenter/wstunnel/releases/download/v${wstunnel_version}/wstunnel_${wstunnel_version}_linux_${gh_arch}.tar.gz"
+
+    mkdir -p "${wstunnel_pkg}"
+    tmp="$(mktemp -d)"
+    (# Run in a sub shell to prevent changing the working directory of the caller
+        cd "${tmp}"
+        curl -Lo "wstunnel.tar.gz" "${wstunnel_url}"
+        rm -rf "${wstunnel_pkg}"
+        mkdir -p ${wstunnel_pkg} # the folder has to exist for tar -C
+        tar xf "wstunnel.tar.gz" -C "${wstunnel_pkg}"
+    )
+    rm -r "${tmp}"
+    chmod a+x "${wstunnel_bin}"
+
+    echo "${wstunnel_bin}"
+}
+
+for d in \
+    SESSION_DIR \
+    SESSION_WORK_DIR \
+    SECRETS_DIR \
+    SECRETS_USER_DIR \
+    SECRETS_DATA_CONNECTORS_DIR \
+    LOGS_DIR
+do
+    echo "${d}: ${!d}"
+    mkdir -p "${!d}"
+done
+
+# Install rclone
+rclone="$(install_rclone "${RCLONE_VERSION}" "${gh_arch}")"
+echo "rclone: ${rclone}"
+
+# Install wstunnel
+wstunnel="$(install_wstunnel "${WSTUNNEL_VERSION}" "${gh_arch}")"
+echo "wstunnel: ${wstunnel}"
+
+# Ensure NVIDIA_VISIBLE_DEVICES is set to void
+# so that cuda enabled images work on eiger
+if !(nvidia-smi 2>&1 >/dev/null); then
+    export NVIDIA_VISIBLE_DEVICES=void
+fi
+
+if srun --help | grep -q -- --environment; then
+    # Create the environment.toml file to run the session
+    EDF_FILE="${SESSION_DIR}/environment.toml"
+    cat <<EOF >"${EDF_FILE}"
+[annotations]
+com.hooks.cxi.enabled = "false"
+EOF
+    srun_param_environment="--environment ${EDF_FILE}"
+else
+    srun_param_environment=""
+fi
+
+srun_param_container_image="--container-image ${REMOTE_SESSION_IMAGE}"
+srun_param_workdir="--container-workdir ${SESSION_WORK_DIR}"
+srun_param_mounts=#{{SESSION_MOUNTS_PLACEHOLDER}}
 
 echo "TODO: setup rclone mounts..."
 
@@ -189,9 +188,6 @@ echo "TODO: setup rclone mounts..."
 # "${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
 
 # echo "Starting tunnel..."
-GIT_PROXY_PORT="${GIT_PROXY_PORT:-65480}"
-GIT_PROXY_HEALTH_PORT="${GIT_PROXY_HEALTH_PORT:-65481}"
-WSTUNNEL_PATH_PREFIX="${WSTUNNEL_PATH_PREFIX:-sessions/my-session/wstunnel}"
 echo "wstunnel client \
   -R tcp://0.0.0.0:${RENKU_SESSION_PORT}:localhost:${RENKU_SESSION_PORT} \
   -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT} \
@@ -256,15 +252,27 @@ if [ -n "${GIT_REPOSITORIES}" ]; then
     fi
 fi
 
-exit_script() {
+function exit_script() {
     echo "Cleaning up session..."
+    # Make sure we have a valid pid before attempting to kill it
+    (test -n "${pid}" && ps "${pid}" > /dev/null && kill -TERM "${pid}") || true
+
     # fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
+
+    # Sometimes the job continues to run...
+    scancel "${SLURM_JOB_ID}" || true
 }
 
 echo "Starting session..."
 # Start session while listening to EXIT signals
 pid=
-trap 'exit_script && [[ $pid ]] && kill -TERM "$pid" && exit_script' EXIT
-srun --environment "${EDF_FILE}" --no-container-entrypoint sh /etc/rc & pid=$!
+trap 'exit_script' EXIT
+srun \
+    ${srun_param_environment} \
+    ${srun_param_container_image} \
+    ${srun_param_workdir} \
+    ${srun_param_mounts} \
+    --no-container-entrypoint sh /etc/rc \
+    & pid=$!
 wait
 pid=

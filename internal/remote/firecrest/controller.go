@@ -158,13 +158,6 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		return nil
 	}
 
-	// do not do anything if `fakeStart` is true
-	if c.fakeStart {
-		c.jobID = "fake-job-id"
-		slog.Info("fake start", "jobID", c.jobID, "env", os.Environ())
-		return nil
-	}
-
 	// TODO: should the 15-minute timeout be configurable?
 	startCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
@@ -765,41 +758,31 @@ func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, s
 	if fileSystems == nil {
 		return strings.Replace(sessionScript, "#{{SESSION_MOUNTS_PLACEHOLDER}}", "", 1)
 	}
-	// Collect file systems we want to mount
-	var home *FileSystem
-	scratches, stores := []*FileSystem{}, []*FileSystem{}
+
+	// Collect file systems we want to mount as "SRC:DST[:FLAG]" strings
+	var mounts []string
 	for _, fs := range *fileSystems {
 		switch fs.DataType {
-		case Scratch:
-			scratches = append(scratches, &fs)
-		case Store:
-			stores = append(stores, &fs)
 		case Users:
-			home = &fs
+			// TODO: Try to mount home at its location (need to handle ~/.bashrc)
+			// TODO: Alternatively, copy the contents in the container
+			mounts = append(mounts, fmt.Sprintf("%s:/home%s:ro", fs.Path, fs.Path))
+		default:
+			// Identity mapping of the host mounts
+			mounts = append(mounts, fmt.Sprintf("%s:%s", fs.Path, fs.Path))
 		}
 	}
 
-	mounts := []string{}
-	for _, scratch := range scratches {
-		mounts = append(mounts, scratch.Path)
-	}
-	for _, store := range stores {
-		mounts = append(mounts, store.Path)
-	}
-	// TODO: Try to mount home at its location (need to handle ~/.bashrc)
-	// TODO: Alternatively, copy the contents in the container
-	if home != nil {
-		mounts = append(mounts, fmt.Sprintf("%s:/home%s:ro", home.Path, home.Path))
+	// Add the secrets mount
+	if secretsPath != "" {
+		mounts = append(mounts, fmt.Sprintf("%s:/secrets:ro", secretsPath))
 	}
 
-	// Add the secrets mount
-	mounts = append(mounts, fmt.Sprintf("%s:/secrets:ro", secretsPath))
 	// Format mount list
 	for i := range mounts {
-		mounts[i] = fmt.Sprintf("    \"%s\",", mounts[i])
+		mounts[i] = fmt.Sprintf("\"%s\"", mounts[i])
 	}
-
-	mountsStr := fmt.Sprintf("mounts = [\n%s\n]", strings.Join(mounts, "\n"))
+	mountsStr := fmt.Sprintf("--container-mounts=%s", strings.Join(mounts, ","))
 	return strings.Replace(sessionScript, "#{{SESSION_MOUNTS_PLACEHOLDER}}", mountsStr, 1)
 }
 
