@@ -58,7 +58,7 @@ func ListSecret(ctx context.Context, namespace, name string) (*v1.SecretList, er
 		return nil, err
 	}
 	if name == "" {
-		return nil, fmt.Errorf("failed to read Secret with K8s client because name is blank")
+		return nil, fmt.Errorf("failed to list secret because name is blank")
 	}
 	return cs.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{FieldSelector: fmt.Sprintf("metadata.name=%s", name)})
 }
