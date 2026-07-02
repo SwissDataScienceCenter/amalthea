@@ -697,10 +697,13 @@ func (as *AmaltheaSession) RemoteSessionDataSources(ctx context.Context) ([]v1.P
 					MountPath: path.Join(common.DataConnectorSecretsProxyFolder, volName),
 				},
 			)
-
+			logger := log.FromContext(ctx).WithName("DEBUG data-connector")
+			logger.Info(fmt.Sprintf("Checking '%v' -> '%v/%v'", volName, as.Namespace, pv.SecretRef.Name))
 			// If there is a user secret linked to the data connector, mount it as it contains required credentials
 			userSecretName := fmt.Sprintf("%s-secrets", pv.SecretRef.Name)
 			if _, err := kube.Secret(ctx, as.Namespace, userSecretName); err == nil {
+				logger.Info(fmt.Sprintf("Found '%v'", userSecretName))
+
 				volNameSecret := fmt.Sprintf("%s-secrets", volName)
 
 				vols = append(
@@ -723,6 +726,8 @@ func (as *AmaltheaSession) RemoteSessionDataSources(ctx context.Context) ([]v1.P
 						MountPath: path.Join(common.UserSecretProxyFolder, volName),
 					},
 				)
+			} else {
+				logger.Info(fmt.Sprintf("FAILED to retrieve '%v/%v': %v", as.Namespace, userSecretName, err))
 			}
 			ids += 1
 		}
