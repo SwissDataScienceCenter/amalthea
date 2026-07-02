@@ -209,6 +209,11 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             remotePath="$(cat "${dc}/remotePath")"
             log_file="${LOGS_DIR}/rclone-dc-${n}.log"
             config_file="${dc}/configData"
+            pass="${dc}/pass"
+
+            if [ -f "${pass}" ]; then
+                local pass_content="$(cat "${pass}" | rclone obscure -)"
+                cat "${config_file}" | sed -e "s,pass = <sensitive>,pass = ${pass_content}," > "${config_file}.tmp" && mv "${config_file}.tmp" "${config_file}"
 
             if [ -f "${dc}/vfsOpt" ]; then
                 vfsOptions="$(to_rclone_mount_arguments "${dc}/vfsOpt" "--vfs")"

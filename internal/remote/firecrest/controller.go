@@ -206,13 +206,6 @@ func (c *FirecrestRemoteSessionController) uploadSecret(ctx context.Context, loc
 	return c.uploadSecretFromBuffer(ctx, remotePath, filename, content)
 }
 
-func (c *FirecrestRemoteSessionController) uploadOptionalSecretFromBuffer(ctx context.Context, remotePath, filename string, content []byte) error {
-	if len(content) > 0 {
-		return c.uploadSecretFromBuffer(ctx, remotePath, filename, content)
-	}
-	return nil
-}
-
 func (c *FirecrestRemoteSessionController) uploadDataSource(ctx context.Context, remotePath string, dataSource *common.DataConnector) error {
 	var err error
 
@@ -221,32 +214,17 @@ func (c *FirecrestRemoteSessionController) uploadDataSource(ctx context.Context,
 		return err
 	}
 
-	if err = c.uploadSecretFromBuffer(ctx, remoteDataConnectorPath, "remote", []byte(dataSource.Remote)); err != nil {
-		return err
-	}
-
-	if err = c.uploadSecretFromBuffer(ctx, remoteDataConnectorPath, "remotePath", []byte(dataSource.RemotePath)); err != nil {
-		return err
-	}
-
-	if err = c.uploadOptionalSecretFromBuffer(ctx, remoteDataConnectorPath, "mountOpt", []byte(dataSource.MountOpt)); err != nil {
-		return err
-	}
-
-	if err = c.uploadOptionalSecretFromBuffer(ctx, remoteDataConnectorPath, "vfsOpt", []byte(dataSource.VfsOpt)); err != nil {
-		return err
-	}
-
-	var configData *string
+	var configData map[string][]byte
 	if configData, err = dataSource.ConfigData(); err != nil {
 		return err
 	}
 
-	if err = c.uploadSecretFromBuffer(ctx, remoteDataConnectorPath, "configData", []byte(*configData)); err != nil {
-		return err
+	for k, v := range configData {
+		if err = c.uploadSecretFromBuffer(ctx, remoteDataConnectorPath, k, v); err != nil {
+			return err
+		}
 	}
 
-	// TODO: Write read-only extra flag from "DATA_SOURCES"
 	return nil
 }
 

@@ -34,7 +34,7 @@ func (dc *DataConnector) fernetKey() (*fernet.Key, error) {
 	}
 }
 
-func (dc *DataConnector) userSecrets() (map[string]string, error) {
+func (dc *DataConnector) userSecrets() (map[string][]byte, error) {
 	var err error
 
 	var fernetKey *fernet.Key
@@ -49,7 +49,7 @@ func (dc *DataConnector) userSecrets() (map[string]string, error) {
 		return nil, err
 	}
 
-	decodedSecrets := make(map[string]string)
+	decodedSecrets := make(map[string][]byte)
 	for _, dir := range dirEntries {
 		// TODO: Add support for hierarchies ?
 		if dir.IsDir() || strings.HasPrefix(dir.Name(), "..") {
@@ -60,13 +60,15 @@ func (dc *DataConnector) userSecrets() (map[string]string, error) {
 		if content, err = os.ReadFile(path.Join(userSecretMountPoint, dir.Name())); err != nil {
 			return nil, err
 		}
-		decodedSecrets[dir.Name()] = string(fernet.VerifyAndDecrypt(content, 0, []*fernet.Key{fernetKey}))
+		decodedSecrets[dir.Name()] = fernet.VerifyAndDecrypt(content, 0, []*fernet.Key{fernetKey})
 	}
 
 	return decodedSecrets, nil
 }
 
-func (dc *DataConnector) ConfigData() (*string, error) {
+func (dc *DataConnector) ConfigData() (map[string][]byte, error) {
+	var configData map[string][]byte
+
 	// name is generated with fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)] and maps to pv.SecretRef.Name
 	content, err := os.ReadFile(path.Join(dc.root, dc.Name, "configData"))
 	if err != nil {
@@ -80,19 +82,24 @@ func (dc *DataConnector) ConfigData() (*string, error) {
 
 	section := iniData.Section(dc.Remote)
 
-	var userSecrets map[string]string
-	userSecrets, err = dc.userSecrets()
+	userSecrets, err := dc.userSecrets()
 	if err != nil {
 		log.Warnf("#### UserSecrets returned %v", err)
 	}
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
+
 	// Override values with secrets
 	for k, v := range userSecrets {
 		log.Warnf("#### ConfigData key %v => %v", k, v)
-
-		section.Key(k).SetValue(v)
+		switch k {
+		case "pass":
+			// Put it in a file, which will allow for passing to `rclone obscure -` before being placed in the config file.
+			configData[k] = v
+		default:
+			section.Key(k).SetValue(string(v))
+		}
 	}
 
 	buffer := new(bytes.Buffer)
@@ -101,12 +108,18 @@ func (dc *DataConnector) ConfigData() (*string, error) {
 
 		return nil, err
 	}
+	configData["configData"] = buffer.Bytes()
+	configData["remote"] = []byte(dc.Remote)
+	configData["remotePath"] = []byte(dc.RemotePath)
+	if len(dc.MountOpt) > 0 {
+		configData["mountOpt"] = []byte(dc.MountOpt)
+	}
+	if len(dc.VfsOpt) > 0 {
+		configData["vfsOpt"] = []byte(dc.VfsOpt)
+	}
+	// TODO: Write read-only extra flag from "DATA_SOURCES"
 
-	// So we can take the address...
-	b := buffer.String()
-	log.Warnf("#### Patched ConfigData '%v'", b)
-
-	return &b, err
+	return configData, err
 }
 
 func LoadDataSource(root, name string) (*DataConnector, error) {

@@ -12,12 +12,14 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/common"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
+	"github.com/SwissDataScienceCenter/amalthea/internal/kube"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -56,6 +58,7 @@ var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
 var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
 var useNoneSameSiteSessionCookie = getUseNoneSameSiteSessionCookie()
+var rcloneCredentialKeyWords = []string{"pass"} // rclone Config file keywords which require the user credential secret
 
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
@@ -673,14 +676,14 @@ func (as *AmaltheaSession) RemoteSessionDataSources(ctx context.Context) ([]v1.P
 	}
 
 	// Generate a short list of secrets names, will be used to also get indices.
-	var secrets []string
+	var dataConnectorSecretNames []string
 	for _, pv := range as.Spec.DataSources {
 		if pv.SecretRef.isAdopted() {
-			secrets = append(secrets, pv.SecretRef.Name)
+			dataConnectorSecretNames = append(dataConnectorSecretNames, pv.SecretRef.Name)
 		}
 	}
 
-	for ids, secret := range secrets {
+	for ids, dataConnectorSecretName := range dataConnectorSecretNames {
 		volName := fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)
 		vols = append(
 			vols,
@@ -688,7 +691,7 @@ func (as *AmaltheaSession) RemoteSessionDataSources(ctx context.Context) ([]v1.P
 				Name: volName,
 				VolumeSource: v1.VolumeSource{
 					Secret: &v1.SecretVolumeSource{
-						SecretName:  secret,
+						SecretName:  dataConnectorSecretName,
 						DefaultMode: ptr.To(int32(256)), // decimal value of 0400 for the access flags (chmod-like)
 					},
 				},
@@ -704,30 +707,36 @@ func (as *AmaltheaSession) RemoteSessionDataSources(ctx context.Context) ([]v1.P
 		)
 
 		// If there is a user secret linked to the data connector, mount it as it contains required credentials
-		userSecretName := fmt.Sprintf("%s-secrets", secret)
-		//if _, err := kube.Secret(ctx, userSecretName); err == nil
-		{
-			volNameSecret := fmt.Sprintf("%s-secrets", volName)
-			vols = append(
-				vols,
-				v1.Volume{
-					Name: volNameSecret,
-					VolumeSource: v1.VolumeSource{
-						Secret: &v1.SecretVolumeSource{
-							SecretName:  userSecretName,
-							DefaultMode: ptr.To(int32(256)), // decimal value of 0400 for the access flags (chmod-like)
+		// We look for specific keyword in the main DataConnector secret, and if we find them we assume the user secret
+		// is or will be set up. We exit as soon as we find one, as we can directly add the user secret volume.
+		if dataConnectorSecret, err := kube.Secret(ctx, dataConnectorSecretName); err == nil && dataConnectorSecret != nil {
+			for k, _ := range dataConnectorSecret.Data {
+				if slices.Contains(rcloneCredentialKeyWords, k) {
+					userSecretName := fmt.Sprintf("%s-secrets", dataConnectorSecretName)
+					volNameSecret := fmt.Sprintf("%s-secrets", volName)
+					vols = append(
+						vols,
+						v1.Volume{
+							Name: volNameSecret,
+							VolumeSource: v1.VolumeSource{
+								Secret: &v1.SecretVolumeSource{
+									SecretName:  userSecretName,
+									DefaultMode: ptr.To(int32(256)), // decimal value of 0400 for the access flags (chmod-like)
+								},
+							},
 						},
-					},
-				},
-			)
-			volMounts = append(
-				volMounts,
-				v1.VolumeMount{
-					Name:      volNameSecret,
-					ReadOnly:  true,
-					MountPath: path.Join(common.UserSecretProxyFolder, volName),
-				},
-			)
+					)
+					volMounts = append(
+						volMounts,
+						v1.VolumeMount{
+							Name:      volNameSecret,
+							ReadOnly:  true,
+							MountPath: path.Join(common.UserSecretProxyFolder, volName),
+						},
+					)
+					return pvcs, vols, volMounts
+				}
+			}
 		}
 	}
 	return pvcs, vols, volMounts
