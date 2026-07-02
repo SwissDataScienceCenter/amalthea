@@ -32,11 +32,6 @@ func loadConfig() (*rest.Config, error) {
 		return nil, err
 	}
 
-	currentNamespace, _, err = kubeConfig.Namespace()
-	if err != nil {
-		return nil, err
-	}
-
 	return config, nil
 }
 
