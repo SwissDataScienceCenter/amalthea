@@ -95,6 +95,7 @@ func (dc *DataConnector) ConfigData() (map[string][]byte, error) {
 		case "pass":
 			// Put it in a file, which will allow for passing to `rclone obscure -` before being placed in the config file.
 			configData[k] = v
+			section.Key(k).SetValue(string(v))
 		default:
 			section.Key(k).SetValue(string(v))
 		}
