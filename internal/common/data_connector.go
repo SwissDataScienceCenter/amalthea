@@ -70,7 +70,6 @@ func (dc *DataConnector) userSecrets() (map[string][]byte, error) {
 func (dc *DataConnector) ConfigData() (map[string][]byte, error) {
 	configData := map[string][]byte{}
 
-	// name is generated with fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)] and maps to pv.SecretRef.Name
 	content, err := os.ReadFile(path.Join(dc.root, dc.Name, "configData"))
 	if err != nil {
 		return nil, err
