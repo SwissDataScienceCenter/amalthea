@@ -13,7 +13,6 @@ import (
 )
 
 var clientset *kubernetes.Clientset
-var currentNamespace string
 
 func loadConfig() (*rest.Config, error) {
 	// In Cluster Config
@@ -53,13 +52,12 @@ func client() (*kubernetes.Clientset, error) {
 	clientset, err = kubernetes.NewForConfig(config)
 	if err != nil {
 		clientset = nil
-		currentNamespace = ""
 		return nil, err
 	}
 	return clientset, nil
 }
 
-func Secret(ctx context.Context, name string) (*v1.Secret, error) {
+func Secret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 	cs, err := client()
 	if err != nil {
 		return nil, err
@@ -67,5 +65,5 @@ func Secret(ctx context.Context, name string) (*v1.Secret, error) {
 	if name == "" {
 		return nil, fmt.Errorf("failed to read Secret with K8s client because name is blank")
 	}
-	return cs.CoreV1().Secrets(currentNamespace).Get(ctx, name, metav1.GetOptions{})
+	return cs.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 }
