@@ -57,7 +57,7 @@ var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
 var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
 var useNoneSameSiteSessionCookie = getUseNoneSameSiteSessionCookie()
-var rcloneCredentialKeyWords = []string{"pass"} // rclone Config file keywords which require the user credential secret
+var rcloneCredentialKeyWords = []string{"secretKey"} // rclone Config file keywords which require the user credential secret
 
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
