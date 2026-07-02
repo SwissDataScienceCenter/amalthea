@@ -212,7 +212,7 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             pass="${dc}/pass"
 
             if [ -f "${pass}" ]; then
-                pass_content="$(cat "${pass}" | base64)"
+                pass_content="$(cat "${pass}" | ${rclone} obscure -)"
                 cat "${config_file}" | sed -e "s,pass *= <sensitive>,pass = ${pass_content}," > "${config_file}.tmp" && mv "${config_file}.tmp" "${config_file}"
             fi
 
