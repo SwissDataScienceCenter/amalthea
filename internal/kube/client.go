@@ -52,7 +52,7 @@ func client() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func Secret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+func ListSecret(ctx context.Context, namespace, name string) (*v1.SecretList, error) {
 	cs, err := client()
 	if err != nil {
 		return nil, err
@@ -60,5 +60,5 @@ func Secret(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 	if name == "" {
 		return nil, fmt.Errorf("failed to read Secret with K8s client because name is blank")
 	}
-	return cs.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	return cs.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{FieldSelector: fmt.Sprintf("metadata.name=%s", name)})
 }
