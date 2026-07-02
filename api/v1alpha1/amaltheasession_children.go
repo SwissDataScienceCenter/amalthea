@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -710,8 +709,8 @@ func (as *AmaltheaSession) RemoteSessionDataSources(ctx context.Context) ([]v1.P
 		// We look for specific keyword in the main DataConnector secret, and if we find them we assume the user secret
 		// is or will be set up. We exit as soon as we find one, as we can directly add the user secret volume.
 		if dataConnectorSecret, err := kube.Secret(ctx, dataConnectorSecretName); err == nil && dataConnectorSecret != nil {
-			for k, _ := range dataConnectorSecret.Data {
-				if slices.Contains(rcloneCredentialKeyWords, k) {
+			for _, k := range rcloneCredentialKeyWords {
+				if _, ok := dataConnectorSecret.Data[k]; ok {
 					userSecretName := fmt.Sprintf("%s-secrets", dataConnectorSecretName)
 					volNameSecret := fmt.Sprintf("%s-secrets", volName)
 					vols = append(

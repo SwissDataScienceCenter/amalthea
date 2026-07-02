@@ -83,9 +83,6 @@ func (dc *DataConnector) ConfigData() (map[string][]byte, error) {
 	section := iniData.Section(dc.Remote)
 
 	userSecrets, err := dc.userSecrets()
-	if err != nil {
-		log.Warnf("#### UserSecrets returned %v", err)
-	}
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
@@ -104,8 +101,6 @@ func (dc *DataConnector) ConfigData() (map[string][]byte, error) {
 
 	buffer := new(bytes.Buffer)
 	if _, err = iniData.WriteTo(buffer); err != nil {
-		log.Warnf("#### WriteTo returned %v '%v'", err, buffer)
-
 		return nil, err
 	}
 	configData["configData"] = buffer.Bytes()
