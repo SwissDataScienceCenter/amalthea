@@ -18,8 +18,9 @@ const DataConnectorSecretsProxyFolder = "/secrets-dcs"
 type DataConnector struct {
 	root string
 
-	Name       string
-	Remote     string
+	Name   string
+	Remote string
+
 	RemotePath string
 	MountOpt   string
 	VfsOpt     string

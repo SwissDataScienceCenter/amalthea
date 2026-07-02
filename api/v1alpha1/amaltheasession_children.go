@@ -710,6 +710,7 @@ func (as *AmaltheaSession) RemoteSessionDataSources(ctx context.Context) ([]v1.P
 		// If there is a user secret linked to the data connector, mount it as it contains required credentials
 		// We look for specific keyword in the main DataConnector secret, and if we find them we assume the user secret
 		// is or will be set up. We exit as soon as we find one, as we can directly add the user secret volume.
+		logger.Info(fmt.Sprintf("### Processing DataConnector: %v", dataConnectorSecretName))
 		if dataConnectorSecret, err := kube.Secret(ctx, dataConnectorSecretName); err == nil && dataConnectorSecret != nil {
 			logger.Info(fmt.Sprintf("### DataConnector found: %v", dataConnectorSecret.Name))
 			for _, k := range rcloneCredentialKeyWords {
