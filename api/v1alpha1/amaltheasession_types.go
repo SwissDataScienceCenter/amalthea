@@ -646,11 +646,3 @@ const (
 	SessionTypeInteractive    SessionType = "Interactive"
 	SessionTypeNonInteractive SessionType = "NonInteractive"
 )
-
-func (t *SessionType) IsInteractive() bool {
-	return t == nil || *t == SessionTypeInteractive
-}
-
-func (t *SessionType) IsNonInteractive() bool {
-	return !t.IsInteractive()
-}

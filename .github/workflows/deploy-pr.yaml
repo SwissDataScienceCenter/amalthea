@@ -97,14 +97,14 @@ jobs:
           echo "KUBECONFIG=${KUBECONFIG}" >> "$GITHUB_ENV"
 
       - name: Build and deploy
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.22.1
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@leafty/what-da-heck
         env:
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
           GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
           RENKU_RELEASE: renku-ci-am-${{ github.event.number }}
           RENKU_VALUES_FILE: ${{ github.workspace }}/values.yaml
-          RENKU_VALUES: minimal-deployment/minimal-deployment-values.yaml
+          RENKU_VALUES: minimal-deployment/sdsc-azure-ci-deployment-values.yaml
           TEST_ARTIFACTS_PATH: "tests-artifacts-${{ github.sha }}"
           renku_ui: "${{ needs.check-deploy.outputs.renku-ui }}"
           KUBERNETES_CLUSTER_FQDN: "dev.renku.ch"

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 )
@@ -24,6 +25,22 @@ func handleBadWaitingState(status v1.ContainerStatus) string {
 	}
 
 	return fmt.Sprintf("the container %s is failing because %s", status.Name, waitingState.Reason)
+}
+
+func jobFailureReason(job *batchv1.Job) string {
+	if job == nil {
+		return ""
+	}
+
+	if job.Status.Failed > 0 {
+		for _, cond := range job.Status.Conditions {
+			if (cond.Type == batchv1.JobFailed || cond.Type == batchv1.JobFailureTarget) && cond.Status == v1.ConditionTrue {
+				return cond.Reason + ": " + cond.Message
+			}
+		}
+		return "The job failed."
+	}
+	return ""
 }
 
 func podFailureReason(pod *v1.Pod) string {

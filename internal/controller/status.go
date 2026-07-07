@@ -6,6 +6,7 @@ import (
 	"time"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,10 +22,17 @@ func containerCounts(pod *v1.Pod) (amaltheadevv1alpha1.ContainerCounts, amalthea
 	if pod == nil {
 		return initCounts, counts
 	}
+
 	for _, container := range pod.Status.InitContainerStatuses {
-		containerCompleted := container.State.Terminated != nil && container.State.Terminated.ExitCode == 0 && container.State.Terminated.Reason == "Completed"
+		var containerOk bool
+		if isContainerSidecar(container, *pod) {
+			containerOk = container.Ready && container.State.Running != nil
+		} else {
+			containerOk = container.State.Terminated != nil && container.State.Terminated.ExitCode == 0 && container.State.Terminated.Reason == "Completed"
+		}
+
 		initCounts.Total += 1
-		if containerCompleted {
+		if containerOk {
 			initCounts.Ready += 1
 		}
 	}
@@ -39,14 +47,50 @@ func containerCounts(pod *v1.Pod) (amaltheadevv1alpha1.ContainerCounts, amalthea
 	return initCounts, counts
 }
 
+func containerRestartPolicy(status v1.ContainerStatus, pod v1.Pod) *v1.ContainerRestartPolicy {
+	for _, c := range pod.Spec.Containers {
+		if c.Name == status.Name {
+			return c.RestartPolicy
+		}
+	}
+	return nil
+}
+
+func isContainerSidecar(status v1.ContainerStatus, pod v1.Pod) bool {
+	restartPolicy := containerRestartPolicy(status, pod)
+	if restartPolicy != nil {
+		switch *restartPolicy {
+		case v1.ContainerRestartPolicyAlways:
+			return true
+		}
+	}
+	return false
+}
+
 func podIsReady(pod *v1.Pod) bool {
 	if pod == nil || pod.GetDeletionTimestamp() != nil {
-		// A missing pod or a pod being deleted is not considered ready
 		return false
 	}
 	phaseOk := pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodRunning
-	initCounts, counts := containerCounts(pod)
-	return initCounts.Ok() && counts.Ok() && phaseOk
+	condOk := false
+	for _, c := range pod.Status.Conditions {
+		if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+			condOk = true
+		}
+	}
+	return phaseOk && condOk
+}
+
+func jobIsSuccess(job *batchv1.Job) bool {
+	if job == nil {
+		return false
+	}
+	for _, c := range job.Status.Conditions {
+		if c.Type == batchv1.JobComplete && c.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 func podIsCompleted(pod *v1.Pod) bool {
@@ -66,6 +110,15 @@ func podIsCompleted(pod *v1.Pod) bool {
 	}
 
 	return phaseCompleted && totalCnt == completedCnt
+}
+
+func jobIsFinished(job batchv1.JobStatus) bool {
+	for _, c := range job.Conditions {
+		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 func metrics(ctx context.Context, clnt metricsv1beta1.PodMetricsesGetter, cr *amaltheadevv1alpha1.AmaltheaSession) (v1.ResourceList, error) {

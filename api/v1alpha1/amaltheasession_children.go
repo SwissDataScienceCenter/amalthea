@@ -102,11 +102,10 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	_, dsVols, dsVolMounts := cr.DataSources()
 	cloneInit := cr.cloneInit()
 	sessionVols, sessionMounts := cr.SessionVolumes()
-	isInteractive := cr.Spec.SessionType.IsInteractive()
 
 	var auth = manifests{}
 	// auth containers are only for interactive sessions
-	if isInteractive {
+	if cr.Spec.SessionType != SessionTypeNonInteractive {
 		var err error
 		auth, err = cr.auth()
 		if err != nil {
@@ -181,13 +180,6 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 		activeTTL = ptr.To(int64(cr.Spec.Culling.MaxAge.Seconds()))
 	}
 
-	// use MaxHibernatedDuration (amount of time until a hibernated session is deleted) to set the time
-	// after which the job is removed after it has completed
-	var ttlFinish *int32
-	if cr.Spec.Culling.MaxHibernatedDuration.Seconds() > 0 {
-		ttlFinish = ptr.To(int32(cr.Spec.Culling.MaxHibernatedDuration.Seconds()))
-	}
-
 	job := batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cr.JobName(),
@@ -196,12 +188,11 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: batchv1.JobSpec{
-			Parallelism:             ptr.To(int32(1)),
-			Completions:             ptr.To(int32(1)),
-			BackoffLimit:            ptr.To(int32(0)),
-			ActiveDeadlineSeconds:   activeTTL,
-			TTLSecondsAfterFinished: ttlFinish,
-			Suspend:                 &cr.Spec.Hibernated,
+			Parallelism:           ptr.To(int32(1)),
+			Completions:           ptr.To(int32(1)),
+			BackoffLimit:          ptr.To(int32(0)),
+			ActiveDeadlineSeconds: activeTTL,
+			Suspend:               &cr.Spec.Hibernated,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      cr.childLabels(),
@@ -291,6 +282,10 @@ func (cr *AmaltheaSession) Service() v1.Service {
 		},
 	}
 	if cr.Spec.SessionLocation == Remote {
+		// NOTE: In order to connect through the reverse tunnel,
+		// we need to have the tunnel established so we publish
+		// the service without the pod being ready
+		svc.Spec.PublishNotReadyAddresses = true
 		svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
 			Protocol:   v1.ProtocolTCP,
 			Name:       tunnelServiceName,
@@ -486,7 +481,7 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
 	log := log.FromContext(ctx)
-	if cr.Spec.SessionType.IsNonInteractive() {
+	if cr.Spec.SessionType == SessionTypeNonInteractive {
 		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
 		podList := &v1.PodList{}
 		listOpts := &client.ListOptions{Namespace: cr.Namespace, LabelSelector: selector}
@@ -858,11 +853,11 @@ func makeTunnelSecret(length int) (string, error) {
 
 // sessionContainer returns the main session container
 func (cr *AmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount, config config.AmaltheaSessionConfiguration) v1.Container {
-	if cr.Spec.SessionLocation == Local {
-		return cr.sessionContainerLocal(volumeMounts, config)
+	if cr.Spec.SessionLocation == Remote {
+		return cr.sessionContainerRemote(volumeMounts)
 	}
-	// cr.Spec.SessionLocation == Remote
-	return cr.sessionContainerRemote(volumeMounts)
+	// cr.Spec.SessionLocation == Local
+	return cr.sessionContainerLocal(volumeMounts, config)
 }
 
 // sessionContainer returns the main session container
@@ -928,6 +923,9 @@ func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, 
 		RunAsNonRoot: ptr.To(true),
 		RunAsUser:    ptr.To(session.RunAsUser),
 		RunAsGroup:   ptr.To(session.RunAsGroup),
+		Capabilities: &v1.Capabilities{
+			Drop: []v1.Capability{"ALL"},
+		},
 	}
 	if session.RunAsUser == 0 {
 		securityContext.RunAsNonRoot = ptr.To(false)
@@ -954,6 +952,9 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: ptr.To(false),
 			RunAsNonRoot:             ptr.To(true),
+			Capabilities: &v1.Capabilities{
+				Drop: []v1.Capability{"ALL"},
+			},
 		},
 		Args: []string{
 			"remote-session-controller",
@@ -993,6 +994,18 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 		v1.EnvVar{
 			Name:  "RSC_SERVER_PORT",
 			Value: fmt.Sprintf("%d", RemoteSessionControllerPort),
+		},
+		v1.EnvVar{
+			Name:  "RSC_SESSION_PORT",
+			Value: fmt.Sprintf("%d", cr.Spec.Session.Port),
+		},
+		v1.EnvVar{
+			Name:  "RSC_SESSION_URL_PATH",
+			Value: cr.Spec.Session.URLPath,
+		},
+		v1.EnvVar{
+			Name:  "RSC_READINESS_PROBE_TYPE",
+			Value: string(cr.Spec.Session.ReadinessProbe.Type),
 		},
 		v1.EnvVar{
 			Name: "RSC_WSTUNNEL_SECRET",
