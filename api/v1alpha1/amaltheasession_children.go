@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SwissDataScienceCenter/amalthea/internal/common"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
@@ -182,6 +183,13 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 		activeTTL = ptr.To(int64(cr.Spec.Culling.MaxAge.Seconds()))
 	}
 
+	// use MaxHibernatedDuration (amount of time until a hibernated session is deleted) to set the time
+	// after which the job is removed after it has completed
+	var ttlFinish *int32
+	if cr.Spec.Culling.MaxHibernatedDuration.Seconds() > 0 {
+		ttlFinish = ptr.To(int32(cr.Spec.Culling.MaxHibernatedDuration.Seconds()))
+	}
+
 	job := batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cr.JobName(),
@@ -190,11 +198,12 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: batchv1.JobSpec{
-			Parallelism:           ptr.To(int32(1)),
-			Completions:           ptr.To(int32(1)),
-			BackoffLimit:          ptr.To(int32(0)),
-			ActiveDeadlineSeconds: activeTTL,
-			Suspend:               &cr.Spec.Hibernated,
+			Parallelism:             ptr.To(int32(1)),
+			Completions:             ptr.To(int32(1)),
+			BackoffLimit:            ptr.To(int32(0)),
+			ActiveDeadlineSeconds:   activeTTL,
+			TTLSecondsAfterFinished: ttlFinish,
+			Suspend:                 &cr.Spec.Hibernated,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      cr.childLabels(),
@@ -652,44 +661,75 @@ func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 
 func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
 	pvcs := []v1.PersistentVolumeClaim{}
-	vols := []v1.Volume{}
-	volMounts := []v1.VolumeMount{}
-
-	// Generate a short list of secrets names, will be used to also get indices.
-	var secrets []string
-	for _, pv := range as.Spec.DataSources {
-		if pv.SecretRef.isAdopted() {
-			secrets = append(secrets, pv.SecretRef.Name)
-		}
-	}
-
-	proxySecretsFolder, exists := os.LookupEnv("RENKU_SECRETS_PATH")
-	if !exists {
-		proxySecretsFolder = "/secrets"
-	}
-	proxySecretsFolder = fmt.Sprintf("%s-dcs", proxySecretsFolder)
-	for ids, secret := range secrets {
-		volName := fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)
-		vols = append(
-			vols,
-			v1.Volume{
-				Name: volName,
-				VolumeSource: v1.VolumeSource{
-					Secret: &v1.SecretVolumeSource{
-						SecretName:  secret,
-						DefaultMode: ptr.To(int32(256)), // decimal value of 0400 for the access flags (chmod-like)
-					},
+	vols := []v1.Volume{
+		{
+			Name: fmt.Sprintf("%s-%s", prefix, as.Name),
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName:  as.InternalSecretName(),
+					DefaultMode: ptr.To(int32(256)), // decimal value of 0400 for the access flags (chmod-like)
 				},
 			},
-		)
-		volMounts = append(
-			volMounts,
-			v1.VolumeMount{
-				Name:      volName,
-				ReadOnly:  true,
-				MountPath: path.Join(proxySecretsFolder, volName),
-			},
-		)
+		},
+	}
+	volMounts := []v1.VolumeMount{
+		{
+			Name:      fmt.Sprintf("%s-%s", prefix, as.Name),
+			ReadOnly:  true,
+			MountPath: common.UserSecretProxyFolder,
+		},
+	}
+
+	ids := 0
+	for _, pv := range as.Spec.DataSources {
+		if pv.SecretRef.isAdopted() {
+			volName := fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)
+			vols = append(
+				vols,
+				v1.Volume{
+					Name: volName,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName:  pv.SecretRef.Name,
+							DefaultMode: ptr.To(int32(256)), // decimal value of 0400 for the access flags (chmod-like)
+						},
+					},
+				},
+			)
+			volMounts = append(
+				volMounts,
+				v1.VolumeMount{
+					Name:      volName,
+					ReadOnly:  true,
+					MountPath: path.Join(common.DataConnectorProxyFolder, volName),
+				},
+			)
+			// If there is a user secret linked to the data connector, mount it as it contains required credentials
+			userSecretName := fmt.Sprintf("%s-secrets", pv.SecretRef.Name)
+			volNameSecret := fmt.Sprintf("%s-secrets", volName)
+			vols = append(
+				vols,
+				v1.Volume{
+					Name: volNameSecret,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName:  userSecretName,
+							Optional:    ptr.To(true),
+							DefaultMode: ptr.To(int32(256)), // decimal value of 0400 for the access flags (chmod-like)
+						},
+					},
+				},
+			)
+			volMounts = append(
+				volMounts,
+				v1.VolumeMount{
+					Name:      volNameSecret,
+					ReadOnly:  true,
+					MountPath: path.Join(common.DataConnectorSecretProxyFolder, volName),
+				},
+			)
+			ids += 1
+		}
 	}
 	return pvcs, vols, volMounts
 }
@@ -814,14 +854,23 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		if err != nil {
 			panic(err)
 		}
-		secret.StringData["WSTUNNEL_SECRET"] = tunnelSecret
+		secret.StringData["wstunnel_secret"] = tunnelSecret
 
 		// Add the Datasources Specifications so that the proxy container can write them out to the HPC cluster
-		ds, dsErr := json.Marshal(as.Spec.DataSources)
-		if dsErr != nil {
-			panic(dsErr)
+		ids := 0
+		for _, pv := range as.Spec.DataSources {
+			if pv.SecretRef.isAdopted() {
+
+				var content []byte
+				content, err = json.Marshal(pv)
+				if err != nil {
+					panic(err)
+				}
+
+				secret.StringData[fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)] = string(content)
+				ids += 1
+			}
 		}
-		secret.StringData["DATA_SOURCES"] = string(ds)
 	}
 
 	// Skip the 'oidc' configuration if it is not needed
@@ -1055,24 +1104,6 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 			Name:  "RSC_READINESS_PROBE_TYPE",
 			Value: string(cr.Spec.Session.ReadinessProbe.Type),
 		},
-		v1.EnvVar{
-			Name: "RSC_WSTUNNEL_SECRET",
-			ValueFrom: ptr.To(v1.EnvVarSource{
-				SecretKeyRef: ptr.To(v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
-					Key:                  "WSTUNNEL_SECRET",
-				}),
-			}),
-		},
-		v1.EnvVar{ //TODO: simplify the container secret handling, why put some values in the env instead of secrets mounts?
-			Name: "RSC_DATA_SOURCES",
-			ValueFrom: ptr.To(v1.EnvVarSource{
-				SecretKeyRef: ptr.To(v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
-					Key:                  "DATA_SOURCES",
-				}),
-			}),
-		},
 	)
 
 	if session.RemoteSecretRef != nil {
@@ -1132,7 +1163,7 @@ func (cr *AmaltheaSession) tunnelContainer() v1.Container {
 				ValueFrom: ptr.To(v1.EnvVarSource{
 					SecretKeyRef: ptr.To(v1.SecretKeySelector{
 						LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
-						Key:                  "WSTUNNEL_SECRET",
+						Key:                  "wstunnel_secret",
 					}),
 				}),
 			},
