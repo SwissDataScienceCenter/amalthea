@@ -779,7 +779,7 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 	}
 
 	// Skip the 'oidc' configuration if it is not needed
-	if as.Spec.Authentication.Type == Oidc {
+	if as.Spec.Authentication != nil && as.Spec.Authentication.Type == Oidc {
 		pathPrefix := as.ingressPathPrefix()
 		sessionURL := as.GetURL()
 		pathPrefixURL := url.URL{Host: sessionURL.Host, Path: pathPrefix, Scheme: sessionURL.Scheme}
