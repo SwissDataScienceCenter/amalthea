@@ -223,9 +223,10 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 	for key := range cr.Spec.Template.Metadata.Annotations {
 		annotations[key] = cr.Spec.Template.Metadata.Annotations[key]
 	}
-	// Add the annotation for the runID
+	// Add the annotations for the runID and the launchID
 	if cr.Status.RunId != "" {
 		annotations["renku.io/run_id"] = cr.Status.RunId
+		annotations["renku.io/launch_id"] = string(cr.GetUID())
 	}
 
 	sts := appsv1.StatefulSet{
