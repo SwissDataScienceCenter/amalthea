@@ -836,7 +836,7 @@ func (c ChildResourceUpdates) Status(
 		FailingSince:          failingSince,
 		HibernatedSince:       hibernatedSince,
 		WillHibernateAt:       hibernationDate,
-		RunId:                 cr.Status.RunId,
+		RunID:                 cr.Status.RunID,
 		Error:                 failMsg,
 	}
 	warning := c.warningMessage(pod)
