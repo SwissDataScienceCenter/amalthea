@@ -226,7 +226,10 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 	// Add the annotations for the runID and the launchID
 	if cr.Status.RunId != "" {
 		annotations["renku.io/run_id"] = cr.Status.RunId
-		annotations["renku.io/launch_id"] = string(cr.GetUID())
+	}
+	uid := string(cr.GetUID())
+	if uid != "" {
+		annotations["renku.io/launch_id"] = uid
 	}
 
 	sts := appsv1.StatefulSet{
