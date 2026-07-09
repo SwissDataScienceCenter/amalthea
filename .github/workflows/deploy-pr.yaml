@@ -97,7 +97,7 @@ jobs:
           echo "KUBECONFIG=${KUBECONFIG}" >> "$GITHUB_ENV"
 
       - name: Build and deploy
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@1.23.1
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.23.1
         env:
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
