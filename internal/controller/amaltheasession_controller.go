@@ -209,7 +209,6 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		// The session just got created or is being resumed, set the new run ID
 		runID = ulid.Make().String()
 	}
-	log.Info("DEBUG: runID", "amaltheasession.Spec.Hibernated", amaltheasession.Spec.Hibernated, "amaltheasession.Status.RunId", amaltheasession.Status.RunId, "newRunID", runID)
 	amaltheasession.Status.RunId = runID
 
 	children, err := NewChildResources(amaltheasession, r.Configuration)
@@ -246,7 +245,6 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		if newStatus.RunId != "" && amaltheasession.Status.RunId != "" {
 			newStatus.RunId = amaltheasession.Status.RunId
 		}
-		log.Info("DEBUG: runID, retry", "amaltheasession.Status.RunId", amaltheasession.Status.RunId, "newRunID", newStatus.RunId)
 		amaltheasession.Status = newStatus
 		err = r.Status().Update(ctx, amaltheasession)
 		if err != nil {
