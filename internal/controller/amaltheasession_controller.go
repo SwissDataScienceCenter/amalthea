@@ -242,7 +242,11 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		log.Info("DEBUG: runID, retry", "amaltheasession.Status.RunId", amaltheasession.Status.RunId, "newRunID", runID)
+		// Handle run ID being set by a concurrent loop
+		if newStatus.RunId != "" && amaltheasession.Status.RunId != "" {
+			newStatus.RunId = amaltheasession.Status.RunId
+		}
+		log.Info("DEBUG: runID, retry", "amaltheasession.Status.RunId", amaltheasession.Status.RunId, "newRunID", newStatus.RunId)
 		amaltheasession.Status = newStatus
 		err = r.Status().Update(ctx, amaltheasession)
 		if err != nil {
