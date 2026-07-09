@@ -877,6 +877,10 @@ func (c ChildResourceUpdates) Status(
 		status.InitContainerCounts.Ready = 0
 	}
 
+	if state == amaltheadevv1alpha1.Failed || state == amaltheadevv1alpha1.Hibernated || state == amaltheadevv1alpha1.Running || state == amaltheadevv1alpha1.Succeeded {
+		status.FailedSchedulingSince = metav1.Time{}
+	}
+
 	c.statusCallback(&status)
 
 	// Used for debugging to ensure the reconcile loop does not needlessly reschdule or update child resources
