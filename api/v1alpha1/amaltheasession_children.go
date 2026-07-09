@@ -759,7 +759,6 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		},
 		StringData: map[string]string{},
 	}
-
 	// Secret used to secure the tunnel for remote sessions
 	if as.Spec.SessionLocation == Remote {
 		tunnelSecret, err := makeTunnelSecret(16)
