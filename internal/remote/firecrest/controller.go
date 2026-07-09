@@ -137,7 +137,7 @@ func (c *FirecrestRemoteSessionController) uploadSecrets(ctx context.Context, re
 	files, err := os.ReadDir(localSessionSecretsFolder)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// The folder does not exist if there are no secrets slots defined.
+			// The folder does not exist if there are no user secrets defined.
 			return nil
 		}
 		return err
@@ -269,8 +269,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		}
 	}
 	// Upload user secrets into secretsPath
-	secretSlotsPath := path.Join(secretsPath, "slots")
-	err = c.uploadSecrets(startCtx, secretSlotsPath)
+	userSecretsPath := path.Join(secretsPath, "user")
+	err = c.uploadSecrets(startCtx, userSecretsPath)
 	if err != nil {
 		return err
 	}
@@ -352,7 +352,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
 	// Upload the session script
-	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, secretSlotsPath)
+	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, userSecretsPath)
 	err = c.uploadFile(ctx, sessionPath, "session_script.sh", []byte(sessionScriptFinal))
 	if err != nil {
 		return err
