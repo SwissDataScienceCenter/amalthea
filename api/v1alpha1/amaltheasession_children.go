@@ -905,6 +905,7 @@ func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, 
 		VolumeMounts:             volumeMounts,
 		TerminationMessagePath:   "/dev/termination-log",
 		TerminationMessagePolicy: v1.TerminationMessageReadFile,
+		WorkingDir:               cr.Spec.Session.WorkingDir,
 	}
 	// Assign a readiness probe to the session container
 	switch cr.Spec.Session.ReadinessProbe.Type {
