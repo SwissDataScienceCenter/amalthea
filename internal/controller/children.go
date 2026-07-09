@@ -123,6 +123,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
 					status.FailingSince = metav1.Time{}
+					status.FailedSchedulingSince = metav1.Time{}
 					status.HibernatedSince = metav1.Time{}
 				}
 			}
@@ -131,6 +132,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
 					status.FailingSince = metav1.Time{}
+					status.FailedSchedulingSince = metav1.Time{}
 					status.HibernatedSince = metav1.Now()
 				}
 			}
@@ -322,6 +324,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
 					status.FailingSince = metav1.Time{}
+					status.FailedSchedulingSince = metav1.Time{}
 					status.HibernatedSince = metav1.Time{}
 				}
 			}
@@ -330,6 +333,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
 					status.FailingSince = metav1.Time{}
+					status.FailedSchedulingSince = metav1.Time{}
 					status.HibernatedSince = metav1.Now()
 				}
 			}
@@ -820,7 +824,7 @@ func (c ChildResourceUpdates) Status(
 	if failing && failingSince.IsZero() {
 		failingSince = metav1.NewTime(time.Now())
 	}
-	if !hibernated && !failingSince.IsZero() {
+	if !failing && !failingSince.IsZero() {
 		failingSince = metav1.Time{}
 	}
 
