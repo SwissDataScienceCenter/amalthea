@@ -122,7 +122,7 @@ func TestEventsInferredStateWhereScheduled(t *testing.T) {
 	}
 	session := v1alpha.AmaltheaSession{}
 	result, err := EventsInferedState(context.TODO(), &session, client)
-	assert.Equal(t, EisrAutoScheduling, result)
+	assert.Equal(t, EisrNone, result)
 	assert.Nil(t, err)
 }
 
@@ -132,7 +132,7 @@ func TestEventsInferredStateWhereTriggeredScaleup(t *testing.T) {
 	}
 	session := v1alpha.AmaltheaSession{}
 	result, err := EventsInferedState(context.TODO(), &session, client)
-	assert.Equal(t, EisrAutoScheduling, result)
+	assert.Equal(t, EisrNone, result)
 	assert.Nil(t, err)
 }
 
@@ -146,7 +146,7 @@ func TestEventsInferredStateWhereTriggeredScaleupAfterFailed(t *testing.T) {
 	}
 	session := v1alpha.AmaltheaSession{}
 	result, err := EventsInferedState(context.TODO(), &session, client)
-	assert.Equal(t, EisrAutoScheduling, result)
+	assert.Equal(t, EisrInitiallyFailed, result)
 	assert.Nil(t, err)
 }
 

@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -63,7 +62,7 @@ type ChildResourceUpdates struct {
 // https://github.com/kubernetes-sigs/metrics-server/blob/9ebbad973db2a54193712c4d9292bbe3eaa849dc/pkg/storage/pod.go#L31
 const freshContainerMinimalAge = 15 * time.Second
 
-const maxWaitForClearFailedScheduling = 90 * time.Second
+const maxWaitForClearFailedScheduling = 10 * time.Minute
 
 func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
 	log := log.FromContext(ctx)
@@ -502,8 +501,8 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 	return (stsReady || jobReady) && podReady
 }
 
-func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod) (amaltheadevv1alpha1.State, string) {
-	msg := c.failureMessage(pod)
+func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod, job *batchv1.Job) (amaltheadevv1alpha1.State, string) {
+	msg := c.failureMessage(pod, job)
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
 		return amaltheadevv1alpha1.NotReady, ""
@@ -516,13 +515,15 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	case c.IsRunning(pod):
 		return amaltheadevv1alpha1.Running, ""
 	case podIsCompleted(pod):
+		fallthrough
+	case jobIsSuccess(job):
 		return amaltheadevv1alpha1.Succeeded, ""
 	default:
 		return amaltheadevv1alpha1.NotReady, ""
 	}
 }
 
-func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
+func (c ChildResourceUpdates) failureMessage(pod *v1.Pod, job *batchv1.Job) string {
 	msg := podFailureReason(pod)
 	if msg != "" {
 		return msg
@@ -545,7 +546,7 @@ func (c ChildResourceUpdates) failureMessage(pod *v1.Pod) string {
 	if msg != "" {
 		return msg
 	}
-	msg = jobFailureReason(c.Job.Manifest)
+	msg = jobFailureReason(job)
 	if msg != "" {
 		return msg
 	}
@@ -560,7 +561,6 @@ const (
 	EisrInitiallyFailed EventsInferedStateResult = "Initially Failed"
 	EisrTemporaryFailed EventsInferedStateResult = "Temporary Failed"
 	EisrFinallyFailed   EventsInferedStateResult = "Finally Failed"
-	EisrAutoScheduling  EventsInferedStateResult = "Auto Scheduling"
 )
 
 // eventsInferedFailure looks into the events of the session pod to
@@ -578,9 +578,8 @@ const (
 // - none of the above
 func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, client client.Reader) (EventsInferedStateResult, error) {
 	const failedScheduling = "FailedScheduling"
-	const scheduled = "Scheduled"
-	const triggeredScaleUp = "TriggeredScaleUp"
 	log := log.FromContext(ctx)
+
 	events, err := cr.GetPodEvents(ctx, client)
 	if err != nil {
 		return EisrNone, fmt.Errorf("%v", err)
@@ -588,26 +587,26 @@ func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSes
 	if events == nil {
 		return EisrNone, nil
 	}
-	for _, v := range slices.Backward(events.Items) {
+
+	var waitedTime time.Duration
+	if !cr.Status.FailedSchedulingSince.IsZero() {
+		waitedTime = time.Since(cr.Status.FailedSchedulingSince.Time)
+	}
+
+	for _, v := range events.Items {
 		if v.Reason == failedScheduling {
-			var waitedTime time.Duration
-			if !cr.Status.FailedSchedulingSince.IsZero() {
-				waitedTime = time.Since(cr.Status.FailedSchedulingSince.Time)
-			}
 			if cr.Status.FailedSchedulingSince.IsZero() {
 				log.Info("Found FailedScheduling event, initially failing", "event", v.Message)
 				return EisrInitiallyFailed, nil
-			} else if waitedTime >= maxWaitForClearFailedScheduling {
-				log.Info("Found FailedScheduling event, finally failing", "waited", waitedTime)
-				return EisrFinallyFailed, fmt.Errorf("failed scheduling: %s", v.Message)
 			} else {
-				log.Info("Found FailedScheduling event, temporary failing", "event", v.Message, "waiting", waitedTime)
-				return EisrTemporaryFailed, nil
+				if waitedTime >= maxWaitForClearFailedScheduling {
+					log.Info("Found FailedScheduling event, finally failing", "waited", waitedTime)
+					return EisrFinallyFailed, fmt.Errorf("failed scheduling: %s", v.Message)
+				} else {
+					log.Info("Found FailedScheduling event, temporary failing", "event", v.Message, "waiting", waitedTime)
+					return EisrTemporaryFailed, nil
+				}
 			}
-		}
-		if v.Reason == scheduled || v.Reason == triggeredScaleUp {
-			log.Info("Found a Scheduled or TriggeredScaleUp event", "event", v.Message)
-			return EisrAutoScheduling, nil
 		}
 	}
 	return EisrNone, nil
@@ -721,9 +720,6 @@ func checkEventsInferedState(ctx context.Context,
 		case EisrInitiallyFailed:
 			failedSchedulingSince = metav1.NewTime(time.Now())
 
-		case EisrAutoScheduling:
-			// reset the failedSchedulingSince when a scheduling/trigger-scaleup event occurs
-			failedSchedulingSince = metav1.Time{}
 		default:
 			if err != nil {
 				log.Error(err, "Error obtaining state from pod events")
@@ -748,10 +744,17 @@ func (c ChildResourceUpdates) Status(
 			log.Error(err, "Could not read the session pod when updating the status")
 		}
 	}
+	job, err := cr.GetJob(ctx, r.Client)
+	if err != nil {
+		job = nil
+		if !apierrors.IsNotFound(err) {
+			log.Error(err, "Could not read the session job when updating the status")
+		}
+	}
 
 	idle := false
 	idleSince := cr.Status.IdleSince
-	state, failMsg := c.State(cr, pod)
+	state, failMsg := c.State(cr, pod, job)
 
 	failedSchedulingSince, nextState, err := checkEventsInferedState(ctx, r, cr, state)
 	state = nextState

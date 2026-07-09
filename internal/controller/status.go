@@ -81,6 +81,18 @@ func podIsReady(pod *v1.Pod) bool {
 	return phaseOk && condOk
 }
 
+func jobIsSuccess(job *batchv1.Job) bool {
+	if job == nil {
+		return false
+	}
+	for _, c := range job.Status.Conditions {
+		if c.Type == batchv1.JobComplete && c.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
 func podIsCompleted(pod *v1.Pod) bool {
 	if pod == nil || pod.GetDeletionTimestamp() != nil {
 		// A missing pod or a pod being deleted is not completed
