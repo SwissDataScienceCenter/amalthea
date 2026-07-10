@@ -757,6 +757,7 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 			Labels:      as.childLabels(),
 			Annotations: as.Spec.Template.Metadata.Annotations,
 		},
+		StringData: map[string]string{},
 	}
 	// Secret used to secure the tunnel for remote sessions
 	tunnelSecret := ""
@@ -772,9 +773,7 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		// In this case we do not need the 'oidc' configuration in the secret,
 		// we just return an empty one, or one populated with the tunnel secret.
 		if tunnelSecret != "" {
-			secret.StringData = map[string]string{
-				"WSTUNNEL_SECRET": tunnelSecret,
-			}
+			secret.StringData["WSTUNNEL_SECRET"] = tunnelSecret
 		}
 		return secret
 	}
@@ -837,10 +836,9 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		panic(err)
 	}
 
-	secret.StringData = map[string]string{
-		"oauth2-proxy-alpha-config.yaml": string(newConfigStr),
-		"oauth2-proxy-config.yaml":       strings.Join(oldConfigLines, "\n"),
-	}
+	secret.StringData["oauth2-proxy-alpha-config.yaml"] = string(newConfigStr)
+	secret.StringData["oauth2-proxy-config.yaml"] = strings.Join(oldConfigLines, "\n")
+
 	if tunnelSecret != "" {
 		secret.StringData["WSTUNNEL_SECRET"] = tunnelSecret
 	}
