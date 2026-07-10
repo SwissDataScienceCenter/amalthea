@@ -126,6 +126,58 @@ func (c *FirecrestRemoteSessionController) Status(ctx context.Context) (state mo
 	return c.currentStatus, c.currentStatusError
 }
 
+func (c *FirecrestRemoteSessionController) uploadSecrets(ctx context.Context, remoteSecretsPath string) error {
+	var err error
+
+	localSessionSecretsFolder, exists := os.LookupEnv("RENKU_SECRETS_PATH")
+	if !exists {
+		localSessionSecretsFolder = "/secrets"
+	}
+
+	files, err := os.ReadDir(localSessionSecretsFolder)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// The folder does not exist if there are no user secrets defined.
+			return nil
+		}
+		return err
+	}
+
+	// Ensure the remote folder exists
+	err = c.mkdir(ctx, remoteSecretsPath, true)
+	if err != nil {
+		return err
+	}
+
+	err = c.chmod(ctx, remoteSecretsPath, "700")
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			// Ignore hierarchies for now, this will also skip "." and ".." as both are folders
+			continue
+		}
+		var content []byte
+		name := file.Name()
+		content, err = os.ReadFile(path.Join(localSessionSecretsFolder, name))
+		if err != nil {
+			return err
+		}
+		err = c.uploadFile(ctx, remoteSecretsPath, name, content)
+		if err != nil {
+			return err
+		}
+		err = c.chmod(ctx, path.Join(remoteSecretsPath, name), "400")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Start sets up and starts the remote session using the FirecREST API
 //
 //nolint:gocyclo // TODO: can we break down session start?
@@ -211,8 +263,17 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		err = c.chmod(startCtx, path.Join(secretsPath, "wstunnel_secret"), "400")
+		if err != nil {
+			return err
+		}
 	}
-	// TODO: upload user secrets into secretsPath
+	// Upload user secrets into secretsPath
+	userSecretsPath := path.Join(secretsPath, "user")
+	err = c.uploadSecrets(startCtx, userSecretsPath)
+	if err != nil {
+		return err
+	}
 
 	// Setup git repositories
 	renkuWorkDir := os.Getenv("RENKU_WORKING_DIR")
@@ -291,7 +352,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
 	// Upload the session script
-	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, secretsPath)
+	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, userSecretsPath)
 	err = c.uploadFile(ctx, sessionPath, "session_script.sh", []byte(sessionScriptFinal))
 	if err != nil {
 		return err
