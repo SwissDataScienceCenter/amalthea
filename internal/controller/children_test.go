@@ -108,8 +108,8 @@ func TestEventsInferredStateWhereFailedSchedulingTimeoutExceeded(t *testing.T) {
 		listResult: &v1.EventList{Items: []v1.Event{failedSchedulingEvent()}},
 	}
 	session := v1alpha.AmaltheaSession{}
-	time, _ := time.Parse(time.DateTime, "2006-01-02 15:04:05")
-	session.Status.FailedSchedulingSince = metav1.NewTime(time)
+	pastTime, _ := time.Parse(time.DateTime, "2006-01-02 15:04:05")
+	session.Status.FailedSchedulingSince = metav1.NewTime(pastTime)
 	assert.False(t, session.Status.FailedSchedulingSince.IsZero())
 	result, err := EventsInferedState(context.TODO(), &session, clnt)
 	assert.Equal(t, EisrFinallyFailed, result)
