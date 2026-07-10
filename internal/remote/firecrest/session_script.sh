@@ -251,6 +251,14 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             mkdir -p "${SESSION_WORK_DIR}/${mount}"
             mkdir -p "${CACHE_DIR}/${n}"
 
+            echo "PS: $(ps -u "${USER}" -o pid=,cmd= ; echo $?)"
+            echo "GREP: $(ps -u "${USER}" -o pid=,cmd= | grep "${SESSION_WORK_DIR}/${mount}" | grep -v grep ; echo $?)"
+            echo "SED: $(ps -u "${USER}" -o pid=,cmd= | grep "${SESSION_WORK_DIR}/${mount}" | grep -v grep | sed -e 's,^ *,,' ; echo $?)"
+            rclone_pids=$(ps -u "${USER}" -o pid=,cmd= | grep "${SESSION_WORK_DIR}/${mount}" | grep -v grep | sed -e 's,^ *,,' | cut -d ' ' -f 1)
+            echo "TR: $($rclone_pids ; echo $?)"
+            send_signals KILL ${rclone_pids}
+            echo "send_signals: DONE ; echo $?"
+
             ${rclone} mount \
                 --daemon \
                 ${mountOptions} \
