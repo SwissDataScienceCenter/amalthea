@@ -852,21 +852,21 @@ func makeTunnelSecret(length int) (string, error) {
 }
 
 // sessionContainer returns the main session container
-func (cr *AmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount, config config.AmaltheaSessionConfiguration) v1.Container {
+func (cr *AmaltheaSession) sessionContainer(volumeMounts []v1.VolumeMount, cfg config.AmaltheaSessionConfiguration) v1.Container {
 	if cr.Spec.SessionLocation == Remote {
 		return cr.sessionContainerRemote(volumeMounts)
 	}
 	// cr.Spec.SessionLocation == Local
-	return cr.sessionContainerLocal(volumeMounts, config)
+	return cr.sessionContainerLocal(volumeMounts, cfg)
 }
 
 // sessionContainer returns the main session container
-func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, config config.AmaltheaSessionConfiguration) v1.Container {
+func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, cfg config.AmaltheaSessionConfiguration) v1.Container {
 	session := cr.Spec.Session
 	// Rewrite image if no pull secrets are configured
 	image := session.Image
-	if len(cr.Spec.ImagePullSecrets) == 0 && config.ImageFieldRewriter != nil {
-		newImage, err := config.ImageFieldRewriter.Rewrite(image)
+	if len(cr.Spec.ImagePullSecrets) == 0 && cfg.ImageFieldRewriter != nil {
+		newImage, err := cfg.ImageFieldRewriter.Rewrite(image)
 		if err != nil {
 			log.Log.Error(
 				err,

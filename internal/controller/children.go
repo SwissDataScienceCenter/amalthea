@@ -420,12 +420,12 @@ func NewNonInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cf
 	return output, nil
 }
 
-func NewInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, config config.AmaltheaSessionConfiguration) (ChildResources, error) {
+func NewInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.AmaltheaSessionConfiguration) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredService := cr.Service()
 	desiredPVC := cr.PVC()
-	desiredStatefulSet, err := cr.StatefulSet(config)
+	desiredStatefulSet, err := cr.StatefulSet(cfg)
 	if err != nil {
 		return ChildResources{}, err
 	}
