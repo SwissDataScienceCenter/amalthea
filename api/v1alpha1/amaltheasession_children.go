@@ -480,24 +480,24 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 }
 
 func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 	if cr.Spec.SessionType == SessionTypeNonInteractive {
 		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
 		podList := &v1.PodList{}
 		listOpts := &client.ListOptions{Namespace: cr.Namespace, LabelSelector: selector}
 		if err := clnt.List(ctx, podList, listOpts); err != nil {
-			log.Info("cannot list pods for batch job", "job-name", cr.JobName(), "error", err)
+			logger.Info("cannot list pods for batch job", "job-name", cr.JobName(), "error", err)
 			return nil, err
 		}
 		itemLength := len(podList.Items)
 		if itemLength > 1 {
-			log.Info("Too many pods returned for batch job", "job-name", cr.JobName(), "num_pods", itemLength)
+			logger.Info("Too many pods returned for batch job", "job-name", cr.JobName(), "num_pods", itemLength)
 			return nil, errors.New("more than one pod found for job")
 		}
 		if itemLength > 0 {
 			return &podList.Items[0], nil
 		}
-		log.Info("No pod found for batch job", "job-name", cr.JobName())
+		logger.Info("No pod found for batch job", "job-name", cr.JobName())
 		return nil, nil
 	} else {
 		pod := v1.Pod{}
@@ -535,10 +535,10 @@ func eventTimestamp(ev v1.Event) time.Time {
 // GetPodEvents finds all events where the pod of the given session is
 // involved in. It will be sorted by timestamp
 func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*v1.EventList, error) {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 	events := v1.EventList{}
 	podName := as.PodName()
-	log.Info("Getting event list for pod", "pod", podName)
+	logger.Info("Getting event list for pod", "pod", podName)
 	err := c.List(ctx,
 		&events,
 		client.MatchingFields{

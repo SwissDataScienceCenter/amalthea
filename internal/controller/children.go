@@ -65,7 +65,7 @@ const freshContainerMinimalAge = 15 * time.Second
 const maxWaitForClearFailedScheduling = 10 * time.Minute
 
 func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 	if c.Current == nil {
 		return ChildResourceUpdate[T]{}
 	}
@@ -80,7 +80,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating an ingress")
+				logger.Info("Creating an ingress")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
@@ -112,7 +112,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a statefulset")
+				logger.Info("Creating a statefulset")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
@@ -171,7 +171,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a PVC")
+				logger.Info("Creating a PVC")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
@@ -223,7 +223,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a service")
+				logger.Info("Creating a service")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
@@ -259,7 +259,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a secret")
+				logger.Info("Creating a secret")
 				current.Data = desired.Data
 				current.StringData = desired.StringData
 				current.ObjectMeta = desired.ObjectMeta
@@ -304,16 +304,16 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			}
 			// finished jobs are not updated
 			if jobIsFinished(current.Status) {
-				log.Info("Job is terminated, not reconciling", "job", current.Name)
+				logger.Info("Job is terminated, not reconciling", "job", current.Name)
 				return nil
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a Job", "job", desired.Spec)
+				logger.Info("Creating a Job", "job", desired.Spec)
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
 				if err != nil {
-					log.Error(err, "Error setting controller reference")
+					logger.Error(err, "Error setting controller reference")
 				}
 				return err
 			}
@@ -365,7 +365,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			return nil
 		})
 		if err != nil {
-			log.Error(err, "Error reconciling Job")
+			logger.Error(err, "Error reconciling Job")
 		}
 		return ChildResourceUpdate[T]{c.Current, res, err, statusCallback}
 
@@ -584,7 +584,7 @@ const (
 func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, client client.Reader) (EventsInferedStateResult, error) {
 	const failedScheduling = "FailedScheduling"
 	const scheduled = "Scheduled"
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
 	events, err := cr.GetPodEvents(ctx, client)
 	if err != nil {
@@ -612,19 +612,19 @@ func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSes
 	scheduledTime := getEventTime(scheduledEvent)
 	failedSchedulingTime := getEventTime(failedSchedulingEvent)
 	if !scheduledTime.IsZero() && scheduledTime.After(failedSchedulingTime.Time) {
-		log.Info("Found Scheduled event", "event", scheduledEvent)
+		logger.Info("Found Scheduled event", "event", scheduledEvent)
 		return EisrScheduled, nil
 	}
 	if failedSchedulingEvent != nil {
 		if cr.Status.FailedSchedulingSince.IsZero() {
-			log.Info("Found FailedScheduling event, initially failing", "event", failedSchedulingEvent.Message)
+			logger.Info("Found FailedScheduling event, initially failing", "event", failedSchedulingEvent.Message)
 			return EisrInitiallyFailed, nil
 		} else {
 			if waitedTime >= maxWaitForClearFailedScheduling {
-				log.Info("Found FailedScheduling event, finally failing", "waited", waitedTime)
+				logger.Info("Found FailedScheduling event, finally failing", "waited", waitedTime)
 				return EisrFinallyFailed, fmt.Errorf("failed scheduling: %s", failedSchedulingEvent.Message)
 			} else {
-				log.Info("Found FailedScheduling event, temporary failing", "event", failedSchedulingEvent.Message, "waiting", waitedTime)
+				logger.Info("Found FailedScheduling event, temporary failing", "event", failedSchedulingEvent.Message, "waiting", waitedTime)
 				return EisrTemporaryFailed, nil
 			}
 		}
@@ -731,7 +731,7 @@ func checkEventsInferedState(ctx context.Context,
 	var err error
 	nextState := currentState
 	if currentState == amaltheadevv1alpha1.NotReady {
-		log := log.FromContext(ctx)
+		logger := log.FromContext(ctx)
 		var result EventsInferedStateResult
 		result, err = EventsInferedState(ctx, cr, r.Client)
 		switch result {
@@ -746,7 +746,7 @@ func checkEventsInferedState(ctx context.Context,
 
 		default:
 			if err != nil {
-				log.Error(err, "Error obtaining state from pod events")
+				logger.Error(err, "Error obtaining state from pod events")
 			}
 		}
 	}
@@ -759,20 +759,20 @@ func (c ChildResourceUpdates) Status(
 	r *AmaltheaSessionReconciler,
 	cr *amaltheadevv1alpha1.AmaltheaSession,
 ) amaltheadevv1alpha1.AmaltheaSessionStatus {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
 	pod, err := cr.GetPod(ctx, r.Client)
 	if err != nil {
 		pod = nil
 		if !apierrors.IsNotFound(err) {
-			log.Error(err, "Could not read the session pod when updating the status")
+			logger.Error(err, "Could not read the session pod when updating the status")
 		}
 	}
 	job, err := cr.GetJob(ctx, r.Client)
 	if err != nil {
 		job = nil
 		if !apierrors.IsNotFound(err) {
-			log.Error(err, "Could not read the session job when updating the status")
+			logger.Error(err, "Could not read the session job when updating the status")
 		}
 	}
 
@@ -826,7 +826,7 @@ func (c ChildResourceUpdates) Status(
 				}
 			}
 		} else {
-			log.Error(err, "couldn't list events")
+			logger.Error(err, "couldn't list events")
 		}
 	}
 
@@ -848,7 +848,7 @@ func (c ChildResourceUpdates) Status(
 		failingSince = metav1.Time{}
 	}
 
-	hibernationDate := calculateHibernationDate(log, cr.GetCreationTimestamp(), cr.Status, cr.Spec.Culling)
+	hibernationDate := calculateHibernationDate(logger, cr.GetCreationTimestamp(), cr.Status, cr.Spec.Culling)
 
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
 		Conditions:            Conditions(state, ctx, r, cr),
@@ -884,7 +884,7 @@ func (c ChildResourceUpdates) Status(
 	c.statusCallback(&status)
 
 	// Used for debugging to ensure the reconcile loop does not needlessly reschdule or update child resources
-	// log.Info("Update summary", "Ingress", c.Ingress.UpdateResult, "StatefulSet", c.StatefulSet.UpdateResult, "PVC", c.StatefulSet.UpdateResult, "Service", c.Service.UpdateResult)
+	// logger.Info("Update summary", "Ingress", c.Ingress.UpdateResult, "StatefulSet", c.StatefulSet.UpdateResult, "PVC", c.StatefulSet.UpdateResult, "Service", c.Service.UpdateResult)
 
 	return status
 }

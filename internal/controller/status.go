@@ -162,7 +162,7 @@ func getIdleState(
 	r *AmaltheaSessionReconciler,
 	cr *amaltheadevv1alpha1.AmaltheaSession,
 ) (metav1.Time, bool) {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 	if cr == nil {
 		return metav1.Time{}, false
 	}
@@ -172,7 +172,7 @@ func getIdleState(
 	var cpuUsage *resource.Quantity
 	metrics, err := metrics(ctx, r.MetricsClient, cr)
 	if err != nil {
-		log.Info("Metrics returned error when checking idleness", "error", err)
+		logger.Info("Metrics returned error when checking idleness", "error", err)
 	} else {
 		cpuUsage = metrics.Cpu()
 	}
@@ -192,7 +192,7 @@ func getIdleState(
 		idleSince = metav1.Time{}
 	}
 
-	log.Info("session idle check", "idle", idle, "session", cr.Name, "cpuUsage", cpuUsage, "cpuUsageThreshold", cpuUsageIdlenessThreshold)
+	logger.Info("session idle check", "idle", idle, "session", cr.Name, "cpuUsage", cpuUsage, "cpuUsageThreshold", cpuUsageIdlenessThreshold)
 
 	return idleSince, idle
 }
