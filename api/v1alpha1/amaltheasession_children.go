@@ -778,66 +778,69 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		return secret
 	}
 
-	pathPrefix := as.ingressPathPrefix()
-	sessionURL := as.GetURL()
-	pathPrefixURL := url.URL{Host: sessionURL.Host, Path: pathPrefix, Scheme: sessionURL.Scheme}
-	cookieSecret := make([]byte, 32)
-	_, err := rand.Read(cookieSecret)
-	if err != nil {
-		// NOTE: Read cannot panic except for on legacy Linux systems
-		// See: https://pkg.go.dev/crypto/rand#Read
-		panic(err)
-	}
-	oldConfigLines := []string{
-		"session_cookie_minimal = true",
-		"skip_provider_button = true",
-		fmt.Sprintf("redirect_url = \"%s\"", pathPrefixURL.JoinPath("oauth2/callback").String()),
-		fmt.Sprintf("cookie_path = \"%s\"", pathPrefix),
-		fmt.Sprintf("proxy_prefix = \"%soauth2\"", pathPrefix),
-		"authenticated_emails_file = \"/authorized_emails\"",
-		fmt.Sprintf("cookie_secret = \"%s\"", base64.URLEncoding.EncodeToString(cookieSecret)),
-	}
-	upstreamPort := secondProxyPort
-	upstreamConfig := map[string]any{
-		"upstreams": []map[string]any{
-			{
-				"id":                    "amalthea-upstream",
-				"path":                  pathPrefix,
-				"uri":                   fmt.Sprintf("http://127.0.0.1:%d", upstreamPort),
-				"insecureSkipTLSVerify": true,
-				"passHostHeader":        true,
-				"proxyWebSockets":       true,
-			},
-		},
-	}
-	newConfig := map[string]any{
-		"providers": []map[string]any{
-			{
-				"clientID":     "${OIDC_CLIENT_ID}",
-				"clientSecret": "${OIDC_CLIENT_SECRET}",
-				"id":           "amalthea-oidc",
-				"provider":     "oidc",
-				"oidcConfig": map[string]any{
-					"insecureSkipNonce":            false,
-					"issuerURL":                    "${OIDC_ISSUER_URL}",
-					"insecureAllowUnverifiedEmail": "${ALLOW_UNVERIFIED_EMAILS}",
-					"emailClaim":                   "email",
-					"audienceClaims":               []string{"aud"},
+	// Add the 'oidc' configuration if requested
+	if as.Spec.Authentication != nil && as.Spec.Authentication.Type == Oidc {
+		pathPrefix := as.ingressPathPrefix()
+		sessionURL := as.GetURL()
+		pathPrefixURL := url.URL{Host: sessionURL.Host, Path: pathPrefix, Scheme: sessionURL.Scheme}
+		cookieSecret := make([]byte, 32)
+		_, err := rand.Read(cookieSecret)
+		if err != nil {
+			// NOTE: Read cannot panic except for on legacy Linux systems
+			// See: https://pkg.go.dev/crypto/rand#Read
+			panic(err)
+		}
+		oldConfigLines := []string{
+			"session_cookie_minimal = true",
+			"skip_provider_button = true",
+			fmt.Sprintf("redirect_url = \"%s\"", pathPrefixURL.JoinPath("oauth2/callback").String()),
+			fmt.Sprintf("cookie_path = \"%s\"", pathPrefix),
+			fmt.Sprintf("proxy_prefix = \"%soauth2\"", pathPrefix),
+			"authenticated_emails_file = \"/authorized_emails\"",
+			fmt.Sprintf("cookie_secret = \"%s\"", base64.URLEncoding.EncodeToString(cookieSecret)),
+		}
+		upstreamPort := secondProxyPort
+		upstreamConfig := map[string]any{
+			"upstreams": []map[string]any{
+				{
+					"id":                    "amalthea-upstream",
+					"path":                  pathPrefix,
+					"uri":                   fmt.Sprintf("http://127.0.0.1:%d", upstreamPort),
+					"insecureSkipTLSVerify": true,
+					"passHostHeader":        true,
+					"proxyWebSockets":       true,
 				},
 			},
-		},
-		"server": map[string]string{
-			"bindAddress": fmt.Sprintf("0.0.0.0:%d", authenticatedPort),
-		},
-		"upstreamConfig": upstreamConfig,
-	}
-	newConfigStr, err := yaml.Marshal(newConfig)
-	if err != nil {
-		panic(err)
-	}
+		}
+		newConfig := map[string]any{
+			"providers": []map[string]any{
+				{
+					"clientID":     "${OIDC_CLIENT_ID}",
+					"clientSecret": "${OIDC_CLIENT_SECRET}",
+					"id":           "amalthea-oidc",
+					"provider":     "oidc",
+					"oidcConfig": map[string]any{
+						"insecureSkipNonce":            false,
+						"issuerURL":                    "${OIDC_ISSUER_URL}",
+						"insecureAllowUnverifiedEmail": "${ALLOW_UNVERIFIED_EMAILS}",
+						"emailClaim":                   "email",
+						"audienceClaims":               []string{"aud"},
+					},
+				},
+			},
+			"server": map[string]string{
+				"bindAddress": fmt.Sprintf("0.0.0.0:%d", authenticatedPort),
+			},
+			"upstreamConfig": upstreamConfig,
+		}
+		newConfigStr, err := yaml.Marshal(newConfig)
+		if err != nil {
+			panic(err)
+		}
 
-	secret.StringData["oauth2-proxy-alpha-config.yaml"] = string(newConfigStr)
-	secret.StringData["oauth2-proxy-config.yaml"] = strings.Join(oldConfigLines, "\n")
+		secret.StringData["oauth2-proxy-alpha-config.yaml"] = string(newConfigStr)
+		secret.StringData["oauth2-proxy-config.yaml"] = strings.Join(oldConfigLines, "\n")
+	}
 
 	if tunnelSecret != "" {
 		secret.StringData["WSTUNNEL_SECRET"] = tunnelSecret
