@@ -115,7 +115,7 @@ func (dc *DataConnector) ConfigFiles() (map[string][]byte, error) {
 		configFiles["vfsOpt"] = []byte(dc.VfsOpt)
 	}
 	if len(dc.ExtraArgs) > 0 {
-		configFiles["ExtraArgs"] = []byte(strings.Join(dc.ExtraArgs, " "))
+		configFiles["extraArgs"] = []byte(strings.Join(dc.ExtraArgs, " "))
 	}
 
 	return configFiles, err
