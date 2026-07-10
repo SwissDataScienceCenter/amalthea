@@ -82,9 +82,9 @@ type RunaiApi struct {
 }
 
 // NewRunaiApi creates a new RunAI client instance
-func NewRunaiApi(baseURL string, auth auth.RunaiAuth, httpClient *http.Client) (*RunaiApi, error) {
+func NewRunaiApi(baseURL string, runaiAuth auth.RunaiAuth, httpClient *http.Client) (*RunaiApi, error) {
 
-	client := &RunaiApi{BaseURL: baseURL, Auth: auth, HTTPClient: httpClient}
+	client := &RunaiApi{BaseURL: baseURL, Auth: runaiAuth, HTTPClient: httpClient}
 
 	if client.BaseURL == "" {
 		client.BaseURL = "https://api.run.ai"
