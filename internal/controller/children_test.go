@@ -63,81 +63,81 @@ func (c TestClient) List(ctx context.Context, list client.ObjectList, opts ...cl
 
 func TestEventsInferredStateWhereEventsFailed(t *testing.T) {
 	err := fmt.Errorf("not implemented")
-	client := TestClient{
+	clnt := TestClient{
 		listError: &err,
 	}
 	session := v1alpha.AmaltheaSession{}
-	result, errx := EventsInferedState(context.TODO(), &session, client)
+	result, errx := EventsInferedState(context.TODO(), &session, clnt)
 	assert.Contains(t, errx.Error(), "not implemented")
 	assert.Equal(t, EisrNone, result)
 }
 
 func TestEventsInferredStateWhereNoEvents(t *testing.T) {
-	client := TestClient{}
+	clnt := TestClient{}
 	session := v1alpha.AmaltheaSession{}
-	result, err := EventsInferedState(context.TODO(), &session, client)
+	result, err := EventsInferedState(context.TODO(), &session, clnt)
 	assert.Equal(t, EisrNone, result)
 	assert.Nil(t, err)
 }
 
 func TestEventsInferredStateWhereFailedSchedulingFirstTime(t *testing.T) {
-	client := TestClient{
+	clnt := TestClient{
 		listResult: &v1.EventList{Items: []v1.Event{failedSchedulingEvent()}},
 	}
 	session := v1alpha.AmaltheaSession{}
 	assert.True(t, session.Status.FailedSchedulingSince.IsZero())
-	result, err := EventsInferedState(context.TODO(), &session, client)
+	result, err := EventsInferedState(context.TODO(), &session, clnt)
 	assert.Equal(t, EisrInitiallyFailed, result)
 	assert.Nil(t, err)
 }
 
 func TestEventsInferredStateWhereFailedSchedulingWithinTimeout(t *testing.T) {
-	client := TestClient{
+	clnt := TestClient{
 		listResult: &v1.EventList{Items: []v1.Event{failedSchedulingEvent()}},
 	}
 	session := v1alpha.AmaltheaSession{}
 	session.Status.FailedSchedulingSince = metav1.NewTime(time.Now())
 	assert.False(t, session.Status.FailedSchedulingSince.IsZero())
-	result, err := EventsInferedState(context.TODO(), &session, client)
+	result, err := EventsInferedState(context.TODO(), &session, clnt)
 	assert.Equal(t, EisrTemporaryFailed, result)
 	assert.Nil(t, err)
 }
 
 func TestEventsInferredStateWhereFailedSchedulingTimeoutExceeded(t *testing.T) {
-	client := TestClient{
+	clnt := TestClient{
 		listResult: &v1.EventList{Items: []v1.Event{failedSchedulingEvent()}},
 	}
 	session := v1alpha.AmaltheaSession{}
 	time, _ := time.Parse(time.DateTime, "2006-01-02 15:04:05")
 	session.Status.FailedSchedulingSince = metav1.NewTime(time)
 	assert.False(t, session.Status.FailedSchedulingSince.IsZero())
-	result, err := EventsInferedState(context.TODO(), &session, client)
+	result, err := EventsInferedState(context.TODO(), &session, clnt)
 	assert.Equal(t, EisrFinallyFailed, result)
 	assert.Contains(t, err.Error(), "failed scheduling:")
 }
 
 func TestEventsInferredStateWhereScheduled(t *testing.T) {
-	client := TestClient{
+	clnt := TestClient{
 		listResult: &v1.EventList{Items: []v1.Event{scheduledEvent()}},
 	}
 	session := v1alpha.AmaltheaSession{}
-	result, err := EventsInferedState(context.TODO(), &session, client)
+	result, err := EventsInferedState(context.TODO(), &session, clnt)
 	assert.Equal(t, EisrNone, result)
 	assert.Nil(t, err)
 }
 
 func TestEventsInferredStateWhereTriggeredScaleup(t *testing.T) {
-	client := TestClient{
+	clnt := TestClient{
 		listResult: &v1.EventList{Items: []v1.Event{triggeredScaleUpEvent()}},
 	}
 	session := v1alpha.AmaltheaSession{}
-	result, err := EventsInferedState(context.TODO(), &session, client)
+	result, err := EventsInferedState(context.TODO(), &session, clnt)
 	assert.Equal(t, EisrNone, result)
 	assert.Nil(t, err)
 }
 
 func TestEventsInferredStateWhereTriggeredScaleupAfterFailed(t *testing.T) {
-	client := TestClient{
+	clnt := TestClient{
 		listResult: &v1.EventList{Items: []v1.Event{
 			failedSchedulingEvent(),
 			arbitraryEvent(),
@@ -145,13 +145,13 @@ func TestEventsInferredStateWhereTriggeredScaleupAfterFailed(t *testing.T) {
 		}},
 	}
 	session := v1alpha.AmaltheaSession{}
-	result, err := EventsInferedState(context.TODO(), &session, client)
+	result, err := EventsInferedState(context.TODO(), &session, clnt)
 	assert.Equal(t, EisrInitiallyFailed, result)
 	assert.Nil(t, err)
 }
 
 func TestEventsInferredStateWhereFailedAfterScheduled(t *testing.T) {
-	client := TestClient{
+	clnt := TestClient{
 		listResult: &v1.EventList{Items: []v1.Event{
 			scheduledEvent(),
 			arbitraryEvent(),
@@ -161,7 +161,7 @@ func TestEventsInferredStateWhereFailedAfterScheduled(t *testing.T) {
 		}},
 	}
 	session := v1alpha.AmaltheaSession{}
-	result, err := EventsInferedState(context.TODO(), &session, client)
+	result, err := EventsInferedState(context.TODO(), &session, clnt)
 	assert.Equal(t, EisrInitiallyFailed, result)
 	assert.Nil(t, err)
 }

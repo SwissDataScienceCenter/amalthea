@@ -581,12 +581,12 @@ const (
 // - finally failed: if the latest event is FailedScheduling and this has been seen for a while exceeding maximum wait time
 // - auto scheduling: if an TriggeredScaleUp events has been found as the last event
 // - none of the above
-func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, client client.Reader) (EventsInferedStateResult, error) {
+func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, clnt client.Reader) (EventsInferedStateResult, error) {
 	const failedScheduling = "FailedScheduling"
 	const scheduled = "Scheduled"
 	logger := log.FromContext(ctx)
 
-	events, err := cr.GetPodEvents(ctx, client)
+	events, err := cr.GetPodEvents(ctx, clnt)
 	if err != nil {
 		return EisrNone, fmt.Errorf("%v", err)
 	}
