@@ -778,7 +778,7 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		return secret
 	}
 
-	// Skip the 'oidc' configuration if it is not needed
+	// Add the 'oidc' configuration if requested
 	if as.Spec.Authentication != nil && as.Spec.Authentication.Type == Oidc {
 		pathPrefix := as.ingressPathPrefix()
 		sessionURL := as.GetURL()
