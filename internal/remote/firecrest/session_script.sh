@@ -222,6 +222,7 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
         for dc in "${SECRETS_DATA_CONNECTORS_DIR}"/*; do
             n=$(echo ${dc}|sed -e 's,.*-,,')
             mount="$(cat "${dc}/remote")"
+            mountDir="${SESSION_WORK_DIR}/${mount}"
             remotePath="$(cat "${dc}/remotePath")"
             log_file="${LOGS_DIR}/rclone-dc-${n}.log"
             config_file="${dc}/configData"
@@ -248,16 +249,12 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             echo >> "${log_file}"
             echo "--- Starting $(date)" >> "${log_file}"
 
-            mkdir -p "${SESSION_WORK_DIR}/${mount}"
+            mkdir -p "${mountDir}"
             mkdir -p "${CACHE_DIR}/${n}"
 
-            echo "PS: $(ps -u "${USER}" -o pid=,cmd= ; echo $?)"
-            echo "GREP: $(ps -u "${USER}" -o pid=,cmd= | grep "${SESSION_WORK_DIR}/${mount}" | grep -v grep ; echo $?)"
-            echo "SED: $(ps -u "${USER}" -o pid=,cmd= | grep "${SESSION_WORK_DIR}/${mount}" | grep -v grep | sed -e 's,^ *,,' ; echo $?)"
-            rclone_pids=$(ps -u "${USER}" -o pid=,cmd= | grep "${SESSION_WORK_DIR}/${mount}" | grep -v grep | sed -e 's,^ *,,' | cut -d ' ' -f 1)
-            echo "TR: $($rclone_pids ; echo $?)"
-            send_signals KILL ${rclone_pids}
-            echo "send_signals: DONE ; echo $?"
+            # Make sure there is no stale mount, and if so clean it up.
+            fusermount3 -uz "${mountDir}" 2>/dev/null || true
+            sleep 1 # Let the state stabilise before mounting something there
 
             ${rclone} mount \
                 --daemon \
@@ -268,7 +265,7 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
                 --config="${config_file}" \
                 ${extraArgs} \
                 "${mount}:${remotePath}" \
-                "//${SESSION_WORK_DIR}/${mount}"
+                "//${mountDir}"
         done
     )
 fi
@@ -343,19 +340,10 @@ function exit_script() {
     # Make sure we have a valid pid before attempting to kill it
     (test -n "${pid}" && ps "${pid}" > /dev/null && kill -TERM "${pid}") || true
 
-    # kill rclone to unmount DCs, but only the ones of the current session
-    # which we figure out by their log file
-    rclone_pids=$(ps -u "${USER}" -o pid=,cmd= | grep "${LOGS_DIR}/rclone-dc-" | grep -v grep | sed -e 's,^ *,,' | cut -d ' ' -f 1)
-    send_signals TERM ${rclone_pids}
-
-    if [ -n "${rclone_pids}" ]; then
-        sleep 1
-        send_signals KILL ${rclone_pids}
-    fi
-
     # Cleanup Data Source mount points
     if [ -d "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
         for dc in "${SECRETS_DATA_CONNECTORS_DIR}"/*; do
+            fusermount3 -uz "${SESSION_WORK_DIR}/$(cat "${dc}/remote")" 2>/dev/null || true
             rmdir "${SESSION_WORK_DIR}/$(cat "${dc}/remote")" || true
         done
     fi
