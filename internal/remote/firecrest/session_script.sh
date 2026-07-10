@@ -256,8 +256,12 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             fusermount3 -uz "${mountDir}" 2>/dev/null || true
             sleep 1 # Let the state stabilise before mounting something there
 
+            # We do our best to make sure we do not leave around bad rclone
+            # state, but sometimes there is still something lingering on...
+            # so we have to add --allow-non-empty.
             ${rclone} mount \
                 --daemon \
+                --allow-non-empty \
                 ${mountOptions} \
                 --log-file="${log_file}" \
                 --cache-dir="${CACHE_DIR}/$n" \
