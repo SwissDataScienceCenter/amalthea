@@ -57,6 +57,8 @@ func readCloseOutput(out io.Reader, errOut io.Reader) (string, string, error) {
 }
 
 func TestVersion(t *testing.T) {
+	// The package documentation shows it like that
+	//revive:disable-next-line:import-shadowing
 	assert := assert.New(t)
 	stdoutBuf := bytes.NewBufferString("")
 	stderrBuf := bytes.NewBufferString("")
@@ -74,6 +76,8 @@ func TestVersion(t *testing.T) {
 }
 
 func TestBasicAPI(t *testing.T) {
+	// The package documentation shows it like that
+	//revive:disable-next-line:import-shadowing
 	assert := assert.New(t)
 	cmd := buildCommands()
 	cmd.SetArgs([]string{"notexist", "test", "--help"})
