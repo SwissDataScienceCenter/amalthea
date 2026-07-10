@@ -64,6 +64,12 @@ const freshContainerMinimalAge = 15 * time.Second
 
 const maxWaitForClearFailedScheduling = 10 * time.Minute
 
+// Return whether the session is failed or hibernated
+func isFailedOrHibernated(as *amaltheadevv1alpha1.AmaltheaSession) bool {
+	return as.Status.State == amaltheadevv1alpha1.Failed ||
+		as.Status.State == amaltheadevv1alpha1.Hibernated
+}
+
 func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
 	logger := log.FromContext(ctx)
 	if c.Current == nil {
@@ -90,7 +96,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !isFailedOrHibernated(cr) {
 					return nil
 				}
 				fallthrough
@@ -145,7 +151,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !isFailedOrHibernated(cr) {
 					return nil
 				}
 				fallthrough
@@ -181,7 +187,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !isFailedOrHibernated(cr) {
 					return nil
 				}
 				fallthrough
@@ -233,7 +239,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !isFailedOrHibernated(cr) {
 					return nil
 				}
 				fallthrough
@@ -270,7 +276,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !isFailedOrHibernated(cr) {
 					return nil
 				}
 				fallthrough
@@ -348,7 +354,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !isFailedOrHibernated(cr) {
 					return nil
 				}
 				fallthrough
