@@ -1130,15 +1130,15 @@ func findConflicts(destination, source map[string]string) []string {
 
 // Creates a map of labels from the given session spec. A new allocated map is returned.
 func (cr *AmaltheaSession) childLabels() map[string]string {
-	labels := map[string]string{}
-	maps.Copy(labels, cr.Spec.Template.Metadata.Labels)
+	sessionLabels := map[string]string{}
+	maps.Copy(sessionLabels, cr.Spec.Template.Metadata.Labels)
 	selectorLabels := selectorLabels(cr.Name)
-	conflicts := findConflicts(labels, selectorLabels)
+	conflicts := findConflicts(sessionLabels, selectorLabels)
 	if len(conflicts) > 0 {
 		log.Log.Info(
 			"Found conflicts in template labels and selector labels, the selector labels will take precedence",
 			"template labels",
-			labels,
+			sessionLabels,
 			"selector labels",
 			selectorLabels,
 			"conflicting keys",
@@ -1147,6 +1147,6 @@ func (cr *AmaltheaSession) childLabels() map[string]string {
 	}
 	// NOTE: stuff from selectorLabels will overwrite conflicts in labels (if there are any)
 	// This is the desired behaviour, we do not want to overwrite the selector labels.
-	maps.Copy(labels, selectorLabels)
-	return labels
+	maps.Copy(sessionLabels, selectorLabels)
+	return sessionLabels
 }
