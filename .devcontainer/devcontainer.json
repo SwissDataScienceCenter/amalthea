@@ -22,7 +22,7 @@
 			"minikube": "none"
 		},
 		"ghcr.io/dhoeric/features/k9s:1": {
-			"version": "0.50.18"
+			"version": "0.51.0"
 		},
 		"ghcr.io/devcontainers/features/python:1": {},
 		"./fix-yarnpkg": {}
