@@ -105,7 +105,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Labels = desired.Labels
 				current.Annotations = desired.Annotations
 			default:
-				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile ingress with unknown strategy %s", strategy)
 			}
 			return nil
 		})
@@ -165,7 +165,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Spec.Template.Labels = desired.Spec.Template.Labels
 				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
 			default:
-				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile ingress with unknown strategy %s", strategy)
 			}
 			return nil
 		})
@@ -217,7 +217,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 					current.Annotations[key] = preservedAnnotations[key]
 				}
 			default:
-				return fmt.Errorf("attempting to reconcile PVC with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile PVC with unknown strategy %s", strategy)
 			}
 			return nil
 		})
@@ -249,7 +249,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Labels = desired.Labels
 				current.Annotations = desired.Annotations
 			default:
-				return fmt.Errorf("attempting to reconcile service with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile service with unknown strategy %s", strategy)
 			}
 			return nil
 		})
@@ -296,7 +296,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Labels = desired.Labels
 				current.Annotations = desired.Annotations
 			default:
-				return fmt.Errorf("attempting to reconcile secret with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile secret with unknown strategy %s", strategy)
 			}
 			return nil
 		})
@@ -366,7 +366,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Annotations = desired.Annotations
 				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
 			default:
-				return fmt.Errorf("attempting to reconcile batchjob with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile batchjob with unknown strategy %s", strategy)
 			}
 			return nil
 		})
@@ -376,7 +376,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 		return ChildResourceUpdate[T]{c.Current, res, err, statusCallback}
 
 	default:
-		return ChildResourceUpdate[T]{Error: fmt.Errorf("encountered an uknown child resource type")}
+		return ChildResourceUpdate[T]{Error: fmt.Errorf("encountered an unknown child resource type")}
 	}
 }
 
@@ -579,7 +579,7 @@ const (
 // the latest first, if an event occurs that indicates a scale-up or a
 // scheduled reason, then it is considered non-failing. If the first
 // event encountered is a "FailedScheduling" reason, then it indicates
-// a failure iff this state has occurred for a pre-defined period.
+// a failure if this state has occurred for a pre-defined period.
 //
 // Returns one of:
 // - initially failed: if the latest event is FailedScheduling and none of these has been seen before
@@ -889,7 +889,7 @@ func (c ChildResourceUpdates) Status(
 
 	c.statusCallback(&status)
 
-	// Used for debugging to ensure the reconcile loop does not needlessly reschdule or update child resources
+	// Used for debugging to ensure the reconcile loop does not needlessly reschedule or update child resources
 	// logger.Info("Update summary", "Ingress", c.Ingress.UpdateResult, "StatefulSet", c.StatefulSet.UpdateResult, "PVC", c.StatefulSet.UpdateResult, "Service", c.Service.UpdateResult)
 
 	return status

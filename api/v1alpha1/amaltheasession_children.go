@@ -870,7 +870,7 @@ func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, 
 		if err != nil {
 			log.Log.Error(
 				err,
-				"Error rewritting image, using original value",
+				"Error rewriting image, using original value",
 				"image",
 				session.Image,
 			)
@@ -1116,7 +1116,7 @@ func (cr *AmaltheaSession) tunnelContainer() v1.Container {
 	return tunnelContainer
 }
 
-// findConflicst will return all the keys from source that can be found in desintation.
+// findConflicst will return all the keys from source that can be found in destination.
 func findConflicts(destination, source map[string]string) []string {
 	conflicts := []string{}
 	for srcKey := range source {

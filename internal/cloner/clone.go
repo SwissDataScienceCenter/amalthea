@@ -147,7 +147,7 @@ func clone(cmd *cobra.Command, args []string) {
 		if cloneFonfig.PrivateKey != nil {
 			publicKeys, err := ssh.NewPublicKeys("git", []byte(*cloneFonfig.PrivateKey), cloneFonfig.Password)
 			if err != nil {
-				log.Fatal("generate publickeys failed: ", err)
+				log.Fatal("generate public keys failed: ", err)
 			}
 			cloneOptions.Auth = publicKeys
 		} else if cloneFonfig.Username != nil {
