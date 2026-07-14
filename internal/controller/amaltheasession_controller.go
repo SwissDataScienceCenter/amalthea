@@ -116,6 +116,8 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		transaction.Status = sentry.SpanStatusInternalError
 		hub.CaptureException(err)
 	}
+	// SA1019: although deprecated, examples are still using Requeue
+	//nolint:staticcheck
 	transaction.SetData("controller.result.requeue", res.Requeue || res.RequeueAfter > 0)
 	if res.RequeueAfter != 0 {
 		transaction.SetData("controller.result.requeue_after", res.RequeueAfter)
