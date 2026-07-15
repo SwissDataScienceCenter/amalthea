@@ -161,6 +161,68 @@ var _ = Describe("AmaltheaSession Controller", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 		})
+
+		It("should not touch well known labels/annotations", func(ctx SpecContext) {
+			// Run reconcile once to start
+			controllerReconciler := newReconciler()
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Adding new labels and annotations
+			newLabels := map[string]string{
+				"renku.io/test":                "newLabel",
+				"app.kubernetes.io/created-by": "other-manager",
+				"app.kubernetes.io/name":       "other-name",
+			}
+			expectedLabels := map[string]string{
+				"renku.io/test":                "newLabel",
+				"app.kubernetes.io/created-by": "controller-manager",
+				"app.kubernetes.io/name":       "AmaltheaSession",
+			}
+
+			// Adding well-known annotations to simulate the system doing it
+			// These annotations are reserved and shall not be set/modified
+			// by other components
+			newAnnotations := map[string]string{
+				"renku.io/test": "newAnnotation",
+				"applyset.kubernetes.io/additional-namespaces":       "namespace1,namespace2",
+				"kube-scheduler-simulator.sigs.k8s.io/selected-node": "testnode",
+			}
+			expectedAnnotations := map[string]string{
+				"renku.io/test": "newAnnotation",
+				"applyset.kubernetes.io/additional-namespaces":       "namespace1,namespace2",
+				"kube-scheduler-simulator.sigs.k8s.io/selected-node": "testnode",
+			}
+
+			newSession0 := amaltheasession.DeepCopy()
+			newSession0.Spec.Template.Metadata.Labels = newLabels
+			newSession0.Spec.Template.Metadata.Annotations = newAnnotations
+			newSession0.Spec.ReconcileStrategy = amaltheadevv1alpha1.Always
+			err = k8sClient.Patch(ctx, newSession0, client.MergeFrom(amaltheasession))
+			Expect(err).NotTo(HaveOccurred())
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			childrenMetadataCheck(ctx, k8sClient, typeNamespacedName, expectedLabels, expectedAnnotations, false)
+
+			// Altering well-known annotations should fail
+			newAnnotations = map[string]string{
+				"applyset.kubernetes.io/additional-namespaces":       "namespace3,namespace4",
+				"kube-scheduler-simulator.sigs.k8s.io/selected-node": "other-node",
+			}
+
+			newSession0.Spec.Template.Metadata.Annotations = newAnnotations
+			err = k8sClient.Patch(ctx, newSession0, client.MergeFrom(amaltheasession))
+			Expect(err).NotTo(HaveOccurred())
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			childrenMetadataCheck(ctx, k8sClient, typeNamespacedName, expectedLabels, expectedAnnotations, false)
+		})
 	})
 
 	Context("When reconciling a resource without ingress", func() {
