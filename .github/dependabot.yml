@@ -9,6 +9,7 @@ updates:
         patterns:
           - "*"
     ignore:
+      # Versions set by operator-sdk 1.42.3 when creating a project
       - dependency-name: "github.com/onsi/ginkgo/v2"
         update-types:
           - "version-update:semver-major"
@@ -17,11 +18,19 @@ updates:
         update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
+      - dependency-name: "k8s.io/api"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
       - dependency-name: "k8s.io/apimachinery"
         update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
       - dependency-name: "k8s.io/client-go"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "k8s.io/metrics"
         update-types:
           - "version-update:semver-major"
           - "version-update:semver-minor"
