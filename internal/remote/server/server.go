@@ -52,13 +52,13 @@ func Start() {
 	}
 	slog.Info("using remote kind", "kind", cfg.RemoteKind)
 
-	controller, err := controller.NewRemoteSessionController(cfg)
+	rsController, err := controller.NewRemoteSessionController(cfg)
 	if err != nil {
-		slog.Error("failed to create controller", "error", err)
+		slog.Error("failed to create remote session controller", "error", err)
 		os.Exit(1)
 	}
 
-	server := newServer(controller, cfg)
+	server := newServer(rsController, cfg)
 
 	address := fmt.Sprintf(":%d", cfg.ServerPort)
 
@@ -74,7 +74,7 @@ func Start() {
 	slog.Info(fmt.Sprintf("http server started on %s", address))
 
 	// Start the remote session
-	err = controller.Start(ctx)
+	err = rsController.Start(ctx)
 	if err != nil {
 		slog.Error("could not start session", "error", err)
 		os.Exit(1)
@@ -85,7 +85,7 @@ func Start() {
 	slog.Info("shutting down the server", "reason", ctx.Err())
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	if err := controller.Stop(ctx); err != nil {
+	if err := rsController.Stop(ctx); err != nil {
 		slog.Error("cancelling the remote job failed", "error", err)
 	}
 	if err := server.Shutdown(ctx); err != nil {
@@ -97,7 +97,7 @@ func Start() {
 var logLevel *slog.LevelVar = new(slog.LevelVar)
 var jsonLogger *slog.Logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 
-func newServer(controller controller.RemoteSessionController, cfg config.RemoteSessionControllerConfig) (server *echo.Echo) {
+func newServer(rsController controller.RemoteSessionController, cfg config.RemoteSessionControllerConfig) (server *echo.Echo) {
 	e := echo.New()
 
 	e.HideBanner = true
@@ -163,7 +163,7 @@ func newServer(controller controller.RemoteSessionController, cfg config.RemoteS
 
 	// Status endpoint
 	e.GET("/status", func(c echo.Context) error {
-		status, err := controller.Status(c.Request().Context())
+		status, err := rsController.Status(c.Request().Context())
 		if err == nil && status == models.Running {
 			return c.JSON(http.StatusOK, statusResponse{
 				Status: status,

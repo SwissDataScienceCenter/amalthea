@@ -8,6 +8,27 @@ updates:
       go:
         patterns:
           - "*"
+    ignore:
+      - dependency-name: "github.com/onsi/ginkgo/v2"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "github.com/onsi/gomega"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "k8s.io/apimachinery"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "k8s.io/client-go"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "sigs.k8s.io/controller-runtime"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:

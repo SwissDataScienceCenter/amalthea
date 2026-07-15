@@ -46,9 +46,9 @@ func NewFirecrestClient(apiURL *url.URL, options ...FirecrestClientOption) (fc *
 
 type FirecrestClientOption func(*FirecrestClient) error
 
-func WithAuth(auth auth.FirecrestAuth) FirecrestClientOption {
+func WithAuth(fcAuth auth.FirecrestAuth) FirecrestClientOption {
 	return func(fc *FirecrestClient) error {
-		fc.auth = auth
+		fc.auth = fcAuth
 		return nil
 	}
 }

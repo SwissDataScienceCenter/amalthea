@@ -4,6 +4,7 @@ run:
 linters:
   default: none
   enable:
+    - copyloopvar
     - dupl
     - errcheck
     - ginkgolinter
@@ -24,6 +25,7 @@ linters:
     revive:
       rules:
         - name: comment-spacings
+        - name: import-shadowing
   exclusions:
     generated: lax
     rules:
@@ -34,13 +36,6 @@ linters:
           - dupl
           - lll
         path: internal/*
-      - linters:
-          - staticcheck
-        path: test/*
-        text: "ST1001:"
-      - linters:
-          - staticcheck
-        text: "QF1001:"
     paths:
       - third_party$
       - builtin$

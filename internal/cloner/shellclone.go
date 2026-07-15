@@ -67,7 +67,7 @@ func loadRepositories(config CloneConfig) []Repository {
 			log.Fatal("failed to parse", repository.URL, err)
 		}
 		splittedRepo := strings.FieldsFunc(endpoint.Path, func(c rune) bool { return c == '/' }) // FieldsFunc handles repeated and beginning/ending separator characters more sanely than Split
-		if !(len(splittedRepo) > 0) {
+		if len(splittedRepo) == 0 {
 			log.Fatal("expecting repo in url path, received: ", endpoint.Path)
 		}
 		projectName := splittedRepo[len(splittedRepo)-1]

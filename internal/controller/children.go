@@ -64,8 +64,14 @@ const freshContainerMinimalAge = 15 * time.Second
 
 const maxWaitForClearFailedScheduling = 10 * time.Minute
 
+// Return whether the session is failed or hibernated
+func isFailedOrHibernated(as *amaltheadevv1alpha1.AmaltheaSession) bool {
+	return as.Status.State == amaltheadevv1alpha1.Failed ||
+		as.Status.State == amaltheadevv1alpha1.Hibernated
+}
+
 func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 	if c.Current == nil {
 		return ChildResourceUpdate[T]{}
 	}
@@ -80,7 +86,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating an ingress")
+				logger.Info("Creating an ingress")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
@@ -90,7 +96,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !isFailedOrHibernated(cr) {
 					return nil
 				}
 				fallthrough
@@ -99,7 +105,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Labels = desired.Labels
 				current.Annotations = desired.Annotations
 			default:
-				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile ingress with unknown strategy %s", strategy)
 			}
 			return nil
 		})
@@ -112,7 +118,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a statefulset")
+				logger.Info("Creating a statefulset")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
@@ -145,7 +151,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !isFailedOrHibernated(cr) {
 					return nil
 				}
 				fallthrough
@@ -159,7 +165,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Spec.Template.Labels = desired.Spec.Template.Labels
 				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
 			default:
-				return fmt.Errorf("attempting to reconcile ingress with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile ingress with unknown strategy %s", strategy)
 			}
 			return nil
 		})
@@ -171,7 +177,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a PVC")
+				logger.Info("Creating a PVC")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
@@ -181,7 +187,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !isFailedOrHibernated(cr) {
 					return nil
 				}
 				fallthrough
@@ -211,7 +217,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 					current.Annotations[key] = preservedAnnotations[key]
 				}
 			default:
-				return fmt.Errorf("attempting to reconcile PVC with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile PVC with unknown strategy %s", strategy)
 			}
 			return nil
 		})
@@ -223,7 +229,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a service")
+				logger.Info("Creating a service")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
@@ -233,7 +239,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !isFailedOrHibernated(cr) {
 					return nil
 				}
 				fallthrough
@@ -243,7 +249,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Labels = desired.Labels
 				current.Annotations = desired.Annotations
 			default:
-				return fmt.Errorf("attempting to reconcile service with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile service with unknown strategy %s", strategy)
 			}
 			return nil
 		})
@@ -259,7 +265,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				return fmt.Errorf("could not cast when reconciling")
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a secret")
+				logger.Info("Creating a secret")
 				current.Data = desired.Data
 				current.StringData = desired.StringData
 				current.ObjectMeta = desired.ObjectMeta
@@ -270,7 +276,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !isFailedOrHibernated(cr) {
 					return nil
 				}
 				fallthrough
@@ -290,7 +296,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Labels = desired.Labels
 				current.Annotations = desired.Annotations
 			default:
-				return fmt.Errorf("attempting to reconcile secret with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile secret with unknown strategy %s", strategy)
 			}
 			return nil
 		})
@@ -304,16 +310,16 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			}
 			// finished jobs are not updated
 			if jobIsFinished(current.Status) {
-				log.Info("Job is terminated, not reconciling", "job", current.Name)
+				logger.Info("Job is terminated, not reconciling", "job", current.Name)
 				return nil
 			}
 			if current.CreationTimestamp.IsZero() {
-				log.Info("Creating a Job", "job", desired.Spec)
+				logger.Info("Creating a Job", "job", desired.Spec)
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
 				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
 				if err != nil {
-					log.Error(err, "Error setting controller reference")
+					logger.Error(err, "Error setting controller reference")
 				}
 				return err
 			}
@@ -348,7 +354,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Never:
 				return nil
 			case amaltheadevv1alpha1.WhenFailedOrHibernated:
-				if !(cr.Status.State == amaltheadevv1alpha1.Failed || cr.Status.State == amaltheadevv1alpha1.Hibernated) {
+				if !isFailedOrHibernated(cr) {
 					return nil
 				}
 				fallthrough
@@ -360,17 +366,17 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Annotations = desired.Annotations
 				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
 			default:
-				return fmt.Errorf("attempting to reconcile batchjob with unknown stategy %s", strategy)
+				return fmt.Errorf("attempting to reconcile batchjob with unknown strategy %s", strategy)
 			}
 			return nil
 		})
 		if err != nil {
-			log.Error(err, "Error reconciling Job")
+			logger.Error(err, "Error reconciling Job")
 		}
 		return ChildResourceUpdate[T]{c.Current, res, err, statusCallback}
 
 	default:
-		return ChildResourceUpdate[T]{Error: fmt.Errorf("encountered an uknown child resource type")}
+		return ChildResourceUpdate[T]{Error: fmt.Errorf("encountered an unknown child resource type")}
 	}
 }
 
@@ -420,12 +426,12 @@ func NewNonInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cf
 	return output, nil
 }
 
-func NewInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, config config.AmaltheaSessionConfiguration) (ChildResources, error) {
+func NewInteractiveChildResources(cr *amaltheadevv1alpha1.AmaltheaSession, cfg config.AmaltheaSessionConfiguration) (ChildResources, error) {
 	metadata := metav1.ObjectMeta{Name: cr.Name, Namespace: cr.Namespace}
 	secretMetadata := metav1.ObjectMeta{Name: cr.InternalSecretName(), Namespace: cr.Namespace}
 	desiredService := cr.Service()
 	desiredPVC := cr.PVC()
-	desiredStatefulSet, err := cr.StatefulSet(config)
+	desiredStatefulSet, err := cr.StatefulSet(cfg)
 	if err != nil {
 		return ChildResources{}, err
 	}
@@ -581,12 +587,12 @@ const (
 // - finally failed: if the latest event is FailedScheduling and this has been seen for a while exceeding maximum wait time
 // - auto scheduling: if an TriggeredScaleUp events has been found as the last event
 // - none of the above
-func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, client client.Reader) (EventsInferedStateResult, error) {
+func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, clnt client.Reader) (EventsInferedStateResult, error) {
 	const failedScheduling = "FailedScheduling"
 	const scheduled = "Scheduled"
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
-	events, err := cr.GetPodEvents(ctx, client)
+	events, err := cr.GetPodEvents(ctx, clnt)
 	if err != nil {
 		return EisrNone, fmt.Errorf("%v", err)
 	}
@@ -612,19 +618,19 @@ func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSes
 	scheduledTime := getEventTime(scheduledEvent)
 	failedSchedulingTime := getEventTime(failedSchedulingEvent)
 	if !scheduledTime.IsZero() && scheduledTime.After(failedSchedulingTime.Time) {
-		log.Info("Found Scheduled event", "event", scheduledEvent)
+		logger.Info("Found Scheduled event", "event", scheduledEvent)
 		return EisrScheduled, nil
 	}
 	if failedSchedulingEvent != nil {
 		if cr.Status.FailedSchedulingSince.IsZero() {
-			log.Info("Found FailedScheduling event, initially failing", "event", failedSchedulingEvent.Message)
+			logger.Info("Found FailedScheduling event, initially failing", "event", failedSchedulingEvent.Message)
 			return EisrInitiallyFailed, nil
 		} else {
 			if waitedTime >= maxWaitForClearFailedScheduling {
-				log.Info("Found FailedScheduling event, finally failing", "waited", waitedTime)
+				logger.Info("Found FailedScheduling event, finally failing", "waited", waitedTime)
 				return EisrFinallyFailed, fmt.Errorf("failed scheduling: %s", failedSchedulingEvent.Message)
 			} else {
-				log.Info("Found FailedScheduling event, temporary failing", "event", failedSchedulingEvent.Message, "waiting", waitedTime)
+				logger.Info("Found FailedScheduling event, temporary failing", "event", failedSchedulingEvent.Message, "waiting", waitedTime)
 				return EisrTemporaryFailed, nil
 			}
 		}
@@ -731,7 +737,7 @@ func checkEventsInferedState(ctx context.Context,
 	var err error
 	nextState := currentState
 	if currentState == amaltheadevv1alpha1.NotReady {
-		log := log.FromContext(ctx)
+		logger := log.FromContext(ctx)
 		var result EventsInferedStateResult
 		result, err = EventsInferedState(ctx, cr, r.Client)
 		switch result {
@@ -746,7 +752,7 @@ func checkEventsInferedState(ctx context.Context,
 
 		default:
 			if err != nil {
-				log.Error(err, "Error obtaining state from pod events")
+				logger.Error(err, "Error obtaining state from pod events")
 			}
 		}
 	}
@@ -759,20 +765,20 @@ func (c ChildResourceUpdates) Status(
 	r *AmaltheaSessionReconciler,
 	cr *amaltheadevv1alpha1.AmaltheaSession,
 ) amaltheadevv1alpha1.AmaltheaSessionStatus {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
 	pod, err := cr.GetPod(ctx, r.Client)
 	if err != nil {
 		pod = nil
 		if !apierrors.IsNotFound(err) {
-			log.Error(err, "Could not read the session pod when updating the status")
+			logger.Error(err, "Could not read the session pod when updating the status")
 		}
 	}
 	job, err := cr.GetJob(ctx, r.Client)
 	if err != nil {
 		job = nil
 		if !apierrors.IsNotFound(err) {
-			log.Error(err, "Could not read the session job when updating the status")
+			logger.Error(err, "Could not read the session job when updating the status")
 		}
 	}
 
@@ -826,7 +832,7 @@ func (c ChildResourceUpdates) Status(
 				}
 			}
 		} else {
-			log.Error(err, "couldn't list events")
+			logger.Error(err, "couldn't list events")
 		}
 	}
 
@@ -848,7 +854,7 @@ func (c ChildResourceUpdates) Status(
 		failingSince = metav1.Time{}
 	}
 
-	hibernationDate := calculateHibernationDate(log, cr.GetCreationTimestamp(), cr.Status, cr.Spec.Culling)
+	hibernationDate := calculateHibernationDate(logger, cr.GetCreationTimestamp(), cr.Status, cr.Spec.Culling)
 
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
 		Conditions:            Conditions(state, ctx, r, cr),
@@ -883,8 +889,8 @@ func (c ChildResourceUpdates) Status(
 
 	c.statusCallback(&status)
 
-	// Used for debugging to ensure the reconcile loop does not needlessly reschdule or update child resources
-	// log.Info("Update summary", "Ingress", c.Ingress.UpdateResult, "StatefulSet", c.StatefulSet.UpdateResult, "PVC", c.StatefulSet.UpdateResult, "Service", c.Service.UpdateResult)
+	// Used for debugging to ensure the reconcile loop does not needlessly reschedule or update child resources
+	// logger.Info("Update summary", "Ingress", c.Ingress.UpdateResult, "StatefulSet", c.StatefulSet.UpdateResult, "PVC", c.StatefulSet.UpdateResult, "Service", c.Service.UpdateResult)
 
 	return status
 }

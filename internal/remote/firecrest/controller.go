@@ -514,10 +514,10 @@ func (c *FirecrestRemoteSessionController) uploadFile(ctx context.Context, direc
 	return nil
 }
 
-func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path string, createParents bool) error {
+func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, srcPath string, createParents bool) error {
 	body := PostMakeDirRequest{
 		Parent:     &createParents,
-		SourcePath: &path,
+		SourcePath: &srcPath,
 	}
 	res, err := c.client.PostMkdirFilesystemSystemNameOpsMkdirPostWithResponse(ctx, c.systemName, body)
 	if err != nil {
@@ -533,10 +533,10 @@ func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, path strin
 	return nil
 }
 
-func (c *FirecrestRemoteSessionController) chmod(ctx context.Context, path string, mode string) error {
+func (c *FirecrestRemoteSessionController) chmod(ctx context.Context, srcPath string, mode string) error {
 	body := PutFileChmodRequest{
 		Mode:       mode,
-		SourcePath: &path,
+		SourcePath: &srcPath,
 	}
 	res, err := c.client.PutChmodFilesystemSystemNameOpsChmodPutWithResponse(ctx, c.systemName, body)
 	if err != nil {
