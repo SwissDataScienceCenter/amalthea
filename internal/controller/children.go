@@ -123,6 +123,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
 					status.FailingSince = metav1.Time{}
+					status.FailedSchedulingSince = metav1.Time{}
 					status.HibernatedSince = metav1.Time{}
 				}
 			}
@@ -131,6 +132,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
 					status.FailingSince = metav1.Time{}
+					status.FailedSchedulingSince = metav1.Time{}
 					status.HibernatedSince = metav1.Now()
 				}
 			}
@@ -322,6 +324,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
 					status.FailingSince = metav1.Time{}
+					status.FailedSchedulingSince = metav1.Time{}
 					status.HibernatedSince = metav1.Time{}
 				}
 			}
@@ -330,6 +333,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				statusCallback = func(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 					status.IdleSince = metav1.Time{}
 					status.FailingSince = metav1.Time{}
+					status.FailedSchedulingSince = metav1.Time{}
 					status.HibernatedSince = metav1.Now()
 				}
 			}
@@ -561,6 +565,7 @@ const (
 	EisrInitiallyFailed EventsInferedStateResult = "Initially Failed"
 	EisrTemporaryFailed EventsInferedStateResult = "Temporary Failed"
 	EisrFinallyFailed   EventsInferedStateResult = "Finally Failed"
+	EisrScheduled       EventsInferedStateResult = "Scheduled"
 )
 
 // eventsInferedFailure looks into the events of the session pod to
@@ -578,6 +583,7 @@ const (
 // - none of the above
 func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, client client.Reader) (EventsInferedStateResult, error) {
 	const failedScheduling = "FailedScheduling"
+	const scheduled = "Scheduled"
 	log := log.FromContext(ctx)
 
 	events, err := cr.GetPodEvents(ctx, client)
@@ -593,19 +599,33 @@ func EventsInferedState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSes
 		waitedTime = time.Since(cr.Status.FailedSchedulingSince.Time)
 	}
 
+	var scheduledEvent *v1.Event = nil
+	var failedSchedulingEvent *v1.Event = nil
 	for _, v := range events.Items {
+		if v.Reason == scheduled {
+			scheduledEvent = &v
+		}
 		if v.Reason == failedScheduling {
-			if cr.Status.FailedSchedulingSince.IsZero() {
-				log.Info("Found FailedScheduling event, initially failing", "event", v.Message)
-				return EisrInitiallyFailed, nil
+			failedSchedulingEvent = &v
+		}
+	}
+	scheduledTime := getEventTime(scheduledEvent)
+	failedSchedulingTime := getEventTime(failedSchedulingEvent)
+	if !scheduledTime.IsZero() && scheduledTime.After(failedSchedulingTime.Time) {
+		log.Info("Found Scheduled event", "event", scheduledEvent)
+		return EisrScheduled, nil
+	}
+	if failedSchedulingEvent != nil {
+		if cr.Status.FailedSchedulingSince.IsZero() {
+			log.Info("Found FailedScheduling event, initially failing", "event", failedSchedulingEvent.Message)
+			return EisrInitiallyFailed, nil
+		} else {
+			if waitedTime >= maxWaitForClearFailedScheduling {
+				log.Info("Found FailedScheduling event, finally failing", "waited", waitedTime)
+				return EisrFinallyFailed, fmt.Errorf("failed scheduling: %s", failedSchedulingEvent.Message)
 			} else {
-				if waitedTime >= maxWaitForClearFailedScheduling {
-					log.Info("Found FailedScheduling event, finally failing", "waited", waitedTime)
-					return EisrFinallyFailed, fmt.Errorf("failed scheduling: %s", v.Message)
-				} else {
-					log.Info("Found FailedScheduling event, temporary failing", "event", v.Message, "waiting", waitedTime)
-					return EisrTemporaryFailed, nil
-				}
+				log.Info("Found FailedScheduling event, temporary failing", "event", failedSchedulingEvent.Message, "waiting", waitedTime)
+				return EisrTemporaryFailed, nil
 			}
 		}
 	}
@@ -704,7 +724,8 @@ func (c ChildResourceUpdates) statusCallback(status *amaltheadevv1alpha1.Amalthe
 
 func checkEventsInferedState(ctx context.Context,
 	r *AmaltheaSessionReconciler,
-	cr *amaltheadevv1alpha1.AmaltheaSession, currentState amaltheadevv1alpha1.State) (metav1.Time, amaltheadevv1alpha1.State, error) {
+	cr *amaltheadevv1alpha1.AmaltheaSession, currentState amaltheadevv1alpha1.State,
+) (metav1.Time, amaltheadevv1alpha1.State, error) {
 
 	failedSchedulingSince := cr.Status.FailedSchedulingSince
 	var err error
@@ -719,6 +740,9 @@ func checkEventsInferedState(ctx context.Context,
 
 		case EisrInitiallyFailed:
 			failedSchedulingSince = metav1.NewTime(time.Now())
+
+		case EisrScheduled:
+			failedSchedulingSince = metav1.NewTime(time.Time{})
 
 		default:
 			if err != nil {
@@ -820,7 +844,7 @@ func (c ChildResourceUpdates) Status(
 	if failing && failingSince.IsZero() {
 		failingSince = metav1.NewTime(time.Now())
 	}
-	if !hibernated && !failingSince.IsZero() {
+	if !failing && !failingSince.IsZero() {
 		failingSince = metav1.Time{}
 	}
 
@@ -851,6 +875,10 @@ func (c ChildResourceUpdates) Status(
 	if state == amaltheadevv1alpha1.Hibernated || cr.DeletionTimestamp != nil {
 		status.ContainerCounts.Ready = 0
 		status.InitContainerCounts.Ready = 0
+	}
+
+	if state == amaltheadevv1alpha1.Hibernated || state == amaltheadevv1alpha1.Running || state == amaltheadevv1alpha1.Succeeded {
+		status.FailedSchedulingSince = metav1.Time{}
 	}
 
 	c.statusCallback(&status)
@@ -886,4 +914,20 @@ func (c ChildResourceUpdates) combineErrors() error {
 		return nil
 	}
 	return fmt.Errorf("error in reconciling children %s", strings.Join(errorMsgs, ", "))
+}
+
+func getEventTime(event *v1.Event) metav1.Time {
+	if event == nil {
+		return metav1.Time{}
+	}
+	if !event.LastTimestamp.IsZero() {
+		return event.LastTimestamp
+	}
+	if !event.EventTime.IsZero() {
+		return metav1.Time(event.EventTime)
+	}
+	if !event.FirstTimestamp.IsZero() {
+		return event.FirstTimestamp
+	}
+	return metav1.Time{}
 }
