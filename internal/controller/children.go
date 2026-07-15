@@ -75,19 +75,22 @@ func isFailedOrHibernated(as *amaltheadevv1alpha1.AmaltheaSession) bool {
 // Reference: https://kubernetes.io/docs/reference/labels-annotations-taints/
 func cleanWellKnown(current map[string]string, desired map[string]string) map[string]string {
 	preserved := map[string]string{}
-	for key := range current {
+	for key, value := range current {
 		domain, _, _ := strings.Cut(key, "/")
 		if domain == "kubernetes.io" || domain == "k8s.io" || strings.HasSuffix(domain, ".kubernetes.io") ||
 			strings.HasSuffix(domain, ".k8s.io") {
-			preserved[key] = current[key]
+			preserved[key] = value
 		}
 	}
 
-	clean := desired
-	for key := range preserved {
-		clean[key] = preserved[key]
+	clean := map[string]string{}
+	for key, value := range desired {
+		clean[key] = value
 	}
 
+	for key, value := range preserved {
+		clean[key] = value
+	}
 	return clean
 }
 
