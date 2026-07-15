@@ -579,7 +579,7 @@ const (
 // the latest first, if an event occurs that indicates a scale-up or a
 // scheduled reason, then it is considered non-failing. If the first
 // event encountered is a "FailedScheduling" reason, then it indicates
-// a failure if this state has occurred for a pre-defined period.
+// a failure iff this state has occurred for a pre-defined period.
 //
 // Returns one of:
 // - initially failed: if the latest event is FailedScheduling and none of these has been seen before
