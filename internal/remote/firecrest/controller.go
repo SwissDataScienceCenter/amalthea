@@ -182,6 +182,10 @@ func (c *FirecrestRemoteSessionController) uploadSecrets(ctx context.Context, re
 //
 //nolint:gocyclo // TODO: can we break down session start?
 func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
+	// Please note:
+	// * local*Path: A path on the current system
+	// * remote*Path: A path on the remote firecrest system
+
 	// Start a go routine to update the session status
 	go c.periodicSessionStatus(ctx)
 
@@ -224,8 +228,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 	slog.Info("got username", "username", userName)
 
-	scratch := getPreferredScratch(system.FileSystems)
-	if scratch == nil {
+	remoteScratch := getPreferredScratch(system.FileSystems)
+	if remoteScratch == nil {
 		return fmt.Errorf("could not find scratch file system on '%s'", c.systemName)
 	}
 
@@ -240,51 +244,51 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		slog.Warn("RENKU_BASE_URL_PATH is not defined", "defaultValue", renkuBaseURLPath)
 	}
 
-	scratchPathRenku := path.Join(scratch.Path, userName, "renku")
-	sessionPath := path.Join(scratchPathRenku, "sessions", renkuProjectPath, strings.TrimPrefix(renkuBaseURLPath, "/sessions"))
+	remoteRenkuPath := path.Join(remoteScratch.Path, userName, "renku")
+	remoteSessionPath := path.Join(remoteRenkuPath, "sessions", renkuProjectPath, strings.TrimPrefix(renkuBaseURLPath, "/sessions"))
 
-	slog.Info("determined session path", "sessionPath", sessionPath)
+	slog.Info("determined session path", "sessionPath", remoteSessionPath)
 
 	// Setup secrets
-	secretsPath := path.Join(sessionPath, "secrets")
-	err = c.mkdir(startCtx, secretsPath, true /* createParents */)
+	remoteSecretsPath := path.Join(remoteSessionPath, "secrets")
+	err = c.mkdir(startCtx, remoteSecretsPath, true /* createParents */)
 	if err != nil {
 		return err
 	}
 	// Makes sure that only the session owner can read session files
-	err = c.chmod(startCtx, sessionPath, "700")
+	err = c.chmod(startCtx, remoteSessionPath, "700")
 	if err != nil {
 		return err
 	}
 	// TODO: get wstunnel_secret as a config value
 	wstunnel_secret := os.Getenv("RSC_WSTUNNEL_SECRET")
 	if wstunnel_secret != "" {
-		err = c.uploadFile(startCtx, secretsPath, "wstunnel_secret", []byte(wstunnel_secret))
+		err = c.uploadFile(startCtx, remoteSecretsPath, "wstunnel_secret", []byte(wstunnel_secret))
 		if err != nil {
 			return err
 		}
-		err = c.chmod(startCtx, path.Join(secretsPath, "wstunnel_secret"), "400")
+		err = c.chmod(startCtx, path.Join(remoteSecretsPath, "wstunnel_secret"), "400")
 		if err != nil {
 			return err
 		}
 	}
-	// Upload user secrets into secretsPath
-	userSecretsPath := path.Join(secretsPath, "user")
-	err = c.uploadSecrets(startCtx, userSecretsPath)
+	// Upload user secrets
+	remoteUserSecretsPath := path.Join(remoteSecretsPath, "user")
+	err = c.uploadSecrets(startCtx, remoteUserSecretsPath)
 	if err != nil {
 		return err
 	}
 
 	// Setup git repositories
-	renkuWorkDir := os.Getenv("RENKU_WORKING_DIR")
-	gitRepositories, err := c.collectGitRepositories(startCtx, renkuWorkDir)
+	localRenkuWorkDir := os.Getenv("RENKU_WORKING_DIR")
+	gitRepositories, err := c.collectGitRepositories(startCtx, localRenkuWorkDir)
 	if err != nil {
 		return err
 	}
 	slog.Info("collected git repositories", "gitRepositories", gitRepositories)
 	for repo := range gitRepositories {
-		repoGitDirPath := path.Join(sessionPath, "work", repo, ".git")
-		err = c.mkdir(startCtx, repoGitDirPath, true /* createParents */)
+		remoteGitRepoPath := path.Join(remoteSessionPath, "work", repo, ".git")
+		err = c.mkdir(startCtx, remoteGitRepoPath, true /* createParents */)
 		if err != nil {
 			return err
 		}
@@ -292,7 +296,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		err = c.uploadFile(startCtx, repoGitDirPath, "config", gitConfigContents)
+		err = c.uploadFile(startCtx, remoteGitRepoPath, "config", gitConfigContents)
 		if err != nil {
 			return err
 		}
@@ -352,8 +356,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
 	// Upload the session script
-	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, userSecretsPath)
-	err = c.uploadFile(ctx, sessionPath, "session_script.sh", []byte(sessionScriptFinal))
+	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, remoteUserSecretsPath)
+	err = c.uploadFile(ctx, remoteSessionPath, "session_script.sh", []byte(sessionScriptFinal))
 	if err != nil {
 		return err
 	}
@@ -365,8 +369,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 	job := JobDescriptionModel{
 		Env:              &jobEnv,
-		ScriptPath:       ptr.To(path.Join(sessionPath, "session_script.sh")),
-		WorkingDirectory: sessionPath,
+		ScriptPath:       ptr.To(path.Join(remoteSessionPath, "session_script.sh")),
+		WorkingDirectory: remoteSessionPath,
 	}
 	// The slurm account can be set by the user as an environment variable
 	slurmAccount := os.Getenv("USER_ENV_SLURM_ACCOUNT")
