@@ -188,7 +188,7 @@ func serve(cmd *cobra.Command, args []string) {
 	}
 
 	rs := NewStats()
-	proxyMWs := []echo.MiddlewareFunc{middleware.Logger(), rs.Process}
+	proxyMWs := []echo.MiddlewareFunc{middleware.RequestLogger(), rs.Process}
 
 	if len(token) > 0 {
 		keyLookup := fmt.Sprintf("cookie:%v,header:Authorization", cookieKey)
