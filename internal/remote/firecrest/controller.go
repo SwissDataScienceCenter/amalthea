@@ -756,14 +756,14 @@ func (c *FirecrestRemoteSessionController) getCurrentStatus(ctx context.Context)
 	return state, nil
 }
 
-func (c *FirecrestRemoteSessionController) renderSessionScript(sessionScript string, fileSystems *[]FileSystem, nodeSecretsPath, containerSecretsPath string) string {
-	return renderSessionScriptStatic(sessionScript, c.partition, fileSystems, nodeSecretsPath, containerSecretsPath)
+func (c *FirecrestRemoteSessionController) renderSessionScript(sessionScript string, fileSystems *[]FileSystem, remoteSecretsPath, containerSecretsPath string) string {
+	return renderSessionScriptStatic(sessionScript, c.partition, fileSystems, remoteSecretsPath, containerSecretsPath)
 }
 
-func renderSessionScriptStatic(sessionScript, partition string, fileSystems *[]FileSystem, nodeSecretsPath, containerSecretsPath string) string {
+func renderSessionScriptStatic(sessionScript, partition string, fileSystems *[]FileSystem, remoteSecretsPath, containerSecretsPath string) string {
 	sessionScriptFinal := removeMaintainersNotesFromScript(sessionScript)
 	sessionScriptFinal = addSbatchDirectivesToScript(sessionScriptFinal, partition)
-	sessionScriptFinal = addSessionMountsToScript(sessionScriptFinal, fileSystems, nodeSecretsPath, containerSecretsPath)
+	sessionScriptFinal = addSessionMountsToScript(sessionScriptFinal, fileSystems, remoteSecretsPath, containerSecretsPath)
 	return sessionScriptFinal
 }
 
@@ -788,7 +788,7 @@ func addSbatchDirectivesToScript(sessionScript, partition string) string {
 	return strings.Replace(sessionScript, "#{{SBATCH_DIRECTIVES_PLACEHOLDER}}", directivesStr, 1)
 }
 
-func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, nodeSecretPath, containerSecretPath string) string {
+func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, remoteSecretPath, containerSecretPath string) string {
 	if fileSystems == nil {
 		return strings.Replace(sessionScript, "#{{SESSION_MOUNTS_PLACEHOLDER}}", "", 1)
 	}
@@ -808,8 +808,8 @@ func addSessionMountsToScript(sessionScript string, fileSystems *[]FileSystem, n
 	}
 
 	// Add the secrets mount
-	if nodeSecretPath != "" && containerSecretPath != "" {
-		mounts = append(mounts, fmt.Sprintf("%s:%s:ro", nodeSecretPath, containerSecretPath))
+	if remoteSecretPath != "" && containerSecretPath != "" {
+		mounts = append(mounts, fmt.Sprintf("%s:%s:ro", remoteSecretPath, containerSecretPath))
 	}
 
 	// Format mount list
