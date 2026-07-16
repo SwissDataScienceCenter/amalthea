@@ -453,7 +453,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	env["GIT_PROXY_HEALTH_PORT"] = fmt.Sprintf("%d", 65481) // git proxy port
 
 	// Upload the session script
-	// We mirror the RENKU_SECRETS_PATH in the proxy and container final container, as it contains the user secrets, at
+	// We mirror the RENKU_SECRETS_PATH in the proxy and final containers, as it contains the user secrets, at
 	// the user secrets location (configurable by end-user)
 	sessionScriptFinal := c.renderSessionScript(sessionScript, system.FileSystems, remoteUserSecretsPath, localSecretsPath)
 	err = c.uploadFile(startCtx, remoteSessionPath, "session_script.sh", []byte(sessionScriptFinal))
