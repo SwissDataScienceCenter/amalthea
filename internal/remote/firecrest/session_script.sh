@@ -57,20 +57,6 @@ rmdir "${SESSION_DIR}/secrets"
 # Load the wstunnel secret
 export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
 
-# Send the given signal to the listed PIDs
-#
-# Usage:
-#     send_signals $SIGNAL $pid_list
-function send_signals() {
-    local signal=${1:?"send_signals: missing signal name"}
-    shift
-    local pids=${@}
-
-    echo ${pids} | while read pid; do
-        (test -n "${pid}" && kill  -${signal} "${pid}") || true
-    done
-}
-
 # CamelCase to kebab-case conversion
 #
 # Usage:
@@ -216,14 +202,14 @@ srun_param_mounts=#{{SESSION_MOUNTS_PLACEHOLDER}}
 # We cannot generate directly the local secrets path from the proxy as the final path is only known after ${SECRETS_DIR} as been set.
 srun_param_mounts=$(echo ${srun_param_mounts} | sed -e "s,${SESSION_DIR}/secrets,${SECRETS_DIR},g")
 
-# Mount DataSources, if any
+# Mount Data Connectors, if any
 if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
     (# Run in a sub shell to scope the temporary variables
         for dc in "${SECRETS_DATA_CONNECTORS_DIR}"/*; do
             n=$(echo ${dc}|sed -e 's,.*-,,')
             mount="$(cat "${dc}/remote")"
-            mountDir="${SESSION_WORK_DIR}/${mount}"
-            remotePath="$(cat "${dc}/remotePath")"
+            mount_point="${SESSION_WORK_DIR}/${mount}"
+            remote_path="$(cat "${dc}/remotePath")"
             log_file="${LOGS_DIR}/rclone-dc-${n}.log"
             config_file="${dc}/configData"
             pass="${dc}/pass"
@@ -235,25 +221,25 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             fi
 
             if [ -f "${dc}/vfsOpt" ]; then
-                vfsOptions="$(to_rclone_mount_arguments "${dc}/vfsOpt" "--vfs")"
+                vfs_options="$(to_rclone_mount_arguments "${dc}/vfsOpt" "--vfs")"
             fi
 
             if [ -f "${dc}/mountOpt" ]; then
-                mountOptions="$(to_rclone_mount_arguments "${dc}/mountOpt" "-")"
+                mount_options="$(to_rclone_mount_arguments "${dc}/mountOpt" "-")"
             fi
 
             if [ -f "${dc}/extraArgs" ]; then
-                extraArgs="$(cat "${dc}/extraArgs")"
+                extra_args="$(cat "${dc}/extraArgs")"
             fi
 
             echo >> "${log_file}"
             echo "--- Starting $(date)" >> "${log_file}"
 
-            mkdir -p "${mountDir}"
+            mkdir -p "${mount_point}"
             mkdir -p "${CACHE_DIR}/${n}"
 
             # Make sure there is no stale mount, and if so clean it up.
-            fusermount3 -uz "${mountDir}" 2>/dev/null || true
+            fusermount3 -uz "${mount_point}" 2>/dev/null || true
             sleep 1 # Let the state stabilise before mounting something there
 
             # We do our best to make sure we do not leave around bad rclone
@@ -262,14 +248,14 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             ${rclone} mount \
                 --daemon \
                 --allow-non-empty \
-                ${mountOptions} \
+                ${mount_options} \
                 --log-file="${log_file}" \
                 --cache-dir="${CACHE_DIR}/$n" \
-                ${vfsOptions} \
+                ${vfs_options} \
                 --config="${config_file}" \
-                ${extraArgs} \
-                "${mount}:${remotePath}" \
-                "//${mountDir}"
+                ${extra_args} \
+                "${mount}:${remote_path}" \
+                "//${mount_point}"
         done
     )
 fi
@@ -344,7 +330,7 @@ function exit_script() {
     # Make sure we have a valid pid before attempting to kill it
     (test -n "${pid}" && ps "${pid}" > /dev/null && kill -TERM "${pid}") || true
 
-    # Cleanup Data Source mount points
+    # Cleanup Data Connector mount points
     if [ -d "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
         for dc in "${SECRETS_DATA_CONNECTORS_DIR}"/*; do
             fusermount3 -uz "${SESSION_WORK_DIR}/$(cat "${dc}/remote")" 2>/dev/null || true
