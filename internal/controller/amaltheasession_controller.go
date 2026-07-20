@@ -259,6 +259,8 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 	if statusChanged {
 		// If the status is evolving we should requeue faster
 		requeueAfter = 0
+	} else if !amaltheasession.Status.HibernatedSince.IsZero() {
+		requeueAfter = time.Duration(amaltheasession.Spec.Culling.MaxHibernatedDuration.Nanoseconds())
 	}
 	return ctrl.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
 }
