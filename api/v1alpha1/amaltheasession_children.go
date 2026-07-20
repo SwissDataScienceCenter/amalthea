@@ -218,7 +218,7 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 		return appsv1.StatefulSet{}, err
 	}
 
-	labels := cr.childLabels()
+	stsLabels := cr.childLabels()
 	annotations := map[string]string{}
 	for key := range cr.Spec.Template.Metadata.Annotations {
 		annotations[key] = cr.Spec.Template.Metadata.Annotations[key]
@@ -236,7 +236,7 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cr.Name,
 			Namespace:   cr.Namespace,
-			Labels:      labels,
+			Labels:      stsLabels,
 			Annotations: annotations,
 		},
 		Spec: appsv1.StatefulSetSpec{
@@ -249,7 +249,7 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      labels,
+					Labels:      stsLabels,
 					Annotations: annotations,
 				},
 				Spec: *pod,
