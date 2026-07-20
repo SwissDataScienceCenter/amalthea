@@ -229,7 +229,7 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 	}
 	uid := string(cr.GetUID())
 	if uid != "" {
-		annotations["renku.io/launch_id"] = uid
+		annotations["renku.io/session_uid"] = uid
 	}
 
 	sts := appsv1.StatefulSet{
