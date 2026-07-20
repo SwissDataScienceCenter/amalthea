@@ -19,7 +19,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - uses: azure/setup-helm@v4.2.0
+      - uses: azure/setup-helm@v5.0.1
       - name: Publish chart and push images
         id: publish-chart
         env:
