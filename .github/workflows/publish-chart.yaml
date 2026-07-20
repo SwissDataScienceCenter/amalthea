@@ -12,14 +12,14 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/')"
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: 3.12
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - uses: azure/setup-helm@v4.2.0
+      - uses: azure/setup-helm@v5.0.1
       - name: Publish chart and push images
         id: publish-chart
         env:
