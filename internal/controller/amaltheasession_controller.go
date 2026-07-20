@@ -117,6 +117,8 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		transaction.Status = sentry.SpanStatusInternalError
 		hub.CaptureException(err)
 	}
+	// SA1019: although deprecated, examples are still using Requeue
+	//nolint:staticcheck
 	transaction.SetData("controller.result.requeue", res.Requeue || res.RequeueAfter > 0)
 	if res.RequeueAfter != 0 {
 		transaction.SetData("controller.result.requeue_after", res.RequeueAfter)
@@ -125,7 +127,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
 	amaltheasession := &amaltheadevv1alpha1.AmaltheaSession{}
 	err := r.Get(ctx, req.NamespacedName, amaltheasession)
@@ -133,11 +135,11 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		if apierrors.IsNotFound(err) {
 			// If the custom resource is not found then, it usually means that it was deleted or not created
 			// In this way, we will stop the reconciliation
-			log.Info("amaltheasession resource not found. Ignoring since object must be deleted")
+			logger.Info("amaltheasession resource not found. Ignoring since object must be deleted")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get amaltheasession")
+		logger.Error(err, "Failed to get amaltheasession")
 		return ctrl.Result{}, err
 	}
 
@@ -213,7 +215,7 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 
 	children, err := NewChildResources(amaltheasession, r.Configuration)
 	if err != nil {
-		log.Error(
+		logger.Error(
 			err,
 			"There was an error in generating the Kubernetes resources based on AmaltheaSession specification. Please report this with the Renku developers.",
 			"name",
@@ -226,7 +228,7 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 
 	updates, err := children.Reconcile(ctx, r.Client, amaltheasession)
 	if err != nil {
-		log.Error(err, "Failed when reconciling children")
+		logger.Error(err, "Failed when reconciling children")
 		return ctrl.Result{}, err
 	}
 
@@ -259,7 +261,7 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		// Clean up metrics for this session before deleting it
 		RemoveAmaltheaSessionMetrics(amaltheasession)
 		err = r.Delete(ctx, amaltheasession)
-		log.Info("custom resource deleted")
+		logger.Info("custom resource deleted")
 		return ctrl.Result{}, err
 	}
 
@@ -280,8 +282,8 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession) error {
 	adoptedSecrets := cr.AdoptedSecrets()
 	if len(adoptedSecrets.Items) == 0 {
-		log := log.FromContext(ctx)
-		log.Info("Secret deletion finalizer called without any secret adopted, doing nothing")
+		logger := log.FromContext(ctx)
+		logger.Info("Secret deletion finalizer called without any secret adopted, doing nothing")
 		return nil
 	}
 

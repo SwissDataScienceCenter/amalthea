@@ -20,7 +20,7 @@ jobs:
           runCmd: |
             make lint && \
             make test && \
-            make test-e2e && \
+            make test-e2e KIND_CLUSTER=kind && \
             helm dep update helm-chart/amalthea-sessions && \
             helm lint helm-chart/amalthea-sessions
           push: never

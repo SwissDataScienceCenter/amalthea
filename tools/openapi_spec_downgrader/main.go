@@ -53,7 +53,7 @@ func run(cmd *cobra.Command, args []string) {
 		log.Fatalln(err)
 	}
 	doc := map[string]any{}
-	err = yaml.Unmarshal(contents, &doc)
+	_, err = yaml.Unmarshal(contents, &doc, yaml.DecodeOpts{})
 	if err != nil {
 		log.Fatalln(err)
 	}

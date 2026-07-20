@@ -37,7 +37,7 @@ func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, a
 	}
 
 	status := amaltheasession.Status
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 	if !amaltheasession.Spec.Hibernated {
 		hibernationDate := status.WillHibernateAt
 		if status.State != amaltheadevv1alpha1.Hibernated && needsScaleDown(hibernationDate) {
@@ -46,7 +46,7 @@ func updateHibernationState(ctx context.Context, r *AmaltheaSessionReconciler, a
 			if err != nil {
 				return err
 			}
-			log.Info("statefulSet scaled down")
+			logger.Info("statefulSet scaled down")
 		}
 	}
 	return nil
@@ -98,7 +98,7 @@ func hibernationDateByIdleSince(status amaltheadevv1alpha1.AmaltheaSessionStatus
 	return metav1.Time{}
 }
 
-func calculateHibernationDate(log logr.Logger, creationTimestamp metav1.Time, status amaltheadevv1alpha1.AmaltheaSessionStatus, culling amaltheadevv1alpha1.Culling) metav1.Time {
+func calculateHibernationDate(logger logr.Logger, creationTimestamp metav1.Time, status amaltheadevv1alpha1.AmaltheaSessionStatus, culling amaltheadevv1alpha1.Culling) metav1.Time {
 	type Pair struct {
 		Name string
 		Date metav1.Time
@@ -126,7 +126,7 @@ func calculateHibernationDate(log logr.Logger, creationTimestamp metav1.Time, st
 	} else {
 		logMsg += fmt.Sprint(" => ", result.Name, ":", result.Date)
 	}
-	log.Info("hibernationDate", "DecisionLog", strings.TrimSpace(logMsg))
+	logger.Info("hibernationDate", "DecisionLog", strings.TrimSpace(logMsg))
 	return result.Date
 }
 

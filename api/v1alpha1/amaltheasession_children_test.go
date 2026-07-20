@@ -33,20 +33,20 @@ func (c TestClient) List(ctx context.Context, list client.ObjectList, opts ...cl
 }
 
 func TestGetPodEventsNoEvents(t *testing.T) {
-	client := TestClient{}
+	clnt := TestClient{}
 	session := AmaltheaSession{}
-	res, err := session.GetPodEvents(context.TODO(), client)
+	res, err := session.GetPodEvents(context.TODO(), clnt)
 	assert.Nil(t, err)
 	assert.Equal(t, *res, v1.EventList{})
 }
 
 func TestGetPodEventsWithError(t *testing.T) {
 	err := fmt.Errorf("oopsies")
-	client := TestClient{
+	clnt := TestClient{
 		listError: &err,
 	}
 	session := AmaltheaSession{}
-	_, err = session.GetPodEvents(context.TODO(), client)
+	_, err = session.GetPodEvents(context.TODO(), clnt)
 	assert.NotNil(t, err)
 }
 
@@ -56,11 +56,11 @@ func TestGetPodEventsSorted(t *testing.T) {
 	ev2 := v1.Event{Reason: "blup", EventTime: metav1.MicroTime(ref)}
 	ev3 := v1.Event{Reason: "foo", FirstTimestamp: metav1.NewTime(ref.AddDate(0, -1, 0))}
 	events := []v1.Event{ev1, ev2, ev3}
-	client := TestClient{
+	clnt := TestClient{
 		listResult: &v1.EventList{Items: events},
 	}
 	session := AmaltheaSession{}
-	res, err := session.GetPodEvents(context.TODO(), client)
+	res, err := session.GetPodEvents(context.TODO(), clnt)
 	assert.Nil(t, err)
 	assert.Equal(t, res.Items, []v1.Event{ev3, ev2, ev1})
 }

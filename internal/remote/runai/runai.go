@@ -51,9 +51,9 @@ func NewRunaiClient(baseUrl *url.URL, options ...RunaiClientOption) (rc *RunaiCl
 
 type RunaiClientOption func(*RunaiClient) error
 
-func WithAuth(auth auth.RunaiAuth) RunaiClientOption {
+func WithAuth(runaiAuth auth.RunaiAuth) RunaiClientOption {
 	return func(rc *RunaiClient) error {
-		rc.auth = auth
+		rc.auth = runaiAuth
 		return nil
 	}
 }

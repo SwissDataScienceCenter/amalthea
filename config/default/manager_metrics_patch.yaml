@@ -2,7 +2,3 @@
 - op: add
   path: /spec/template/spec/containers/0/args/0
   value: --metrics-bind-address=:8443
-# This patch adds the args to allow securing the metrics endpoint
-- op: add
-  path: /spec/template/spec/containers/0/args/0
-  value: --metrics-secure

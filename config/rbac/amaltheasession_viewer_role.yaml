@@ -1,13 +1,15 @@
-# permissions for end users to view amaltheasessions.
+# This rule is not used by the project amalthea itself.
+# It is provided to allow the cluster admin to help manage permissions for users.
+#
+# Grants read-only access to amalthea.dev resources.
+# This role is intended for users who need visibility into these resources
+# without permissions to modify them. It is ideal for monitoring purposes and limited-access viewing.
+
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: amaltheasession-viewer-role
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: amalthea
-    app.kubernetes.io/part-of: amalthea
+    app.kubernetes.io/name: amalthea
     app.kubernetes.io/managed-by: kustomize
   name: amaltheasession-viewer-role
 rules:
