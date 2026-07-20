@@ -517,7 +517,7 @@ func (c *FirecrestRemoteSessionController) uploadFile(ctx context.Context, direc
 func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, srcPath string, createParents bool) error {
 	body := PostMakeDirRequest{
 		Parent:     &createParents,
-		SourcePath: &srcPath,
+		SourcePath: srcPath,
 	}
 	res, err := c.client.PostMkdirFilesystemSystemNameOpsMkdirPostWithResponse(ctx, c.systemName, body)
 	if err != nil {
@@ -536,7 +536,7 @@ func (c *FirecrestRemoteSessionController) mkdir(ctx context.Context, srcPath st
 func (c *FirecrestRemoteSessionController) chmod(ctx context.Context, srcPath string, mode string) error {
 	body := PutFileChmodRequest{
 		Mode:       mode,
-		SourcePath: &srcPath,
+		SourcePath: srcPath,
 	}
 	res, err := c.client.PutChmodFilesystemSystemNameOpsChmodPutWithResponse(ctx, c.systemName, body)
 	if err != nil {
