@@ -19,6 +19,7 @@ require (
 	github.com/oapi-codegen/oapi-codegen/v2 v2.8.0
 	github.com/oapi-codegen/runtime v1.6.0
 	github.com/oasdiff/yaml v0.1.1
+	github.com/oklog/ulid/v2 v2.1.1
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/prometheus/client_golang v1.24.0
