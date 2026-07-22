@@ -7,7 +7,7 @@ tool fybrik.io/crdoc
 require (
 	github.com/distribution/reference v0.6.0
 	github.com/elazarl/goproxy v1.8.5
-	github.com/getkin/kin-openapi v0.142.0
+	github.com/getkin/kin-openapi v0.143.0
 	github.com/getsentry/sentry-go v0.48.0
 	github.com/go-git/go-git/v5 v5.19.1
 	github.com/go-logr/logr v1.4.4
