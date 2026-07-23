@@ -202,6 +202,7 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 	}
 
 	children, err := NewChildResources(amaltheasession, r.Configuration)
+
 	if err != nil {
 		logger.Error(
 			err,
@@ -260,7 +261,11 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		// If the status is evolving we should requeue faster
 		requeueAfter = 0
 	}
-	return ctrl.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
+
+	if requeueAfter > 0 {
+		return ctrl.Result{RequeueAfter: requeueAfter}, nil
+	}
+	return ctrl.Result{Requeue: true}, nil
 }
 
 func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession) error {
