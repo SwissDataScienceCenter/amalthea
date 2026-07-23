@@ -101,6 +101,13 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 	}
 	switch current := any(c.Current).(type) {
 	case *networkingv1.Ingress:
+		if cr.Spec.Hibernated {
+			err := clnt.Delete(ctx, current)
+			if apierrors.IsNotFound(err) {
+				return ChildResourceUpdate[T]{c.Current, controllerutil.OperationResultNone, nil, nil}
+			}
+			return ChildResourceUpdate[T]{c.Current, "deleted", err, nil}
+		}
 		res, err := controllerutil.CreateOrPatch(ctx, clnt, current, func() error {
 			// NOTE: the callback function  in CreateOrPatch will load the
 			// state of the object referenced from k8s, then run the callback to update
