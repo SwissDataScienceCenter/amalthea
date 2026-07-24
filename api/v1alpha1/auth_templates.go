@@ -85,7 +85,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 					"cpu":    resource.MustParse("20m"),
 				},
 				Limits: v1.ResourceList{
-					"memory": resource.MustParse("32Mi"),
+					"memory": resource.MustParse("16Mi"),
 					// NOTE: Cpu limit not set on purpose
 					// Without cpu limit if there is spare you can go over the request
 					// If there is no spare cpu then all things get throttled relative to their request
@@ -204,7 +204,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 					"cpu":    resource.MustParse("20m"),
 				},
 				Limits: v1.ResourceList{
-					"memory": resource.MustParse("32Mi"),
+					"memory": resource.MustParse("16Mi"),
 					// NOTE: Cpu limit not set on purpose
 					// Without cpu limit if there is spare you can go over the request
 					// If there is no spare cpu then all things get throttled relative to their request
@@ -260,7 +260,7 @@ func (as *AmaltheaSession) get_rewrite_authn_proxy(listenPort int32, metaListenP
 				"cpu":    resource.MustParse("20m"),
 			},
 			Limits: v1.ResourceList{
-				"memory": resource.MustParse("32Mi"),
+				"memory": resource.MustParse("16Mi"),
 				// NOTE: Cpu limit not set on purpose
 				// Without cpu limit if there is spare you can go over the request
 				// If there is no spare cpu then all things get throttled relative to their request
