@@ -33,6 +33,7 @@ import (
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
@@ -332,6 +333,7 @@ func GetK8sClient(ctx context.Context, namespace string) (client.Client, error) 
 						&amaltheadevv1alpha1.AmaltheaSession{},
 						&corev1.Pod{},
 						&corev1.Event{},
+						&networkingv1.Ingress{},
 					},
 				},
 			},
