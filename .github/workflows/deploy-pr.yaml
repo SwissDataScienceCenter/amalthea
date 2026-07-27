@@ -52,7 +52,7 @@ jobs:
     #   url: https://renku-ci-am-${{ github.event.number }}.dev.renku.ch
     steps:
       - name: Checkout renku repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: SwissDataScienceCenter/renku
           sparse-checkout: |
