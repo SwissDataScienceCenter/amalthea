@@ -52,14 +52,14 @@ jobs:
     #   url: https://renku-ci-am-${{ github.event.number }}.dev.renku.ch
     steps:
       - name: Checkout renku repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: SwissDataScienceCenter/renku
           sparse-checkout: |
             minimal-deployment
 
       - name: Find deplyoment url
-        uses: peter-evans/find-comment@v3
+        uses: peter-evans/find-comment@v4
         id: deploymentUrlMessage
         with:
           issue-number: ${{ github.event.pull_request.number }}
@@ -68,7 +68,7 @@ jobs:
 
       - name: Create comment deployment url
         if: steps.deploymentUrlMessage.outputs.comment-id == 0
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@v5
         with:
           token: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
@@ -83,7 +83,7 @@ jobs:
           subscription-id: ${{ secrets.CI_RENKU_AZURE_SUBSCRIPTION_ID }}
 
       - name: Set AKS context
-        uses: azure/aks-set-context@v4
+        uses: azure/aks-set-context@v5
         with:
           resource-group: "renku-dev"
           cluster-name: "aks-switzerlandnorth-renku-dev"
@@ -180,7 +180,7 @@ jobs:
       id-token: write
     steps:
       - name: Find deplyoment url
-        uses: peter-evans/find-comment@v3
+        uses: peter-evans/find-comment@v4
         id: deploymentUrlMessage
         with:
           issue-number: ${{ github.event.pull_request.number }}
@@ -189,7 +189,7 @@ jobs:
 
       - name: Create comment deployment url
         if: steps.deploymentUrlMessage.outputs.comment-id == 0
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@v5
         with:
           token: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
@@ -204,7 +204,7 @@ jobs:
           subscription-id: ${{ secrets.CI_RENKU_AZURE_SUBSCRIPTION_ID }}
 
       - name: Set AKS context
-        uses: azure/aks-set-context@v4
+        uses: azure/aks-set-context@v5
         with:
           resource-group: "renku-dev"
           cluster-name: "aks-switzerlandnorth-renku-dev"
