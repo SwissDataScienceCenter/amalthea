@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -63,4 +64,64 @@ func TestGetPodEventsSorted(t *testing.T) {
 	res, err := session.GetPodEvents(context.TODO(), clnt)
 	assert.Nil(t, err)
 	assert.Equal(t, res.Items, []v1.Event{ev3, ev2, ev1})
+}
+
+func TestSessionContainerRemoteResources(t *testing.T) {
+	cases := []struct {
+		name string
+		reqs v1.ResourceList
+		lims v1.ResourceList
+		cpu  string
+		mem  string
+		gpus string
+	}{
+		{
+			name: "requests",
+			reqs: v1.ResourceList{
+				v1.ResourceCPU:                    resource.MustParse("1500m"),
+				v1.ResourceMemory:                 resource.MustParse("2Gi"),
+				v1.ResourceName("nvidia.com/gpu"): resource.MustParse("2"),
+				v1.ResourceName("amd.com/gpu"):    resource.MustParse("3"),
+			},
+			cpu:  "2",
+			mem:  "2048",
+			gpus: "5",
+		},
+		{
+			name: "limits fallback",
+			lims: v1.ResourceList{
+				v1.ResourceCPU:                    resource.MustParse("2500m"),
+				v1.ResourceMemory:                 resource.MustParse("3Gi"),
+				v1.ResourceName("nvidia.com/gpu"): resource.MustParse("4"),
+			},
+			cpu:  "3",
+			mem:  "3072",
+			gpus: "4",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cr := &AmaltheaSession{
+				Spec: AmaltheaSessionSpec{
+					SessionLocation: Remote,
+					Session: Session{
+						Image:     "my-image",
+						Resources: v1.ResourceRequirements{Requests: tc.reqs, Limits: tc.lims},
+					},
+				},
+			}
+
+			container := cr.sessionContainerRemote(nil)
+
+			envMap := make(map[string]string)
+			for _, e := range container.Env {
+				envMap[e.Name] = e.Value
+			}
+
+			assert.Equal(t, tc.cpu, envMap["RSC_SESSION_CPU"])
+			assert.Equal(t, tc.mem, envMap["RSC_SESSION_MEMORY"])
+			assert.Equal(t, tc.gpus, envMap["RSC_SESSION_GPUS"])
+		})
+	}
 }
