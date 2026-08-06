@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1045,6 +1046,46 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 				}),
 			}),
 		},
+	)
+
+	resources := session.Resources
+
+	var cpuValue, memoryValue, gpuValue string
+
+	if cpuQ, ok := resources.Requests[v1.ResourceCPU]; ok && !cpuQ.IsZero() {
+		cpuValue = strconv.FormatInt((cpuQ.MilliValue()+999)/1000, 10)
+	} else if cpuQ, ok := resources.Limits[v1.ResourceCPU]; ok && !cpuQ.IsZero() {
+		cpuValue = strconv.FormatInt((cpuQ.MilliValue()+999)/1000, 10)
+	}
+
+	if memQ, ok := resources.Requests[v1.ResourceMemory]; ok && !memQ.IsZero() {
+		memoryValue = strconv.FormatInt(memQ.Value()/(1024*1024), 10)
+	} else if memQ, ok := resources.Limits[v1.ResourceMemory]; ok && !memQ.IsZero() {
+		memoryValue = strconv.FormatInt(memQ.Value()/(1024*1024), 10)
+	}
+
+	var gpuCount int64
+	for name, q := range resources.Requests {
+		if strings.HasSuffix(string(name), "/gpu") {
+			gpuCount += q.Value()
+		}
+	}
+	if gpuCount == 0 {
+		for name, q := range resources.Limits {
+			if strings.HasSuffix(string(name), "/gpu") {
+				gpuCount += q.Value()
+			}
+		}
+	}
+	if gpuCount > 0 {
+		gpuValue = strconv.FormatInt(gpuCount, 10)
+	}
+
+	sessionContainer.Env = append(
+		sessionContainer.Env,
+		v1.EnvVar{Name: "RSC_SESSION_CPU", Value: cpuValue},
+		v1.EnvVar{Name: "RSC_SESSION_MEMORY", Value: memoryValue},
+		v1.EnvVar{Name: "RSC_SESSION_GPUS", Value: gpuValue},
 	)
 
 	if session.RemoteSecretRef != nil {
