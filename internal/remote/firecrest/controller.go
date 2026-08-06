@@ -757,6 +757,19 @@ func addSbatchDirectivesToScript(sessionScript, partition string) string {
 	if slurmAccount != "" {
 		directives = append(directives, fmt.Sprintf("#SBATCH --account=%s", slurmAccount))
 	}
+
+	if os.Getenv("RSC_FIRECREST_IGNORE_RESOURCE_CLASS_VALUES") != "true" {
+		if cpu := os.Getenv("RSC_SESSION_CPU"); cpu != "" {
+			directives = append(directives, fmt.Sprintf("#SBATCH --cpus-per-task=%s", cpu))
+		}
+		if mem := os.Getenv("RSC_SESSION_MEMORY"); mem != "" {
+			directives = append(directives, fmt.Sprintf("#SBATCH --mem=%sM", mem))
+		}
+		if gpus := os.Getenv("RSC_SESSION_GPUS"); gpus != "" {
+			directives = append(directives, fmt.Sprintf("#SBATCH --gpus=%s", gpus))
+		}
+	}
+
 	directivesStr := strings.Join(directives, "\n")
 	return strings.Replace(sessionScript, "#{{SBATCH_DIRECTIVES_PLACEHOLDER}}", directivesStr, 1)
 }
