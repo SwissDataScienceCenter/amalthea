@@ -81,11 +81,10 @@ func TestSessionContainerRemoteResources(t *testing.T) {
 				v1.ResourceCPU:                    resource.MustParse("1500m"),
 				v1.ResourceMemory:                 resource.MustParse("2Gi"),
 				v1.ResourceName("nvidia.com/gpu"): resource.MustParse("2"),
-				v1.ResourceName("amd.com/gpu"):    resource.MustParse("3"),
 			},
 			cpu:  "2",
 			mem:  "2048",
-			gpus: "5",
+			gpus: "2",
 		},
 		{
 			name: "limits fallback",
@@ -97,6 +96,30 @@ func TestSessionContainerRemoteResources(t *testing.T) {
 			cpu:  "3",
 			mem:  "3072",
 			gpus: "4",
+		},
+		{
+			name: "cpu only",
+			reqs: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("2"),
+			},
+			cpu: "2",
+		},
+		{
+			name: "memory only",
+			reqs: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			mem: "1024",
+		},
+		{
+			name: "gpu only",
+			reqs: v1.ResourceList{
+				v1.ResourceName("nvidia.com/gpu"): resource.MustParse("3"),
+			},
+			gpus: "3",
+		},
+		{
+			name: "nothing set",
 		},
 	}
 
