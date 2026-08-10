@@ -84,6 +84,8 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 
 	t.Run("only cpu provided", func(t *testing.T) {
 		t.Setenv("RSC_SESSION_CPU", "4")
+		t.Setenv("RSC_SESSION_MEMORY", "")
+		t.Setenv("RSC_SESSION_GPUS", "")
 
 		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath)
 		assert.Contains(t, script, "#SBATCH --cpus-per-task=4")
