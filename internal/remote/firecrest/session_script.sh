@@ -147,6 +147,21 @@ mkdir -p "${LOGS_DIR}"
 wstunnel=$(install_wstunnel)
 echo "wstunnel: ${wstunnel}"
 
+# Finds a free IPv4 TCP port by briefly binding with nc. Enroot shares the host
+# network namespace, so co-located sessions collide on fixed ports; only the
+# local (node) binds are reselected, the remote session port is preserved.
+find_free_port() {
+    # $1: blank-separated ports already taken by us (never re-pick them)
+    local used=" $1 " p rc
+    for ((p = 20000 + RANDOM % 10000; p < 32000; p++)); do
+        [[ $used == *" $p "* ]] && continue
+        rc=0; timeout 0.05 nc -l -p "$p" &>/dev/null || rc=$?
+        ((rc == 124)) && { echo "$p"; return 0; }   # timed out => bind held => free
+    done
+    return 1
+}
+
+
 # Ensure NVIDIA_VISIBLE_DEVICES is set to void 
 # so that cuda enabled images work on eiger
 if !(nvidia-smi 2>&1 >/dev/null); then
