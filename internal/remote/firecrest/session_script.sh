@@ -158,6 +158,7 @@ find_free_port() {
         rc=0; timeout 0.05 nc -l -p "$p" &>/dev/null || rc=$?
         ((rc == 124)) && { echo "$p"; return 0; }   # timed out => bind held => free
     done
+    >&2 echo "ERROR: could not find a free port in the range 20000-31999"
     return 1
 }
 
