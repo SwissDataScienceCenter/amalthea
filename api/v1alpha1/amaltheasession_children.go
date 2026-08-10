@@ -57,6 +57,8 @@ var useNoneSameSiteSessionCookie = getUseNoneSameSiteSessionCookie()
 
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
+const oneMebiByte int64 = 1024*1024
+
 func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 	pvc := cr.PVC()
 	volumes := []v1.Volume{
@@ -1042,7 +1044,7 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 		cpuValue = strconv.FormatInt(q.Value(), 10)
 	}
 	if q := resourceValue(resources, v1.ResourceMemory); !q.IsZero() {
-		memoryValue = strconv.FormatInt(q.Value()/(1024*1024), 10)
+		memoryValue = strconv.FormatInt(q.Value()/oneMebiByte, 10)
 	}
 	if q := resourceValue(resources, v1.ResourceName("nvidia.com/gpu")); !q.IsZero() {
 		gpuValue = strconv.FormatInt(q.Value(), 10)
