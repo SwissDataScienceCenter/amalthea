@@ -1039,7 +1039,7 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 	var cpuValue, memoryValue, gpuValue string
 
 	if q := resourceValue(resources, v1.ResourceCPU); !q.IsZero() {
-		cpuValue = strconv.FormatInt((q.MilliValue()+999)/1000, 10) // ceil(milli/1000)
+		cpuValue = strconv.FormatInt(q.Value(), 10)
 	}
 	if q := resourceValue(resources, v1.ResourceMemory); !q.IsZero() {
 		memoryValue = strconv.FormatInt(q.Value()/(1024*1024), 10)
