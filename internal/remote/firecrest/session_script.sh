@@ -203,9 +203,16 @@ echo "TODO: setup rclone mounts..."
 # EOF
 # "${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
 
+# listen ports: get free local port - use standard remote port
+RENKU_SESSION_REMOTE_PORT="${RENKU_SESSION_PORT:-8888}"
+RENKU_SESSION_PORT="$(find_free_port)"
+export RENKU_SESSION_PORT RENKU_SESSION_REMOTE_PORT
+GIT_PROXY_REMOTE_PORT="${GIT_PROXY_PORT:-65480}"
+GIT_PROXY_PORT="$(find_free_port "$RENKU_SESSION_PORT")"
+GIT_PROXY_HEALTH_REMOTE_PORT="${GIT_PROXY_HEALTH_PORT:-65481}"
+GIT_PROXY_HEALTH_PORT="$(find_free_port "$RENKU_SESSION_PORT $GIT_PROXY_PORT")"
+export GIT_PROXY_PORT GIT_PROXY_REMOTE_PORT GIT_PROXY_HEALTH_PORT GIT_PROXY_HEALTH_REMOTE_PORT
 # echo "Starting tunnel..."
-GIT_PROXY_PORT="${GIT_PROXY_PORT:-65480}"
-GIT_PROXY_HEALTH_PORT="${GIT_PROXY_HEALTH_PORT:-65481}"
 WSTUNNEL_PATH_PREFIX="${WSTUNNEL_PATH_PREFIX:-sessions/my-session/wstunnel}"
 echo "wstunnel client \
   -R tcp://0.0.0.0:${RENKU_SESSION_PORT}:localhost:${RENKU_SESSION_PORT} \
