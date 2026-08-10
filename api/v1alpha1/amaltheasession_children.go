@@ -1052,33 +1052,14 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 
 	var cpuValue, memoryValue, gpuValue string
 
-	if cpuQ, ok := resources.Requests[v1.ResourceCPU]; ok && !cpuQ.IsZero() {
-		cpuValue = strconv.FormatInt((cpuQ.MilliValue()+999)/1000, 10)
-	} else if cpuQ, ok := resources.Limits[v1.ResourceCPU]; ok && !cpuQ.IsZero() {
-		cpuValue = strconv.FormatInt((cpuQ.MilliValue()+999)/1000, 10)
+	if q := resourceValue(resources, v1.ResourceCPU); !q.IsZero() {
+		cpuValue = strconv.FormatInt((q.MilliValue()+999)/1000, 10) // ceil(milli/1000)
 	}
-
-	if memQ, ok := resources.Requests[v1.ResourceMemory]; ok && !memQ.IsZero() {
-		memoryValue = strconv.FormatInt(memQ.Value()/(1024*1024), 10)
-	} else if memQ, ok := resources.Limits[v1.ResourceMemory]; ok && !memQ.IsZero() {
-		memoryValue = strconv.FormatInt(memQ.Value()/(1024*1024), 10)
+	if q := resourceValue(resources, v1.ResourceMemory); !q.IsZero() {
+		memoryValue = strconv.FormatInt(q.Value()/(1024*1024), 10)
 	}
-
-	var gpuCount int64
-	for name, q := range resources.Requests {
-		if strings.HasSuffix(string(name), "/gpu") {
-			gpuCount += q.Value()
-		}
-	}
-	if gpuCount == 0 {
-		for name, q := range resources.Limits {
-			if strings.HasSuffix(string(name), "/gpu") {
-				gpuCount += q.Value()
-			}
-		}
-	}
-	if gpuCount > 0 {
-		gpuValue = strconv.FormatInt(gpuCount, 10)
+	if q := resourceValue(resources, v1.ResourceName("nvidia.com/gpu")); !q.IsZero() {
+		gpuValue = strconv.FormatInt(q.Value(), 10)
 	}
 
 	sessionContainer.Env = append(
@@ -1120,6 +1101,18 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 	}
 
 	return sessionContainer
+}
+
+// resourceValue returns q[name] from Requests, falling back to Limits
+// (what the node actually reserves), or zero when neither is set.
+func resourceValue(res v1.ResourceRequirements, name v1.ResourceName) resource.Quantity {
+	if q, ok := res.Requests[name]; ok && !q.IsZero() {
+		return q
+	}
+	if q, ok := res.Limits[name]; ok && !q.IsZero() {
+		return q
+	}
+	return resource.Quantity{}
 }
 
 // tunnelContainer returns the tunnel container for remote sessions
