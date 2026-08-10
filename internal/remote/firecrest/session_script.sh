@@ -268,6 +268,10 @@ if [ -n "${GIT_REPOSITORIES}" ]; then
             echo "repo: ${repo}, branch: ${branch}"
             cd "${RENKU_WORKING_DIR}/${repo}"
             git init || echo "Error: could not run git init" > "ERROR"
+            # Override the proxy in the config copied from k8s (hardcoded 65480) with the
+            # free local port chosen for this session.
+            git config http.proxy "http://localhost:${GIT_PROXY_PORT}" || echo "Error: could not set git http.proxy" > "ERROR"
+            git config http.sslVerify false || echo "Error: could not set git http.sslVerify" > "ERROR"
             git fetch || echo "Error: could not run git fetch" > "ERROR"
             if [ -n "${branch}" ]; then
                 git checkout "${branch}"  || echo "Error: could not run git checkout" > "ERROR"
