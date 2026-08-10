@@ -215,17 +215,17 @@ export GIT_PROXY_PORT GIT_PROXY_REMOTE_PORT GIT_PROXY_HEALTH_PORT GIT_PROXY_HEAL
 # echo "Starting tunnel..."
 WSTUNNEL_PATH_PREFIX="${WSTUNNEL_PATH_PREFIX:-sessions/my-session/wstunnel}"
 echo "wstunnel client \
-  -R tcp://0.0.0.0:${RENKU_SESSION_PORT}:localhost:${RENKU_SESSION_PORT} \
-  -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT} \
-  -L tcp://${GIT_PROXY_HEALTH_PORT}:localhost:${GIT_PROXY_HEALTH_PORT} \
+  -R tcp://0.0.0.0:${RENKU_SESSION_REMOTE_PORT}:localhost:${RENKU_SESSION_PORT} \
+  -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_REMOTE_PORT} \
+  -L tcp://${GIT_PROXY_HEALTH_PORT}:localhost:${GIT_PROXY_HEALTH_REMOTE_PORT} \
   wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT} \
   -P ${WSTUNNEL_PATH_PREFIX} \
   -H Authorization: Bearer <SECRET> \
   --tls-verify-certificate &"
 "${wstunnel}" client \
-  -R "tcp://0.0.0.0:${RENKU_SESSION_PORT}:localhost:${RENKU_SESSION_PORT}" \
-  -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT} \
-  -L tcp://${GIT_PROXY_HEALTH_PORT}:localhost:${GIT_PROXY_HEALTH_PORT} \
+  -R "tcp://0.0.0.0:${RENKU_SESSION_REMOTE_PORT}:localhost:${RENKU_SESSION_PORT}" \
+  -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_REMOTE_PORT} \
+  -L tcp://${GIT_PROXY_HEALTH_PORT}:localhost:${GIT_PROXY_HEALTH_REMOTE_PORT} \
   "wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT}" \
   -P "${WSTUNNEL_PATH_PREFIX}" \
   -H "Authorization: Bearer ${WSTUNNEL_SECRET}" \
