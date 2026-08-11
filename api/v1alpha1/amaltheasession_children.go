@@ -57,7 +57,7 @@ var useNoneSameSiteSessionCookie = getUseNoneSameSiteSessionCookie()
 
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
 
-const oneMebiByte int64 = 1024*1024
+const oneMebiByte int64 = 1024 * 1024
 
 func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 	pvc := cr.PVC()
