@@ -63,6 +63,7 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 		t.Setenv("RSC_SESSION_CPU", "2")
 		t.Setenv("RSC_SESSION_MEMORY", "2048")
 		t.Setenv("RSC_SESSION_GPUS", "1")
+		t.Setenv("RSC_FIRECREST_FORWARD_RESOURCE_VALUES", "true")
 
 		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath)
 		assert.Contains(t, script, "#SBATCH --cpus-per-task=2")
@@ -70,11 +71,10 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 		assert.Contains(t, script, "#SBATCH --gpus=1")
 	})
 
-	t.Run("ignore flag omits resources", func(t *testing.T) {
+	t.Run("forward flag off omits resources", func(t *testing.T) {
 		t.Setenv("RSC_SESSION_CPU", "2")
 		t.Setenv("RSC_SESSION_MEMORY", "2048")
 		t.Setenv("RSC_SESSION_GPUS", "1")
-		t.Setenv("RSC_FIRECREST_IGNORE_RESOURCE_CLASS_VALUES", "true")
 
 		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath)
 		assert.NotContains(t, script, "--cpus-per-task")
@@ -86,6 +86,7 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 		t.Setenv("RSC_SESSION_CPU", "4")
 		t.Setenv("RSC_SESSION_MEMORY", "")
 		t.Setenv("RSC_SESSION_GPUS", "")
+		t.Setenv("RSC_FIRECREST_FORWARD_RESOURCE_VALUES", "true")
 
 		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath)
 		assert.Contains(t, script, "#SBATCH --cpus-per-task=4")
