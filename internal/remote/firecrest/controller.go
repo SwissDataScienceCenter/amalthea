@@ -758,7 +758,7 @@ func addSbatchDirectivesToScript(sessionScript, partition string) string {
 		directives = append(directives, fmt.Sprintf("#SBATCH --account=%s", slurmAccount))
 	}
 
-	if os.Getenv("RSC_FIRECREST_IGNORE_RESOURCE_CLASS_VALUES") != "true" {
+	if strings.ToLower(os.Getenv("RSC_FIRECREST_FORWARD_RESOURCE_VALUES")) == "true" {
 		if cpu := os.Getenv("RSC_SESSION_CPU"); cpu != "" {
 			directives = append(directives, fmt.Sprintf("#SBATCH --cpus-per-task=%s", cpu))
 		}
