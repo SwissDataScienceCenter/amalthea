@@ -180,12 +180,26 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 		activeTTL = ptr.To(int64(cr.Spec.Culling.MaxAge.Seconds()))
 	}
 
+	jobLabels := cr.childLabels()
+	annotations := map[string]string{}
+	for key := range cr.Spec.Template.Metadata.Annotations {
+		annotations[key] = cr.Spec.Template.Metadata.Annotations[key]
+	}
+	// Add the annotations for the run ID and the session UID
+	if cr.Status.RunID != "" {
+		annotations["renku.io/run_id"] = cr.Status.RunID
+	}
+	uid := string(cr.GetUID())
+	if uid != "" {
+		annotations["renku.io/session_uid"] = uid
+	}
+
 	job := batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cr.JobName(),
 			Namespace:   cr.Namespace,
-			Labels:      cr.childLabels(),
-			Annotations: cr.Spec.Template.Metadata.Annotations,
+			Labels:      jobLabels,
+			Annotations: annotations,
 		},
 		Spec: batchv1.JobSpec{
 			Parallelism:           ptr.To(int32(1)),
@@ -195,8 +209,8 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 			Suspend:               &cr.Spec.Hibernated,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      cr.childLabels(),
-					Annotations: cr.Spec.Template.Metadata.Annotations,
+					Labels:      jobLabels,
+					Annotations: annotations,
 				},
 				Spec: *pod,
 			},
@@ -223,7 +237,7 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 	for key := range cr.Spec.Template.Metadata.Annotations {
 		annotations[key] = cr.Spec.Template.Metadata.Annotations[key]
 	}
-	// Add the annotations for the runID and the launchID
+	// Add the annotations for the run ID and the session UID
 	if cr.Status.RunID != "" {
 		annotations["renku.io/run_id"] = cr.Status.RunID
 	}
