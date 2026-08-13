@@ -214,7 +214,6 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 					g.Expect(sessionPod.Spec.Containers[0].Resources.Requests.Memory()).ShouldNot(Equal(&newMemory))
 				}, "30s").WithContext(ctx).Should(Succeed())
 				By("Hibernating the session")
-
 				Eventually(
 					utils.PatchAmaltheaSession(ctx, k8sClient, typeNamespacedName, func(session *amaltheadevv1alpha1.AmaltheaSession) error {
 						session.Spec.Hibernated = true
@@ -227,7 +226,6 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 					g.Expect(sessionPod).To(BeNil())
 				}, "60s").WithContext(ctx).Should(Succeed())
 				By("Resuming the session we should see the new changes")
-
 				Eventually(
 					utils.PatchAmaltheaSession(ctx, k8sClient, typeNamespacedName, func(session *amaltheadevv1alpha1.AmaltheaSession) error {
 						session.Spec.Hibernated = false

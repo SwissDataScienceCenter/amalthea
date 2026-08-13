@@ -429,7 +429,12 @@ type SessionUpdateFunc func(session *amaltheadevv1alpha1.AmaltheaSession) error
 // PatchAmaltheaSession will eventually patch a session CR,
 // retrying when the patch is rejected because the resource was
 // modified in-flight.
-func PatchAmaltheaSession(ctx SpecContext, k8sClient client.Client, typeNamespacedName types.NamespacedName, updateFunc SessionUpdateFunc) func(g gomega.Gomega) {
+func PatchAmaltheaSession(
+	ctx SpecContext,
+	k8sClient client.Client,
+	typeNamespacedName types.NamespacedName,
+	updateFunc SessionUpdateFunc,
+) func(g gomega.Gomega) {
 	return func(g gomega.Gomega) {
 		session := amaltheadevv1alpha1.AmaltheaSession{}
 		g.Expect(k8sClient.Get(ctx, typeNamespacedName, &session)).To(gomega.Succeed())
