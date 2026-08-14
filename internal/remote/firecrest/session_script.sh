@@ -147,6 +147,22 @@ mkdir -p "${LOGS_DIR}"
 wstunnel=$(install_wstunnel)
 echo "wstunnel: ${wstunnel}"
 
+# Finds a free IPv4 TCP port by briefly binding with nc. Enroot shares the host
+# network namespace, so co-located sessions collide on fixed ports; only the
+# local (node) binds are reselected, the remote session port is preserved.
+find_free_port() {
+    # $1: blank-separated ports already taken by us (never re-pick them)
+    local used=" $1 " p rc
+    for ((p = 20000 + RANDOM % 10000; p < 32000; p++)); do
+        [[ $used == *" $p "* ]] && continue
+        rc=0; timeout 0.05 nc -l -p "$p" &>/dev/null || rc=$?
+        ((rc == 124)) && { echo "$p"; return 0; }   # timed out => bind held => free
+    done
+    >&2 echo "ERROR: could not find a free port in the range 20000-31999"
+    return 1
+}
+
+
 # Ensure NVIDIA_VISIBLE_DEVICES is set to void 
 # so that cuda enabled images work on eiger
 if !(nvidia-smi 2>&1 >/dev/null); then
@@ -188,22 +204,29 @@ echo "TODO: setup rclone mounts..."
 # EOF
 # "${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
 
+# listen ports: get free local port - use standard remote port
+RENKU_SESSION_REMOTE_PORT="${RENKU_SESSION_PORT:-8888}"
+RENKU_SESSION_PORT="$(find_free_port)"
+export RENKU_SESSION_PORT RENKU_SESSION_REMOTE_PORT
+GIT_PROXY_REMOTE_PORT="${GIT_PROXY_PORT:-65480}"
+GIT_PROXY_PORT="$(find_free_port "$RENKU_SESSION_PORT")"
+GIT_PROXY_HEALTH_REMOTE_PORT="${GIT_PROXY_HEALTH_PORT:-65481}"
+GIT_PROXY_HEALTH_PORT="$(find_free_port "$RENKU_SESSION_PORT $GIT_PROXY_PORT")"
+export GIT_PROXY_PORT GIT_PROXY_REMOTE_PORT GIT_PROXY_HEALTH_PORT GIT_PROXY_HEALTH_REMOTE_PORT
 # echo "Starting tunnel..."
-GIT_PROXY_PORT="${GIT_PROXY_PORT:-65480}"
-GIT_PROXY_HEALTH_PORT="${GIT_PROXY_HEALTH_PORT:-65481}"
 WSTUNNEL_PATH_PREFIX="${WSTUNNEL_PATH_PREFIX:-sessions/my-session/wstunnel}"
 echo "wstunnel client \
-  -R tcp://0.0.0.0:${RENKU_SESSION_PORT}:localhost:${RENKU_SESSION_PORT} \
-  -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT} \
-  -L tcp://${GIT_PROXY_HEALTH_PORT}:localhost:${GIT_PROXY_HEALTH_PORT} \
+  -R tcp://0.0.0.0:${RENKU_SESSION_REMOTE_PORT}:localhost:${RENKU_SESSION_PORT} \
+  -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_REMOTE_PORT} \
+  -L tcp://${GIT_PROXY_HEALTH_PORT}:localhost:${GIT_PROXY_HEALTH_REMOTE_PORT} \
   wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT} \
   -P ${WSTUNNEL_PATH_PREFIX} \
   -H Authorization: Bearer <SECRET> \
   --tls-verify-certificate &"
 "${wstunnel}" client \
-  -R "tcp://0.0.0.0:${RENKU_SESSION_PORT}:localhost:${RENKU_SESSION_PORT}" \
-  -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_PORT} \
-  -L tcp://${GIT_PROXY_HEALTH_PORT}:localhost:${GIT_PROXY_HEALTH_PORT} \
+  -R "tcp://0.0.0.0:${RENKU_SESSION_REMOTE_PORT}:localhost:${RENKU_SESSION_PORT}" \
+  -L tcp://${GIT_PROXY_PORT}:localhost:${GIT_PROXY_REMOTE_PORT} \
+  -L tcp://${GIT_PROXY_HEALTH_PORT}:localhost:${GIT_PROXY_HEALTH_REMOTE_PORT} \
   "wss://${WSTUNNEL_SERVICE_ADDRESS}:${WSTUNNEL_SERVICE_PORT}" \
   -P "${WSTUNNEL_PATH_PREFIX}" \
   -H "Authorization: Bearer ${WSTUNNEL_SECRET}" \
@@ -246,6 +269,10 @@ if [ -n "${GIT_REPOSITORIES}" ]; then
             echo "repo: ${repo}, branch: ${branch}"
             cd "${RENKU_WORKING_DIR}/${repo}"
             git init || echo "Error: could not run git init" > "ERROR"
+            # Override the proxy in the config copied from k8s (hardcoded 65480) with the
+            # free local port chosen for this session.
+            git config http.proxy "http://localhost:${GIT_PROXY_PORT}" || echo "Error: could not set git http.proxy" > "ERROR"
+            git config http.sslVerify false || echo "Error: could not set git http.sslVerify" > "ERROR"
             git fetch || echo "Error: could not run git fetch" > "ERROR"
             if [ -n "${branch}" ]; then
                 git checkout "${branch}"  || echo "Error: could not run git checkout" > "ERROR"
