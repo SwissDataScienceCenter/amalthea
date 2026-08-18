@@ -29,11 +29,13 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2" //nolint:staticcheck,revive
+	"github.com/onsi/gomega"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	metricsv "k8s.io/metrics/pkg/client/clientset/versioned"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -419,4 +421,24 @@ func GetController(namespace string) (manager.Manager, error) {
 	}
 	cancel()
 	return mgr, nil
+}
+
+// SessionUpdateFunc type of update function used to patch a session
+type SessionUpdateFunc func(session *amaltheadevv1alpha1.AmaltheaSession) error
+
+// PatchAmaltheaSession will eventually patch a session CR,
+// retrying when the patch is rejected because the resource was
+// modified in-flight.
+func PatchAmaltheaSession(
+	ctx SpecContext,
+	k8sClient client.Client,
+	typeNamespacedName types.NamespacedName,
+	updateFunc SessionUpdateFunc,
+) func(g gomega.Gomega) {
+	return func(g gomega.Gomega) {
+		session := amaltheadevv1alpha1.AmaltheaSession{}
+		g.Expect(k8sClient.Get(ctx, typeNamespacedName, &session)).To(gomega.Succeed())
+		g.Expect(updateFunc(&session)).To(gomega.Succeed())
+		g.Expect(k8sClient.Update(ctx, &session)).To(gomega.Succeed())
+	}
 }

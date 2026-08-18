@@ -125,8 +125,16 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			patched := amaltheasession.DeepCopy()
 			By("Patching the session")
 			newMemory := resource.MustParse("100Mi")
-			patched.Spec.Session.Resources.Requests = corev1.ResourceList{corev1.ResourceMemory: newMemory}
-			Expect(k8sClient.Update(ctx, patched)).To(Succeed())
+			Eventually(
+				utils.PatchAmaltheaSession(
+					ctx,
+					k8sClient,
+					typeNamespacedName,
+					func(session *amaltheadevv1alpha1.AmaltheaSession) error {
+						session.Spec.Session.Resources.Requests = corev1.ResourceList{corev1.ResourceMemory: newMemory}
+						return nil
+					},
+				)).WithContext(ctx).WithTimeout(10 * time.Second).Should(Succeed())
 			By("Checking the session was restarted")
 			Eventually(func(g Gomega) {
 				sessionPod, err = patched.GetPod(ctx, k8sClient)
@@ -158,8 +166,16 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 			patched = amaltheasession.DeepCopy()
 			By("Patching the session")
 			newMemory := resource.MustParse("100Mi")
-			patched.Spec.Session.Resources.Requests = corev1.ResourceList{corev1.ResourceMemory: newMemory}
-			Expect(k8sClient.Update(ctx, patched)).To(Succeed())
+			Eventually(
+				utils.PatchAmaltheaSession(
+					ctx,
+					k8sClient,
+					typeNamespacedName,
+					func(session *amaltheadevv1alpha1.AmaltheaSession) error {
+						session.Spec.Session.Resources.Requests = corev1.ResourceList{corev1.ResourceMemory: newMemory}
+						return nil
+					},
+				)).WithContext(ctx).WithTimeout(10 * time.Second).Should(Succeed())
 			By("Checking the session is not restarted")
 			Consistently(func(g Gomega) {
 				sessionPod, err = patched.GetPod(ctx, k8sClient)
@@ -193,8 +209,16 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 				patched = amaltheasession.DeepCopy()
 				By("Patching the session")
 				newMemory := resource.MustParse("100Mi")
-				patched.Spec.Session.Resources.Requests = corev1.ResourceList{corev1.ResourceMemory: newMemory}
-				Expect(k8sClient.Update(ctx, patched)).To(Succeed())
+				Eventually(
+					utils.PatchAmaltheaSession(
+						ctx,
+						k8sClient,
+						typeNamespacedName,
+						func(session *amaltheadevv1alpha1.AmaltheaSession) error {
+							session.Spec.Session.Resources.Requests = corev1.ResourceList{corev1.ResourceMemory: newMemory}
+							return nil
+						},
+					)).WithContext(ctx).WithTimeout(10 * time.Second).Should(Succeed())
 				By("Checking the session is not restarted or changed")
 				Consistently(func(g Gomega) {
 					sessionPod, err = patched.GetPod(ctx, k8sClient)
@@ -205,10 +229,15 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 					g.Expect(sessionPod.Spec.Containers[0].Resources.Requests.Memory()).ShouldNot(Equal(&newMemory))
 				}, "30s").WithContext(ctx).Should(Succeed())
 				By("Hibernating the session")
-				patched = &amaltheadevv1alpha1.AmaltheaSession{}
-				Expect(k8sClient.Get(ctx, typeNamespacedName, patched)).To(Succeed())
-				patched.Spec.Hibernated = true
-				Expect(k8sClient.Update(ctx, patched)).To(Succeed())
+				Eventually(
+					utils.PatchAmaltheaSession(ctx,
+						k8sClient,
+						typeNamespacedName,
+						func(session *amaltheadevv1alpha1.AmaltheaSession) error {
+							session.Spec.Hibernated = true
+							return nil
+						},
+					)).WithContext(ctx).WithTimeout(10 * time.Second).Should(Succeed())
 				// Make sure the session has stopped, and the pod has been cleaned up
 				Eventually(func(g Gomega) {
 					sessionPod, err = amaltheasession.GetPod(ctx, k8sClient)
@@ -216,10 +245,16 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 					g.Expect(sessionPod).To(BeNil())
 				}, "60s").WithContext(ctx).Should(Succeed())
 				By("Resuming the session we should see the new changes")
-				patched = &amaltheadevv1alpha1.AmaltheaSession{}
-				Expect(k8sClient.Get(ctx, typeNamespacedName, patched)).To(Succeed())
-				patched.Spec.Hibernated = false
-				Expect(k8sClient.Update(ctx, patched)).To(Succeed())
+				Eventually(
+					utils.PatchAmaltheaSession(
+						ctx,
+						k8sClient,
+						typeNamespacedName,
+						func(session *amaltheadevv1alpha1.AmaltheaSession) error {
+							session.Spec.Hibernated = false
+							return nil
+						},
+					)).WithContext(ctx).WithTimeout(10 * time.Second).Should(Succeed())
 				Eventually(func(g Gomega) {
 					sessionPod, err = amaltheasession.GetPod(ctx, k8sClient)
 					g.Expect(err).NotTo(HaveOccurred())
