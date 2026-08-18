@@ -27,11 +27,14 @@ spec:
       jsonPath: .status.containerCounts.ready
       name: Ready
       type: string
-    - description: The total numeber of containers in the session, disregarding init
+    - description: The total number of containers in the session, disregarding init
         containers.
       jsonPath: .status.containerCounts.total
       name: Total
       type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
     - description: Whether the session is idle or not.
       jsonPath: .status.idle
       name: Idle
