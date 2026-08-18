@@ -999,7 +999,7 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 				"cpu":    resource.MustParse("100m"),
 			},
 			Limits: v1.ResourceList{
-				"memory": resource.MustParse("128Mi"),
+				"memory": resource.MustParse("64Mi"),
 				// NOTE: Cpu limit not set on purpose
 				// Without cpu limit if there is spare you can go over the request
 				// If there is no spare cpu then all things get throttled relative to their request
@@ -1151,7 +1151,7 @@ func (cr *AmaltheaSession) tunnelContainer() v1.Container {
 				"cpu":    resource.MustParse("100m"),
 			},
 			Limits: v1.ResourceList{
-				"memory": resource.MustParse("128Mi"),
+				"memory": resource.MustParse("64Mi"),
 				// NOTE: Cpu limit not set on purpose
 				// Without cpu limit if there is spare you can go over the request
 				// If there is no spare cpu then all things get throttled relative to their request
