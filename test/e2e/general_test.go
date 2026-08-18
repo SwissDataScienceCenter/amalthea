@@ -313,12 +313,15 @@ var _ = Describe("reconcile strategies", Ordered, func() {
 				}, "60s").WithContext(ctx).Should(Succeed())
 
 				By("Resuming the session we should see the ingress again")
-				Eventually(func(g Gomega) {
-					patched = &amaltheadevv1alpha1.AmaltheaSession{}
-					Expect(k8sClient.Get(ctx, typeNamespacedName, patched)).To(Succeed())
-					patched.Spec.Hibernated = false
-					Expect(k8sClient.Update(ctx, patched)).To(Succeed())
-				}, "60s").WithContext(ctx).Should(Succeed())
+				Eventually(
+					utils.PatchAmaltheaSession(ctx,
+						k8sClient,
+						typeNamespacedName,
+						func(session *amaltheadevv1alpha1.AmaltheaSession) error {
+							session.Spec.Hibernated = false
+							return nil
+						},
+					)).WithContext(ctx).WithTimeout(10 * time.Second).Should(Succeed())
 				Eventually(func(g Gomega) {
 					ingress := &networkingv1.Ingress{}
 					g.Expect(k8sClient.Get(ctx, typeNamespacedName, ingress)).To(Succeed())
