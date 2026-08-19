@@ -29,11 +29,14 @@ spec:
       jsonPath: .status.containerCounts.ready
       name: Ready
       type: string
-    - description: The total numeber of containers in the session, disregarding init
+    - description: The total number of containers in the session, disregarding init
         containers.
       jsonPath: .status.containerCounts.total
       name: Total
       type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
     - description: Whether the session is idle or not.
       jsonPath: .status.idle
       name: Idle
@@ -6592,6 +6595,11 @@ spec:
                   total:
                     type: integer
                 type: object
+              runID:
+                description: |-
+                  The ID of the current run of the workload. A run is a continuous execution of the workload;
+                  every time a session gets resumed from hibernation, it gets a new runID.
+                type: string
               state:
                 default: NotReady
                 enum:

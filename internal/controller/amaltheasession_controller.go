@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/oklog/ulid/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -64,7 +65,7 @@ const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch
-// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metrics.k8s.io,resources=pods,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -201,7 +202,19 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	// We need to handle run ID before generating children resources
+	runID := amaltheasession.Status.RunID
+	if amaltheasession.Spec.Hibernated {
+		// The session is getting hibernated, unset the run ID
+		runID = ""
+	} else if runID == "" {
+		// The session just got created or is being resumed, set the new run ID
+		runID = ulid.Make().String()
+	}
+	amaltheasession.Status.RunID = runID
+
 	children, err := NewChildResources(amaltheasession, r.Configuration)
+
 	if err != nil {
 		logger.Error(
 			err,
@@ -230,6 +243,10 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		err = r.Get(ctx, req.NamespacedName, amaltheasession)
 		if err != nil {
 			return ctrl.Result{}, err
+		}
+		// Handle run ID being set by a concurrent loop
+		if newStatus.RunID != "" && amaltheasession.Status.RunID != "" {
+			newStatus.RunID = amaltheasession.Status.RunID
 		}
 		amaltheasession.Status = newStatus
 		err = r.Status().Update(ctx, amaltheasession)
@@ -262,7 +279,11 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 	} else if !amaltheasession.Status.HibernatedSince.IsZero() {
 		requeueAfter = time.Duration(amaltheasession.Spec.Culling.MaxHibernatedDuration.Nanoseconds())
 	}
-	return ctrl.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
+
+	if requeueAfter > 0 {
+		return ctrl.Result{RequeueAfter: requeueAfter}, nil
+	}
+	return ctrl.Result{Requeue: true}, nil
 }
 
 func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession) error {

@@ -485,6 +485,10 @@ type AmaltheaSessionStatus struct {
 	// The date-time when the session is hibernated.
 	WillHibernateAt metav1.Time `json:"willHibernateAt,omitempty"`
 
+	// The ID of the current run of the workload. A run is a continuous execution of the workload;
+	// every time a session gets resumed from hibernation, it gets a new runID.
+	RunID string `json:"runID,omitempty"`
+
 	// If the state is failed then the message will contain information about what went wrong, otherwise it is empty
 	// +optional
 	Error string `json:"error,omitempty"`
@@ -496,7 +500,8 @@ type AmaltheaSessionStatus struct {
 
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=`.status.state`,description="The overall status of the session."
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=`.status.containerCounts.ready`,description="The number of containers in a ready state for the session, disregarding init containers."
-// +kubebuilder:printcolumn:name="Total",type="string",JSONPath=`.status.containerCounts.total`,description="The total numeber of containers in the session, disregarding init containers."
+// +kubebuilder:printcolumn:name="Total",type="string",JSONPath=`.status.containerCounts.total`,description="The total number of containers in the session, disregarding init containers."
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Idle",type="boolean",JSONPath=`.status.idle`,description="Whether the session is idle or not."
 // +kubebuilder:printcolumn:name="URL",type="string",JSONPath=`.status.url`,description="The URL where the session can be accessed."
 // AmaltheaSession is the Schema for the amaltheasessions API

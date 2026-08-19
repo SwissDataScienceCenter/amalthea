@@ -34,7 +34,7 @@ jobs:
     steps:
       - name: Check PR description
         id: deploy-comment
-        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v1.22.1
+        uses: SwissDataScienceCenter/renku-actions/check-pr-description@v1.23.1
         with:
           pr_ref: ${{ github.event.number }}
 
@@ -52,14 +52,14 @@ jobs:
     #   url: https://renku-ci-am-${{ github.event.number }}.dev.renku.ch
     steps:
       - name: Checkout renku repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: SwissDataScienceCenter/renku
           sparse-checkout: |
             minimal-deployment
 
       - name: Find deplyoment url
-        uses: peter-evans/find-comment@v3
+        uses: peter-evans/find-comment@v4
         id: deploymentUrlMessage
         with:
           issue-number: ${{ github.event.pull_request.number }}
@@ -68,7 +68,7 @@ jobs:
 
       - name: Create comment deployment url
         if: steps.deploymentUrlMessage.outputs.comment-id == 0
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@v5
         with:
           token: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
@@ -83,7 +83,7 @@ jobs:
           subscription-id: ${{ secrets.CI_RENKU_AZURE_SUBSCRIPTION_ID }}
 
       - name: Set AKS context
-        uses: azure/aks-set-context@v4
+        uses: azure/aks-set-context@v5
         with:
           resource-group: "renku-dev"
           cluster-name: "aks-switzerlandnorth-renku-dev"
@@ -97,7 +97,7 @@ jobs:
           echo "KUBECONFIG=${KUBECONFIG}" >> "$GITHUB_ENV"
 
       - name: Build and deploy
-        uses: SwissDataScienceCenter/renku-actions/deploy-renku@leafty/what-da-heck
+        uses: SwissDataScienceCenter/renku-actions/deploy-renku@v1.23.1
         env:
           DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
           DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
@@ -140,7 +140,7 @@ jobs:
     steps:
       - name: Extract Renku repository reference
         run: echo "RENKU_REFERENCE=`echo '${{ needs.check-deploy.outputs.renku }}' | cut -d'@' -f2`" >> $GITHUB_ENV
-      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.22.1
+      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.23.1
         with:
           e2e-folder: cypress/e2e/v2/
           e2e-target: ${{ matrix.tests }}
@@ -162,7 +162,7 @@ jobs:
     steps:
       - name: Extract Renku repository reference
         run: echo "RENKU_REFERENCE=`echo '${{ needs.check-deploy.outputs.renku }}' | cut -d'@' -f2`" >> $GITHUB_ENV
-      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.22.1
+      - uses: SwissDataScienceCenter/renku-actions/test-renku-cypress@v1.23.1
         with:
           e2e-folder: cypress/e2e/slow/
           e2e-target: ${{ matrix.tests }}
@@ -180,7 +180,7 @@ jobs:
       id-token: write
     steps:
       - name: Find deplyoment url
-        uses: peter-evans/find-comment@v3
+        uses: peter-evans/find-comment@v4
         id: deploymentUrlMessage
         with:
           issue-number: ${{ github.event.pull_request.number }}
@@ -189,7 +189,7 @@ jobs:
 
       - name: Create comment deployment url
         if: steps.deploymentUrlMessage.outputs.comment-id == 0
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@v5
         with:
           token: ${{ secrets.RENKUBOT_GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
@@ -204,7 +204,7 @@ jobs:
           subscription-id: ${{ secrets.CI_RENKU_AZURE_SUBSCRIPTION_ID }}
 
       - name: Set AKS context
-        uses: azure/aks-set-context@v4
+        uses: azure/aks-set-context@v5
         with:
           resource-group: "renku-dev"
           cluster-name: "aks-switzerlandnorth-renku-dev"
@@ -218,7 +218,7 @@ jobs:
           echo "KUBECONFIG=${KUBECONFIG}" >> "$GITHUB_ENV"
 
       - name: Renku teardown
-        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.22.1
+        uses: SwissDataScienceCenter/renku-actions/cleanup-renku-ci-deployments@v1.23.1
         env:
           HELM_RELEASE_REGEX: "^renku-ci-am-${{ github.event.number }}$"
           GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}

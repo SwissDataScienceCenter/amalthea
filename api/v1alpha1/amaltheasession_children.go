@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,6 +56,8 @@ var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
 var useNoneSameSiteSessionCookie = getUseNoneSameSiteSessionCookie()
 
 const rcloneStorageSecretNameAnnotation = "csi-rclone.dev/secretName"
+
+const oneMebiByte int64 = 1024 * 1024
 
 func (cr *AmaltheaSession) SessionVolumes() ([]v1.Volume, []v1.VolumeMount) {
 	pvc := cr.PVC()
@@ -180,12 +183,26 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 		activeTTL = ptr.To(int64(cr.Spec.Culling.MaxAge.Seconds()))
 	}
 
+	jobLabels := cr.childLabels()
+	annotations := map[string]string{}
+	for key := range cr.Spec.Template.Metadata.Annotations {
+		annotations[key] = cr.Spec.Template.Metadata.Annotations[key]
+	}
+	// Add the annotations for the run ID and the session UID
+	if cr.Status.RunID != "" {
+		annotations["renku.io/run_id"] = cr.Status.RunID
+	}
+	uid := string(cr.GetUID())
+	if uid != "" {
+		annotations["renku.io/session_uid"] = uid
+	}
+
 	job := batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cr.JobName(),
 			Namespace:   cr.Namespace,
-			Labels:      cr.childLabels(),
-			Annotations: cr.Spec.Template.Metadata.Annotations,
+			Labels:      jobLabels,
+			Annotations: annotations,
 		},
 		Spec: batchv1.JobSpec{
 			Parallelism:           ptr.To(int32(1)),
@@ -195,8 +212,8 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 			Suspend:               &cr.Spec.Hibernated,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      cr.childLabels(),
-					Annotations: cr.Spec.Template.Metadata.Annotations,
+					Labels:      jobLabels,
+					Annotations: annotations,
 				},
 				Spec: *pod,
 			},
@@ -218,12 +235,26 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 		return appsv1.StatefulSet{}, err
 	}
 
+	stsLabels := cr.childLabels()
+	annotations := map[string]string{}
+	for key := range cr.Spec.Template.Metadata.Annotations {
+		annotations[key] = cr.Spec.Template.Metadata.Annotations[key]
+	}
+	// Add the annotations for the run ID and the session UID
+	if cr.Status.RunID != "" {
+		annotations["renku.io/run_id"] = cr.Status.RunID
+	}
+	uid := string(cr.GetUID())
+	if uid != "" {
+		annotations["renku.io/session_uid"] = uid
+	}
+
 	sts := appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cr.Name,
 			Namespace:   cr.Namespace,
-			Labels:      cr.childLabels(),
-			Annotations: cr.Spec.Template.Metadata.Annotations,
+			Labels:      stsLabels,
+			Annotations: annotations,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			// NOTE: Parallel pod management policy is important
@@ -235,8 +266,8 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      cr.childLabels(),
-					Annotations: cr.Spec.Template.Metadata.Annotations,
+					Labels:      stsLabels,
+					Annotations: annotations,
 				},
 				Spec: *pod,
 			},
@@ -968,7 +999,7 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 				"cpu":    resource.MustParse("100m"),
 			},
 			Limits: v1.ResourceList{
-				"memory": resource.MustParse("128Mi"),
+				"memory": resource.MustParse("64Mi"),
 				// NOTE: Cpu limit not set on purpose
 				// Without cpu limit if there is spare you can go over the request
 				// If there is no spare cpu then all things get throttled relative to their request
@@ -1019,6 +1050,27 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 		},
 	)
 
+	resources := session.Resources
+
+	var cpuValue, memoryValue, gpuValue string
+
+	if q := resourceValue(resources, v1.ResourceCPU); !q.IsZero() {
+		cpuValue = strconv.FormatInt(q.Value(), 10)
+	}
+	if q := resourceValue(resources, v1.ResourceMemory); !q.IsZero() {
+		memoryValue = strconv.FormatInt(q.Value()/oneMebiByte, 10)
+	}
+	if q := resourceValue(resources, v1.ResourceName("nvidia.com/gpu")); !q.IsZero() {
+		gpuValue = strconv.FormatInt(q.Value(), 10)
+	}
+
+	sessionContainer.Env = append(
+		sessionContainer.Env,
+		v1.EnvVar{Name: "RSC_SESSION_CPU", Value: cpuValue},
+		v1.EnvVar{Name: "RSC_SESSION_MEMORY", Value: memoryValue},
+		v1.EnvVar{Name: "RSC_SESSION_GPUS", Value: gpuValue},
+	)
+
 	if session.RemoteSecretRef != nil {
 		sessionContainer.EnvFrom = append(sessionContainer.EnvFrom, v1.EnvFromSource{
 			// This secret contains the configuration for the remote session controller
@@ -1051,6 +1103,18 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 	}
 
 	return sessionContainer
+}
+
+// resourceValue returns q[name] from Requests, falling back to Limits
+// (what the node actually reserves), or zero when neither is set.
+func resourceValue(res v1.ResourceRequirements, name v1.ResourceName) resource.Quantity {
+	if q, ok := res.Requests[name]; ok && !q.IsZero() {
+		return q
+	}
+	if q, ok := res.Limits[name]; ok && !q.IsZero() {
+		return q
+	}
+	return resource.Quantity{}
 }
 
 // tunnelContainer returns the tunnel container for remote sessions
@@ -1087,7 +1151,7 @@ func (cr *AmaltheaSession) tunnelContainer() v1.Container {
 				"cpu":    resource.MustParse("100m"),
 			},
 			Limits: v1.ResourceList{
-				"memory": resource.MustParse("128Mi"),
+				"memory": resource.MustParse("64Mi"),
 				// NOTE: Cpu limit not set on purpose
 				// Without cpu limit if there is spare you can go over the request
 				// If there is no spare cpu then all things get throttled relative to their request

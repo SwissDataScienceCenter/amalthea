@@ -1,0 +1,9 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: user-sessions
+spec:
+  minAvailable: 100%
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: AmaltheaSession

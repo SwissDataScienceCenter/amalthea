@@ -58,6 +58,41 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 	assert.Contains(t, foundMounts, "\"/store\"")
 	assert.Contains(t, foundMounts, "\"/users:/home/users:ro\"")
 	assert.Contains(t, foundMounts, "\"/secrets:/secrets:ro\"")
+
+	t.Run("resources provided", func(t *testing.T) {
+		t.Setenv("RSC_SESSION_CPU", "2")
+		t.Setenv("RSC_SESSION_MEMORY", "2048")
+		t.Setenv("RSC_SESSION_GPUS", "1")
+		t.Setenv("RSC_FIRECREST_FORWARD_RESOURCE_VALUES", "true")
+
+		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath)
+		assert.Contains(t, script, "#SBATCH --cpus-per-task=2")
+		assert.Contains(t, script, "#SBATCH --mem=2048M")
+		assert.Contains(t, script, "#SBATCH --gpus=1")
+	})
+
+	t.Run("forward flag off omits resources", func(t *testing.T) {
+		t.Setenv("RSC_SESSION_CPU", "2")
+		t.Setenv("RSC_SESSION_MEMORY", "2048")
+		t.Setenv("RSC_SESSION_GPUS", "1")
+
+		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath)
+		assert.NotContains(t, script, "--cpus-per-task")
+		assert.NotContains(t, script, "--mem")
+		assert.NotContains(t, script, "--gpus")
+	})
+
+	t.Run("only cpu provided", func(t *testing.T) {
+		t.Setenv("RSC_SESSION_CPU", "4")
+		t.Setenv("RSC_SESSION_MEMORY", "")
+		t.Setenv("RSC_SESSION_GPUS", "")
+		t.Setenv("RSC_FIRECREST_FORWARD_RESOURCE_VALUES", "true")
+
+		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath)
+		assert.Contains(t, script, "#SBATCH --cpus-per-task=4")
+		assert.NotContains(t, script, "--mem")
+		assert.NotContains(t, script, "--gpus")
+	})
 }
 
 func TestStreamsToFetch(t *testing.T) {
