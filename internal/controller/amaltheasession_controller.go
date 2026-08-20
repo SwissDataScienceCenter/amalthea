@@ -296,16 +296,16 @@ func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amalt
 	}
 
 	// create an initial empty error list
-	error_list := errors.Join(nil, nil)
+	errorList := errors.Join()
 	for _, item := range adoptedSecrets.Items {
 		err := r.Delete(ctx, &item)
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
-				error_list = errors.Join(error_list, err)
+				errorList = errors.Join(errorList, err)
 			}
 		}
 	}
-	return error_list
+	return errorList
 }
 
 // SetupWithManager sets up the controller with the Manager.
