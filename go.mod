@@ -17,7 +17,7 @@ require (
 	github.com/labstack/gommon v0.5.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/oapi-codegen/oapi-codegen/v2 v2.8.0
-	github.com/oapi-codegen/runtime v1.6.0
+	github.com/oapi-codegen/runtime v1.7.0
 	github.com/oasdiff/yaml v0.1.1
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/onsi/ginkgo/v2 v2.23.4
