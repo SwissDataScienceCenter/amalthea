@@ -147,16 +147,10 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		if reflect.DeepEqual(amaltheasession.Status, amaltheadevv1alpha1.AmaltheaSessionStatus{State: amaltheadevv1alpha1.NotReady, Idle: false}) {
 			// First status update/render
 			amaltheasession.Status.URL = amaltheasession.GetURLString()
-			err := r.Status().Update(ctx, amaltheasession)
-			if err != nil {
-				err = r.Get(ctx, req.NamespacedName, amaltheasession)
-				if err != nil {
-					return ctrl.Result{}, err
-				}
-				err = r.Status().Update(ctx, amaltheasession)
-				if err != nil {
-					return ctrl.Result{}, err
-				}
+			if err := r.updateStatusWithRetry(ctx, amaltheasession, func(cr *amaltheadevv1alpha1.AmaltheaSession) {
+				cr.Status.URL = cr.GetURLString()
+			}); err != nil {
+				return ctrl.Result{}, err
 			}
 			// Record initial metrics
 			RecordAmaltheaSessionMetrics(amaltheasession)
@@ -172,18 +166,10 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		}
 	} else {
 		amaltheasession.Status.State = amaltheadevv1alpha1.NotReady
-		err := r.Status().Update(ctx, amaltheasession)
-		if err != nil {
-			// The status update can fail if the CR is out of date, re-read the CR here and retry
-			err = r.Get(ctx, req.NamespacedName, amaltheasession)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			amaltheasession.Status.State = amaltheadevv1alpha1.NotReady
-			err = r.Status().Update(ctx, amaltheasession)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
+		if err := r.updateStatusWithRetry(ctx, amaltheasession, func(cr *amaltheadevv1alpha1.AmaltheaSession) {
+			cr.Status.State = amaltheadevv1alpha1.NotReady
+		}); err != nil {
+			return ctrl.Result{}, err
 		}
 
 		// The object is being deleted
@@ -237,22 +223,14 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 	statusChanged := !reflect.DeepEqual(amaltheasession.Status, newStatus)
 
 	amaltheasession.Status = newStatus
-	err = r.Status().Update(ctx, amaltheasession)
-	if err != nil {
-		// The status update can fail if the CR is out of date, re-read the CR here and retry
-		err = r.Get(ctx, req.NamespacedName, amaltheasession)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+	if err := r.updateStatusWithRetry(ctx, amaltheasession, func(cr *amaltheadevv1alpha1.AmaltheaSession) {
 		// Handle run ID being set by a concurrent loop
-		if newStatus.RunID != "" && amaltheasession.Status.RunID != "" {
-			newStatus.RunID = amaltheasession.Status.RunID
+		if newStatus.RunID != "" && cr.Status.RunID != "" {
+			newStatus.RunID = cr.Status.RunID
 		}
-		amaltheasession.Status = newStatus
-		err = r.Status().Update(ctx, amaltheasession)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+		cr.Status = newStatus
+	}); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// Record metrics for the session status
@@ -285,6 +263,25 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
 	return ctrl.Result{Requeue: true}, nil
+}
+
+func (r *AmaltheaSessionReconciler) updateStatusWithRetry(
+	ctx context.Context,
+	cr *amaltheadevv1alpha1.AmaltheaSession,
+	onConflict func(*amaltheadevv1alpha1.AmaltheaSession),
+) error {
+	err := r.Status().Update(ctx, cr)
+	if err == nil {
+		return nil
+	}
+	if !apierrors.IsConflict(err) {
+		return err
+	}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(cr), cr); err != nil {
+		return err
+	}
+	onConflict(cr)
+	return r.Status().Update(ctx, cr)
 }
 
 func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession) error {
