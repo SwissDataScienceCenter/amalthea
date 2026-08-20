@@ -240,7 +240,9 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		// Clean up metrics for this session before deleting it
 		RemoveAmaltheaSessionMetrics(amaltheasession)
 		err = r.Delete(ctx, amaltheasession)
-		logger.Info("custom resource deleted")
+		if err == nil {
+			logger.Info("custom resource deleted")
+		}
 		return ctrl.Result{}, err
 	}
 
