@@ -348,7 +348,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		return err
 	}
 
-	err = c.uploadSecret(startCtx, common.UserSecretProxyFolder, remoteSecretsPath, "wstunnel_secret")
+	err = c.uploadSecret(startCtx, common.LocalUserSecretPath, remoteSecretsPath, "wstunnel_secret")
 	if err != nil {
 		return err
 	}
@@ -371,7 +371,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 	}
 
 	remoteDataConnectorsPath := path.Join(remoteSecretsPath, "data_connectors")
-	localDataConnectorsPath := common.DataConnectorProxyFolder
+	localDataConnectorsPath := common.LocalDataConnectorPath
 	if err = c.uploadDataConnectors(startCtx, localDataConnectorsPath, remoteDataConnectorsPath); err != nil {
 		return err
 	}

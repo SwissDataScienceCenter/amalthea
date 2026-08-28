@@ -12,9 +12,9 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-const UserSecretProxyFolder = "/secrets-user"
-const DataConnectorProxyFolder = "/secrets-dcs"
-const DataConnectorSecretProxyFolder = "/secrets-dcs-secrets"
+const LocalUserSecretPath = "/secrets-user"
+const LocalDataConnectorPath = "/secrets-dcs"
+const LocalDataConnectorSecretPath = "/secrets-dcs-secrets"
 
 type DataConnector struct {
 	root string
@@ -48,7 +48,7 @@ func (dc *DataConnector) dataConnectorSecrets() (map[string][]byte, error) {
 	}
 
 	var dirEntries []os.DirEntry
-	dataConnectorSecretMountPoint := path.Join(DataConnectorSecretProxyFolder, dc.Name)
+	dataConnectorSecretMountPoint := path.Join(LocalDataConnectorSecretPath, dc.Name)
 	if dirEntries, err = os.ReadDir(dataConnectorSecretMountPoint); err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func parsePV(name string) ([]string, error) {
 	var content []byte
 	var err error
 
-	if content, err = os.ReadFile(path.Join(UserSecretProxyFolder, name)); err != nil {
+	if content, err = os.ReadFile(path.Join(LocalUserSecretPath, name)); err != nil {
 		return nil, err
 	}
 

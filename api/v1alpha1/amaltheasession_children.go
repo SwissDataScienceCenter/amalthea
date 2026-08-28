@@ -672,7 +672,7 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 		{
 			Name:      fmt.Sprintf("%s-%s", prefix, as.Name),
 			ReadOnly:  true,
-			MountPath: common.UserSecretProxyFolder,
+			MountPath: common.LocalUserSecretPath,
 		},
 	}
 
@@ -697,7 +697,7 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 				v1.VolumeMount{
 					Name:      volName,
 					ReadOnly:  true,
-					MountPath: path.Join(common.DataConnectorProxyFolder, volName),
+					MountPath: path.Join(common.LocalDataConnectorPath, volName),
 				},
 			)
 			// If there is a user secret linked to the data connector, mount it as it contains required credentials
@@ -721,7 +721,7 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 				v1.VolumeMount{
 					Name:      volNameSecret,
 					ReadOnly:  true,
-					MountPath: path.Join(common.DataConnectorSecretProxyFolder, volName),
+					MountPath: path.Join(common.LocalDataConnectorSecretPath, volName),
 				},
 			)
 			ids += 1
