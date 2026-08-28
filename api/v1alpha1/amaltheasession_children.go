@@ -663,7 +663,7 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
 					SecretName:  as.InternalSecretName(),
-					DefaultMode: ptr.To(int32(256)), // decimal value of 0400 for the access flags (chmod-like)
+					DefaultMode: ptr.To(int32(0400)), // chmod: r-- --- ---
 				},
 			},
 		},
@@ -687,7 +687,7 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 					VolumeSource: v1.VolumeSource{
 						Secret: &v1.SecretVolumeSource{
 							SecretName:  pv.SecretRef.Name,
-							DefaultMode: ptr.To(int32(256)), // decimal value of 0400 for the access flags (chmod-like)
+							DefaultMode: ptr.To(int32(0400)), // chmod: r-- --- ---
 						},
 					},
 				},
@@ -711,7 +711,7 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 						Secret: &v1.SecretVolumeSource{
 							SecretName:  userSecretName,
 							Optional:    ptr.To(true),
-							DefaultMode: ptr.To(int32(256)), // decimal value of 0400 for the access flags (chmod-like)
+							DefaultMode: ptr.To(int32(0400)), // chmod: r-- --- ---
 						},
 					},
 				},
