@@ -645,14 +645,11 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 // Assuming that the csi-rclone driver from https://github.com/SwissDataScienceCenter/csi-rclone
 // is installed, this will generate PVCs for the data sources that have the rclone type.
 func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
-	switch as.Spec.SessionLocation {
-	case Remote:
+	if as.Spec.SessionLocation == Remote {
 		return as.RemoteSessionDataSources()
-	case Local:
-		return as.LocalSessionDataSources()
-	default:
-		panic("invalid session location")
 	}
+	// as.Spec.SessionLocation == Local
+	return as.LocalSessionDataSources()
 }
 
 func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
