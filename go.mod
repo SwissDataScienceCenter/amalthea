@@ -7,8 +7,8 @@ tool fybrik.io/crdoc
 require (
 	github.com/distribution/reference v0.6.0
 	github.com/elazarl/goproxy v1.9.0
-	github.com/getkin/kin-openapi v0.147.0
-	github.com/getsentry/sentry-go v0.48.0
+	github.com/getkin/kin-openapi v0.148.0
+	github.com/getsentry/sentry-go v0.49.0
 	github.com/go-git/go-git/v5 v5.19.2
 	github.com/go-logr/logr v1.4.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -105,7 +105,7 @@ require (
 	github.com/prometheus/common v0.70.1 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
