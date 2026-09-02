@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 
 	configLib "github.com/SwissDataScienceCenter/amalthea/internal/git-https-proxy/config"
@@ -88,25 +87,10 @@ func GetProxyHandler(config configLib.GitProxyConfig) *goproxy.ProxyHttpServer {
 
 // Ensure that hosts name match with/without www. I.e.
 // ensure www.hostname.com matches hostname.com and vice versa
-func hostsMatch(url1 *url.URL, url2 *url.URL) bool {
-	var err error
-	var url1ContainsWww, url2ContainsWww bool
-	wwwRegex := fmt.Sprintf("^%s", regexp.QuoteMeta("www."))
-	url1ContainsWww, err = regexp.MatchString(wwwRegex, url1.Hostname())
-	if err != nil {
-		log.Fatalln(err)
-	}
-	url2ContainsWww, err = regexp.MatchString(wwwRegex, url2.Hostname())
-	if err != nil {
-		log.Fatalln(err)
-	}
-	if url1ContainsWww && !url2ContainsWww {
-		return url1.Hostname() == fmt.Sprintf("www.%s", url2.Hostname())
-	} else if !url1ContainsWww && url2ContainsWww {
-		return fmt.Sprintf("www.%s", url1.Hostname()) == url2.Hostname()
-	} else {
-		return url1.Hostname() == url2.Hostname()
-	}
+func hostsMatch(url1, url2 *url.URL) bool {
+	host1 := strings.TrimPrefix(strings.ToLower(url1.Hostname()), "www.")
+	host2 := strings.TrimPrefix(strings.ToLower(url2.Hostname()), "www.")
+	return host1 == host2
 }
 
 // Infer port if not explicitly specified
