@@ -31,7 +31,7 @@ type DataConnector struct {
 
 func (dc *DataConnector) fernetKey() (*fernet.Key, error) {
 	// the fernet key is mounted as part of the data source secret
-	if encodedKey, err := os.ReadFile(path.Join(dc.root, dc.Name, "secretKey")); err == nil {
+	if encodedKey, err := os.ReadFile(path.Join(dc.Root, dc.Name, "secretKey")); err == nil {
 		return fernet.DecodeKey(string(encodedKey))
 	} else {
 		return nil, err
@@ -73,7 +73,7 @@ func (dc *DataConnector) dataConnectorSecrets() (map[string][]byte, error) {
 func (dc *DataConnector) ConfigFiles() (map[string][]byte, error) {
 	configFiles := map[string][]byte{}
 
-	content, err := os.ReadFile(path.Join(dc.root, dc.Name, "configData"))
+	content, err := os.ReadFile(path.Join(dc.Root, dc.Name, "configData"))
 	if err != nil {
 		return nil, err
 	}
