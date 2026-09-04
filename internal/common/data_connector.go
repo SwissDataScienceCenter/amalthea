@@ -17,7 +17,7 @@ const LocalDataConnectorPath = "/secrets-dcs"
 const LocalDataConnectorSecretPath = "/secrets-dcs-secrets"
 
 type DataConnector struct {
-	root string
+	Root string
 
 	Name   string
 	Remote string
