@@ -14,6 +14,15 @@ import (
 type GitRepository struct {
 	Url      string `json:"url"`
 	Provider string `json:"provider"`
+
+	// References == nil means no additional Git authorization is imposed;
+	// the token's scope is the sole authorization boundary.
+	//
+	// References != nil imposes an additional restriction on receive-pack:
+	// every ref update in the request must be listed in References, or
+	// the entire request is rejected. GET and upload-pack remain allowed.
+	// E.g. [ `refs/heads/main`, `refs/tags/main` ]
+	References *[]string `json:"branches"`
 }
 
 type GitProvider struct {
