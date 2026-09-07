@@ -660,6 +660,7 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
 					SecretName:  as.InternalSecretName(),
+					Optional:    ptr.To(false),
 					DefaultMode: ptr.To(int32(0400)), // chmod: r-- --- ---
 				},
 			},
