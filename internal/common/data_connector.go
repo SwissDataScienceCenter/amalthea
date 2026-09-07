@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/fernet/fernet-go"
@@ -31,7 +31,8 @@ type DataConnector struct {
 
 func (dc *DataConnector) fernetKey() (*fernet.Key, error) {
 	// the fernet key is mounted as part of the data source secret
-	if encodedKey, err := os.ReadFile(path.Join(dc.Root, dc.Name, "secretKey")); err == nil {
+	root := filepath.FromSlash(filepath.Clean(dc.Root)) // Clean and convert `dc.Root`
+	if encodedKey, err := os.ReadFile(filepath.Join(root, dc.Name, "secretKey")); err == nil {
 		return fernet.DecodeKey(string(encodedKey))
 	} else {
 		return nil, err
@@ -47,8 +48,10 @@ func (dc *DataConnector) dataConnectorSecrets() (map[string][]byte, error) {
 		return nil, err
 	}
 
+	dataConnectorSecretBaseFilePath := filepath.FromSlash(filepath.Clean(LocalDataConnectorSecretPath))
+	dataConnectorSecretMountPoint := filepath.Join(dataConnectorSecretBaseFilePath, dc.Name)
+
 	var dirEntries []os.DirEntry
-	dataConnectorSecretMountPoint := path.Join(LocalDataConnectorSecretPath, dc.Name)
 	if dirEntries, err = os.ReadDir(dataConnectorSecretMountPoint); err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
@@ -61,7 +64,7 @@ func (dc *DataConnector) dataConnectorSecrets() (map[string][]byte, error) {
 		}
 
 		var content []byte
-		if content, err = os.ReadFile(path.Join(dataConnectorSecretMountPoint, dir.Name())); err != nil {
+		if content, err = os.ReadFile(filepath.Join(dataConnectorSecretMountPoint, dir.Name())); err != nil {
 			return nil, err
 		}
 		decodedSecrets[dir.Name()] = fernet.VerifyAndDecrypt(content, 0, []*fernet.Key{fernetKey})
@@ -73,7 +76,8 @@ func (dc *DataConnector) dataConnectorSecrets() (map[string][]byte, error) {
 func (dc *DataConnector) ConfigFiles() (map[string][]byte, error) {
 	configFiles := map[string][]byte{}
 
-	content, err := os.ReadFile(path.Join(dc.Root, dc.Name, "configData"))
+	root := filepath.FromSlash(filepath.Clean(dc.Root)) // Clean and convert `dc.Root`
+	content, err := os.ReadFile(filepath.Join(root, dc.Name, "configData"))
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +144,8 @@ func parsePV(name string) ([]string, error) {
 	var content []byte
 	var err error
 
-	if content, err = os.ReadFile(path.Join(LocalUserSecretPath, name)); err != nil {
+	localUserSecretBaseFilePath := filepath.FromSlash(filepath.Clean(LocalUserSecretPath))
+	if content, err = os.ReadFile(filepath.Join(localUserSecretBaseFilePath, name)); err != nil {
 		return nil, err
 	}
 
@@ -156,26 +161,28 @@ func parsePV(name string) ([]string, error) {
 	return extraArgs, nil
 }
 
-func LoadDataConnector(root, name string) (*DataConnector, error) {
+func LoadDataConnector(rootDir, name string) (*DataConnector, error) {
 	var content []byte
 	var err error
 
-	if content, err = os.ReadFile(path.Join(root, name, "remote")); err != nil {
+	root := filepath.FromSlash(filepath.Clean(rootDir)) // Clean and convert `dc.Root`
+
+	if content, err = os.ReadFile(filepath.Join(root, name, "remote")); err != nil {
 		return nil, err
 	}
 	remote := string(content)
 
-	if content, err = os.ReadFile(path.Join(root, name, "remotePath")); err != nil {
+	if content, err = os.ReadFile(filepath.Join(root, name, "remotePath")); err != nil {
 		return nil, err
 	}
 	remotePath := string(content)
 
-	if content, err = os.ReadFile(path.Join(root, name, "mountOpt")); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if content, err = os.ReadFile(filepath.Join(root, name, "mountOpt")); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
 	mountOpt := string(content)
 
-	if content, err = os.ReadFile(path.Join(root, name, "vfsOpt")); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if content, err = os.ReadFile(filepath.Join(root, name, "vfsOpt")); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
 	vfsOpt := string(content)
