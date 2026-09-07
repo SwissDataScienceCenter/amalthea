@@ -656,7 +656,7 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 	pvcs := []v1.PersistentVolumeClaim{}
 	vols := []v1.Volume{
 		{
-			Name: fmt.Sprintf("%s-%s", prefix, as.Name),
+			Name: fmt.Sprintf("%s%s", prefix, as.Name),
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
 					SecretName:  as.InternalSecretName(),
@@ -667,7 +667,7 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 	}
 	volMounts := []v1.VolumeMount{
 		{
-			Name:      fmt.Sprintf("%s-%s", prefix, as.Name),
+			Name:      fmt.Sprintf("%s%s", prefix, as.Name),
 			ReadOnly:  true,
 			MountPath: common.LocalUserSecretPath,
 		},
