@@ -58,8 +58,9 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 		},
 	}
 	secretsPath := "/secrets"
+	containerSecretsPath := "/container-secrets"
 
-	sessionScriptFinal := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath)
+	sessionScriptFinal := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath, containerSecretsPath)
 
 	// Check that the rendered script starts with "#!/bin/bash"
 	assert.Regexp(t, regexp.MustCompile("^#!/bin/bash"), sessionScriptFinal)
@@ -86,6 +87,6 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 	assert.Contains(t, foundMounts, "\"/scratch:/scratch\"")
 	assert.Contains(t, foundMounts, "\"/store:/store\"")
 	assert.Contains(t, foundMounts, "\"/users:/home/users:ro\"")
-	assert.Contains(t, foundMounts, "\"/secrets:/secrets:ro\"")
+	assert.Contains(t, foundMounts, "\"/secrets:/container-secrets:ro\"")
 	assert.Contains(t, foundMounts, "\"/cluster-specific:/cluster-specific\"")
 }
