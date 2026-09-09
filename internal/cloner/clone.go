@@ -124,7 +124,7 @@ func clone(cmd *cobra.Command, args []string) {
 		URL:               remote,
 		SingleBranch:      true,
 		ReferenceName:     plumbing.ReferenceName(revision),
-		RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
+		RecurseSubmodules: git.NoRecurseSubmodules,
 		Progress:          os.Stdout,
 	}
 
