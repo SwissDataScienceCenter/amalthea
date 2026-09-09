@@ -58,8 +58,9 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 		},
 	}
 	secretsPath := "/secrets"
+	containerSecretsPath := "/container-secrets"
 
-	sessionScriptFinal := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath)
+	sessionScriptFinal := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath, containerSecretsPath)
 
 	// Check that the rendered script starts with "#!/bin/bash"
 	assert.Regexp(t, regexp.MustCompile("^#!/bin/bash"), sessionScriptFinal)
@@ -86,7 +87,7 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 	assert.Contains(t, foundMounts, "\"/scratch:/scratch\"")
 	assert.Contains(t, foundMounts, "\"/store:/store\"")
 	assert.Contains(t, foundMounts, "\"/users:/home/users:ro\"")
-	assert.Contains(t, foundMounts, "\"/secrets:/secrets:ro\"")
+	assert.Contains(t, foundMounts, "\"/secrets:/container-secrets:ro\"")
 	assert.Contains(t, foundMounts, "\"/cluster-specific:/cluster-specific\"")
 
 	t.Run("resources provided", func(t *testing.T) {
@@ -95,7 +96,7 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 		t.Setenv("RSC_SESSION_GPUS", "1")
 		t.Setenv("RSC_FIRECREST_FORWARD_RESOURCE_VALUES", "true")
 
-		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath)
+		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath, containerSecretsPath)
 		assert.Contains(t, script, "#SBATCH --cpus-per-task=2")
 		assert.Contains(t, script, "#SBATCH --mem=2048M")
 		assert.Contains(t, script, "#SBATCH --gpus=1")
@@ -106,7 +107,7 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 		t.Setenv("RSC_SESSION_MEMORY", "2048")
 		t.Setenv("RSC_SESSION_GPUS", "1")
 
-		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath)
+		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath, containerSecretsPath)
 		assert.NotContains(t, script, "--cpus-per-task")
 		assert.NotContains(t, script, "--mem")
 		assert.NotContains(t, script, "--gpus")
@@ -118,7 +119,7 @@ func TestRenderSessionScriptStatic(t *testing.T) {
 		t.Setenv("RSC_SESSION_GPUS", "")
 		t.Setenv("RSC_FIRECREST_FORWARD_RESOURCE_VALUES", "true")
 
-		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath)
+		script := renderSessionScriptStatic(sessionScript, partition, &fileSystems, secretsPath, containerSecretsPath)
 		assert.Contains(t, script, "#SBATCH --cpus-per-task=4")
 		assert.NotContains(t, script, "--mem")
 		assert.NotContains(t, script, "--gpus")
