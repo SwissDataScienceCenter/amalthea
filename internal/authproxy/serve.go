@@ -177,6 +177,17 @@ func (l *RequestStats) Handle(c echo.Context) error {
 	return c.JSON(http.StatusOK, RequestStatsResponse{LastRequestTime: l.LastRequest})
 }
 
+// checkAuthConfig fails closed when token authentication is enabled but the
+// resolved token is empty. A config file is only passed by the operator for
+// token authenticated sessions, so an empty token there means the proxy would
+// otherwise run without any authentication.
+func checkAuthConfig() error {
+	if config != "" && len(token) == 0 {
+		return fmt.Errorf("token authentication is enabled but the resolved token is empty, refusing to start without authentication")
+	}
+	return nil
+}
+
 func serve(cmd *cobra.Command, args []string) {
 
 	e := echo.New()
@@ -185,6 +196,10 @@ func serve(cmd *cobra.Command, args []string) {
 	e.Logger.SetLevel(log.INFO)
 	if verbose {
 		e.Logger.SetLevel(log.DEBUG)
+	}
+
+	if err := checkAuthConfig(); err != nil {
+		e.Logger.Fatal(err)
 	}
 
 	rs := NewStats()
