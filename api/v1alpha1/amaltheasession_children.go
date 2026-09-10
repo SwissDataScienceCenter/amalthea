@@ -38,6 +38,7 @@ const prefix string = "amalthea-"
 const SessionContainerName string = prefix + "session"
 const servicePortName string = prefix + "http"
 const serviceMetaPortName string = prefix + "http-meta"
+const serviceSSHPortName string = prefix + "ssh"
 const servicePort int32 = 80
 const sessionVolumeName string = prefix + "volume"
 const shmVolumeName string = prefix + "dev-shm"
@@ -49,6 +50,7 @@ const AuthProxyMetaPort int32 = 65534
 const secondProxyPort int32 = 65533
 const RemoteSessionControllerPort int32 = 65532
 const TunnelPort int32 = 65531
+const SSHPort int32 = 2222
 
 var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
@@ -322,6 +324,16 @@ func (cr *AmaltheaSession) Service() v1.Service {
 			Name:       tunnelServiceName,
 			Port:       TunnelPort,
 			TargetPort: intstr.FromString(tunnelServiceName),
+		})
+	} else {
+		// TODO(ssh): POC — port 2222 is reachable from anywhere in the cluster.
+		// Before shipping: netpol so only the SSH proxy can reach it, and gate
+		// on image capability (OCI label ch.datascience.renku.ssh=true).
+		svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
+			Protocol:   v1.ProtocolTCP,
+			Name:       serviceSSHPortName,
+			Port:       SSHPort,
+			TargetPort: intstr.FromInt32(SSHPort),
 		})
 	}
 	return svc

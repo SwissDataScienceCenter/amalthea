@@ -9,6 +9,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -64,6 +65,62 @@ func TestGetPodEventsSorted(t *testing.T) {
 	res, err := session.GetPodEvents(context.TODO(), clnt)
 	assert.Nil(t, err)
 	assert.Equal(t, res.Items, []v1.Event{ev3, ev2, ev1})
+}
+
+func TestServiceSSHPort(t *testing.T) {
+	sshPort := v1.ServicePort{
+		Protocol:   v1.ProtocolTCP,
+		Name:       serviceSSHPortName,
+		Port:       SSHPort,
+		TargetPort: intstr.FromInt32(SSHPort),
+	}
+	cases := []struct {
+		name       string
+		location   SessionLocation
+		auth       bool
+		sshEnabled bool
+	}{
+		{
+			name:       "local session gets the ssh port",
+			location:   Local,
+			sshEnabled: true,
+		},
+		{
+			name:       "local session with authentication still gets the ssh port",
+			location:   Local,
+			auth:       true,
+			sshEnabled: true,
+		},
+		{
+			name:     "remote session does not get the ssh port",
+			location: Remote,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cr := &AmaltheaSession{
+				Spec: AmaltheaSessionSpec{
+					SessionLocation: tc.location,
+					Session: Session{
+						Image: "my-image",
+						Port:  8888,
+					},
+				},
+			}
+			if tc.auth {
+				cr.Spec.Authentication = &Authentication{Enabled: true, Type: OauthProxy}
+			}
+			svc := cr.Service()
+			found := false
+			for _, port := range svc.Spec.Ports {
+				if port.Name == serviceSSHPortName {
+					found = true
+					assert.Equal(t, sshPort, port)
+				}
+			}
+			assert.Equal(t, tc.sshEnabled, found)
+		})
+	}
 }
 
 func TestSessionContainerRemoteResources(t *testing.T) {
