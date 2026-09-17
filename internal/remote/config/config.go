@@ -26,6 +26,7 @@ import (
 
 	firecrestConfig "github.com/SwissDataScienceCenter/amalthea/internal/remote/config/firecrest"
 	runaiConfig "github.com/SwissDataScienceCenter/amalthea/internal/remote/config/runai"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config/runners"
 	configUtils "github.com/SwissDataScienceCenter/amalthea/internal/remote/config/utils"
 )
 
@@ -34,9 +35,11 @@ type RemoteKind string
 const (
 	RemoteKindFirecrest RemoteKind = "firecrest"
 	RemoteKindRunai     RemoteKind = "runai"
+	RemoteKindRunners   RemoteKind = "runners"
 )
 
 const (
+	remoteKindFlag         = "remote_kind"
 	serverPortFlag         = "server-port"
 	fakeStartFlag          = "fake-start"
 	sessionPortFlag        = "session-port"
@@ -46,12 +49,15 @@ const (
 
 type RemoteSessionControllerConfig struct {
 
-	// The type of remote infrastructure to use, currently FirecREST or Runai
+	// The type of remote infrastructure to use, currently FirecREST, Runai or Runners
 	RemoteKind RemoteKind
 
 	// The configuration for the FirecREST API
 	Firecrest firecrestConfig.FirecrestConfig
-	Runai     runaiConfig.RunaiConfig
+	// The configuration for the Runai API
+	Runai runaiConfig.RunaiConfig
+	// The configuration for using session runners
+	Runners runners.RunnersConfig
 
 	// The port the server will listen to
 	ServerPort int32
@@ -70,6 +76,14 @@ type RemoteSessionControllerConfig struct {
 }
 
 func SetFlags(cmd *cobra.Command) error {
+	cmd.Flags().String(remoteKindFlag, "", "kind of remote")
+	if err := viper.BindPFlag(remoteKindFlag, cmd.Flags().Lookup(remoteKindFlag)); err != nil {
+		return err
+	}
+	if err := viper.BindEnv(remoteKindFlag, configUtils.AsEnvVarFlag(remoteKindFlag)); err != nil {
+		return err
+	}
+
 	cmd.Flags().Int32(serverPortFlag, amaltheadevv1alpha1.RemoteSessionControllerPort, "port to listen to")
 	if err := viper.BindPFlag(serverPortFlag, cmd.Flags().Lookup(serverPortFlag)); err != nil {
 		return err
@@ -132,7 +146,9 @@ func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
 	// This only gets the config, but does not validate it
 	cfg.Firecrest = firecrestConfig.GetConfig()
 	cfg.Runai = runaiConfig.GetConfig()
+	cfg.Runners = runners.GetConfig()
 
+	cfg.RemoteKind = RemoteKind(viper.GetString(remoteKindFlag))
 	cfg.ServerPort = viper.GetInt32(serverPortFlag)
 	cfg.FakeStart = viper.GetBool(fakeStartFlag)
 	cfg.SessionPort = viper.GetInt32(sessionPortFlag)
@@ -149,7 +165,17 @@ func (cfg *RemoteSessionControllerConfig) Validate() error {
 		return fmt.Errorf("invalid readiness probe type: %s", cfg.ReadinessProbeType)
 	}
 
-	// FireCREST has priority over Runai
+	// Use the value of the remote kind flag if given
+	switch cfg.RemoteKind {
+	case RemoteKindFirecrest:
+		return cfg.Firecrest.Validate()
+	case RemoteKindRunai:
+		return cfg.Runai.Validate()
+	case RemoteKindRunners:
+		return cfg.Runners.Validate()
+	}
+
+	// Legacy behavior: FireCREST has priority over Runai when "cfg.RemoteKind" is not set
 	cfg.RemoteKind = RemoteKindFirecrest
 	firecrestConfigErr := cfg.Firecrest.Validate()
 	if firecrestConfigErr == nil {
