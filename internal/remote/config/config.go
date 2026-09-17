@@ -26,7 +26,7 @@ import (
 
 	firecrestConfig "github.com/SwissDataScienceCenter/amalthea/internal/remote/config/firecrest"
 	runaiConfig "github.com/SwissDataScienceCenter/amalthea/internal/remote/config/runai"
-	"github.com/SwissDataScienceCenter/amalthea/internal/remote/config/runners"
+	runnersConfig "github.com/SwissDataScienceCenter/amalthea/internal/remote/config/runners"
 	configUtils "github.com/SwissDataScienceCenter/amalthea/internal/remote/config/utils"
 )
 
@@ -57,7 +57,7 @@ type RemoteSessionControllerConfig struct {
 	// The configuration for the Runai API
 	Runai runaiConfig.RunaiConfig
 	// The configuration for using session runners
-	Runners runners.RunnersConfig
+	Runners runnersConfig.RunnersConfig
 
 	// The port the server will listen to
 	ServerPort int32
@@ -146,7 +146,7 @@ func GetConfig() (cfg RemoteSessionControllerConfig, err error) {
 	// This only gets the config, but does not validate it
 	cfg.Firecrest = firecrestConfig.GetConfig()
 	cfg.Runai = runaiConfig.GetConfig()
-	cfg.Runners = runners.GetConfig()
+	cfg.Runners = runnersConfig.GetConfig()
 
 	cfg.RemoteKind = RemoteKind(viper.GetString(remoteKindFlag))
 	cfg.ServerPort = viper.GetInt32(serverPortFlag)
