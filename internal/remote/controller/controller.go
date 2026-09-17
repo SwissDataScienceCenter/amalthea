@@ -24,6 +24,7 @@ import (
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/firecrest"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/models"
 	"github.com/SwissDataScienceCenter/amalthea/internal/remote/runai"
+	"github.com/SwissDataScienceCenter/amalthea/internal/remote/runners"
 )
 
 type RemoteSessionController interface {
@@ -35,6 +36,7 @@ type RemoteSessionController interface {
 // Check that the backend-specific session controllers satisfy the RemoteSessionController interface
 var _ RemoteSessionController = (*firecrest.FirecrestRemoteSessionController)(nil)
 var _ RemoteSessionController = (*runai.RunaiRemoteSessionController)(nil)
+var _ RemoteSessionController = (*runners.RunnersRemoteSessionController)(nil)
 
 func NewRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c RemoteSessionController, err error) {
 	if cfg.RemoteKind == config.RemoteKindFirecrest {
@@ -46,6 +48,13 @@ func NewRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c Rem
 	}
 	if cfg.RemoteKind == config.RemoteKindRunai {
 		controller, err := runai.NewRunaiRemoteSessionController(cfg)
+		if err != nil {
+			return nil, err
+		}
+		return controller, nil
+	}
+	if cfg.RemoteKind == config.RemoteKindRunners {
+		controller, err := runners.NewRunnersRemoteSessionController(cfg)
 		if err != nil {
 			return nil, err
 		}
