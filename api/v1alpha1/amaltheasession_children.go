@@ -131,6 +131,11 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	initContainers := []v1.Container{} //nolint:prealloc
 	initContainers = append(initContainers, cloneInit.Containers...)
 	initContainers = append(initContainers, cr.Spec.ExtraInitContainers...)
+	if cr.Spec.RcloneDataSource != nil {
+		rcVol, rcVolMount := cr.RcloneDataSource()
+		volumes = append(volumes, rcVol)
+		volumeMounts = append(volumeMounts, rcVolMount)
+	}
 
 	// Create the main session container
 	sessionContainer := cr.sessionContainer(volumeMounts, cfg)
@@ -262,7 +267,7 @@ func (cr *AmaltheaSession) StatefulSet(cfg config.AmaltheaSessionConfiguration) 
 			PodManagementPolicy: appsv1.ParallelPodManagement,
 			Replicas:            &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: selectorLabels(cr.Name),
+				MatchLabels: SelectorLabels(cr.Name),
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -295,7 +300,7 @@ func (cr *AmaltheaSession) Service() v1.Service {
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: v1.ServiceSpec{
-			Selector: selectorLabels(cr.Name),
+			Selector: SelectorLabels(cr.Name),
 			Ports: []v1.ServicePort{
 				{
 					Protocol:   v1.ProtocolTCP,
@@ -360,7 +365,7 @@ func (cr *AmaltheaSession) Ingress() *networkingv1.Ingress {
 		return nil
 	}
 
-	conflicts := findConflicts(ingress.Annotations, cr.Spec.Template.Metadata.Annotations)
+	conflicts := FindConflicts(ingress.Annotations, cr.Spec.Template.Metadata.Annotations)
 	if len(conflicts) > 0 {
 		log.Log.Info("Found conflicts in ingress annotations, will ignore templated conflicting annotations for ingress", "conflicting keys", conflicts)
 	}
@@ -457,9 +462,9 @@ func (cr *AmaltheaSession) PVC() v1.PersistentVolumeClaim {
 	return pvc
 }
 
-// selectorLabels returns the labels for selecting the resources
+// SelectorLabels returns the labels for selecting the resources
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
-func selectorLabels(name string) map[string]string {
+func SelectorLabels(name string) map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":       "AmaltheaSession",
 		"app.kubernetes.io/instance":   name,
@@ -731,6 +736,30 @@ func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 		}
 	}
 	return pvcs, vols, volMounts
+}
+
+// Generates the volume and volume mount used inside the session statefulset spec
+func (as *AmaltheaSession) RcloneDataSource() (v1.Volume, v1.VolumeMount) {
+	if as.Spec.RcloneDataSource == nil {
+		return v1.Volume{}, v1.VolumeMount{}
+	}
+	volName := "rclone-v2-volume"
+	readOnly := as.Spec.RcloneDataSource.AccessMode == v1.ReadOnlyMany
+	vol := v1.Volume{
+		Name: volName,
+		VolumeSource: v1.VolumeSource{
+			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+				ClaimName: as.RcloneV2ResourceName(),
+				ReadOnly:  readOnly,
+			},
+		},
+	}
+	volMount := v1.VolumeMount{
+		Name:      volName,
+		ReadOnly:  readOnly,
+		MountPath: as.Spec.RcloneDataSource.MountPath,
+	}
+	return vol, volMount
 }
 
 func getStorageClass() string {
@@ -1180,8 +1209,8 @@ func (cr *AmaltheaSession) tunnelContainer() v1.Container {
 	return tunnelContainer
 }
 
-// findConflicst will return all the keys from source that can be found in destination.
-func findConflicts(destination, source map[string]string) []string {
+// findConflicst will return all the keys from source that can be found in desintation.
+func FindConflicts(destination, source map[string]string) []string {
 	conflicts := []string{}
 	for srcKey := range source {
 		_, found := destination[srcKey]
@@ -1196,8 +1225,8 @@ func findConflicts(destination, source map[string]string) []string {
 func (cr *AmaltheaSession) childLabels() map[string]string {
 	sessionLabels := map[string]string{}
 	maps.Copy(sessionLabels, cr.Spec.Template.Metadata.Labels)
-	selectorLabels := selectorLabels(cr.Name)
-	conflicts := findConflicts(sessionLabels, selectorLabels)
+	selectorLabels := SelectorLabels(cr.Name)
+	conflicts := FindConflicts(sessionLabels, selectorLabels)
 	if len(conflicts) > 0 {
 		log.Log.Info(
 			"Found conflicts in template labels and selector labels, the selector labels will take precedence",
@@ -1213,4 +1242,8 @@ func (cr *AmaltheaSession) childLabels() map[string]string {
 	// This is the desired behaviour, we do not want to overwrite the selector labels.
 	maps.Copy(sessionLabels, selectorLabels)
 	return sessionLabels
+}
+
+func (cr *AmaltheaSession) RcloneV2ResourceName() string {
+	return cr.Name + "-nfs"
 }

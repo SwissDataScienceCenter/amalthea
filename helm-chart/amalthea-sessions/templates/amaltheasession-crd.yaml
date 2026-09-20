@@ -1247,7 +1247,10 @@ spec:
                     type: string
                 type: object
               dataSources:
-                description: A list of data sources that should be added to the session
+                description: |-
+                  A list of data sources that should be added to the session
+                  Note that for rcloneV2 we support only one data source of this kind.
+                  If you need more than one simply combine the configurations into one.
                 items:
                   properties:
                     accessMode:
@@ -1259,6 +1262,11 @@ spec:
                       description: Path relative to the session working directory
                         where the data should be mounted
                       example: data/storages
+                      type: string
+                    rcloneRemoteName:
+                      default: rclone
+                      description: The name of the source/remote in the rclone config
+                        that should be used to serve
                       type: string
                     secretRef:
                       description: |-
@@ -1285,9 +1293,12 @@ spec:
                       type: object
                     type:
                       default: rclone
-                      description: The data source type
+                      description: |-
+                        The data source type
+                        rclone requires the csi-rclone driver
                       enum:
                       - rclone
+                      - rcloneV2
                       type: string
                   type: object
                 type: array
@@ -6057,6 +6068,146 @@ spec:
                 description: The name of the priority class assigned to the session
                   Pod.
                 type: string
+              rcloneDataSource:
+                description: Used to mount rclone data sources without needing a CSI
+                  Rclone driver.
+                properties:
+                  accessMode:
+                    default: ReadOnlyMany
+                    description: The access mode for the data source
+                    type: string
+                  configPasswordSecret:
+                    description: |-
+                      The secret that contains the key used to decrypt the Rclone configuration.
+                      If omitted it is assumed that the Rclone config is not encrypted.
+                    properties:
+                      adopt:
+                        description: If the secret is adopted then the operator will
+                          delete the secret when the custom resource that uses it
+                          is deleted.
+                        type: boolean
+                      key:
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
+                  extraArgs:
+                    description: Extra args added to the rclone nfs serve command,
+                      can be used to setup caching.
+                    items:
+                      type: string
+                    type: array
+                  image:
+                    default: rclone/rclone:1.75
+                    description: The image used to run rclone NFS server.
+                    type: string
+                  mountOptions:
+                    description: Mount options to pass to the PV
+                    items:
+                      type: string
+                    type: array
+                  mountPath:
+                    default: data
+                    description: Path relative to the session working directory where
+                      the data should be mounted
+                    example: data/storages
+                    type: string
+                  remoteName:
+                    description: The name of the remote from the secret that is present
+                      in the ini config that should be mounted.
+                    type: string
+                  remotePath:
+                    description: |-
+                      The path on the remote side that should be mounted. For S3 this contains at least the bucket name.
+                      In some cases this is empty or just `/`.
+                    type: string
+                  resources:
+                    default:
+                      limits:
+                        memory: 500Mi
+                      requests:
+                        cpu: 500m
+                        memory: 500Mi
+                    description: The resources requests and limits for the statefulset
+                      that runs rclone
+                    properties:
+                      claims:
+                        description: |-
+                          Claims lists the names of resources, defined in spec.resourceClaims,
+                          that are used by this container.
+
+                          This is an alpha field and requires enabling the
+                          DynamicResourceAllocation feature gate.
+
+                          This field is immutable. It can only be set for containers.
+                        items:
+                          description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                          properties:
+                            name:
+                              description: |-
+                                Name must match the name of one entry in pod.spec.resourceClaims of
+                                the Pod where this field is used. It makes that resource available
+                                inside a container.
+                              type: string
+                            request:
+                              description: |-
+                                Request is the name chosen for a request in the referenced claim.
+                                If empty, everything from the claim is made available, otherwise
+                                only the result of this request.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                    type: object
+                  secret:
+                    description: The secret containing the rclone configuration (in
+                      ini format) that defines all Rclone remotes.
+                    properties:
+                      adopt:
+                        description: If the secret is adopted then the operator will
+                          delete the secret when the custom resource that uses it
+                          is deleted.
+                        type: boolean
+                      key:
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
+                type: object
               reconcileStrategy:
                 default: always
                 description: |-

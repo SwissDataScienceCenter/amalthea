@@ -22,7 +22,7 @@ import (
 )
 
 type ChildResourceType interface {
-	networkingv1.Ingress | v1.Service | v1.PersistentVolumeClaim | appsv1.StatefulSet | v1.Secret | batchv1.Job
+	networkingv1.Ingress | v1.Service | v1.PersistentVolumeClaim | appsv1.StatefulSet | v1.Secret | batchv1.Job | v1.PersistentVolume
 }
 
 type ChildResource[T ChildResourceType] struct {

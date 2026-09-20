@@ -49,7 +49,13 @@ type AmaltheaSessionSpec struct {
 
 	// +optional
 	// A list of data sources that should be added to the session
+	// Note that for rcloneV2 we support only one data source of this kind.
+	// If you need more than one simply combine the configurations into one.
 	DataSources []DataSource `json:"dataSources,omitempty"`
+
+	// +optional
+	// Used to mount rclone data sources without needing a CSI Rclone driver.
+	RcloneDataSource *RcloneDataSource `json:"rcloneDataSource,omitempty"`
 
 	// Authentication configuration for the session
 	// +optional
@@ -297,6 +303,7 @@ const Rclone StorageType = "rclone"
 type DataSource struct {
 	// +kubebuilder:default:=rclone
 	// The data source type
+	// rclone requires the csi-rclone driver
 	Type StorageType `json:"type,omitempty"`
 	// +kubebuilder:example:=data/storages
 	// +kubebuilder:default:="data"
@@ -310,6 +317,9 @@ type DataSource struct {
 	// NOTE: define all values in a single key of the Kubernetes secret.
 	// rclone: any valid rclone configuration for a single remote, see the output of `rclone config providers` for validation and format.
 	SecretRef *SessionSecretRef `json:"secretRef,omitempty"`
+	// +kubebuilder:default:=rclone
+	// The name of the source/remote in the rclone config that should be used to serve
+	RcloneRemoteName string `json:"rcloneRemoteName,omitempty"`
 }
 
 type Culling struct {
@@ -651,3 +661,55 @@ const (
 	SessionTypeInteractive    SessionType = "Interactive"
 	SessionTypeNonInteractive SessionType = "NonInteractive"
 )
+
+type Cache struct {
+	// +optional
+	// If set to true a dedicated PVC for the cache will not be created
+	// If set to false then the cache will be located at /tmp
+	CreatePVC bool `json:"createPVC,omitempty"`
+	// +optional
+	// +kubebuilder:default:="1Gi"
+	// The size of the cache, if using PVC it will be the size of the PVC.
+	// If using /tmp then it will only be used to inform rclone of the size constraints
+	// Setting the value to zero means the cache is unlimited.
+	Size resource.Quantity `json:"size,omitempty"`
+	// +optional
+	// The name of the storage class that should be used for the cache, only valid if PVC is used.
+	ClassName *string `json:"className,omitempty"`
+}
+
+type RcloneDataSource struct {
+	// The name of the remote from the secret that is present in the ini config that should be mounted.
+	RemoteName string `json:"remoteName,omitempty"`
+	// +optional
+	// The path on the remote side that should be mounted. For S3 this contains at least the bucket name.
+	// In some cases this is empty or just `/`.
+	RemotePath string `json:"remotePath,omitempty"`
+	// The secret containing the rclone configuration (in ini format) that defines all Rclone remotes.
+	Secret SessionSecretKeyRef `json:"secret,omitempty"`
+	// +kubebuilder:example:=data/storages
+	// +kubebuilder:default:="data"
+	// Path relative to the session working directory where the data should be mounted
+	MountPath string `json:"mountPath,omitempty"`
+	// +kubebuilder:default:=ReadOnlyMany
+	// The access mode for the data source
+	AccessMode v1.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
+	// +optional
+	// Extra args added to the rclone nfs serve command, can be used to setup caching.
+	ExtraArgs []string `json:"extraArgs,omitempty"`
+	// +optional
+	// The secret that contains the key used to decrypt the Rclone configuration.
+	// If omitted it is assumed that the Rclone config is not encrypted.
+	ConfigPasswordSecret *SessionSecretKeyRef `json:"configPasswordSecret,omitempty"`
+	// +optional
+	// Mount options to pass to the PV
+	MountOptions []string `json:"mountOptions,omitempty"`
+	// +optional
+	// +kubebuilder:default:="rclone/rclone:1.75"
+	// The image used to run rclone NFS server.
+	Image string `json:"image,omitempty"`
+	// +optional
+	// +kubebuilder:default:={requests: {cpu: "500m", memory: "500Mi"}, limits: {memory: "500Mi"}}
+	// The resources requests and limits for the statefulset that runs rclone
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+}
