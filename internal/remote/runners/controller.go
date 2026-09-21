@@ -57,9 +57,9 @@ func (c *RunnersRemoteSessionController) Start(ctx context.Context) error {
 	// Determine session ID
 	sessionPath := os.Getenv("RENKU_BASE_URL_PATH")
 	sessionID := ""
-	for _, split := range strings.Split(sessionPath, "/") {
-		if split != "" {
-			sessionID = split
+	for part := range strings.SplitSeq(sessionPath, "/") {
+		if part != "" {
+			sessionID = part
 		}
 	}
 

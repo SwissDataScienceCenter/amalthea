@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	renkuAPIURLFlag = "renku-api-url"
+	renkuAPIURLFlag = "runners-api-url"
 )
 
 type RunnersConfig struct {
@@ -39,6 +39,7 @@ func SetFlags(cmd *cobra.Command) error {
 
 func GetConfig() (cfg RunnersConfig) {
 	cfg = RunnersConfig{}
+	cfg.APIURL = viper.GetString(renkuAPIURLFlag)
 
 	runnersAuthConfig := GetAuthConfig()
 	cfg.AuthConfig = runnersAuthConfig
