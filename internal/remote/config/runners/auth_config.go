@@ -59,21 +59,23 @@ func (cfg *RunnersAuthConfig) validateRenkuV2() error {
 }
 
 func SetAuthFlags(cmd *cobra.Command) error {
-	cmd.Flags().String(configUtils.AuthPrefix+"-"+accessTokenFlag, "", "the Renku access token (renku auth)")
-	if err := viper.BindPFlag(configUtils.AuthPrefix+"."+accessTokenFlag, cmd.Flags().Lookup(configUtils.AuthPrefix+"-"+accessTokenFlag)); err != nil {
-		return err
-	}
-	if err := viper.BindEnv(configUtils.AuthPrefix+"."+accessTokenFlag, configUtils.AsEnvVarFlag(configUtils.AuthPrefix+"-"+accessTokenFlag)); err != nil {
-		return err
-	}
+	// SKIPPED: this would fail as redifining flags (pflag panic)
 
-	cmd.Flags().String(configUtils.AuthPrefix+"-"+refreshTokenFlag, "", "the Renku refresh token (renku auth)")
-	if err := viper.BindPFlag(configUtils.AuthPrefix+"."+refreshTokenFlag, cmd.Flags().Lookup(configUtils.AuthPrefix+"-"+refreshTokenFlag)); err != nil {
-		return err
-	}
-	if err := viper.BindEnv(configUtils.AuthPrefix+"."+refreshTokenFlag, configUtils.AsEnvVarFlag(configUtils.AuthPrefix+"-"+refreshTokenFlag)); err != nil {
-		return err
-	}
+	// cmd.Flags().String(configUtils.AuthPrefix+"-"+accessTokenFlag, "", "the Renku access token (renku auth)")
+	// if err := viper.BindPFlag(configUtils.AuthPrefix+"."+accessTokenFlag, cmd.Flags().Lookup(configUtils.AuthPrefix+"-"+accessTokenFlag)); err != nil {
+	// 	return err
+	// }
+	// if err := viper.BindEnv(configUtils.AuthPrefix+"."+accessTokenFlag, configUtils.AsEnvVarFlag(configUtils.AuthPrefix+"-"+accessTokenFlag)); err != nil {
+	// 	return err
+	// }
+
+	// cmd.Flags().String(configUtils.AuthPrefix+"-"+refreshTokenFlag, "", "the Renku refresh token (renku auth)")
+	// if err := viper.BindPFlag(configUtils.AuthPrefix+"."+refreshTokenFlag, cmd.Flags().Lookup(configUtils.AuthPrefix+"-"+refreshTokenFlag)); err != nil {
+	// 	return err
+	// }
+	// if err := viper.BindEnv(configUtils.AuthPrefix+"."+refreshTokenFlag, configUtils.AsEnvVarFlag(configUtils.AuthPrefix+"-"+refreshTokenFlag)); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
