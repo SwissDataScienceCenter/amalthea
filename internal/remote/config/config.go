@@ -139,6 +139,11 @@ func SetFlags(cmd *cobra.Command) error {
 		return err
 	}
 
+	// Set up Runners flags
+	if err := runnersConfig.SetFlags(cmd); err != nil {
+		return err
+	}
+
 	return nil
 }
 
