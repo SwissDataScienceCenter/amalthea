@@ -66,6 +66,7 @@ func (c *RunnersRemoteSessionController) Start(ctx context.Context) error {
 	if sessionID == "" {
 		return fmt.Errorf("could not determine session ID")
 	}
+	slog.Info("Got session ID", "sessionID", sessionID)
 
 	// Wait for runner
 	session, err := c.waitUntilRunnerIsAssigned(ctx, sessionID)
@@ -79,6 +80,7 @@ func (c *RunnersRemoteSessionController) Start(ctx context.Context) error {
 	if runnerID == "" {
 		return fmt.Errorf("could not determine session runner ID")
 	}
+	slog.Info("Got runner ID", "runnerID", runnerID)
 
 	// TODO: get wstunnel_secret as a config value
 	wstunnelSecret := os.Getenv("RSC_WSTUNNEL_SECRET")
@@ -157,5 +159,4 @@ func (c *RunnersRemoteSessionController) patchSessionSecrets(ctx context.Context
 		return fmt.Errorf("failed to update session secrets: %s", message)
 	}
 	return nil
-
 }
