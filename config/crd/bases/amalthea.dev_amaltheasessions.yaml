@@ -1296,7 +1296,6 @@ spec:
                         rclone requires the csi-rclone driver
                       enum:
                       - rclone
-                      - rcloneV2
                       type: string
                   type: object
                 type: array
@@ -6070,10 +6069,6 @@ spec:
                 description: Used to mount rclone data sources without needing a CSI
                   Rclone driver.
                 properties:
-                  accessMode:
-                    default: ReadOnlyMany
-                    description: The access mode for the data source
-                    type: string
                   configPasswordSecret:
                     description: |-
                       The secret that contains the key used to decrypt the Rclone configuration.
@@ -6107,20 +6102,46 @@ spec:
                     items:
                       type: string
                     type: array
-                  mountPath:
-                    default: data
-                    description: Path relative to the session working directory where
-                      the data should be mounted
-                    example: data/storages
-                    type: string
-                  remoteName:
-                    description: The name of the remote from the secret that is present
-                      in the ini config that should be mounted.
-                    type: string
-                  remotePath:
+                  mounts:
                     description: |-
-                      The path on the remote side that should be mounted. For S3 this contains at least the bucket name.
-                      In some cases this is empty or just `/`.
+                      Paths inside the storage that is served and where they should be mounted.
+                      The paths refer to paths inside the `RemoteName` Rclone remote in the config.
+                    items:
+                      properties:
+                        mountPath:
+                          description: |-
+                            Where the data should be mounted inside the Amalthea session.
+                            If the path is relative, then it is relative to the session working directory.
+                            If absolute then it is mounted at that exact path.
+                          minLength: 1
+                          type: string
+                        readOnly:
+                          default: false
+                          description: If set to true the remote will be mounted as
+                            read only in the session
+                          type: boolean
+                        subPath:
+                          description: The path inside the rclone remote that should
+                            be mounted, if omitted the whole remote is mounted at
+                            mountPath.
+                          minLength: 1
+                          type: string
+                      required:
+                      - mountPath
+                      type: object
+                    minItems: 1
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - mountPath
+                    x-kubernetes-list-type: map
+                  remoteName:
+                    description: |-
+                      The name of the remote from the secret that is present in the ini config that will be served by rclone.
+                      In this case rclone uses nfs to serve this remote and only this remote is available in the session.
+                      Users are expected to use combine/union type remotes in the config to make sure multiple different sources are mounted.
+                    maxLength: 128
+                    minLength: 1
+                    pattern: ^[A-Za-z0-9_.][A-Za-z0-9_.-]*$
                     type: string
                   resources:
                     default:
@@ -6205,6 +6226,10 @@ spec:
                     - key
                     - name
                     type: object
+                required:
+                - mounts
+                - remoteName
+                - secret
                 type: object
               reconcileStrategy:
                 default: always

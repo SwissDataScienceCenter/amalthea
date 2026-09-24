@@ -17,6 +17,7 @@ limitations under the License.
 package children
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log"
@@ -181,7 +182,7 @@ func rcloneV2Statefulset(cr *amaltheadevv1alpha1.AmaltheaSession) (appsv1.Statef
 	args := []string{
 		"serve",
 		"nfs",
-		cr.Spec.RcloneDataSource.RemoteName + ":" + cr.Spec.RcloneDataSource.RemotePath,
+		cr.Spec.RcloneDataSource.RemoteName + ":",
 		fmt.Sprintf("--addr=0.0.0.0:%d", rcloneV2NFSPort),
 	}
 	args = append(args, cr.Spec.RcloneDataSource.ExtraArgs...)
@@ -214,7 +215,7 @@ done`
 			{
 				Name:      "rclone",
 				Image:     cr.Spec.RcloneDataSource.Image,
-				Resources: cr.Spec.RcloneDataSource.Resources,
+				Resources: *cmp.Or(cr.Spec.RcloneDataSource.Resources, ptr.To(v1.ResourceRequirements{})),
 				SecurityContext: &v1.SecurityContext{
 					Privileged:               ptr.To(false),
 					AllowPrivilegeEscalation: ptr.To(false),

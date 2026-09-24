@@ -679,21 +679,24 @@ type Cache struct {
 }
 
 type RcloneDataSource struct {
-	// The name of the remote from the secret that is present in the ini config that should be mounted.
-	RemoteName string `json:"remoteName,omitempty"`
-	// +optional
-	// The path on the remote side that should be mounted. For S3 this contains at least the bucket name.
-	// In some cases this is empty or just `/`.
-	RemotePath string `json:"remotePath,omitempty"`
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9_.][A-Za-z0-9_.-]*$`
+	// The name of the remote from the secret that is present in the ini config that will be served by rclone.
+	// In this case rclone uses nfs to serve this remote and only this remote is available in the session.
+	// Users are expected to use combine/union type remotes in the config to make sure multiple different sources are mounted.
+	RemoteName string `json:"remoteName"`
+	// +required
+	// +listType=map
+	// +listMapKey=mountPath
+	// +kubebuilder:validation:MinItems=1
+	// Paths inside the storage that is served and where they should be mounted.
+	// The paths refer to paths inside the `RemoteName` Rclone remote in the config.
+	Mounts []RcloneMount `json:"mounts"`
+	// +required
 	// The secret containing the rclone configuration (in ini format) that defines all Rclone remotes.
-	Secret SessionSecretKeyRef `json:"secret,omitempty"`
-	// +kubebuilder:example:=data/storages
-	// +kubebuilder:default:="data"
-	// Path relative to the session working directory where the data should be mounted
-	MountPath string `json:"mountPath,omitempty"`
-	// +kubebuilder:default:=ReadOnlyMany
-	// The access mode for the data source
-	AccessMode v1.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
+	Secret SessionSecretKeyRef `json:"secret"`
 	// +optional
 	// Extra args added to the rclone nfs serve command, can be used to setup caching.
 	ExtraArgs []string `json:"extraArgs,omitempty"`
@@ -711,5 +714,22 @@ type RcloneDataSource struct {
 	// +optional
 	// +kubebuilder:default:={requests: {cpu: "500m", memory: "500Mi"}, limits: {memory: "500Mi"}}
 	// The resources requests and limits for the statefulset that runs rclone
-	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type RcloneMount struct {
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// Where the data should be mounted inside the Amalthea session.
+	// If the path is relative, then it is relative to the session working directory.
+	// If absolute then it is mounted at that exact path.
+	MountPath string `json:"mountPath"`
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// The path inside the rclone remote that should be mounted, if omitted the whole remote is mounted at mountPath.
+	SubPath string `json:"subPath,omitempty"`
+	// +optional
+	// +kubebuilder:default:=false
+	// If set to true the remote will be mounted as read only in the session
+	ReadOnly bool `json:"readOnly,omitempty"`
 }

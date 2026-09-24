@@ -134,7 +134,7 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	if cr.Spec.RcloneDataSource != nil {
 		rcVol, rcVolMount := cr.RcloneDataSource()
 		volumes = append(volumes, rcVol)
-		volumeMounts = append(volumeMounts, rcVolMount)
+		volumeMounts = append(volumeMounts, rcVolMount...)
 	}
 
 	// Create the main session container
@@ -739,27 +739,30 @@ func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 }
 
 // Generates the volume and volume mount used inside the session statefulset spec
-func (as *AmaltheaSession) RcloneDataSource() (v1.Volume, v1.VolumeMount) {
+func (as *AmaltheaSession) RcloneDataSource() (v1.Volume, []v1.VolumeMount) {
 	if as.Spec.RcloneDataSource == nil {
-		return v1.Volume{}, v1.VolumeMount{}
+		return v1.Volume{}, []v1.VolumeMount{}
 	}
 	volName := "rclone-v2-volume"
-	readOnly := as.Spec.RcloneDataSource.AccessMode == v1.ReadOnlyMany
 	vol := v1.Volume{
 		Name: volName,
 		VolumeSource: v1.VolumeSource{
 			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 				ClaimName: as.RcloneV2ResourceName(),
-				ReadOnly:  readOnly,
 			},
 		},
 	}
-	volMount := v1.VolumeMount{
-		Name:      volName,
-		ReadOnly:  readOnly,
-		MountPath: as.Spec.RcloneDataSource.MountPath,
+
+	volMounts := []v1.VolumeMount{}
+	for _, mount := range as.Spec.RcloneDataSource.Mounts {
+		volMounts = append(volMounts, v1.VolumeMount{
+			Name:      volName,
+			ReadOnly:  mount.ReadOnly,
+			MountPath: mount.MountPath,
+			SubPath:   mount.SubPath,
+		})
 	}
-	return vol, volMount
+	return vol, volMounts
 }
 
 func getStorageClass() string {
