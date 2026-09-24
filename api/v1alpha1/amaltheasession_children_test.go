@@ -9,6 +9,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -64,6 +65,78 @@ func TestGetPodEventsSorted(t *testing.T) {
 	res, err := session.GetPodEvents(context.TODO(), clnt)
 	assert.Nil(t, err)
 	assert.Equal(t, res.Items, []v1.Event{ev3, ev2, ev1})
+}
+
+func TestServiceSSHPort(t *testing.T) {
+	sshPort := v1.ServicePort{
+		Protocol:   v1.ProtocolTCP,
+		Name:       serviceSSHPortName,
+		Port:       SSHPort,
+		TargetPort: intstr.FromInt32(SSHPort),
+	}
+	cases := []struct {
+		name       string
+		location   SessionLocation
+		auth       bool
+		frontend   string
+		sshEnabled bool
+	}{
+		{
+			name:       "local ssh session gets the ssh port",
+			location:   Local,
+			frontend:   "ssh",
+			sshEnabled: true,
+		},
+		{
+			name:       "local ssh session with authentication still gets the ssh port",
+			location:   Local,
+			auth:       true,
+			frontend:   "ssh",
+			sshEnabled: true,
+		},
+		{
+			name:     "local session without a frontend label does not get the ssh port",
+			location: Local,
+		},
+		{
+			name:     "local non-ssh session does not get the ssh port",
+			location: Local,
+			frontend: "jupyterlab",
+		},
+		{
+			name:     "remote ssh session does not get the ssh port",
+			location: Remote,
+			frontend: "ssh",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cr := &AmaltheaSession{
+				Spec: AmaltheaSessionSpec{
+					SessionLocation: tc.location,
+					Session: Session{
+						Image: "my-image",
+						Port:  8888,
+					},
+				},
+			}
+			if tc.frontend != "" {
+				cr.Labels = map[string]string{frontendVariantLabel: tc.frontend}
+			}
+			if tc.auth {
+				cr.Spec.Authentication = &Authentication{Enabled: true, Type: OauthProxy}
+			}
+			svc := cr.Service()
+			found := false
+			for _, port := range svc.Spec.Ports {
+				if port.Name == serviceSSHPortName {
+					found = true
+					assert.Equal(t, sshPort, port)
+				}
+			}
+			assert.Equal(t, tc.sshEnabled, found)
+		})
+	}
 }
 
 func TestSessionContainerRemoteResources(t *testing.T) {
