@@ -78,22 +78,35 @@ func TestServiceSSHPort(t *testing.T) {
 		name       string
 		location   SessionLocation
 		auth       bool
+		frontend   string
 		sshEnabled bool
 	}{
 		{
-			name:       "local session gets the ssh port",
+			name:       "local ssh session gets the ssh port",
 			location:   Local,
+			frontend:   "ssh",
 			sshEnabled: true,
 		},
 		{
-			name:       "local session with authentication still gets the ssh port",
+			name:       "local ssh session with authentication still gets the ssh port",
 			location:   Local,
 			auth:       true,
+			frontend:   "ssh",
 			sshEnabled: true,
 		},
 		{
-			name:     "remote session does not get the ssh port",
+			name:     "local session without a frontend label does not get the ssh port",
+			location: Local,
+		},
+		{
+			name:     "local non-ssh session does not get the ssh port",
+			location: Local,
+			frontend: "jupyterlab",
+		},
+		{
+			name:     "remote ssh session does not get the ssh port",
 			location: Remote,
+			frontend: "ssh",
 		},
 	}
 	for _, tc := range cases {
@@ -106,6 +119,9 @@ func TestServiceSSHPort(t *testing.T) {
 						Port:  8888,
 					},
 				},
+			}
+			if tc.frontend != "" {
+				cr.Labels = map[string]string{frontendVariantLabel: tc.frontend}
 			}
 			if tc.auth {
 				cr.Spec.Authentication = &Authentication{Enabled: true, Type: OauthProxy}

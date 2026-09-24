@@ -52,6 +52,10 @@ const RemoteSessionControllerPort int32 = 65532
 const TunnelPort int32 = 65531
 const SSHPort int32 = 2222
 
+// frontendVariantLabel is set by data-services on the session CR; only ssh sessions need port 2222.
+const frontendVariantLabel string = "renku.io/frontend-variant"
+const sshFrontendVariant string = "ssh"
+
 var sidecarsImage string = getSidecarsImage()
 var rcloneStorageClass string = getStorageClass()
 var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
@@ -325,10 +329,10 @@ func (cr *AmaltheaSession) Service() v1.Service {
 			Port:       TunnelPort,
 			TargetPort: intstr.FromString(tunnelServiceName),
 		})
-	} else {
-		// TODO(ssh): POC — port 2222 is reachable from anywhere in the cluster.
-		// Before shipping: netpol so only the SSH proxy can reach it, and gate
-		// on image capability (OCI label ch.datascience.renku.ssh=true).
+	} else if cr.Labels[frontendVariantLabel] == sshFrontendVariant {
+		// Only ssh sessions get the port; data-services sets the frontend-variant label on the CR.
+		// amalthea does not restrict who may reach 2222; the deployment must supply a netpol.
+		// The Renku chart does: ingress-to-any-session-from-ssh-proxy allows only the ssh proxy.
 		svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
 			Protocol:   v1.ProtocolTCP,
 			Name:       serviceSSHPortName,
