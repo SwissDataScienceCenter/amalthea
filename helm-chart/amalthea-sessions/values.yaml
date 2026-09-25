@@ -39,6 +39,7 @@ controllerManager:
       prometheus.io/scheme: http
   serviceAccount:
     annotations: {}
+  podLabels: {}
 kubernetesClusterDomain: cluster.local
 # If set to true then the operator will watch and operate in all namespaces
 clusterScoped: false
