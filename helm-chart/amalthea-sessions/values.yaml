@@ -39,6 +39,8 @@ controllerManager:
       prometheus.io/scheme: http
   serviceAccount:
     annotations: {}
+  remoteServiceAccount:
+    annotations: {}
 kubernetesClusterDomain: cluster.local
 # If set to true then the operator will watch and operate in all namespaces
 clusterScoped: false
@@ -46,6 +48,10 @@ clusterScoped: false
 deployCrd: true
 # Whether to install the dependencies or not
 deploy:
+  priorityClass: false
+  # Whether to create a default resource quota priority class named `renku-user-sessions-priority`
+  remoteServiceAccount: false
+  # Whether to create a service account for a remote Renku portal to connect to the cluster running this operator.
   csiRclone: false
 
 # rcloneStorageClass is the storage class name for the csi-rclone Helm chart
