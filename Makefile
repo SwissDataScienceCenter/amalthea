@@ -384,7 +384,7 @@ catalog-push: ## Push a catalog image.
 
 ##@ FirecREST
 
-FIRECREST_API_VERSION ?= 2.5.0
+FIRECREST_API_VERSION ?= 2.6.0
 
 .PHONY: firecrest-apispec
 firecrest-apispec:
