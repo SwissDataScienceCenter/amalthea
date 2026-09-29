@@ -708,8 +708,10 @@ type RcloneDataSource struct {
 	// Mount options to pass to the PV
 	MountOptions []string `json:"mountOptions,omitempty"`
 	// +optional
-	// +kubebuilder:default:="rclone/rclone:1.75"
+	// +kubebuilder:default:="olevski90/rclone:1.75"
 	// The image used to run rclone NFS server.
+	// Has to be able to run with any arbitrary non-root user.
+	// Has to run as non-root by default. The default rclone image runs as root by default.
 	Image string `json:"image,omitempty"`
 	// +optional
 	// +kubebuilder:default:={requests: {cpu: "500m", memory: "500Mi"}, limits: {memory: "500Mi"}}

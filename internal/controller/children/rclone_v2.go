@@ -226,8 +226,6 @@ done`
 					AllowPrivilegeEscalation: ptr.To(false),
 					RunAsNonRoot:             ptr.To(true),
 					Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
-					RunAsUser:                ptr.To(int64(1009)),
-					RunAsGroup:               ptr.To(int64(1009)),
 				},
 				Ports: []v1.ContainerPort{
 					{Name: rcloneV2NFSPortName, ContainerPort: rcloneV2NFSPort},

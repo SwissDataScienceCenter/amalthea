@@ -6096,8 +6096,11 @@ spec:
                       type: string
                     type: array
                   image:
-                    default: rclone/rclone:1.75
-                    description: The image used to run rclone NFS server.
+                    default: olevski90/rclone:1.75
+                    description: |-
+                      The image used to run rclone NFS server.
+                      Has to be able to run with any arbitrary non-root user.
+                      Has to run as non-root by default. The default rclone image runs as root by default.
                     type: string
                   mountOptions:
                     description: Mount options to pass to the PV
