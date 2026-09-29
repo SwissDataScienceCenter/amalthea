@@ -22,7 +22,7 @@ type GitRepository struct {
 	// every ref update in the request must be listed in References, or
 	// the entire request is rejected. GET and upload-pack remain allowed.
 	// E.g. [ `refs/heads/main`, `refs/tags/main` ]
-	References *[]string `json:"branches"`
+	References *[]string `json:"references"`
 }
 
 type GitProvider struct {
