@@ -32,22 +32,31 @@ func jobFailureReason(job *batchv1.Job) string {
 		return ""
 	}
 
-	if job.Status.Failed > 0 {
-		for _, cond := range job.Status.Conditions {
-			if (cond.Type == batchv1.JobFailed || cond.Type == batchv1.JobFailureTarget) && cond.Status == v1.ConditionTrue {
-				return cond.Reason + ": " + cond.Message
-			}
+	for _, cond := range job.Status.Conditions {
+		if (cond.Type == batchv1.JobFailed || cond.Type == batchv1.JobFailureTarget) && cond.Status == v1.ConditionTrue {
+			return cond.Reason + ": " + cond.Message
 		}
-		return "The job failed."
 	}
 	return ""
 }
 
-func podFailureReason(pod *v1.Pod) string {
+func podIsDisrupted(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.DisruptionTarget && condition.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+func podFailureReason(pod *v1.Pod, isJob bool) string {
 	if pod == nil {
 		return ""
 	}
 	if pod.GetDeletionTimestamp() != nil {
+		return ""
+	}
+	if isJob && podIsDisrupted(pod) {
 		return ""
 	}
 	// NOTE: Checking the pod phase is not useful because it will still say "Running" when a container

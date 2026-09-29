@@ -526,7 +526,8 @@ func (c ChildResourceUpdates) IsRunning(pod *v1.Pod) bool {
 }
 
 func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod *v1.Pod, job *batchv1.Job) (amaltheadevv1alpha1.State, string) {
-	msg := c.failureMessage(pod, job)
+	isJob := cr.Spec.SessionType == amaltheadevv1alpha1.SessionTypeNonInteractive
+	msg := c.failureMessage(pod, job, isJob)
 	switch {
 	case cr.GetDeletionTimestamp() != nil:
 		return amaltheadevv1alpha1.NotReady, ""
@@ -538,7 +539,7 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 		return amaltheadevv1alpha1.Failed, msg
 	case c.IsRunning(pod):
 		return amaltheadevv1alpha1.Running, ""
-	case podIsCompleted(pod):
+	case !isJob && podIsCompleted(pod):
 		fallthrough
 	case jobIsSuccess(job):
 		return amaltheadevv1alpha1.Succeeded, ""
@@ -547,8 +548,8 @@ func (c ChildResourceUpdates) State(cr *amaltheadevv1alpha1.AmaltheaSession, pod
 	}
 }
 
-func (c ChildResourceUpdates) failureMessage(pod *v1.Pod, job *batchv1.Job) string {
-	msg := podFailureReason(pod)
+func (c ChildResourceUpdates) failureMessage(pod *v1.Pod, job *batchv1.Job, isJob bool) string {
+	msg := podFailureReason(pod, isJob)
 	if msg != "" {
 		return msg
 	}
