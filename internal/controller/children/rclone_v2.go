@@ -100,7 +100,8 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 			if err != nil {
 				return err
 			}
-			obj.ObjectMeta = desired.ObjectMeta
+			obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
+			obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
 			obj.Spec = desired.Spec
 			return nil
 		}),
@@ -112,7 +113,8 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 		WithNamespace[*v1.Service](cr.Namespace),
 		WithMutateFn(func(obj *v1.Service) error {
 			desired := rcloneV2Service(cr)
-			obj.ObjectMeta = desired.ObjectMeta
+			obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
+			obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
 			obj.Spec = desired.Spec
 			return nil
 		}),
@@ -126,7 +128,8 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 				return fmt.Errorf("cannot create volume for rclone dataset because host is not known from the Service")
 			}
 			desired := rcloneV2Volume(cr, service.obj.Spec.ClusterIP)
-			obj.ObjectMeta = desired.ObjectMeta
+			obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
+			obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
 			obj.Spec.Capacity = desired.Spec.Capacity
 			obj.Spec.AccessModes = desired.Spec.AccessModes
 			obj.Spec.StorageClassName = desired.Spec.StorageClassName
@@ -144,10 +147,12 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 		WithMutateFn(func(obj *v1.PersistentVolumeClaim) error {
 			desired := rcloneV2PVC(cr)
 			if !obj.CreationTimestamp.IsZero() {
-				obj.ObjectMeta = desired.ObjectMeta
+				obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
+				obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
 				return nil
 			}
-			obj.ObjectMeta = desired.ObjectMeta
+			obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
+			obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
 			obj.Spec = desired.Spec
 			return nil
 		}),

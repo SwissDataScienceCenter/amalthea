@@ -721,8 +721,9 @@ type RcloneMount struct {
 	// +required
 	// +kubebuilder:validation:MinLength=1
 	// Where the data should be mounted inside the Amalthea session.
-	// If the path is relative, then it is relative to the session working directory.
+	// If the path is relative, it is simply gets `/` prepended.
 	// If absolute then it is mounted at that exact path.
+	// This is the behaviour from the K8s API - we do not modify it.
 	MountPath string `json:"mountPath"`
 	// +optional
 	// +kubebuilder:validation:MinLength=1

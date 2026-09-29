@@ -19,6 +19,7 @@ package children
 import (
 	"context"
 	"reflect"
+	"strings"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	"github.com/labstack/gommon/log"
@@ -125,4 +126,28 @@ func (cr *ChildResource[T]) StatusCallback(status *amaltheadevv1alpha1.AmaltheaS
 type ChildResourcer interface {
 	StatusCallback(status *amaltheadevv1alpha1.AmaltheaSessionStatus)
 	Reconcile(ctx context.Context, clnt client.Client) error
+}
+
+// Returns a map ensuring that the labels/annotations desired do not
+// overwrite well-known values.
+// Reference: https://kubernetes.io/docs/reference/labels-annotations-taints/
+func CleanWellKnown(current map[string]string, desired map[string]string) map[string]string {
+	preserved := map[string]string{}
+	for key, value := range current {
+		domain, _, _ := strings.Cut(key, "/")
+		if domain == "kubernetes.io" || domain == "k8s.io" || strings.HasSuffix(domain, ".kubernetes.io") ||
+			strings.HasSuffix(domain, ".k8s.io") {
+			preserved[key] = value
+		}
+	}
+
+	clean := map[string]string{}
+	for key, value := range desired {
+		clean[key] = value
+	}
+
+	for key, value := range preserved {
+		clean[key] = value
+	}
+	return clean
 }

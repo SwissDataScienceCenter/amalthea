@@ -7,6 +7,7 @@ import (
 	"time"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	"github.com/SwissDataScienceCenter/amalthea/internal/controller/children"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -70,30 +71,6 @@ func isFailedOrHibernated(as *amaltheadevv1alpha1.AmaltheaSession) bool {
 		as.Status.State == amaltheadevv1alpha1.Hibernated
 }
 
-// Returns a map ensuring that the labels/annotations desired do not
-// overwrite well-known values.
-// Reference: https://kubernetes.io/docs/reference/labels-annotations-taints/
-func cleanWellKnown(current map[string]string, desired map[string]string) map[string]string {
-	preserved := map[string]string{}
-	for key, value := range current {
-		domain, _, _ := strings.Cut(key, "/")
-		if domain == "kubernetes.io" || domain == "k8s.io" || strings.HasSuffix(domain, ".kubernetes.io") ||
-			strings.HasSuffix(domain, ".k8s.io") {
-			preserved[key] = value
-		}
-	}
-
-	clean := map[string]string{}
-	for key, value := range desired {
-		clean[key] = value
-	}
-
-	for key, value := range preserved {
-		clean[key] = value
-	}
-	return clean
-}
-
 func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
 	logger := log.FromContext(ctx)
 	if c.Current == nil {
@@ -133,8 +110,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				fallthrough
 			case amaltheadevv1alpha1.Always:
 				current.Spec = desired.Spec
-				current.Labels = cleanWellKnown(current.Labels, desired.Labels)
-				current.Annotations = cleanWellKnown(current.Annotations, desired.Annotations)
+				current.Labels = children.CleanWellKnown(current.Labels, desired.Labels)
+				current.Annotations = children.CleanWellKnown(current.Annotations, desired.Annotations)
 			default:
 				return fmt.Errorf("attempting to reconcile ingress with unknown strategy %s", strategy)
 			}
@@ -191,8 +168,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
 				current.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
 				current.Spec.Selector = desired.Spec.Selector
-				current.Labels = cleanWellKnown(current.Labels, desired.Labels)
-				current.Annotations = cleanWellKnown(current.Annotations, desired.Annotations)
+				current.Labels = children.CleanWellKnown(current.Labels, desired.Labels)
+				current.Annotations = children.CleanWellKnown(current.Annotations, desired.Annotations)
 				current.Spec.Template.Labels = desired.Spec.Template.Labels
 				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
 			default:
@@ -228,8 +205,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 					// NOTE: If the desired storage class is nil then the current spec contains the name for the default storage class
 					current.Spec.StorageClassName = desired.Spec.StorageClassName
 				}
-				current.Labels = cleanWellKnown(current.Labels, desired.Labels)
-				current.Annotations = cleanWellKnown(current.Annotations, desired.Annotations)
+				current.Labels = children.CleanWellKnown(current.Labels, desired.Labels)
+				current.Annotations = children.CleanWellKnown(current.Annotations, desired.Annotations)
 			default:
 				return fmt.Errorf("attempting to reconcile PVC with unknown strategy %s", strategy)
 			}
@@ -260,8 +237,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 			case amaltheadevv1alpha1.Always:
 				current.Spec.Ports = desired.Spec.Ports
 				current.Spec.Selector = desired.Spec.Selector
-				current.Labels = cleanWellKnown(current.Labels, desired.Labels)
-				current.Annotations = cleanWellKnown(current.Annotations, desired.Annotations)
+				current.Labels = children.CleanWellKnown(current.Labels, desired.Labels)
+				current.Annotations = children.CleanWellKnown(current.Annotations, desired.Annotations)
 			default:
 				return fmt.Errorf("attempting to reconcile service with unknown strategy %s", strategy)
 			}
@@ -307,8 +284,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				}
 				current.Data = desired.Data
 				current.StringData = preservedStringData
-				current.Labels = cleanWellKnown(current.Labels, desired.Labels)
-				current.Annotations = cleanWellKnown(current.Annotations, desired.Annotations)
+				current.Labels = children.CleanWellKnown(current.Labels, desired.Labels)
+				current.Annotations = children.CleanWellKnown(current.Annotations, desired.Annotations)
 			default:
 				return fmt.Errorf("attempting to reconcile secret with unknown strategy %s", strategy)
 			}
@@ -376,8 +353,8 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				current.Spec.Template.Spec.Containers = desired.Spec.Template.Spec.Containers
 				current.Spec.Template.Spec.InitContainers = desired.Spec.Template.Spec.InitContainers
 				current.Spec.Template.Spec.Volumes = desired.Spec.Template.Spec.Volumes
-				current.Labels = cleanWellKnown(current.Labels, desired.Labels)
-				current.Annotations = cleanWellKnown(current.Annotations, desired.Annotations)
+				current.Labels = children.CleanWellKnown(current.Labels, desired.Labels)
+				current.Annotations = children.CleanWellKnown(current.Annotations, desired.Annotations)
 				current.Spec.Template.Annotations = desired.Spec.Template.Annotations
 			default:
 				return fmt.Errorf("attempting to reconcile batchjob with unknown strategy %s", strategy)
