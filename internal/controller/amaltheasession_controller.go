@@ -204,9 +204,13 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		}
 		if controllerutil.ContainsFinalizer(amaltheasession, rclonePVFinalizer) {
 			// We don't need the whole PV to delete, just the name
-			pvStub := corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: childutils.RcloneV2ResourceName(amaltheasession)}}
+			pvStub := corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: childutils.RcloneV2PVName(amaltheasession)}}
 			err := r.Delete(ctx, &pvStub)
-			if err != nil && !apierrors.IsNotFound(err) {
+			if apierrors.IsForbidden(err) {
+				// In most clusters the operator is not allowed to delete PVs, the PV has to be cleaned up
+				// externally. We should not block the deletion of the session because of this.
+				logger.Info("not allowed to delete the rclone PV, it has to be cleaned up externally", "pv", pvStub.Name)
+			} else if err != nil && !apierrors.IsNotFound(err) {
 				return ctrl.Result{}, err
 			}
 

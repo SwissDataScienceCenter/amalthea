@@ -1250,3 +1250,10 @@ func (cr *AmaltheaSession) childLabels() map[string]string {
 func (cr *AmaltheaSession) RcloneV2ResourceName() string {
 	return cr.Name + "-nfs"
 }
+
+// RcloneV2PVName is the name of the cluster-scoped PV for the rclone mount. It includes the session
+// UID because PVs can outlive their session (if the operator cannot delete them) and a new session
+// with the same name and namespace must not end up reusing a stale PV.
+func (cr *AmaltheaSession) RcloneV2PVName() string {
+	return cr.RcloneV2ResourceName() + "-" + string(cr.UID)
+}

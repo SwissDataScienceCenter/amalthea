@@ -18,6 +18,7 @@ package children
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -46,6 +47,7 @@ type ChildResource[T ChildResourceType] struct {
 	obj            T
 	statusCallback StatusCallback
 	parent         metav1.Object
+	shouldDelete   func() bool
 }
 
 func NewChildResource[T ChildResourceType](pt T, opts ...ChildResourceOption[T]) ChildResource[T] {
@@ -95,12 +97,40 @@ func WithParent[T ChildResourceType](parent metav1.Object) ChildResourceOption[T
 	}
 }
 
+// WithDeleteWhen makes Reconcile delete the resource (if it exists) instead of
+// creating/patching it whenever the condition returns true.
+func WithDeleteWhen[T ChildResourceType](cond func() bool) ChildResourceOption[T] {
+	return func(cr *ChildResource[T]) {
+		cr.shouldDelete = cond
+	}
+}
+
 func (cr *ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client) error {
+	if cr.shouldDelete != nil && cr.shouldDelete() {
+		// Only the name and namespace of cr.obj are needed for the deletion
+		return client.IgnoreNotFound(clnt.Delete(ctx, cr.obj))
+	}
 	if cr.mutateFn == nil {
 		log.Warnf("Mutate function not set for type %s with name %s, namespace: %s", cr.obj.GetName(), cr.obj.GetNamespace(), cr.obj.GetObjectKind().GroupVersionKind().String())
 		return nil
 	}
-	_, err := controllerutil.CreateOrPatch(ctx, clnt, cr.obj, func() error {
+	// If the resource is still being deleted (e.g. a session was resumed right after hibernation)
+	// we wait for the deletion to complete before recreating it, otherwise we would patch an object
+	// that is about to disappear.
+	current := cr.obj.DeepCopyObject().(T)
+	err := clnt.Get(ctx, client.ObjectKeyFromObject(cr.obj), current)
+	if client.IgnoreNotFound(err) != nil {
+		return err
+	}
+	if err == nil && current.GetDeletionTimestamp() != nil {
+		return fmt.Errorf(
+			"cannot reconcile %s %s/%s because it is still being deleted",
+			reflect.TypeOf(cr.obj).Elem().Name(),
+			cr.obj.GetNamespace(),
+			cr.obj.GetName(),
+		)
+	}
+	_, err = controllerutil.CreateOrPatch(ctx, clnt, cr.obj, func() error {
 		err := cr.mutateFn(cr.obj)
 		if err != nil {
 			return err

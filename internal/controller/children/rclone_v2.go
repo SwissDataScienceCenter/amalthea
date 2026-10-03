@@ -48,6 +48,10 @@ func RcloneV2ResourceName(cr *amaltheadevv1alpha1.AmaltheaSession) string {
 	return cr.RcloneV2ResourceName()
 }
 
+func RcloneV2PVName(cr *amaltheadevv1alpha1.AmaltheaSession) string {
+	return cr.RcloneV2PVName()
+}
+
 func childLabelsRclone(cr *amaltheadevv1alpha1.AmaltheaSession) map[string]string {
 	labels := map[string]string{}
 	maps.Copy(labels, cr.Spec.Template.Metadata.Labels)
@@ -91,6 +95,10 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 	if cr.Spec.RcloneDataSource == nil {
 		return &RcloneV2Resources{}
 	}
+	// NOTE: The service, PV and PVC are kept when the session is hibernated, only the statefulset is scaled down.
+	// In most clusters the operator will only be allowed to create PVs (not patch or delete them). The PV
+	// references the ClusterIP of the service and is pre-bound to the PVC, so neither the service nor
+	// the PVC can be recreated without breaking the PV.
 	ss := NewChildResource(
 		(*appsv1.StatefulSet)(nil),
 		WithName[*appsv1.StatefulSet](RcloneV2ResourceName(cr)),
@@ -122,21 +130,20 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 	)
 	pv := NewChildResource(
 		(*v1.PersistentVolume)(nil),
-		WithName[*v1.PersistentVolume](RcloneV2ResourceName(cr)),
+		WithName[*v1.PersistentVolume](RcloneV2PVName(cr)),
 		WithMutateFn(func(obj *v1.PersistentVolume) error {
+			// NOTE: The PV is write-once, the operator is most likely not allowed to patch PVs.
+			// Leaving an existing PV untouched results in no patch request from CreateOrPatch.
+			if !obj.CreationTimestamp.IsZero() {
+				return nil
+			}
 			if len(service.obj.Spec.ClusterIP) == 0 {
 				return fmt.Errorf("cannot create volume for rclone dataset because host is not known from the Service")
 			}
 			desired := rcloneV2Volume(cr, service.obj.Spec.ClusterIP)
-			obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
-			obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
-			obj.Spec.Capacity = desired.Spec.Capacity
-			obj.Spec.AccessModes = desired.Spec.AccessModes
-			obj.Spec.StorageClassName = desired.Spec.StorageClassName
-			obj.Spec.MountOptions = desired.Spec.MountOptions
-			if obj.CreationTimestamp.IsZero() {
-				obj.Spec.PersistentVolumeSource = desired.Spec.PersistentVolumeSource
-			}
+			obj.Labels = desired.Labels
+			obj.Annotations = desired.Annotations
+			obj.Spec = desired.Spec
 			return nil
 		}),
 	)
@@ -318,7 +325,7 @@ func rcloneV2Volume(cr *amaltheadevv1alpha1.AmaltheaSession, server string) v1.P
 	mountOptions = append(mountOptions, cr.Spec.RcloneDataSource.MountOptions...)
 	return v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        RcloneV2ResourceName(cr),
+			Name:        RcloneV2PVName(cr),
 			Labels:      labels,
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
@@ -327,6 +334,18 @@ func rcloneV2Volume(cr *amaltheadevv1alpha1.AmaltheaSession, server string) v1.P
 			Capacity:         v1.ResourceList{"storage": resource.MustParse("1Gi")},
 			MountOptions:     mountOptions,
 			StorageClassName: "",
+			// NOTE: Pre-bind the PV to the session PVC so that no other PVC can claim it and the
+			// operator never has to patch the PV for binding. The UID is filled in by Kubernetes.
+			ClaimRef: &v1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "PersistentVolumeClaim",
+				Namespace:  cr.Namespace,
+				Name:       RcloneV2ResourceName(cr),
+			},
+			// NOTE: There is no deleter for NFS volumes, so with "Delete" the PV would just end up "Failed"
+			// after the PVC is removed. The PV is deleted by the operator when the session is deleted
+			// (if it has the permissions to do so).
+			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimRetain,
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				NFS: &v1.NFSVolumeSource{
 					Server: server,
@@ -346,7 +365,7 @@ func rcloneV2PVC(cr *amaltheadevv1alpha1.AmaltheaSession) v1.PersistentVolumeCla
 			Annotations: cr.Spec.Template.Metadata.Annotations,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			VolumeName:       RcloneV2ResourceName(cr),
+			VolumeName:       RcloneV2PVName(cr),
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			Resources:        v1.VolumeResourceRequirements{Requests: v1.ResourceList{"storage": resource.MustParse("1Gi")}},
 			StorageClassName: ptr.To(""),
