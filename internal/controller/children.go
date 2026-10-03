@@ -129,8 +129,10 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				logger.Info("Creating a statefulset")
 				current.Spec = desired.Spec
 				current.ObjectMeta = desired.ObjectMeta
-				err := ctrl.SetControllerReference(cr, current, clnt.Scheme())
-				return err
+				if cr.Spec.RcloneDataSource == nil {
+					return ctrl.SetControllerReference(cr, current, clnt.Scheme())
+				}
+				return nil
 			}
 			if current.Spec.Replicas != nil && desired.Spec.Replicas != nil && *current.Spec.Replicas == 0 && *desired.Spec.Replicas == 1 {
 				// The session is being resumed

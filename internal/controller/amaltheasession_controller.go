@@ -32,6 +32,8 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -63,6 +65,7 @@ type AmaltheaSessionReconciler struct {
 // finalizers
 const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
 const rclonePVFinalizer = "amalthea.dev/rclone-pv-finalizer"
+const rcloneShutdownFinalizer = "amalthea.dev/rclone-shutdown-order"
 
 // +kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions/status,verbs=get;update;patch
@@ -182,6 +185,13 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 				return ctrl.Result{}, err
 			}
 		}
+
+		if amaltheasession.Spec.RcloneDataSource != nil && !controllerutil.ContainsFinalizer(amaltheasession, rcloneShutdownFinalizer) {
+			controllerutil.AddFinalizer(amaltheasession, rcloneShutdownFinalizer)
+			if err := r.Update(ctx, amaltheasession); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	} else {
 		amaltheasession.Status.State = amaltheadevv1alpha1.NotReady
 		if err := r.updateStatusWithRetry(ctx, amaltheasession, func(cr *amaltheadevv1alpha1.AmaltheaSession) {
@@ -202,6 +212,45 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 				return ctrl.Result{}, err
 			}
 		}
+
+		if controllerutil.ContainsFinalizer(amaltheasession, rcloneShutdownFinalizer) {
+			// Makes sure the session is deleted before the nfs server, otherwise the nfs server pod never shuts down
+			sessionStub := appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: amaltheasession.Name, Namespace: amaltheasession.Namespace}}
+			err := r.Delete(ctx, &sessionStub, &client.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationForeground)})
+			if client.IgnoreNotFound(err) != nil {
+				return ctrl.Result{}, err
+			}
+
+			// Deleting the Statefulset completes before the pod for it goes away, but we have to wait for the pod to go away
+			wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+				err := r.Get(ctx, client.ObjectKeyFromObject(&sessionStub), &sessionStub)
+				if err == nil {
+					return false, nil
+				}
+				if !apierrors.IsNotFound(err) {
+					return false, err
+				}
+				pods := corev1.PodList{}
+				err = r.List(ctx, &pods, client.InNamespace(amaltheasession.Namespace), client.MatchingLabels(sessionStub.Spec.Selector.MatchLabels))
+				if err != nil {
+					return false, err
+				}
+				return len(pods.Items) == 0, nil
+			})
+
+			nfsStub := appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: amaltheasession.RcloneV2ResourceName(), Namespace: amaltheasession.Namespace}}
+			err = r.Delete(ctx, &nfsStub, &client.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationForeground)})
+			if client.IgnoreNotFound(err) != nil {
+				return ctrl.Result{}, err
+			}
+
+			// remove our finalizer from the list and update it.
+			controllerutil.RemoveFinalizer(amaltheasession, rcloneShutdownFinalizer)
+			if err := r.Update(ctx, amaltheasession); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
 		if controllerutil.ContainsFinalizer(amaltheasession, rclonePVFinalizer) {
 			// We don't need the whole PV to delete, just the name
 			pvStub := corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: childutils.RcloneV2PVName(amaltheasession)}}

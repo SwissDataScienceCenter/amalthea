@@ -113,7 +113,6 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 			obj.Spec = desired.Spec
 			return nil
 		}),
-		WithParent[*appsv1.StatefulSet](cr),
 	)
 	service := NewChildResource(
 		(*v1.Service)(nil),
