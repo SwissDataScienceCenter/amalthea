@@ -85,7 +85,7 @@ func (c *RunnersRemoteSessionController) Start(ctx context.Context) error {
 	// TODO: get wstunnel_secret as a config value
 	wstunnelSecret := os.Getenv("RSC_WSTUNNEL_SECRET")
 	if wstunnelSecret != "" {
-		secrets := []sessionRunners.AssignedSessionSecret{{Name: "RENKU_WSTUNNEL_SECRET", Value: wstunnelSecret}}
+		secrets := []sessionRunners.RemoteUserSessionSecret{{Name: "RENKU_WSTUNNEL_SECRET", Value: wstunnelSecret}}
 		err := c.patchSessionSecrets(ctx, runnerID, sessionID, secrets)
 		if err != nil {
 			return err
@@ -101,7 +101,7 @@ func (c *RunnersRemoteSessionController) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (c *RunnersRemoteSessionController) waitUntilRunnerIsAssigned(ctx context.Context, sessionID string) (session sessionRunners.AssignedSession, err error) {
+func (c *RunnersRemoteSessionController) waitUntilRunnerIsAssigned(ctx context.Context, sessionID string) (session sessionRunners.RemoteUserSession, err error) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -115,8 +115,8 @@ func (c *RunnersRemoteSessionController) waitUntilRunnerIsAssigned(ctx context.C
 	}
 }
 
-func (c *RunnersRemoteSessionController) getSession(ctx context.Context, sessionID string) (session sessionRunners.AssignedSession, err error) {
-	res, err := c.client.SessionRunners().GetSessionRunnersSessionsSessionIdWithResponse(ctx, sessionID)
+func (c *RunnersRemoteSessionController) getSession(ctx context.Context, sessionID string) (session sessionRunners.RemoteUserSession, err error) {
+	res, err := c.client.SessionRunners().GetSessionRunnersUserSessionsSessionIdWithResponse(ctx, sessionID)
 	if err != nil {
 		return session, err
 	}
@@ -138,9 +138,9 @@ func (c *RunnersRemoteSessionController) getSession(ctx context.Context, session
 	return *resJSON, nil
 }
 
-func (c *RunnersRemoteSessionController) patchSessionSecrets(ctx context.Context, runnerID, sessionID string, secrets []sessionRunners.AssignedSessionSecret) error {
-	slog.Info("Sending to PATCH /session_runners/{session_runner_id}/sessions/{session_id}/secrets", "runnerID", runnerID, "sessionID", sessionID)
-	res, err := c.client.SessionRunners().PatchSessionRunnersSessionRunnerIdSessionsSessionIdSecretsWithResponse(ctx, runnerID, sessionID, secrets)
+func (c *RunnersRemoteSessionController) patchSessionSecrets(ctx context.Context, runnerID, sessionID string, secrets []sessionRunners.RemoteUserSessionSecret) error {
+	slog.Info("Sending to PATCH /session_runners/sessions/{session_id}/secrets", "runnerID", runnerID, "sessionID", sessionID)
+	res, err := c.client.SessionRunners().PatchSessionRunnersUserSessionsSessionIdSecretsWithResponse(ctx, sessionID, secrets)
 	if err != nil {
 		return err
 	}
