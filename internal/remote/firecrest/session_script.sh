@@ -51,8 +51,10 @@ export RENKU_SESSION_IP="127.0.0.1"
 # Do not leave secrets on a shared fs, move it to the node where the session runs.
 mkdir -p "${SECRETS_DIR}"
 chmod 700 "${SECRETS_DIR}"
-mv "${SESSION_DIR}/secrets"/{.[!.]*,*} "${SECRETS_DIR}"
-rmdir "${SESSION_DIR}/secrets"
+# If SECRETS_DIR already exists then mv results in a subfolder - but we dont want this, so we use `cp -a`.
+# If using `cp` and `/.` at the end of the source path is excluded we will also get a subfolder in SECRETS_DIR.
+cp -a "${SESSION_DIR}/secrets/." "${SECRETS_DIR}"
+rm -rf "${SESSION_DIR}/secrets/"
 
 # Load the wstunnel secret
 export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
@@ -152,7 +154,7 @@ function install_wstunnel() {
         curl -Lo "wstunnel.tar.gz" "${wstunnel_url}"
         rm -rf "${wstunnel_pkg}"
         mkdir -p ${wstunnel_pkg} # the folder has to exist for tar -C
-        tar xf "wstunnel.tar.gz" -C "${wstunnel_pkg}"
+        tar xf "wstunnel.tar.gz" -C "${wstunnel_pkg}" --strip-components=1
     )
     rm -r "${tmp}"
     chmod a+x "${wstunnel_bin}"
