@@ -6105,6 +6105,9 @@ spec:
                     items:
                       type: string
                     type: array
+                    x-kubernetes-validations:
+                    - message: mountOptions is immutable
+                      rule: self == oldSelf
                   mounts:
                     description: |-
                       Paths inside the storage that is served and where they should be mounted.
@@ -6235,6 +6238,9 @@ spec:
                 - remoteName
                 - secret
                 type: object
+                x-kubernetes-validations:
+                - message: mountOptions cannot be added or removed
+                  rule: has(self.mountOptions) == has(oldSelf.mountOptions)
               reconcileStrategy:
                 default: always
                 description: |-

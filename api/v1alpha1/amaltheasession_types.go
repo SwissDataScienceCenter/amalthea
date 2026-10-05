@@ -678,6 +678,7 @@ type Cache struct {
 	ClassName *string `json:"className,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="has(self.mountOptions) == has(oldSelf.mountOptions)",message="mountOptions cannot be added or removed"
 type RcloneDataSource struct {
 	// +required
 	// +kubebuilder:validation:MinLength=1
@@ -705,6 +706,7 @@ type RcloneDataSource struct {
 	// If omitted it is assumed that the Rclone config is not encrypted.
 	ConfigPasswordSecret *SessionSecretKeyRef `json:"configPasswordSecret,omitempty"`
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="mountOptions is immutable"
 	// Mount options to pass to the PV
 	MountOptions []string `json:"mountOptions,omitempty"`
 	// +optional

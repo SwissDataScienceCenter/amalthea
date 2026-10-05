@@ -201,7 +201,6 @@ func rcloneV2Statefulset(cr *amaltheadevv1alpha1.AmaltheaSession) (appsv1.Statef
 	args = append(args, "--vfs-cache-mode", "writes")
 	args = append(args, "--rc")
 	args = append(args, "--log-level", "INFO")
-	args = append(args, cr.Spec.RcloneDataSource.ExtraArgs...)
 	preStopCommand := `
 echo "preStop: waiting for rclone uploads to finish..."
 
