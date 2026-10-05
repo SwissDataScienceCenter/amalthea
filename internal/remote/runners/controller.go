@@ -134,7 +134,7 @@ func (c *RunnersRemoteSessionController) getSession(ctx context.Context, session
 		}
 		return session, fmt.Errorf("failed to get session from Renku: %s", message)
 	}
-	slog.Info("Received from GET /session_runners/sessions/{session_id}", "session", *resJSON)
+	slog.Info("Received from GET /session_runners/user/sessions/{session_id}", "session", *resJSON)
 	return *resJSON, nil
 }
 
