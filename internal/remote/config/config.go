@@ -33,9 +33,9 @@ import (
 type RemoteKind string
 
 const (
-	RemoteKindFirecrest RemoteKind = "firecrest"
-	RemoteKindRunai     RemoteKind = "runai"
-	RemoteKindRunners   RemoteKind = "runners"
+	RemoteKindFirecrest   RemoteKind = "firecrest"
+	RemoteKindRunai       RemoteKind = "runai"
+	RemoteKindUserRunners RemoteKind = "user_runners"
 )
 
 const (
@@ -176,7 +176,7 @@ func (cfg *RemoteSessionControllerConfig) Validate() error {
 		return cfg.Firecrest.Validate()
 	case RemoteKindRunai:
 		return cfg.Runai.Validate()
-	case RemoteKindRunners:
+	case RemoteKindUserRunners:
 		return cfg.Runners.Validate()
 	}
 

@@ -53,7 +53,7 @@ func NewRemoteSessionController(cfg config.RemoteSessionControllerConfig) (c Rem
 		}
 		return controller, nil
 	}
-	if cfg.RemoteKind == config.RemoteKindRunners {
+	if cfg.RemoteKind == config.RemoteKindUserRunners {
 		controller, err := runners.NewRunnersRemoteSessionController(cfg)
 		if err != nil {
 			return nil, err
