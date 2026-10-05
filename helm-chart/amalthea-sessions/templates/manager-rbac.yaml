@@ -80,6 +80,45 @@ rules:
   verbs: [get, list, watch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "amalthea-sessions.fullname" . }}-pv-role
+  labels:
+  {{- include "amalthea-sessions.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+    - persistentvolumes
+  verbs:
+    - create
+    - get
+    - list
+    - watch
+{{- if .Values.rbac.allowPVDeletion }}
+    - delete
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "amalthea-sessions.fullname" . }}-pv-rolebinding
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: amalthea
+    app.kubernetes.io/part-of: amalthea
+  {{- include "amalthea-sessions.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: '{{ include "amalthea-sessions.fullname" . }}-pv-role'
+subjects:
+- kind: ServiceAccount
+  name: '{{ include "amalthea-sessions.fullname" . }}-controller-manager'
+  namespace: '{{ .Release.Namespace }}'
+---
+apiVersion: rbac.authorization.k8s.io/v1
 {{- if .Values.clusterScoped }}
 kind: ClusterRoleBinding
 {{- else }}

@@ -1255,5 +1255,5 @@ func (cr *AmaltheaSession) RcloneV2ResourceName() string {
 // UID because PVs can outlive their session (if the operator cannot delete them) and a new session
 // with the same name and namespace must not end up reusing a stale PV.
 func (cr *AmaltheaSession) RcloneV2PVName() string {
-	return cr.RcloneV2ResourceName() + "-" + string(cr.UID)
+	return "nfs-" + string(cr.UID)
 }

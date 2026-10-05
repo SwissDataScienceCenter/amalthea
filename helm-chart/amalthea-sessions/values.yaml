@@ -89,3 +89,11 @@ httpsSessionIngress: false
 imageRewriteRules: []
   # - source_prefix: "docker.io"
   #   target_prefix: "harbor.renkulab.io/dockerhub_cache"
+
+rbac:
+  # Allows the operator to delete persistent volumes (PVs).
+  # Used for mounting Rclone remote storage in the session withtout needing a CSI driver.
+  # If this is set to false, then you need to setup a cronjob or similar recurring job to cleanup
+  # old/unused PVs from Amalthea sessions that use Rclone storage in your cluster.
+  # If set to true amalthea will cleanup its PVs when the sessions is shut down.
+  allowPVDeletion: false
