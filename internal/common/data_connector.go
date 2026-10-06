@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,8 +153,6 @@ func parsePV(name string) ([]string, error) {
 	if err = json.Unmarshal(content, ds); err != nil {
 		return nil, err
 	}
-
-	slog.Info("Parsed DataSource from secret", "ds", ds)
 
 	if !strings.Contains(ds.AccessMode, "Write") {
 		extraArgs = append(extraArgs, "--read-only")
