@@ -144,8 +144,8 @@ func parsePV(name string) ([]string, error) {
 	var content []byte
 	var err error
 
-	localUserSecretBaseFilePath := filepath.FromSlash(filepath.Clean(LocalUserSecretPath))
-	if content, err = os.ReadFile(filepath.Join(localUserSecretBaseFilePath, name)); err != nil {
+	localDataConnectorSecretBaseFilePath := filepath.FromSlash(filepath.Clean(LocalDataConnectorSecretPath))
+	if content, err = os.ReadFile(filepath.Join(localDataConnectorSecretBaseFilePath, name)); err != nil {
 		return nil, err
 	}
 
