@@ -671,7 +671,7 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 		{
 			Name:      fmt.Sprintf("%s%s", prefix, as.Name),
 			ReadOnly:  true,
-			MountPath: common.LocalUserSecretPath,
+			MountPath: common.LocalSessionSecretsPath,
 		},
 	}
 
