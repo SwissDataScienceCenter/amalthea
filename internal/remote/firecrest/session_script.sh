@@ -208,7 +208,6 @@ srun_param_mounts=$(echo ${srun_param_mounts} | sed -e "s,${SESSION_DIR}/secrets
 if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
     (# Run in a sub shell to scope the temporary variables
         for dc in "${SECRETS_DATA_CONNECTORS_DIR}"/*; do
-        (
             n=$(echo ${dc}|sed -e 's,.*-,,')
             mount="$(cat "${dc}/remote")"
             mount_point="${SESSION_WORK_DIR}/${mount}"
@@ -262,7 +261,6 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
                 ${extra_args} \
                 "${mount}:${remote_path}" \
                 "//${mount_point}"
-        )
         done
     )
 fi
