@@ -46,14 +46,13 @@ func NewRunnersRemoteSessionController(cfg config.RemoteSessionControllerConfig)
 
 // Status returns the status of the remote session
 func (c *RunnersRemoteSessionController) Status(ctx context.Context) (state models.RemoteSessionState, err error) {
-	// TODO
+	// NOTE: for now, we always report 'running'.
+	// TODO: Use status from GET /session_runners/user/sessions/{session_id} once a status is reported there.
 	return models.Running, nil
 }
 
 // Start: does nothing for now
 func (c *RunnersRemoteSessionController) Start(ctx context.Context) error {
-	// TODO
-
 	// Determine session ID
 	sessionPath := os.Getenv("RENKU_BASE_URL_PATH")
 	sessionID := ""
@@ -68,6 +67,16 @@ func (c *RunnersRemoteSessionController) Start(ctx context.Context) error {
 	}
 	slog.Info("Got session ID", "sessionID", sessionID)
 
+	// TODO: get wstunnel_secret as a config value
+	wstunnelSecret := os.Getenv("RSC_WSTUNNEL_SECRET")
+	if wstunnelSecret != "" {
+		secrets := []sessionRunners.RemoteUserSessionSecret{{Name: "RENKU_WSTUNNEL_SECRET", Value: wstunnelSecret}}
+		err := c.patchSessionSecrets(ctx, sessionID, secrets)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Wait for runner
 	session, err := c.waitUntilRunnerIsAssigned(ctx, sessionID)
 	if err != nil {
@@ -80,17 +89,7 @@ func (c *RunnersRemoteSessionController) Start(ctx context.Context) error {
 	if runnerID == "" {
 		return fmt.Errorf("could not determine session runner ID")
 	}
-	slog.Info("Got runner ID", "runnerID", runnerID)
-
-	// TODO: get wstunnel_secret as a config value
-	wstunnelSecret := os.Getenv("RSC_WSTUNNEL_SECRET")
-	if wstunnelSecret != "" {
-		secrets := []sessionRunners.RemoteUserSessionSecret{{Name: "RENKU_WSTUNNEL_SECRET", Value: wstunnelSecret}}
-		err := c.patchSessionSecrets(ctx, runnerID, sessionID, secrets)
-		if err != nil {
-			return err
-		}
-	}
+	slog.Info("Got runner ID, session should start soon...", "runnerID", runnerID)
 
 	return nil
 }
@@ -134,13 +133,13 @@ func (c *RunnersRemoteSessionController) getSession(ctx context.Context, session
 		}
 		return session, fmt.Errorf("failed to get session from Renku: %s", message)
 	}
-	slog.Info("Received from GET /session_runners/user/sessions/{session_id}", "session", *resJSON)
 	return *resJSON, nil
 }
 
-func (c *RunnersRemoteSessionController) patchSessionSecrets(ctx context.Context, runnerID, sessionID string, secrets []sessionRunners.RemoteUserSessionSecret) error {
-	slog.Info("Sending to PATCH /session_runners/sessions/{session_id}/secrets", "runnerID", runnerID, "sessionID", sessionID)
+func (c *RunnersRemoteSessionController) patchSessionSecrets(ctx context.Context, sessionID string, secrets []sessionRunners.RemoteUserSessionSecret) error {
+	slog.Debug("Request to PATCH /session_runners/sessions/{session_id}/secrets", "sessionID", sessionID)
 	res, err := c.client.SessionRunners().PatchSessionRunnersUserSessionsSessionIdSecretsWithResponse(ctx, sessionID, secrets)
+	slog.Debug("Response from PATCH /session_runners/sessions/{session_id}/secrets", "sessionID", sessionID, "status", res.StatusCode(), "err", err)
 	if err != nil {
 		return err
 	}

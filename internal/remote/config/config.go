@@ -49,7 +49,7 @@ const (
 
 type RemoteSessionControllerConfig struct {
 
-	// The type of remote infrastructure to use, currently FirecREST, Runai or Runners
+	// The type of remote infrastructure to use, currently FirecREST, Runai or User-scoped Runners
 	RemoteKind RemoteKind
 
 	// The configuration for the FirecREST API

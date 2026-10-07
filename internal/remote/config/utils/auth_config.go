@@ -1,4 +1,4 @@
-package utils
+package configUtils
 
 import (
 	"github.com/spf13/cobra"
