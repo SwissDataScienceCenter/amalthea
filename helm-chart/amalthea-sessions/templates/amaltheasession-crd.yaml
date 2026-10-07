@@ -6071,6 +6071,45 @@ spec:
                 description: Used to mount rclone data sources without needing a CSI
                   Rclone driver.
                 properties:
+                  cache:
+                    default: {}
+                    properties:
+                      cacheMode:
+                        default: writes
+                        description: |-
+                          The rclone cacheMode to use.
+                          It is not recommended to run without a persistent cache because the disk on the node will be used.
+                        enum:
+                        - writes
+                        - full
+                        type: string
+                      persisted:
+                        default: false
+                        description: |-
+                          If set to true will provision a PVC to back the Rclone cache.
+                          If not persisted then restarting the rclone server will require restarting the session to get the mounts back in the user session.
+                        type: boolean
+                      size:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        default: 1Gi
+                        description: |-
+                          The size of the cache.
+                          When the cache is persisted it is the size of the PVC and the limit for the rclone cache.
+                          When the cache is not persisted it is only used as the limit for the rclone cache.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                        x-kubernetes-validations:
+                        - message: cache size must be a positive quantity
+                          rule: 'type(self) == int ? self > 0 : isQuantity(self) &&
+                            quantity(self).isGreaterThan(quantity(''0''))'
+                      storageClassName:
+                        description: |-
+                          The storage class name to use for the cache.
+                          Used only when the cache is persisted.
+                        type: string
+                    type: object
                   configPasswordSecret:
                     description: |-
                       The secret that contains the key used to decrypt the Rclone configuration.

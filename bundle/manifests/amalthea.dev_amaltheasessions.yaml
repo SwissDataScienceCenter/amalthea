@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.1
+    controller-gen.kubebuilder.io/version: v0.18.0
   creationTimestamp: null
   name: amaltheasessions.amalthea.dev
 spec:
@@ -27,11 +27,14 @@ spec:
       jsonPath: .status.containerCounts.ready
       name: Ready
       type: string
-    - description: The total numeber of containers in the session, disregarding init
+    - description: The total number of containers in the session, disregarding init
         containers.
       jsonPath: .status.containerCounts.total
       name: Total
       type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
     - description: Whether the session is idle or not.
       jsonPath: .status.idle
       name: Idle
@@ -1194,6 +1197,8 @@ spec:
                       is active or not. When the threshold is reached the session is hibernated.
                       A value of zero indicates that Amalthea will not automatically hibernate
                       the session based on its age.
+                      For Non-Interactive sessions, this time indicates runtime of a job. When
+                      the threshold is reached, the job is suspended.
                       Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
                       valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
                     format: duration
@@ -1203,6 +1208,7 @@ spec:
                       How long can a server be in failed state before it gets hibernated. A
                       value of zero indicates that the server will not be automatically
                       hibernated by Amalthea if it is failing.
+                      For Non-Interactive sessions, this value is not used.
                       Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
                       valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
                     format: duration
@@ -1210,8 +1216,10 @@ spec:
                   maxHibernatedDuration:
                     description: |-
                       How long can a session be in hibernated state before
-                      it gets completely deleted. A value of zero indicates that hibernated servers
-                      will not be automatically be deleted by Amalthea after a period of time.
+                      it gets completely deleted. Or how long a Non-Interactive session
+                      will be kept around once it has completed.
+                      A value of zero indicates that hibernated servers or jobs
+                      will not be automatically deleted by Amalthea after a period of time.
                       Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
                       valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
                     format: duration
@@ -1220,6 +1228,7 @@ spec:
                     description: |-
                       How long should a server be idle for before it is hibernated. A value of
                       zero indicates that Amalthea will not automatically hibernate inactive sessions.
+                      For Non-Interactive sessions, this value is not used.
                       Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
                       valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
                     format: duration
@@ -1229,6 +1238,7 @@ spec:
                       How long can a server be in starting state before it gets hibernated. A
                       value of zero indicates that the server will not be automatically hibernated
                       by Amalthea because it took to long to start.
+                      For Non-Interactive sessions, this value is not used.
                       Golang's time.ParseDuration is used to parse this, so values like 2h5min will work,
                       valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
                     format: duration
@@ -1286,7 +1296,6 @@ spec:
                         rclone requires the csi-rclone driver
                       enum:
                       - rclone
-                      - rcloneV2
                       type: string
                   type: object
                 type: array
@@ -6060,10 +6069,45 @@ spec:
                 description: Used to mount rclone data sources without needing a CSI
                   Rclone driver.
                 properties:
-                  accessMode:
-                    default: ReadOnlyMany
-                    description: The access mode for the data source
-                    type: string
+                  cache:
+                    default: {}
+                    properties:
+                      cacheMode:
+                        default: writes
+                        description: |-
+                          The rclone cacheMode to use.
+                          It is not recommended to run without a persistent cache because the disk on the node will be used.
+                        enum:
+                        - writes
+                        - full
+                        type: string
+                      persisted:
+                        default: false
+                        description: |-
+                          If set to true will provision a PVC to back the Rclone cache.
+                          If not persisted then restarting the rclone server will require restarting the session to get the mounts back in the user session.
+                        type: boolean
+                      size:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        default: 1Gi
+                        description: |-
+                          The size of the cache.
+                          When the cache is persisted it is the size of the PVC and the limit for the rclone cache.
+                          When the cache is not persisted it is only used as the limit for the rclone cache.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                        x-kubernetes-validations:
+                        - message: cache size must be a positive quantity
+                          rule: 'type(self) == int ? self > 0 : isQuantity(self) &&
+                            quantity(self).isGreaterThan(quantity(''0''))'
+                      storageClassName:
+                        description: |-
+                          The storage class name to use for the cache.
+                          Used only when the cache is persisted.
+                        type: string
+                    type: object
                   configPasswordSecret:
                     description: |-
                       The secret that contains the key used to decrypt the Rclone configuration.
@@ -6089,28 +6133,61 @@ spec:
                       type: string
                     type: array
                   image:
-                    default: rclone/rclone:1.75
-                    description: The image used to run rclone NFS server.
+                    default: olevski90/rclone:1.75
+                    description: |-
+                      The image used to run rclone NFS server.
+                      Has to be able to run with any arbitrary non-root user.
+                      Has to run as non-root by default. The default rclone image runs as root by default.
                     type: string
                   mountOptions:
                     description: Mount options to pass to the PV
                     items:
                       type: string
                     type: array
-                  mountPath:
-                    default: data
-                    description: Path relative to the session working directory where
-                      the data should be mounted
-                    example: data/storages
-                    type: string
-                  remoteName:
-                    description: The name of the remote from the secret that is present
-                      in the ini config that should be mounted.
-                    type: string
-                  remotePath:
+                    x-kubernetes-validations:
+                    - message: mountOptions is immutable
+                      rule: self == oldSelf
+                  mounts:
                     description: |-
-                      The path on the remote side that should be mounted. For S3 this contains at least the bucket name.
-                      In some cases this is empty or just `/`.
+                      Paths inside the storage that is served and where they should be mounted.
+                      The paths refer to paths inside the `RemoteName` Rclone remote in the config.
+                    items:
+                      properties:
+                        mountPath:
+                          description: |-
+                            Where the data should be mounted inside the Amalthea session.
+                            If the path is relative, it is simply gets `/` prepended.
+                            If absolute then it is mounted at that exact path.
+                            This is the behaviour from the K8s API - we do not modify it.
+                          minLength: 1
+                          type: string
+                        readOnly:
+                          default: false
+                          description: If set to true the remote will be mounted as
+                            read only in the session
+                          type: boolean
+                        subPath:
+                          description: The path inside the rclone remote that should
+                            be mounted, if omitted the whole remote is mounted at
+                            mountPath.
+                          minLength: 1
+                          type: string
+                      required:
+                      - mountPath
+                      type: object
+                    minItems: 1
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - mountPath
+                    x-kubernetes-list-type: map
+                  remoteName:
+                    description: |-
+                      The name of the remote from the secret that is present in the ini config that will be served by rclone.
+                      In this case rclone uses nfs to serve this remote and only this remote is available in the session.
+                      Users are expected to use combine/union type remotes in the config to make sure multiple different sources are mounted.
+                    maxLength: 128
+                    minLength: 1
+                    pattern: ^[A-Za-z0-9_.][A-Za-z0-9_.-]*$
                     type: string
                   resources:
                     default:
@@ -6195,7 +6272,14 @@ spec:
                     - key
                     - name
                     type: object
+                required:
+                - mounts
+                - remoteName
+                - secret
                 type: object
+                x-kubernetes-validations:
+                - message: mountOptions cannot be added or removed
+                  rule: has(self.mountOptions) == has(oldSelf.mountOptions)
               reconcileStrategy:
                 default: always
                 description: |-
@@ -6596,6 +6680,20 @@ spec:
                 required:
                 - image
                 type: object
+              sessionType:
+                default: Interactive
+                description: |-
+                  The session type, it is "Interactive" by default, but can be set to "NonInteractive". Non-interactive
+                  sessions are handled differently in that the main process is expected to be run-once and once it
+                  terminates, the resources are cleaned up. Non-interactive sessions are implemented as jobs and won't
+                  have ingress or authentication enabled.
+                enum:
+                - Interactive
+                - NonInteractive
+                type: string
+                x-kubernetes-validations:
+                - message: sesion type is immutable
+                  rule: self == oldSelf
               template:
                 description: Template for the fields that should be added to all children
                   (and their children if applicable).
@@ -6720,6 +6818,11 @@ spec:
                   total:
                     type: integer
                 type: object
+              runID:
+                description: |-
+                  The ID of the current run of the workload. A run is a continuous execution of the workload;
+                  every time a session gets resumed from hibernation, it gets a new runID.
+                type: string
               state:
                 default: NotReady
                 enum:
@@ -6728,6 +6831,7 @@ spec:
                 - Hibernated
                 - NotReady
                 - RunningDegraded
+                - Succeeded
                 type: string
               url:
                 type: string

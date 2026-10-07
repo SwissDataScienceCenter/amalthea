@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"cmp"
 	"fmt"
 	"net/url"
 	"strings"
@@ -719,6 +720,18 @@ type RcloneDataSource struct {
 	// +kubebuilder:default:={requests: {cpu: "500m", memory: "500Mi"}, limits: {memory: "500Mi"}}
 	// The resources requests and limits for the statefulset that runs rclone
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
+	// +optional
+	// +kubebuilder:default:={}
+	Cache RcloneCache `json:"cache,omitzero"`
+}
+
+func (ds RcloneDataSource) GetCache() RcloneCache {
+	c := ds.Cache
+	c.CacheMode = cmp.Or(c.CacheMode, CacheWrites)
+	if c.Size.IsZero() {
+		c.Size = resource.MustParse("1Gi")
+	}
+	return c
 }
 
 type RcloneMount struct {
@@ -737,4 +750,36 @@ type RcloneMount struct {
 	// +kubebuilder:default:=false
 	// If set to true the remote will be mounted as read only in the session
 	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// +kubebuilder:validation:Enum={writes,full}
+type RcloneCacheMode string
+
+// There are two more modes available 'off' and 'minimal' but with these
+// you cannot write or append to files. So we simply do not allow them.
+const CacheWrites RcloneCacheMode = "writes"
+const CacheFull RcloneCacheMode = "full"
+
+type RcloneCache struct {
+	// +optional
+	// +kubebuilder:default:="writes"
+	// The rclone cacheMode to use.
+	// It is not recommended to run without a persistent cache because the disk on the node will be used.
+	CacheMode RcloneCacheMode `json:"cacheMode,omitempty"`
+	// +optional
+	// +kubebuilder:default:=false
+	// If set to true will provision a PVC to back the Rclone cache.
+	// If not persisted then restarting the rclone server will require restarting the session to get the mounts back in the user session.
+	Persisted bool `json:"persisted,omitempty"`
+	// +optional
+	// The storage class name to use for the cache.
+	// Used only when the cache is persisted.
+	StorageClassName *string `json:"storageClassName,omitempty"`
+	// +optional
+	// +kubebuilder:default:="1Gi"
+	// +kubebuilder:validation:XValidation:rule="type(self) == int ? self > 0 : isQuantity(self) && quantity(self).isGreaterThan(quantity('0'))",message="cache size must be a positive quantity"
+	// The size of the cache.
+	// When the cache is persisted it is the size of the PVC and the limit for the rclone cache.
+	// When the cache is not persisted it is only used as the limit for the rclone cache.
+	Size resource.Quantity `json:"size,omitzero"`
 }

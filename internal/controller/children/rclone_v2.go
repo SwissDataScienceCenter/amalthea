@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"log"
 	"maps"
+	"math"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -50,6 +51,10 @@ func RcloneV2ResourceName(cr *amaltheadevv1alpha1.AmaltheaSession) string {
 
 func RcloneV2PVName(cr *amaltheadevv1alpha1.AmaltheaSession) string {
 	return cr.RcloneV2PVName()
+}
+
+func RcloneV2PVCCacheName(cr *amaltheadevv1alpha1.AmaltheaSession) string {
+	return cr.RcloneV2ResourceName() + "-cache"
 }
 
 func childLabelsRclone(cr *amaltheadevv1alpha1.AmaltheaSession) map[string]string {
@@ -164,9 +169,35 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 		}),
 		WithParent[*v1.PersistentVolumeClaim](cr),
 	)
+	cachePVC := NewChildResource(
+		(*v1.PersistentVolumeClaim)(nil),
+		WithName[*v1.PersistentVolumeClaim](RcloneV2PVCCacheName(cr)),
+		WithNamespace[*v1.PersistentVolumeClaim](cr.Namespace),
+		WithMutateFn(func(obj *v1.PersistentVolumeClaim) error {
+			desired := rcloneV2CachePVC(cr)
+			if desired == nil {
+				return nil
+			}
+			if !obj.CreationTimestamp.IsZero() {
+				obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
+				obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
+				obj.Spec.Resources = desired.Spec.Resources
+				return nil
+			}
+			obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
+			obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
+			obj.Spec = desired.Spec
+			return nil
+		}),
+		WithParent[*v1.PersistentVolumeClaim](cr),
+		// We dont want to keep the cache and keep paying for storage when the session hibernates.
+		WithDeleteWhen[*v1.PersistentVolumeClaim](func() bool {
+			return cr.Spec.Hibernated || cr.Spec.RcloneDataSource == nil || !cr.Spec.RcloneDataSource.GetCache().Persisted
+		}),
+	)
 	// NOTE: The pv must be reconciled after the service, because the ClusterIP
 	// is populated by Kubernetes only after the resource has been created.
-	output := RcloneV2Resources{resources: []ChildResourcer{&ss, &service, &pv, &pvc}}
+	output := RcloneV2Resources{resources: []ChildResourcer{&ss, &service, &pv, &pvc, &cachePVC}}
 	return &output
 }
 
@@ -196,11 +227,27 @@ func rcloneV2Statefulset(cr *amaltheadevv1alpha1.AmaltheaSession) (appsv1.Statef
 		cr.Spec.RcloneDataSource.RemoteName + ":",
 		fmt.Sprintf("--addr=0.0.0.0:%d", rcloneV2NFSPort),
 	}
+	cache := cr.Spec.RcloneDataSource.GetCache()
 	args = append(args, cr.Spec.RcloneDataSource.ExtraArgs...)
 	args = append(args, "--config", RcloneV2SecretsMountPath+"/"+cr.Spec.RcloneDataSource.Secret.Key)
-	args = append(args, "--vfs-cache-mode", "writes")
+	args = append(args, "--vfs-cache-mode", string(cache.CacheMode))
+	args = append(args, fmt.Sprintf("--vfs-cache-max-size=%dB", int(math.Floor(0.95*float64(cache.Size.Value())))))
 	args = append(args, "--rc")
 	args = append(args, "--log-level", "INFO")
+	if cache.Persisted {
+		volumes = append(
+			volumes,
+			v1.Volume{
+				Name:         "cache",
+				VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: RcloneV2PVCCacheName(cr)}},
+			},
+		)
+		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: "cache", MountPath: "/cache"})
+		// Without the nfs-cache args below the user session pod will have to be restarted in order to recover the mounts
+		// when the nfs server pod restarts.
+		args = append(args, "--nfs-cache-type=disk", "--nfs-cache-dir=/cache/handles")
+		args = append(args, "--cache-dir=/cache/vfs")
+	}
 	preStopCommand := `
 echo "preStop: waiting for rclone uploads to finish..."
 
@@ -310,10 +357,9 @@ func rcloneV2Volume(cr *amaltheadevv1alpha1.AmaltheaSession, server string) v1.P
 		// Timeout is in deciseconds - tenths of second, 600 = 60s
 		"timeo=600",
 		"retrans=3",
-		// TODO: Switch to "hard" - that is the default and enforce the removal of the PV and PVC
-		// only after the session and nfs workloads have fully stopped.
-		// Enforcing a shutdown order can be done with finalizers.
-		"soft",
+		// Without hard below when the nfs server restarts the session pod will not recover its mounts
+		"hard",
+		"nolock",
 	}
 	labels := childLabelsRclone(cr)
 	// These are needed so that watching the PVs can generate reconcile requests for Amalthea.
@@ -367,6 +413,31 @@ func rcloneV2PVC(cr *amaltheadevv1alpha1.AmaltheaSession) v1.PersistentVolumeCla
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			Resources:        v1.VolumeResourceRequirements{Requests: v1.ResourceList{"storage": resource.MustParse("1Gi")}},
 			StorageClassName: ptr.To(""),
+		},
+	}
+}
+
+func rcloneV2CachePVC(cr *amaltheadevv1alpha1.AmaltheaSession) *v1.PersistentVolumeClaim {
+	if cr.Spec.Hibernated {
+		return nil
+	}
+	if cr.Spec.RcloneDataSource == nil {
+		return nil
+	}
+	if !cr.Spec.RcloneDataSource.GetCache().Persisted {
+		return nil
+	}
+	return &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        RcloneV2PVCCacheName(cr),
+			Namespace:   cr.Namespace,
+			Labels:      childLabelsRclone(cr),
+			Annotations: cr.Spec.Template.Metadata.Annotations,
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			Resources:        v1.VolumeResourceRequirements{Requests: v1.ResourceList{"storage": cr.Spec.RcloneDataSource.GetCache().Size}},
+			StorageClassName: cr.Spec.RcloneDataSource.GetCache().StorageClassName,
 		},
 	}
 }
