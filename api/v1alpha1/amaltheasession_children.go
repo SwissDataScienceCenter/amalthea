@@ -676,6 +676,10 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 	}
 
 	for ids, ds := range as.Spec.DataSources {
+		// Only handle 'rclone' data sources for now
+		if ds.Type != Rclone {
+			continue
+		}
 		volName := fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)
 		vols = append(
 			vols,
