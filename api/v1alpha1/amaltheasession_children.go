@@ -668,6 +668,15 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 		}
 	}
 
+	if cr.Spec.RcloneDataSource != nil && cr.Spec.RcloneDataSource.Secret.isAdopted() {
+		secrets.Items = append(secrets.Items, v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cr.Spec.RcloneDataSource.Secret.Name,
+				Namespace: cr.Namespace,
+			},
+		})
+	}
+
 	return secrets
 }
 
