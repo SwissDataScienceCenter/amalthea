@@ -1,4 +1,4 @@
-package config
+package firecrestConfig
 
 import (
 	"fmt"

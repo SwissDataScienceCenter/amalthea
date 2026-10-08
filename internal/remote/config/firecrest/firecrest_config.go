@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // package config contains configuration utilities for the remote session controller
-package config
+package firecrestConfig
 
 import (
 	"fmt"
