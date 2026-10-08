@@ -148,8 +148,9 @@ func walkIfMatch(root string, filter func(dir os.DirEntry) bool, process func(di
 		return err
 	}
 
-	if onceBefore != nil && onceBefore[0] != nil {
-		if err = onceBefore[0](); err != nil {
+	// Run the onceBefore functions
+	for _, fn := range onceBefore {
+		if err := fn(); err != nil {
 			return err
 		}
 	}
@@ -261,7 +262,6 @@ func (c *FirecrestRemoteSessionController) uploadDataConnectors(ctx context.Cont
 			if err != nil {
 				return err
 			}
-
 			return c.uploadDataConnector(ctx, remotePath, dc)
 		},
 		func() error {
@@ -358,7 +358,7 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 		return err
 	}
 
-	err = c.uploadSecret(startCtx, common.LocalUserSecretPath, remoteSecretsPath, "wstunnel_secret")
+	err = c.uploadSecret(startCtx, common.LocalSessionSecretsPath, remoteSecretsPath, "wstunnel_secret")
 	if err != nil {
 		return err
 	}
