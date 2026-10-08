@@ -12,7 +12,7 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-const LocalUserSecretPath = "/secrets-user"
+const LocalSessionSecretsPath = "/secrets-session"
 const LocalDataConnectorPath = "/secrets-dcs"
 const LocalDataConnectorSecretPath = "/secrets-dcs-secrets"
 
@@ -144,8 +144,8 @@ func parsePV(name string) ([]string, error) {
 	var content []byte
 	var err error
 
-	localDataConnectorSecretBaseFilePath := filepath.FromSlash(filepath.Clean(LocalDataConnectorSecretPath))
-	if content, err = os.ReadFile(filepath.Join(localDataConnectorSecretBaseFilePath, name)); err != nil {
+	localSessionSecretsBaseFilePath := filepath.FromSlash(filepath.Clean(LocalSessionSecretsPath))
+	if content, err = os.ReadFile(filepath.Join(localSessionSecretsBaseFilePath, name)); err != nil {
 		return nil, err
 	}
 

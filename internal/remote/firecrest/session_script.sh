@@ -208,6 +208,7 @@ srun_param_mounts=$(echo ${srun_param_mounts} | sed -e "s,${SESSION_DIR}/secrets
 if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
     (# Run in a sub shell to scope the temporary variables
         for dc in "${SECRETS_DATA_CONNECTORS_DIR}"/*; do
+        (
             n=$(echo ${dc}|sed -e 's,.*-,,')
             mount="$(cat "${dc}/remote")"
             mount_point="${SESSION_WORK_DIR}/${mount}"
@@ -215,6 +216,9 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             log_file="${LOGS_DIR}/rclone-dc-${n}.log"
             config_file="${dc}/configData"
             pass="${dc}/pass"
+            unset vfs_options
+            unset mount_options
+            unset extra_args
 
             if [ -f "${pass}" ]; then
                 pass_content="$(cat "${pass}" | ${rclone} obscure -)"
@@ -258,6 +262,7 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
                 ${extra_args} \
                 "${mount}:${remote_path}" \
                 "//${mount_point}"
+        )
         done
     )
 fi

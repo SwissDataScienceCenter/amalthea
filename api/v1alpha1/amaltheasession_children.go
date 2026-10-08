@@ -653,6 +653,7 @@ func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volum
 }
 
 func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
+	// NOTE: we add the session secrets as mounted volumes so that the remote session controller can handle them
 	pvcs := []v1.PersistentVolumeClaim{}
 	vols := []v1.Volume{
 		{
@@ -670,61 +671,61 @@ func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClai
 		{
 			Name:      fmt.Sprintf("%s%s", prefix, as.Name),
 			ReadOnly:  true,
-			MountPath: common.LocalUserSecretPath,
+			MountPath: common.LocalSessionSecretsPath,
 		},
 	}
 
-	ids := 0
-	for _, pv := range as.Spec.DataSources {
-		if pv.SecretRef.isAdopted() {
-			volName := fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)
-			vols = append(
-				vols,
-				v1.Volume{
-					Name: volName,
-					VolumeSource: v1.VolumeSource{
-						Secret: &v1.SecretVolumeSource{
-							SecretName:  pv.SecretRef.Name,
-							Optional:    ptr.To(false),
-							DefaultMode: ptr.To(int32(0400)), // chmod: r-- --- ---
-						},
-					},
-				},
-			)
-			volMounts = append(
-				volMounts,
-				v1.VolumeMount{
-					Name:      volName,
-					ReadOnly:  true,
-					MountPath: path.Join(common.LocalDataConnectorPath, volName),
-				},
-			)
-			// If there is a user secret linked to the data connector, mount it as it contains required credentials
-			userSecretName := fmt.Sprintf("%s-secrets", pv.SecretRef.Name)
-			volNameSecret := fmt.Sprintf("%s-secrets", volName)
-			vols = append(
-				vols,
-				v1.Volume{
-					Name: volNameSecret,
-					VolumeSource: v1.VolumeSource{
-						Secret: &v1.SecretVolumeSource{
-							SecretName:  userSecretName,
-							Optional:    ptr.To(true),
-							DefaultMode: ptr.To(int32(0400)), // chmod: r-- --- ---
-						},
-					},
-				},
-			)
-			volMounts = append(
-				volMounts,
-				v1.VolumeMount{
-					Name:      volNameSecret,
-					ReadOnly:  true,
-					MountPath: path.Join(common.LocalDataConnectorSecretPath, volName),
-				},
-			)
-			ids += 1
+	for ids, ds := range as.Spec.DataSources {
+		// Only handle 'rclone' data sources for now
+		if ds.Type != Rclone {
+			continue
 		}
+		volName := fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)
+		vols = append(
+			vols,
+			v1.Volume{
+				Name: volName,
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName:  ds.SecretRef.Name,
+						Optional:    ptr.To(false),
+						DefaultMode: ptr.To(int32(0400)), // chmod: r-- --- ---
+					},
+				},
+			},
+		)
+		volMounts = append(
+			volMounts,
+			v1.VolumeMount{
+				Name:      volName,
+				ReadOnly:  true,
+				MountPath: path.Join(common.LocalDataConnectorPath, volName),
+			},
+		)
+		// If there is a user secret linked to the data connector, mount it as it contains required credentials
+		userSecretName := fmt.Sprintf("%s-secrets", ds.SecretRef.Name)
+		volNameSecret := fmt.Sprintf("%s-secrets", volName)
+		vols = append(
+			vols,
+			v1.Volume{
+				Name: volNameSecret,
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName:  userSecretName,
+						Optional:    ptr.To(true),
+						DefaultMode: ptr.To(int32(0400)), // chmod: r-- --- ---
+					},
+				},
+			},
+		)
+		volMounts = append(
+			volMounts,
+			v1.VolumeMount{
+				Name:      volNameSecret,
+				ReadOnly:  true,
+				MountPath: path.Join(common.LocalDataConnectorSecretPath, volName),
+			},
+		)
 	}
 	return pvcs, vols, volMounts
 }
@@ -852,19 +853,13 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 		secret.StringData["wstunnel_secret"] = tunnelSecret
 
 		// Add the Datasources Specifications so that the proxy container can write them out to the HPC cluster
-		ids := 0
-		for _, pv := range as.Spec.DataSources {
-			if pv.SecretRef.isAdopted() {
-
-				var content []byte
-				content, err = json.Marshal(pv)
-				if err != nil {
-					panic(err)
-				}
-
-				secret.StringData[fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)] = string(content)
-				ids += 1
+		for ids, ds := range as.Spec.DataSources {
+			var content []byte
+			content, err = json.Marshal(ds)
+			if err != nil {
+				panic(err)
 			}
+			secret.StringData[fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)] = string(content)
 		}
 	}
 
