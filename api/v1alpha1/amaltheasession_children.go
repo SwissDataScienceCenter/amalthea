@@ -332,13 +332,13 @@ func (cr *AmaltheaSession) Service() v1.Service {
 
 // The path prefix for the session
 func (cr *AmaltheaSession) urlPath() string {
-	path := cr.Spec.Session.URLPath
+	sessionPath := cr.Spec.Session.URLPath
 	// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
 	// and does not proxy subpaths
-	if !strings.HasSuffix(path, "/") {
-		path = path + "/"
+	if !strings.HasSuffix(sessionPath, "/") {
+		sessionPath = sessionPath + "/"
 	}
-	return path
+	return sessionPath
 }
 
 // The path prefix from the ingress spec for the session
@@ -346,13 +346,13 @@ func (cr *AmaltheaSession) ingressPathPrefix() string {
 	if cr.Spec.Ingress == nil {
 		return "/"
 	}
-	path := cr.Spec.Ingress.PathPrefix
+	ingressPath := cr.Spec.Ingress.PathPrefix
 	// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
 	// and does not proxy subpaths
-	if !strings.HasSuffix(path, "/") {
-		path = path + "/"
+	if !strings.HasSuffix(ingressPath, "/") {
+		ingressPath = ingressPath + "/"
 	}
-	return path
+	return ingressPath
 }
 
 // Ingress returns a AmaltheaSession Ingress object
