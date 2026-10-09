@@ -1,150 +1,183 @@
+#!/bin/bash
 # NOTE FOR AMALTHEA MAINTAINERS:
 #   This script contains template strings in the following form:
 #     `#{{NAME}}`
 #   These strings should be added or removed according to code changes
 #   in the remote session controller.
 # END NOTE
-#!/bin/bash
 #{{SBATCH_DIRECTIVES_PLACEHOLDER}}
 
 set -e -o pipefail
 
-GIT_PROXY_WAIT_SLEEP_SECONDS=10
-GIT_PROXY_WAIT_RETRIES=10
+: ${REMOTE_SESSION_IMAGE:?'not set, aborting!'}
+
+: ${ARCH:=$(uname -m)}
+: ${RENKU_PKG:="${HOME}/.renku/${ARCH}/pkg"}
+: ${GIT_PROXY_PORT:=65480}
+: ${GIT_PROXY_HEALTH_PORT:=65481}
+: ${GIT_PROXY_WAIT_SLEEP_SECONDS:=10}
+: ${GIT_PROXY_WAIT_RETRIES:=10}
+: ${RCLONE_VERSION:="1.70.2"}
+: ${WSTUNNEL_PATH_PREFIX:="sessions/my-session/wstunnel"}
+: ${WSTUNNEL_VERSION:="10.5.5"}
+
+case ${ARCH} in
+    "x86_64")
+        gh_arch=amd64
+        ;;
+    "aarch64")
+        gh_arch=arm64
+        ;;
+    *)
+        >&2 echo "Unsupported platform: ${ARCH}"
+        exit 1
+        ;;
+esac
+
+: ${SESSION_DIR:="${PWD}"}
+: ${SESSION_WORK_DIR:="${SESSION_DIR}/work"}
+: ${SECRETS_DIR:="$(mktemp -d)"}
+: ${SECRETS_USER_DIR:="${SECRETS_DIR}/user/"}
+: ${SECRETS_DATA_CONNECTORS_DIR:="${SECRETS_DIR}/data_connectors"}
+: ${LOGS_DIR:="${SESSION_DIR}/logs"}
+: ${CACHE_DIR:="${SECRETS_DIR}/cache"}
+
+# Setup session environment
+export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
+export RENKU_WORKING_DIR="${SESSION_WORK_DIR}"
+# Force the frontend to listen on 127.0.0.1
+export RENKU_SESSION_IP="127.0.0.1"
+
+# Do not leave secrets on a shared fs, move it to the node where the session runs.
+mkdir -p "${SECRETS_DIR}"
+chmod 700 "${SECRETS_DIR}"
+# If SECRETS_DIR already exists then mv results in a subfolder - but we dont want this, so we use `cp -a`.
+# If using `cp` and `/.` at the end of the source path is excluded we will also get a subfolder in SECRETS_DIR.
+cp -a "${SESSION_DIR}/secrets/." "${SECRETS_DIR}"
+rm -rf "${SESSION_DIR}/secrets/"
+
+# Load the wstunnel secret
+export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
+
+# CamelCase to kebab-case conversion
+#
+# Usage:
+#     kebab_cased="$(to_kebab_case "[cC]amelCaseInput")"
+to_kebab_case() {
+    echo "${1:?"to_kebab_case: input string missing"}" | sed 's/\([A-Z]\)/-\1/g' | tr '[:upper:]' '[:lower:]'
+}
+
+# Convert camelCased key - value pairs stored in a flat json struct to command line arguments.
+#
+# WARNING: Whitespace and json reserved characters are stripped, so they cannot appear in keys nor values.
+#
+# Usage:
+#     arguments_string="$(to_rclone_mount_arguments "file_path" ["argument_prefix"])"
+to_rclone_mount_arguments() {
+    local filename=${1:?"to_rclone_mount_arguments: input file missing"}
+    local prefix=${2}
+    cat "${filename}" | tr -d '{} \t\r\n' | sed -e 's/","/"\n"/g' -e 's/":"/": "/g' | while IFS=': ' read -r key value; do
+        printf "%s%s=%s " "${prefix}" "$(to_kebab_case "${key}")" "${value}"
+    done
+}
 
 # Installs rclone
 #
 # Usage:
-#     rclone="$(install_rclone)"
+#     rclone="$(install_rclone "$version" "$gh_arch")"
 #     "$rclone" version
 function install_rclone() {
-    RENKU_DIR="${HOME}/.renku/$(uname -m)"
-    RENKU_PKG="${RENKU_DIR}/pkg"
-    RCLONE_VERSION="1.70.2"
-    RCLONE_PKG="${RENKU_PKG}/rclone/v${RCLONE_VERSION}"
-    RCLONE_BIN="${RCLONE_PKG}/rclone"
+    rclone_version=${1:?"install_rclone: Version missing"}
+    gh_arch=${2:?"install_rclone: Architecture missing"}
+    rclone_pkg="${RENKU_PKG}/rclone/v${rclone_version}"
+    rclone_bin="${rclone_pkg}/rclone"
 
-    skip_install="0"
-    if [ -f "${RCLONE_BIN}" ]; then
-        version="$("${RCLONE_BIN}" version || echo "bad executable")"
+    if [ -f "${rclone_bin}" ]; then
+        version="$("${rclone_bin}" version || echo "bad executable")"
         version="$(echo "${version}" | head -n 1)"
-        expected="rclone v${RCLONE_VERSION}"
+        expected="rclone v${rclone_version}"
         if [ "${version}" = "${expected}" ]; then
-            skip_install="1"
+            echo "${rclone_bin}"
+            return 0
         else
             >&2 echo "WARNING: found mismatching rclone version ${version}"
         fi
     fi
 
-    if [ "${skip_install}" != "0" ]; then
-        echo "${RCLONE_BIN}"
-        return 0
-    fi
+    rclone_url="https://github.com/rclone/rclone/releases/download/v${rclone_version}/rclone-v${rclone_version}-linux-${gh_arch}.zip"
 
-    arch="$(uname -m)"
-    if [ "${arch}" = "x86_64" ]; then
-        RCLONE_URL="https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-amd64.zip"
-    elif [ "${arch}" = "aarch64" ]; then
-        RCLONE_URL="https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-arm64.zip"
-    else
-        >&2 echo "Unsupported platform: ${arch}"
-        exit 1
-    fi
-
-    mkdir -p "${RCLONE_PKG}"
+    mkdir -p "${rclone_pkg}"
     tmp="$(mktemp -d)"
-    cwd="$(pwd)"
-    cd "${tmp}"
-    curl -Lo "rclone.zip" "${RCLONE_URL}"
-    >&2 unzip "rclone.zip"
-    rm -r "${RCLONE_PKG}"
-    mv ./rclone-v"${RCLONE_VERSION}"-* "${RCLONE_PKG}"
+    (# Run in a subshell to prevent changing the working directory of the caller
+        cd "${tmp}"
+        curl -Lo "rclone.zip" "${rclone_url}"
+        >&2 unzip "rclone.zip"
+        rm -rf "${rclone_pkg}"
+        mv ./rclone-v"${rclone_version}"-* "${rclone_pkg}"
+    )
     rm -r "${tmp}"
-    chmod a+x "${RCLONE_BIN}"
+    chmod a+x "${rclone_bin}"
 
-    echo "${RCLONE_BIN}"
+    echo "${rclone_bin}"
 }
 
 # Installs wstunnel
 #
 # Usage:
-#     wstunnel="$(install_wstunnel)"
+#     wstunnel="$(install_wstunnel "$version" "$gh_arch")"
 #     "$wstunnel" --version
 function install_wstunnel() {
-    RENKU_DIR="${HOME}/.renku/$(uname -m)"
-    RENKU_PKG="${RENKU_DIR}/pkg"
-    WSTUNNEL_VERSION="10.4.4"
-    WSTUNNEL_PKG="${RENKU_PKG}/wstunnel/v${WSTUNNEL_VERSION}"
-    WSTUNNEL_BIN="${WSTUNNEL_PKG}/wstunnel"
+    wstunnel_version=${1:?"wstunnel_version: Version missing"}
+    gh_arch=${2:?"wstunnel_version: Architecture missing"}
+    wstunnel_pkg="${RENKU_PKG}/wstunnel/v${wstunnel_version}"
+    wstunnel_bin="${wstunnel_pkg}/wstunnel"
 
-    arch="$(uname -m)"
-    if [ "${arch}" = "aarch64" ]; then
-        WSTUNNEL_VERSION_FORCED="10.1.10"
-        >&2 echo "Warning: using wstunnel v${WSTUNNEL_VERSION_FORCED} instead of ${WSTUNNEL_VERSION}"
-        WSTUNNEL_VERSION="${WSTUNNEL_VERSION_FORCED}"
-    fi
+    >&2 echo "Info: using wstunnel v${wstunnel_version}"
 
-    skip_install="0"
-    if [ -f "${WSTUNNEL_BIN}" ]; then
-        version="$("${WSTUNNEL_BIN}" --version || echo "bad executable")"
-        expected="wstunnel-cli ${WSTUNNEL_VERSION}"
+    if [ -f "${wstunnel_bin}" ]; then
+        version="$("${wstunnel_bin}" --version || echo "bad executable")"
+        expected="wstunnel-cli ${wstunnel_version}"
         if [ "${version}" = "${expected}" ]; then
-            skip_install="1"
+            echo "${wstunnel_bin}"
+            return 0
         else
             >&2 echo "WARNING: found mismatching wstunnel version ${version}"
         fi
     fi
 
-    if [ "${skip_install}" != "0" ]; then
-        echo "${WSTUNNEL_BIN}"
-        return 0
-    fi
+    wstunnel_url="https://github.com/SwissDataScienceCenter/wstunnel/releases/download/v${wstunnel_version}/wstunnel_${wstunnel_version}_linux_${gh_arch}.tar.gz"
 
-    arch="$(uname -m)"
-    if [ "${arch}" = "x86_64" ]; then
-        WSTUNNEL_URL="https://github.com/erebe/wstunnel/releases/download/v${WSTUNNEL_VERSION}/wstunnel_${WSTUNNEL_VERSION}_linux_amd64.tar.gz"
-    elif [ "${arch}" = "aarch64" ]; then
-        WSTUNNEL_URL="https://github.com/erebe/wstunnel/releases/download/v${WSTUNNEL_VERSION}/wstunnel_${WSTUNNEL_VERSION}_linux_arm64.tar.gz"
-    else
-        >&2 echo "Unsupported platform: ${arch}"
-        exit 1
-    fi
-
-    mkdir -p "${WSTUNNEL_PKG}"
+    mkdir -p "${wstunnel_pkg}"
     tmp="$(mktemp -d)"
-    cwd="$(pwd)"
-    cd "${tmp}"
-    curl -Lo "wstunnel.tar.gz" "${WSTUNNEL_URL}"
-    tar xf "wstunnel.tar.gz" -C "${WSTUNNEL_PKG}"
-    cd "${cwd}"
+    (# Run in a sub shell to prevent changing the working directory of the caller
+        cd "${tmp}"
+        curl -Lo "wstunnel.tar.gz" "${wstunnel_url}"
+        rm -rf "${wstunnel_pkg}"
+        mkdir -p ${wstunnel_pkg} # the folder has to exist for tar -C
+        tar xf "wstunnel.tar.gz" -C "${wstunnel_pkg}" --strip-components=1
+    )
     rm -r "${tmp}"
-    chmod a+x "${WSTUNNEL_BIN}"
+    chmod a+x "${wstunnel_bin}"
 
-    echo "${WSTUNNEL_BIN}"
+    echo "${wstunnel_bin}"
 }
 
-if [ -z "${REMOTE_SESSION_IMAGE}" ]; then
-    echo "REMOTE_SESSION_IMAGE is not set, aborting!"
-    exit 1
-fi
+for d in \
+    SESSION_DIR \
+    SESSION_WORK_DIR \
+    SECRETS_DIR \
+    LOGS_DIR
+do
+    echo "${d}: ${!d}"
+    mkdir -p "${!d}"
+done
 
-SESSION_DIR="$(pwd)"
-SESSION_WORK_DIR="${SESSION_DIR}/work"
-SECRETS_DIR="${SESSION_DIR}/secrets"
-LOGS_DIR="${SESSION_DIR}/logs"
-echo "SESSION_DIR: ${SESSION_DIR}"
-echo "SESSION_WORK_DIR: ${SESSION_WORK_DIR}"
-
-mkdir -p "${SESSION_WORK_DIR}"
-mkdir -p "${SECRETS_DIR}"
-mkdir -p "${LOGS_DIR}"
-
-# # Install rclone
-# rclone=$(install_rclone)
-# echo "rclone: ${rclone}"
+# Install rclone
+rclone="$(install_rclone "${RCLONE_VERSION}" "${gh_arch}")"
+echo "rclone: ${rclone}"
 
 # Install wstunnel
-wstunnel=$(install_wstunnel)
+wstunnel="$(install_wstunnel "${WSTUNNEL_VERSION}" "${gh_arch}")"
 echo "wstunnel: ${wstunnel}"
 
 # Finds a free IPv4 TCP port by briefly binding with nc. Enroot shares the host
@@ -169,40 +202,86 @@ if !(nvidia-smi 2>&1 >/dev/null); then
     export NVIDIA_VISIBLE_DEVICES=void
 fi
 
-# Create the environment.toml file to run the session
-EDF_FILE="${SESSION_DIR}/environment.toml"
-cat <<EOF >"${EDF_FILE}"
-image = "${REMOTE_SESSION_IMAGE}"
-
-#{{SESSION_MOUNTS_PLACEHOLDER}}
-
-workdir = "${SESSION_WORK_DIR}"
-
+if srun --help | grep -q -- --environment; then
+    # Create the environment.toml file to run the session
+    EDF_FILE="${SESSION_DIR}/environment.toml"
+    cat <<EOF >"${EDF_FILE}"
 [annotations]
 com.hooks.cxi.enabled = "false"
 EOF
+    srun_param_environment="--environment ${EDF_FILE}"
+else
+    srun_param_environment=""
+fi
 
-export RENKU_MOUNT_DIR="${SESSION_WORK_DIR}"
-export RENKU_WORKING_DIR="${SESSION_WORK_DIR}"
-# Force the frontend to listen on 127.0.0.1
-export RENKU_SESSION_IP="127.0.0.1"
+srun_param_container_image="--container-image ${REMOTE_SESSION_IMAGE}"
+srun_param_workdir="--container-workdir ${SESSION_WORK_DIR}"
+srun_param_mounts=#{{SESSION_MOUNTS_PLACEHOLDER}}
+# We cannot generate directly the local secrets path from the proxy as the final path is only known after ${SECRETS_DIR} as been set.
+srun_param_mounts=$(echo ${srun_param_mounts} | sed -e "s,${SESSION_DIR}/secrets,${SECRETS_DIR},g")
 
-# Load the wstunnel secret
-export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
+# Mount Data Connectors, if any
+if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
+    (# Run in a sub shell to scope the temporary variables
+        for dc in "${SECRETS_DATA_CONNECTORS_DIR}"/*; do
+        (
+            n=$(echo ${dc}|sed -e 's,.*-,,')
+            mount="$(cat "${dc}/remote")"
+            mount_point="${SESSION_WORK_DIR}/${mount}"
+            remote_path="$(cat "${dc}/remotePath")"
+            log_file="${LOGS_DIR}/rclone-dc-${n}.log"
+            config_file="${dc}/configData"
+            pass="${dc}/pass"
+            unset vfs_options
+            unset mount_options
+            unset extra_args
 
-echo "TODO: setup rclone mounts..."
+            if [ -f "${pass}" ]; then
+                pass_content="$(cat "${pass}" | ${rclone} obscure -)"
+                cat "${config_file}" | sed -e "s,pass *= <sensitive>,pass = ${pass_content}," > "${config_file}.tmp" && mv "${config_file}.tmp" "${config_file}"
+                rm -f "${pass}" || true
+            fi
 
-# echo "Setting up example rclone mount..."
-# fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
-# rm -rf "${SESSION_WORK_DIR}/era5"
-# mkdir -p "${SESSION_WORK_DIR}/era5"
-# RCLONE_CONFIG="${SESSION_DIR}/rclone.conf"
-# cat <<EOF >"${RCLONE_CONFIG}"
-# [era5]
-# type = doi
-# doi = 10.5281/zenodo.3831980
-# EOF
-# "${rclone}" mount --config "${RCLONE_CONFIG}" --daemon --read-only era5: "${SESSION_WORK_DIR}/era5"
+            if [ -f "${dc}/vfsOpt" ]; then
+                vfs_options="$(to_rclone_mount_arguments "${dc}/vfsOpt" "--vfs")"
+            fi
+
+            if [ -f "${dc}/mountOpt" ]; then
+                mount_options="$(to_rclone_mount_arguments "${dc}/mountOpt" "-")"
+            fi
+
+            if [ -f "${dc}/extraArgs" ]; then
+                extra_args="$(cat "${dc}/extraArgs")"
+            fi
+
+            echo >> "${log_file}"
+            echo "--- Starting $(date)" >> "${log_file}"
+
+            mkdir -p "${mount_point}"
+            mkdir -p "${CACHE_DIR}/${n}"
+
+            # Make sure there is no stale mount, and if so clean it up.
+            fusermount3 -uz "${mount_point}" 2>/dev/null || true
+            sleep 1 # Let the state stabilise before mounting something there
+
+            # We do our best to make sure we do not leave around bad rclone
+            # state, but sometimes there is still something lingering on...
+            # so we have to add --allow-non-empty.
+            ${rclone} mount \
+                --daemon \
+                --allow-non-empty \
+                ${mount_options} \
+                --log-file="${log_file}" \
+                --cache-dir="${CACHE_DIR}/$n" \
+                ${vfs_options} \
+                --config="${config_file}" \
+                ${extra_args} \
+                "${mount}:${remote_path}" \
+                "//${mount_point}"
+        )
+        done
+    )
+fi
 
 # listen ports: get free local port - use standard remote port
 RENKU_SESSION_REMOTE_PORT="${RENKU_SESSION_PORT:-8888}"
@@ -283,15 +362,45 @@ if [ -n "${GIT_REPOSITORIES}" ]; then
     fi
 fi
 
-exit_script() {
+function exit_script() {
     echo "Cleaning up session..."
-    # fusermount3 -u "${SESSION_WORK_DIR}/era5" || true
+    # Make sure we have a valid pid before attempting to kill it
+    (test -n "${pid}" && ps "${pid}" > /dev/null && kill -TERM "${pid}") || true
+
+    # Cleanup Data Connector mount points
+    if [ -d "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
+        for dc in "${SECRETS_DATA_CONNECTORS_DIR}"/*; do
+            fusermount3 -uz "${SESSION_WORK_DIR}/$(cat "${dc}/remote")" 2>/dev/null || true
+            rmdir "${SESSION_WORK_DIR}/$(cat "${dc}/remote")" || true
+        done
+    fi
+
+    # Remove the secrets from the node, leaving them generates problem in case
+    # of suppression of Data Connectors/user secrets from the project, for example.
+    # Same thing for the caches, as they will be renumbered.
+    for d in \
+        CACHE_DIR \
+        SECRETS_DATA_CONNECTORS_DIR \
+        SECRETS_USER_DIR \
+        SECRETS_DIR
+    do
+        rm -rf "${!d}" || true
+    done
+
+    # Sometimes the job continues to run...
+    scancel "${SLURM_JOB_ID}" || true
 }
 
 echo "Starting session..."
 # Start session while listening to EXIT signals
 pid=
-trap 'exit_script && [[ $pid ]] && kill -TERM "$pid" && exit_script' EXIT
-srun --environment "${EDF_FILE}" --no-container-entrypoint sh /etc/rc & pid=$!
+trap 'exit_script' EXIT
+srun \
+    ${srun_param_environment} \
+    ${srun_param_container_image} \
+    ${srun_param_workdir} \
+    ${srun_param_mounts} \
+    --no-container-entrypoint sh /etc/rc \
+    & pid=$!
 wait
 pid=

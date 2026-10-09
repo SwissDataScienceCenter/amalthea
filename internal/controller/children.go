@@ -94,6 +94,20 @@ func cleanWellKnown(current map[string]string, desired map[string]string) map[st
 	return clean
 }
 
+// preserveTunnelSecret returns a copy of the desired secret string data with
+// the tunnel secret replaced by the value already stored in the live secret,
+// so that reconciles do not rotate the randomly generated tunnel secret.
+func preserveTunnelSecret(desired map[string]string, current map[string][]byte) map[string]string {
+	preserved := make(map[string]string, len(desired))
+	for k, v := range desired {
+		preserved[k] = v
+	}
+	if existing, exists := current["wstunnel_secret"]; exists {
+		preserved["wstunnel_secret"] = string(existing)
+	}
+	return preserved
+}
+
 func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourceUpdate[T] { //nolint:gocyclo
 	logger := log.FromContext(ctx)
 	if c.Current == nil {
@@ -295,16 +309,7 @@ func (c ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client, cr 
 				}
 				fallthrough
 			case amaltheadevv1alpha1.Always:
-				// Preserve existing random tunnel secret values when updating
-				preservedStringData := make(map[string]string)
-				for k, v := range desired.StringData {
-					preservedStringData[k] = v
-				}
-				if current.Data != nil {
-					if existingTunnel, exists := current.Data["WSTUNNEL_SECRET"]; exists {
-						preservedStringData["WSTUNNEL_SECRET"] = string(existingTunnel)
-					}
-				}
+				preservedStringData := preserveTunnelSecret(desired.StringData, current.Data)
 				current.Data = desired.Data
 				current.StringData = preservedStringData
 				current.Labels = cleanWellKnown(current.Labels, desired.Labels)
