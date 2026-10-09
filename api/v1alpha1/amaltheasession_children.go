@@ -1122,15 +1122,6 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 			Name:  "RSC_READINESS_PROBE_TYPE",
 			Value: string(cr.Spec.Session.ReadinessProbe.Type),
 		},
-		v1.EnvVar{
-			Name: "RSC_WSTUNNEL_SECRET",
-			ValueFrom: ptr.To(v1.EnvVarSource{
-				SecretKeyRef: ptr.To(v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
-					Key:                  "WSTUNNEL_SECRET",
-				}),
-			}),
-		},
 	)
 
 	resources := session.Resources
