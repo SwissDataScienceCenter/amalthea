@@ -97,9 +97,6 @@ func (r *RcloneV2Resources) StatusCallback(status *amaltheadevv1alpha1.AmaltheaS
 }
 
 func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourcer {
-	if cr.Spec.RcloneDataSource == nil {
-		return &RcloneV2Resources{}
-	}
 	// NOTE: The service, PV and PVC are kept when the session is hibernated, only the statefulset is scaled down.
 	// In most clusters the operator will only be allowed to create PVs (not patch or delete them). The PV
 	// references the ClusterIP of the service and is pre-bound to the PVC, so neither the service nor
@@ -109,6 +106,9 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 		WithName[*appsv1.StatefulSet](RcloneV2ResourceName(cr)),
 		WithNamespace[*appsv1.StatefulSet](cr.Namespace),
 		WithMutateFn(func(obj *appsv1.StatefulSet) error {
+			if cr.Spec.RcloneDataSource == nil {
+				return nil
+			}
 			desired, err := rcloneV2Statefulset(cr)
 			if err != nil {
 				return err
@@ -118,12 +118,18 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 			obj.Spec = desired.Spec
 			return nil
 		}),
+		WithDeleteWhen[*appsv1.StatefulSet](func() bool {
+			return cr.Spec.RcloneDataSource == nil
+		}),
 	)
 	service := NewChildResource(
 		(*v1.Service)(nil),
 		WithName[*v1.Service](RcloneV2ResourceName(cr)),
 		WithNamespace[*v1.Service](cr.Namespace),
 		WithMutateFn(func(obj *v1.Service) error {
+			if cr.Spec.RcloneDataSource == nil {
+				return nil
+			}
 			desired := rcloneV2Service(cr)
 			obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
 			obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
@@ -131,11 +137,17 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 			return nil
 		}),
 		WithParent[*v1.Service](cr),
+		WithDeleteWhen[*v1.Service](func() bool {
+			return cr.Spec.RcloneDataSource == nil
+		}),
 	)
 	pv := NewChildResource(
 		(*v1.PersistentVolume)(nil),
 		WithName[*v1.PersistentVolume](RcloneV2PVName(cr)),
 		WithMutateFn(func(obj *v1.PersistentVolume) error {
+			if cr.Spec.RcloneDataSource == nil {
+				return nil
+			}
 			// NOTE: The PV is write-once, the operator is most likely not allowed to patch PVs.
 			// Leaving an existing PV untouched results in no patch request from CreateOrPatch.
 			if !obj.CreationTimestamp.IsZero() {
@@ -150,12 +162,18 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 			obj.Spec = desired.Spec
 			return nil
 		}),
+		WithDeleteWhen[*v1.PersistentVolume](func() bool {
+			return cr.Spec.RcloneDataSource == nil
+		}),
 	)
 	pvc := NewChildResource(
 		(*v1.PersistentVolumeClaim)(nil),
 		WithName[*v1.PersistentVolumeClaim](RcloneV2ResourceName(cr)),
 		WithNamespace[*v1.PersistentVolumeClaim](cr.Namespace),
 		WithMutateFn(func(obj *v1.PersistentVolumeClaim) error {
+			if cr.Spec.RcloneDataSource == nil {
+				return nil
+			}
 			desired := rcloneV2PVC(cr)
 			if !obj.CreationTimestamp.IsZero() {
 				obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
@@ -168,12 +186,18 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 			return nil
 		}),
 		WithParent[*v1.PersistentVolumeClaim](cr),
+		WithDeleteWhen[*v1.PersistentVolumeClaim](func() bool {
+			return cr.Spec.RcloneDataSource == nil
+		}),
 	)
 	cachePVC := NewChildResource(
 		(*v1.PersistentVolumeClaim)(nil),
 		WithName[*v1.PersistentVolumeClaim](RcloneV2PVCCacheName(cr)),
 		WithNamespace[*v1.PersistentVolumeClaim](cr.Namespace),
 		WithMutateFn(func(obj *v1.PersistentVolumeClaim) error {
+			if cr.Spec.RcloneDataSource == nil {
+				return nil
+			}
 			desired := rcloneV2CachePVC(cr)
 			if desired == nil {
 				return nil

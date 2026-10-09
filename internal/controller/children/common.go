@@ -106,6 +106,9 @@ func WithDeleteWhen[T ChildResourceType](cond func() bool) ChildResourceOption[T
 }
 
 func (cr *ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client) error {
+	if cr == nil {
+		return nil
+	}
 	if cr.shouldDelete != nil && cr.shouldDelete() {
 		// Only the name and namespace of cr.obj are needed for the deletion
 		return client.IgnoreNotFound(clnt.Delete(ctx, cr.obj))

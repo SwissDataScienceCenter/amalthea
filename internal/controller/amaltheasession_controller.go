@@ -293,12 +293,15 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
-	updates, err := children.Reconcile(ctx, r.Client, amaltheasession)
-	if err != nil {
-		logger.Error(err, "Failed when reconciling children")
-		return ctrl.Result{}, err
-	}
+	rcloneV2Res := childutils.NewRcloneV2Resources(amaltheasession)
+	var updates ChildResourceUpdates
+
 	if amaltheasession.Spec.Hibernated {
+		updates, err = children.Reconcile(ctx, r.Client, amaltheasession)
+		if err != nil {
+			logger.Error(err, "Failed when reconciling children")
+			return ctrl.Result{}, err
+		}
 		// Wait for the session pod to shut down first and only then continue with the rest of the hibernation
 		pods := corev1.PodList{}
 		err = r.List(ctx, &pods, client.InNamespace(amaltheasession.Namespace), client.MatchingLabels(amaltheadevv1alpha1.SelectorLabels(amaltheasession.Name)))
@@ -308,12 +311,37 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		if len(pods.Items) > 0 {
 			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 		}
-	}
-	rcloneV2Res := childutils.NewRcloneV2Resources(amaltheasession)
-	err = rcloneV2Res.Reconcile(ctx, r.Client)
-	if err != nil {
-		logger.Error(err, "Failed when reconciling rclone data sources")
-		return ctrl.Result{}, err
+		err = rcloneV2Res.Reconcile(ctx, r.Client)
+		if err != nil {
+			logger.Error(err, "Failed when reconciling rclone data sources")
+			return ctrl.Result{}, err
+		}
+	} else {
+		err = rcloneV2Res.Reconcile(ctx, r.Client)
+		if err != nil {
+			logger.Error(err, "Failed when reconciling rclone data sources")
+			return ctrl.Result{}, err
+		}
+		if amaltheasession.Spec.RcloneDataSource != nil {
+			// Wait for the nfs server to start first
+			sset := appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: amaltheasession.RcloneV2ResourceName(), Namespace: amaltheasession.Namespace}}
+			err = r.Get(ctx, client.ObjectKeyFromObject(&sset), &sset)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+				} else {
+					return ctrl.Result{}, err
+				}
+			}
+			if sset.Status.ReadyReplicas == 0 {
+				return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+			}
+		}
+		updates, err = children.Reconcile(ctx, r.Client, amaltheasession)
+		if err != nil {
+			logger.Error(err, "Failed when reconciling children")
+			return ctrl.Result{}, err
+		}
 	}
 
 	newStatus := updates.Status(ctx, r, amaltheasession)
