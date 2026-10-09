@@ -7,3 +7,6 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: AmaltheaSession
+    matchExpressions:
+      - key: batch.kubernetes.io/job-name
+        operator: DoesNotExist

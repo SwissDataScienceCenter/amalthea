@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -205,9 +204,19 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 			Annotations: annotations,
 		},
 		Spec: batchv1.JobSpec{
-			Parallelism:           ptr.To(int32(1)),
-			Completions:           ptr.To(int32(1)),
-			BackoffLimit:          ptr.To(int32(0)),
+			Parallelism:  ptr.To(int32(1)),
+			Completions:  ptr.To(int32(1)),
+			BackoffLimit: ptr.To(int32(0)),
+			PodFailurePolicy: &batchv1.PodFailurePolicy{
+				Rules: []batchv1.PodFailurePolicyRule{
+					{
+						Action: batchv1.PodFailurePolicyActionIgnore,
+						OnPodConditions: []batchv1.PodFailurePolicyOnPodConditionsPattern{
+							{Type: v1.DisruptionTarget, Status: v1.ConditionTrue},
+						},
+					},
+				},
+			},
 			ActiveDeadlineSeconds: activeTTL,
 			Suspend:               &cr.Spec.Hibernated,
 			Template: v1.PodTemplateSpec{
@@ -510,7 +519,7 @@ func (cr *AmaltheaSession) NeedsDeletion() bool {
 	}
 }
 
-func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.Pod, error) {
+func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Reader) (*v1.Pod, error) {
 	logger := log.FromContext(ctx)
 	if cr.Spec.SessionType == SessionTypeNonInteractive {
 		selector := labels.Set{"job-name": cr.JobName()}.AsSelector()
@@ -520,16 +529,11 @@ func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.
 			logger.Info("cannot list pods for batch job", "job-name", cr.JobName(), "error", err)
 			return nil, err
 		}
-		itemLength := len(podList.Items)
-		if itemLength > 1 {
-			logger.Info("Too many pods returned for batch job", "job-name", cr.JobName(), "num_pods", itemLength)
-			return nil, errors.New("more than one pod found for job")
+		pod := currentJobPod(podList.Items)
+		if pod == nil {
+			logger.Info("No pod found for batch job", "job-name", cr.JobName())
 		}
-		if itemLength > 0 {
-			return &podList.Items[0], nil
-		}
-		logger.Info("No pod found for batch job", "job-name", cr.JobName())
-		return nil, nil
+		return pod, nil
 	} else {
 		pod := v1.Pod{}
 		podName := cr.PodName()
@@ -540,6 +544,26 @@ func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Client) (*v1.
 		}
 		return &pod, err
 	}
+}
+
+func currentJobPod(pods []v1.Pod) *v1.Pod {
+	var newest, newestActive *v1.Pod
+	for i := range pods {
+		pod := &pods[i]
+		if newest == nil || newest.CreationTimestamp.Before(&pod.CreationTimestamp) {
+			newest = pod
+		}
+		if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+			continue
+		}
+		if newestActive == nil || newestActive.CreationTimestamp.Before(&pod.CreationTimestamp) {
+			newestActive = pod
+		}
+	}
+	if newestActive != nil {
+		return newestActive
+	}
+	return newest
 }
 
 func (cr *AmaltheaSession) GetJob(ctx context.Context, clnt client.Client) (*batchv1.Job, error) {
@@ -569,6 +593,16 @@ func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*
 	logger := log.FromContext(ctx)
 	events := v1.EventList{}
 	podName := as.PodName()
+	if as.Spec.SessionType == SessionTypeNonInteractive {
+		pod, err := as.GetPod(ctx, c)
+		if err != nil {
+			return nil, err
+		}
+		if pod == nil {
+			return nil, nil
+		}
+		podName = pod.Name
+	}
 	logger.Info("Getting event list for pod", "pod", podName)
 	err := c.List(ctx,
 		&events,
