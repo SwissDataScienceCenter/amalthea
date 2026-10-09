@@ -298,6 +298,17 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		logger.Error(err, "Failed when reconciling children")
 		return ctrl.Result{}, err
 	}
+	if amaltheasession.Spec.Hibernated {
+		// Wait for the session pod to shut down first and only then continue with the rest of the hibernation
+		pods := corev1.PodList{}
+		err = r.List(ctx, &pods, client.InNamespace(amaltheasession.Namespace), client.MatchingLabels(amaltheadevv1alpha1.SelectorLabels(amaltheasession.Name)))
+		if client.IgnoreNotFound(err) != nil {
+			return ctrl.Result{}, err
+		}
+		if len(pods.Items) > 0 {
+			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+		}
+	}
 	rcloneV2Res := childutils.NewRcloneV2Resources(amaltheasession)
 	err = rcloneV2Res.Reconcile(ctx, r.Client)
 	if err != nil {
