@@ -221,7 +221,7 @@ func GetProxyHandler(config configLib.GitProxyConfig) *goproxy.ProxyHttpServer {
 				case http.StatusBadRequest:
 					return r, goproxy.NewResponse(r, goproxy.ContentTypeText, http.StatusBadRequest, "Bad request")
 				default:
-					return r, goproxy.NewResponse(r, goproxy.ContentTypeText, http.StatusInternalServerError, "An internal error occured")
+					return r, goproxy.NewResponse(r, goproxy.ContentTypeText, http.StatusInternalServerError, "An internal error occurred")
 				}
 			}
 			log.Printf("The request %s matches the git repository %s [%s], adding auth headers\n", r.URL.String(), repoURL.String(), provider)
