@@ -97,31 +97,13 @@ func (r *RcloneV2Resources) StatusCallback(status *amaltheadevv1alpha1.AmaltheaS
 }
 
 func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResourcer {
+	if cr.Spec.RcloneDataSource == nil {
+		return &RcloneV2Resources{}
+	}
 	// NOTE: The service, PV and PVC are kept when the session is hibernated, only the statefulset is scaled down.
 	// In most clusters the operator will only be allowed to create PVs (not patch or delete them). The PV
 	// references the ClusterIP of the service and is pre-bound to the PVC, so neither the service nor
 	// the PVC can be recreated without breaking the PV.
-	ss := NewChildResource(
-		(*appsv1.StatefulSet)(nil),
-		WithName[*appsv1.StatefulSet](RcloneV2ResourceName(cr)),
-		WithNamespace[*appsv1.StatefulSet](cr.Namespace),
-		WithMutateFn(func(obj *appsv1.StatefulSet) error {
-			if cr.Spec.RcloneDataSource == nil {
-				return nil
-			}
-			desired, err := rcloneV2Statefulset(cr)
-			if err != nil {
-				return err
-			}
-			obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
-			obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
-			obj.Spec = desired.Spec
-			return nil
-		}),
-		WithDeleteWhen[*appsv1.StatefulSet](func() bool {
-			return cr.Spec.RcloneDataSource == nil
-		}),
-	)
 	service := NewChildResource(
 		(*v1.Service)(nil),
 		WithName[*v1.Service](RcloneV2ResourceName(cr)),
@@ -136,10 +118,28 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 			obj.Spec = desired.Spec
 			return nil
 		}),
-		WithParent[*v1.Service](cr),
 		WithDeleteWhen[*v1.Service](func() bool {
 			return cr.Spec.RcloneDataSource == nil
 		}),
+	)
+	ss := NewChildResource(
+		(*appsv1.StatefulSet)(nil),
+		WithName[*appsv1.StatefulSet](RcloneV2ResourceName(cr)),
+		WithNamespace[*appsv1.StatefulSet](cr.Namespace),
+		WithMutateFn(func(obj *appsv1.StatefulSet) error {
+			if cr.Spec.RcloneDataSource == nil {
+				return nil
+			}
+			desired := rcloneV2Statefulset(cr)
+			obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
+			obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
+			obj.Spec = desired.Spec
+			return nil
+		}),
+		WithDeleteWhen[*appsv1.StatefulSet](func() bool {
+			return cr.Spec.RcloneDataSource == nil
+		}),
+		WithParent[*appsv1.StatefulSet](service.obj),
 	)
 	pv := NewChildResource(
 		(*v1.PersistentVolume)(nil),
@@ -185,7 +185,7 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 			obj.Spec = desired.Spec
 			return nil
 		}),
-		WithParent[*v1.PersistentVolumeClaim](cr),
+		WithParent[*v1.PersistentVolumeClaim](service.obj),
 		WithDeleteWhen[*v1.PersistentVolumeClaim](func() bool {
 			return cr.Spec.RcloneDataSource == nil
 		}),
@@ -213,7 +213,7 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 			obj.Spec = desired.Spec
 			return nil
 		}),
-		WithParent[*v1.PersistentVolumeClaim](cr),
+		WithParent[*v1.PersistentVolumeClaim](service.obj),
 		// We dont want to keep the cache and keep paying for storage when the session hibernates.
 		WithDeleteWhen[*v1.PersistentVolumeClaim](func() bool {
 			return cr.Spec.Hibernated || cr.Spec.RcloneDataSource == nil || !cr.Spec.RcloneDataSource.GetCache().Persisted
@@ -221,7 +221,7 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 	)
 	// NOTE: The pv must be reconciled after the service, because the ClusterIP
 	// is populated by Kubernetes only after the resource has been created.
-	output := RcloneV2Resources{resources: []ChildResourcer{&ss, &service, &pv, &pvc, &cachePVC}}
+	output := RcloneV2Resources{resources: []ChildResourcer{&service, &ss, &pv, &pvc, &cachePVC}}
 	return &output
 }
 
@@ -236,9 +236,9 @@ func rcloneSecretVolumes(cr *amaltheadevv1alpha1.AmaltheaSession) (v1.Volume, v1
 	return vol, mount
 }
 
-func rcloneV2Statefulset(cr *amaltheadevv1alpha1.AmaltheaSession) (appsv1.StatefulSet, error) {
+func rcloneV2Statefulset(cr *amaltheadevv1alpha1.AmaltheaSession) appsv1.StatefulSet {
 	if cr.Spec.RcloneDataSource == nil {
-		return appsv1.StatefulSet{}, fmt.Errorf("data sources of rclonev2 is not defined")
+		return appsv1.StatefulSet{}
 	}
 	secVol, secVolMnt := rcloneSecretVolumes(cr)
 	volumes := []v1.Volume{}
@@ -350,7 +350,7 @@ done`
 				Spec: pod,
 			},
 		},
-	}, nil
+	}
 }
 
 func rcloneV2Service(cr *amaltheadevv1alpha1.AmaltheaSession) v1.Service {
@@ -364,6 +364,9 @@ func rcloneV2Service(cr *amaltheadevv1alpha1.AmaltheaSession) v1.Service {
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
 				{Name: rcloneV2NFSPortName, Port: rcloneV2NFSPort},
+				// NOTE: Port 111 is used by the kubelet to send the unmount command via rpc
+				// Without this unmounting and shutting down the pods is a few minutes slower.
+				{Name: "rpcbind", Port: 111, TargetPort: intstr.FromInt32(111)},
 			},
 			Selector: amaltheadevv1alpha1.SelectorLabels(RcloneV2ResourceName(cr)),
 		},
@@ -377,11 +380,12 @@ func rcloneV2Volume(cr *amaltheadevv1alpha1.AmaltheaSession, server string) v1.P
 		"vers=3",
 		fmt.Sprintf("port=%d", rcloneV2NFSPort),
 		fmt.Sprintf("mountport=%d", rcloneV2NFSPort),
-		"tcp",
+		"proto=tcp",
+		"mountproto=tcp",
+		"mountvers=3",
 		// Timeout is in deciseconds - tenths of second, 600 = 60s
 		"timeo=600",
 		"retrans=3",
-		// Without hard below when the nfs server restarts the session pod will not recover its mounts
 		"hard",
 		"nolock",
 	}

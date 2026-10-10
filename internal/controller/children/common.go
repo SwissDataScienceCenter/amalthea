@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -139,7 +138,7 @@ func (cr *ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client) e
 			return err
 		}
 		if cr.parent != nil && !reflect.ValueOf(cr.parent).IsZero() {
-			err := ctrl.SetControllerReference(cr.parent, cr.obj, clnt.Scheme())
+			err := controllerutil.SetOwnerReference(cr.parent, cr.obj, clnt.Scheme())
 			if err != nil {
 				return err
 			}
