@@ -35,14 +35,18 @@ import (
 )
 
 const (
-	rcloneV2NFSPort                  int32  = 65535
-	rcloneV2NFSPortName              string = "rclone-nfs"
-	RclonePVLabelSessionNamespaceKey string = "amalthea.dev/sessionNamespace"
-	RclonePVLabelSessionNameKey      string = "amalthea.dev/sessionName"
-	RcloneV2CombinedSourceName       string = "__combined__"
-	RcloneV2SecretsMountPath         string = "/secrets"
-	RcloneV2ConfigParentMounthPath   string = "/rclone"
-	RcloneV2ConfigPath               string = "/rclone/rclone-config" // This and the above parent path have to be compatible
+	rcloneV2NFSPort     int32  = 65535
+	rcloneV2NFSPortName string = "rclone-nfs"
+	// Added on Rclone NFS server resources to indicate what session namespace they belong to and to generate reconcile events.
+	RcloneV2LabelSessionNamespaceKey string = "amalthea.dev/sessionNamespace"
+	// Added on Rclone NFS server resources to indicate what session they belong to and to generate reconcile events.
+	RcloneV2LabelSessionNameKey    string = "amalthea.dev/sessionName"
+	RcloneV2LabelKey               string = "app.kubernetes.io/component"
+	RcloneV2LabelValue             string = "rclone-v2"
+	RcloneV2CombinedSourceName     string = "__combined__"
+	RcloneV2SecretsMountPath       string = "/secrets"
+	RcloneV2ConfigParentMounthPath string = "/rclone"
+	RcloneV2ConfigPath             string = "/rclone/rclone-config" // This and the above parent path have to be compatible
 )
 
 func RcloneV2ResourceName(cr *amaltheadevv1alpha1.AmaltheaSession) string {
@@ -57,10 +61,20 @@ func RcloneV2PVCCacheName(cr *amaltheadevv1alpha1.AmaltheaSession) string {
 	return cr.RcloneV2ResourceName() + "-cache"
 }
 
+func rcloneV2SelectorLabels(name string) map[string]string {
+	return map[string]string{
+		"app.kubernetes.io/name":       "AmaltheaSession",
+		"app.kubernetes.io/instance":   name,
+		"app.kubernetes.io/part-of":    "amaltheasession-operator",
+		"app.kubernetes.io/created-by": "controller-manager",
+		RcloneV2LabelKey:               RcloneV2LabelValue,
+	}
+}
+
 func childLabelsRclone(cr *amaltheadevv1alpha1.AmaltheaSession) map[string]string {
 	labels := map[string]string{}
 	maps.Copy(labels, cr.Spec.Template.Metadata.Labels)
-	selectorLabels := amaltheadevv1alpha1.SelectorLabels(RcloneV2ResourceName(cr))
+	selectorLabels := rcloneV2SelectorLabels(RcloneV2ResourceName(cr))
 	conflicts := amaltheadevv1alpha1.FindConflicts(labels, selectorLabels)
 	if len(conflicts) > 0 {
 		log.Println(
@@ -76,6 +90,10 @@ func childLabelsRclone(cr *amaltheadevv1alpha1.AmaltheaSession) map[string]strin
 	// NOTE: stuff from selectorLabels will overwrite conflicts in labels (if there are any)
 	// This is the desired behaviour, we do not want to overwrite the selector labels.
 	maps.Copy(labels, selectorLabels)
+	// These 2 labels below are needed so that changes in Rclone resources can generate reconcile requests for Amalthea.
+	// The reconcile requests for Amalthea contain the session name and namespace.
+	labels[RcloneV2LabelSessionNamespaceKey] = cr.Namespace
+	labels[RcloneV2LabelSessionNameKey] = cr.Name
 	return labels
 }
 
@@ -115,7 +133,8 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 			desired := rcloneV2Service(cr)
 			obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
 			obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
-			obj.Spec = desired.Spec
+			obj.Spec.Ports = desired.Spec.Ports
+			obj.Spec.Selector = desired.Spec.Selector
 			return nil
 		}),
 		WithDeleteWhen[*v1.Service](func() bool {
@@ -133,7 +152,10 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession) ChildResource
 			desired := rcloneV2Statefulset(cr)
 			obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
 			obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
-			obj.Spec = desired.Spec
+			obj.Spec.Replicas = desired.Spec.Replicas
+			obj.Spec.Selector = desired.Spec.Selector
+			obj.Spec.Template = desired.Spec.Template
+			obj.Spec.PodManagementPolicy = desired.Spec.PodManagementPolicy
 			return nil
 		}),
 		WithDeleteWhen[*appsv1.StatefulSet](func() bool {
@@ -340,7 +362,7 @@ done`
 			PodManagementPolicy: appsv1.ParallelPodManagement,
 			Replicas:            replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: amaltheadevv1alpha1.SelectorLabels(RcloneV2ResourceName(cr)),
+				MatchLabels: rcloneV2SelectorLabels(RcloneV2ResourceName(cr)),
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -368,7 +390,7 @@ func rcloneV2Service(cr *amaltheadevv1alpha1.AmaltheaSession) v1.Service {
 				// Without this unmounting and shutting down the pods is a few minutes slower.
 				{Name: "rpcbind", Port: 111, TargetPort: intstr.FromInt32(111)},
 			},
-			Selector: amaltheadevv1alpha1.SelectorLabels(RcloneV2ResourceName(cr)),
+			Selector: rcloneV2SelectorLabels(RcloneV2ResourceName(cr)),
 		},
 	}
 }
@@ -390,10 +412,6 @@ func rcloneV2Volume(cr *amaltheadevv1alpha1.AmaltheaSession, server string) v1.P
 		"nolock",
 	}
 	labels := childLabelsRclone(cr)
-	// These are needed so that watching the PVs can generate reconcile requests for Amalthea.
-	// The reconcile requests for Amalthea contain the session name and namespace.
-	labels[RclonePVLabelSessionNamespaceKey] = cr.Namespace
-	labels[RclonePVLabelSessionNameKey] = cr.Name
 	mountOptions = append(mountOptions, cr.Spec.RcloneDataSource.MountOptions...)
 	return v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{

@@ -304,7 +304,7 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 				return ctrl.Result{}, err
 			}
 			if !startupComplete {
-				return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 			}
 		}
 		updates, err = children.Reconcile(ctx, r.Client, amaltheasession)
@@ -406,14 +406,29 @@ func operatorNamespace() string {
 	return os.Getenv("OPERATOR_NAMESPACE")
 }
 
-func allowedToActOnPV(labels map[string]string) bool {
+func containsRcloneLabels(obj client.Object) bool {
 	clusterScoped := len(operatorNamespace()) == 0
-	ns, nsFound := labels[childutils.RclonePVLabelSessionNamespaceKey]
-	_, nameFound := labels[childutils.RclonePVLabelSessionNameKey]
+	labels := obj.GetLabels()
+	ns, nsFound := labels[childutils.RcloneV2LabelSessionNamespaceKey]
+	_, nameFound := labels[childutils.RcloneV2LabelSessionNameKey]
+	rcloneFound := labels[childutils.RcloneV2LabelKey] == childutils.RcloneV2LabelValue
+	// In the cluster-scoped case we can reconcile the resources created in any namespace.
+	// When not cluster scoped we have to make sure the resources were created in the same namespace as the operator.
 	if clusterScoped {
-		return nsFound && nameFound
-	} else {
-		return nsFound && nameFound && operatorNamespace() == ns
+		return nsFound && nameFound && rcloneFound
+	}
+	return nsFound && nameFound && rcloneFound && operatorNamespace() == ns
+}
+
+func generateRcloneEvent(ctx context.Context, obj client.Object) []reconcile.Request {
+	labels := obj.GetLabels()
+	if !containsRcloneLabels(obj) {
+		return nil
+	}
+	ns := labels[childutils.RcloneV2LabelSessionNamespaceKey]
+	name := labels[childutils.RcloneV2LabelSessionNameKey]
+	return []reconcile.Request{
+		{NamespacedName: types.NamespacedName{Namespace: ns, Name: name}},
 	}
 }
 
@@ -427,27 +442,29 @@ func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&corev1.Secret{}).
 		Watches(
-			// Since PVs are cluster scoped we filter to only watch PVs with the specific labels.
-			// The labels indicate which name and namespace the session belongs to.
-			// We only act on PVs where the namespace label matches the namespace the operator is deployed for.
-			// If the OPERATOR_NAMESPACE env var is not set we assume the operator is cluster scoped and we act on all PVs
-			// that have the name and namespace labels regardless of what namespace the operator is in.
 			&corev1.PersistentVolume{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-				labels := obj.GetLabels()
-				if !allowedToActOnPV(labels) {
-					return nil
-				}
-				ns := labels[childutils.RclonePVLabelSessionNamespaceKey]
-				name := labels[childutils.RclonePVLabelSessionNameKey]
-				return []reconcile.Request{
-					{NamespacedName: types.NamespacedName{Namespace: ns, Name: name}},
-				}
-			}),
-			builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
-				labels := obj.GetLabels()
-				return allowedToActOnPV(labels)
-			})),
+			handler.EnqueueRequestsFromMapFunc(generateRcloneEvent),
+			builder.WithPredicates(predicate.NewPredicateFuncs(containsRcloneLabels)),
+		).
+		Watches(
+			&appsv1.StatefulSet{},
+			handler.EnqueueRequestsFromMapFunc(generateRcloneEvent),
+			builder.WithPredicates(predicate.NewPredicateFuncs(containsRcloneLabels)),
+		).
+		Watches(
+			&corev1.Service{},
+			handler.EnqueueRequestsFromMapFunc(generateRcloneEvent),
+			builder.WithPredicates(predicate.NewPredicateFuncs(containsRcloneLabels)),
+		).
+		Watches(
+			&corev1.PersistentVolumeClaim{},
+			handler.EnqueueRequestsFromMapFunc(generateRcloneEvent),
+			builder.WithPredicates(predicate.NewPredicateFuncs(containsRcloneLabels)),
+		).
+		Watches(
+			&corev1.Pod{},
+			handler.EnqueueRequestsFromMapFunc(generateRcloneEvent),
+			builder.WithPredicates(predicate.NewPredicateFuncs(containsRcloneLabels)),
 		).
 		Complete(r)
 }
