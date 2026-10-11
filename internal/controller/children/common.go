@@ -26,6 +26,7 @@ import (
 	"github.com/labstack/gommon/log"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,6 +48,8 @@ type ChildResource[T ChildResourceType] struct {
 	statusCallback StatusCallback
 	parent         metav1.Object
 	shouldDelete   func() bool
+	// When set, a forbidden error on deletion is logged and ignored
+	ignoreForbiddenDelete bool
 }
 
 func NewChildResource[T ChildResourceType](pt T, opts ...ChildResourceOption[T]) ChildResource[T] {
@@ -104,13 +107,25 @@ func WithDeleteWhen[T ChildResourceType](cond func() bool) ChildResourceOption[T
 	}
 }
 
+// WithIgnoreForbiddenDelete makes Reconcile ignore forbidden errors when deleting the resource.
+func WithIgnoreForbiddenDelete[T ChildResourceType]() ChildResourceOption[T] {
+	return func(cr *ChildResource[T]) {
+		cr.ignoreForbiddenDelete = true
+	}
+}
+
 func (cr *ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client) error {
 	if cr == nil {
 		return nil
 	}
 	if cr.shouldDelete != nil && cr.shouldDelete() {
 		// Only the name and namespace of cr.obj are needed for the deletion
-		return client.IgnoreNotFound(clnt.Delete(ctx, cr.obj))
+		err := clnt.Delete(ctx, cr.obj)
+		if cr.ignoreForbiddenDelete && apierrors.IsForbidden(err) {
+			log.Infof("Not allowed to delete %s %s, it has to be cleaned up externally", reflect.TypeOf(cr.obj).Elem().Name(), cr.obj.GetName())
+			return nil
+		}
+		return client.IgnoreNotFound(err)
 	}
 	if cr.mutateFn == nil {
 		log.Warnf("Mutate function not set for type %s with name %s, namespace: %s", cr.obj.GetName(), cr.obj.GetNamespace(), cr.obj.GetObjectKind().GroupVersionKind().String())

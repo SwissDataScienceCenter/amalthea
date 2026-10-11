@@ -31,8 +31,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -195,12 +193,20 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		}
 
 		if controllerutil.ContainsFinalizer(amaltheasession, rcloneNFSFinalizer) {
-			res, err := nfsShutdownOrder(ctx, amaltheasession, r.Client)
+			if err := deleteSessionWorkload(ctx, r.Client, amaltheasession); err != nil {
+				return ctrl.Result{}, err
+			}
+			obs, err := observeRclone(ctx, r.Client, amaltheasession)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			if err == nil && !res.IsZero() {
-				return res, nil
+			plan, _ := rclonePlan(amaltheasession, obs)
+			if err := childutils.NewRcloneV2Resources(amaltheasession, plan).Reconcile(ctx, r.Client); err != nil {
+				return ctrl.Result{}, err
+			}
+			if plan.Exist {
+				// The NFS server is still in use by the session pod
+				return ctrl.Result{RequeueAfter: rcloneTransitionRequeue}, nil
 			}
 			// remove our finalizer from the list and update it.
 			controllerutil.RemoveFinalizer(amaltheasession, rcloneNFSFinalizer)
@@ -250,68 +256,34 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
-	rcloneV2Res := childutils.NewRcloneV2Resources(amaltheasession)
-	var updates ChildResourceUpdates
+	// The startup and shutdown order of the session and the NFS server follows from the plan,
+	// so the session and the rclone resources can be reconciled in any order.
+	rcloneObs, err := observeRclone(ctx, r.Client, amaltheasession)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	nfsPlan, sessionMayRun := rclonePlan(amaltheasession, rcloneObs)
+	if !sessionMayRun {
+		holdSession(&children)
+	}
 
-	// Handle case where the rclone section was removed from the Spec
-	if amaltheasession.Spec.RcloneDataSource == nil && controllerutil.ContainsFinalizer(amaltheasession, rcloneNFSFinalizer) {
-		res, err := nfsShutdownOrder(ctx, amaltheasession, r.Client)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if err == nil && !res.IsZero() {
-			return res, nil
-		}
+	err = childutils.NewRcloneV2Resources(amaltheasession, nfsPlan).Reconcile(ctx, r.Client)
+	if err != nil {
+		logger.Error(err, "Failed when reconciling rclone data sources")
+		return ctrl.Result{}, err
+	}
+	// The rclone section was removed from the spec and the rclone resources have been cleaned up
+	if amaltheasession.Spec.RcloneDataSource == nil && !nfsPlan.Exist && controllerutil.ContainsFinalizer(amaltheasession, rcloneNFSFinalizer) {
 		controllerutil.RemoveFinalizer(amaltheasession, rcloneNFSFinalizer)
 		if err := r.Update(ctx, amaltheasession); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
 
-	if amaltheasession.Spec.Hibernated {
-		updates, err = children.Reconcile(ctx, r.Client, amaltheasession)
-		if err != nil {
-			logger.Error(err, "Failed when reconciling children")
-			return ctrl.Result{}, err
-		}
-		// Wait for the session pod to shut down first and only then continue with the rest of the hibernation
-		shutdownComplete, err := waitForSessionShutdown(ctx, r.Client, amaltheasession)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if !shutdownComplete {
-			return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
-		}
-		err = rcloneV2Res.Reconcile(ctx, r.Client)
-		if err != nil {
-			logger.Error(err, "Failed when reconciling rclone data sources")
-			return ctrl.Result{}, err
-		}
-	} else {
-		err = rcloneV2Res.Reconcile(ctx, r.Client)
-		if err != nil {
-			logger.Error(err, "Failed when reconciling rclone data sources")
-			return ctrl.Result{}, err
-		}
-		starting, err := sessionStarting(ctx, r, amaltheasession)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if starting {
-			// Wait for the nfs server to start first
-			startupComplete, err := waitForNFSStartup(ctx, r.Client, amaltheasession)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			if !startupComplete {
-				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-			}
-		}
-		updates, err = children.Reconcile(ctx, r.Client, amaltheasession)
-		if err != nil {
-			logger.Error(err, "Failed when reconciling children")
-			return ctrl.Result{}, err
-		}
+	updates, err := children.Reconcile(ctx, r.Client, amaltheasession)
+	if err != nil {
+		logger.Error(err, "Failed when reconciling children")
+		return ctrl.Result{}, err
 	}
 
 	newStatus := updates.Status(ctx, r, amaltheasession)
@@ -351,6 +323,9 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 	if statusChanged {
 		// If the status is evolving we should requeue faster
 		requeueAfter = 0
+	} else if rcloneTransitioning(amaltheasession, rcloneObs, sessionMayRun) {
+		// Waiting for the session pod to shut down or for the NFS server to start
+		requeueAfter = rcloneTransitionRequeue
 	} else if !amaltheasession.Status.HibernatedSince.IsZero() {
 		// If hibernated requeue a bit slower -> once a minute
 		requeueAfter = time.Minute
@@ -467,85 +442,4 @@ func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			builder.WithPredicates(predicate.NewPredicateFuncs(containsRcloneLabels)),
 		).
 		Complete(r)
-}
-
-// When the return flag is true, it means the session pod has shut down
-func waitForSessionShutdown(ctx context.Context, k8sClient client.Reader, cr *amaltheadevv1alpha1.AmaltheaSession) (bool, error) {
-	pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: cr.Name + "-0", Namespace: cr.Namespace}}
-	err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&pod), &pod)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
-	}
-	return false, nil
-}
-
-// When the return flag is true, it means the NFS server has started and is ready
-func waitForNFSStartup(ctx context.Context, k8sClient client.Reader, cr *amaltheadevv1alpha1.AmaltheaSession) (bool, error) {
-	if cr.Spec.RcloneDataSource == nil {
-		// Just a safety, in this case there is no NFS server
-		return true, nil
-	}
-	sset := appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: cr.RcloneV2ResourceName(), Namespace: cr.Namespace}}
-	err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&sset), &sset)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	if sset.Status.ReadyReplicas == 0 {
-		return false, nil
-	}
-	return true, nil
-}
-
-func nfsShutdownOrder(ctx context.Context, amaltheasession *amaltheadevv1alpha1.AmaltheaSession, k8sClient client.Client) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-	ssetStub := appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: amaltheasession.Name, Namespace: amaltheasession.Namespace}}
-	err := k8sClient.Delete(ctx, &ssetStub, &client.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationForeground)})
-	if client.IgnoreNotFound(err) != nil {
-		return ctrl.Result{}, err
-	}
-	shutdownComplete, err := waitForSessionShutdown(ctx, k8sClient, amaltheasession)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if !shutdownComplete {
-		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
-	}
-
-	// The NFS service is the parent of all the other objects (except the PV which is handled below)
-	svcStub := corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: amaltheasession.RcloneV2ResourceName(), Namespace: amaltheasession.Namespace}}
-	err = k8sClient.Delete(ctx, &svcStub, &client.DeleteOptions{PropagationPolicy: ptr.To(metav1.DeletePropagationForeground)})
-	if client.IgnoreNotFound(err) != nil {
-		return ctrl.Result{}, err
-	}
-
-	// We don't need the whole PV to delete, just the name
-	pvStub := corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: childutils.RcloneV2PVName(amaltheasession)}}
-	err = k8sClient.Delete(ctx, &pvStub)
-	if apierrors.IsForbidden(err) {
-		// In most clusters the operator is not allowed to delete PVs, the PV has to be cleaned up
-		// externally. We should not block the deletion of the session because of this.
-		logger.Info("not allowed to delete the rclone PV, it has to be cleaned up externally", "pv", pvStub.Name)
-	} else if err != nil && !apierrors.IsNotFound(err) {
-		return ctrl.Result{}, err
-	}
-	return ctrl.Result{}, nil
-}
-
-// The session pod is about to be started: the StatefulSet doesn't exist yet (first start)
-// or it is currently scaled to 0 (resume from hibernation).
-func sessionStarting(ctx context.Context, c client.Reader, cr *amaltheadevv1alpha1.AmaltheaSession) (bool, error) {
-	sset := appsv1.StatefulSet{}
-	err := c.Get(ctx, client.ObjectKey{Name: cr.Name, Namespace: cr.Namespace}, &sset)
-	if apierrors.IsNotFound(err) {
-		return true, nil
-	} else if err != nil {
-		return false, err
-	}
-	return sset.Spec.Replicas == nil || (*sset.Spec.Replicas == 0 && !cr.Spec.Hibernated), nil
 }
