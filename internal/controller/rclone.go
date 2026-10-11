@@ -12,6 +12,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
 	childutils "github.com/SwissDataScienceCenter/amalthea/internal/controller/children"
@@ -21,11 +22,11 @@ import (
 // and shutdown order is derived from.
 type rcloneObservation struct {
 	// A pod of the session still mounts the rclone NFS volume
-	nfsInUse bool
+	podsMountNFSVolume bool
 	// The rclone NFS server has a ready replica
-	nfsReady bool
+	nfsServerReady bool
 	// The session statefulset is scaled up or the session job is not suspended
-	sessionUp bool
+	sessionScaledUp bool
 }
 
 func observeRclone(ctx context.Context, clnt client.Reader, cr *amaltheadevv1alpha1.AmaltheaSession) (rcloneObservation, error) {
@@ -41,7 +42,7 @@ func observeRclone(ctx context.Context, clnt client.Reader, cr *amaltheadevv1alp
 	}
 	for _, pod := range pods.Items {
 		if podMountsClaim(&pod, cr.RcloneV2ResourceName()) {
-			output.nfsInUse = true
+			output.podsMountNFSVolume = true
 			break
 		}
 	}
@@ -51,7 +52,7 @@ func observeRclone(ctx context.Context, clnt client.Reader, cr *amaltheadevv1alp
 	if client.IgnoreNotFound(err) != nil {
 		return output, err
 	}
-	output.nfsReady = nfsSset.Status.ReadyReplicas > 0
+	output.nfsServerReady = nfsSset.Status.ReadyReplicas > 0
 
 	switch cr.Spec.SessionType {
 	case amaltheadevv1alpha1.SessionTypeNonInteractive:
@@ -60,21 +61,24 @@ func observeRclone(ctx context.Context, clnt client.Reader, cr *amaltheadevv1alp
 		if client.IgnoreNotFound(err) != nil {
 			return output, err
 		}
-		output.sessionUp = job.Spec.Suspend == nil || !*job.Spec.Suspend
+		// If the job is not found, err != nil, without the err condition a missing job will produce sessionScaledUp = true
+		output.sessionScaledUp = err == nil && (job.Spec.Suspend == nil || !*job.Spec.Suspend)
 	default:
 		sset := appsv1.StatefulSet{}
 		err = clnt.Get(ctx, client.ObjectKey{Name: cr.Name, Namespace: cr.Namespace}, &sset)
 		if client.IgnoreNotFound(err) != nil {
 			return output, err
 		}
-		output.sessionUp = err == nil && (sset.Spec.Replicas == nil || *sset.Spec.Replicas > 0)
+		output.sessionScaledUp = sset.Spec.Replicas != nil && *sset.Spec.Replicas > 0
 	}
 	return output, nil
 }
 
-// Pods that have completed are not considered, the kubelet unmounts their volumes.
+// Completed pods that are not deleted are not considered, the kubelet unmounts their volumes.
+// A deleted pod can still have its volumes mounted after reaching a terminal phase, the kubelet
+// only removes the pod once its volumes are cleaned up.
 func podMountsClaim(pod *corev1.Pod, claimName string) bool {
-	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+	if pod.DeletionTimestamp == nil && (pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed) {
 		return false
 	}
 	for _, vol := range pod.Spec.Volumes {
@@ -85,22 +89,47 @@ func podMountsClaim(pod *corev1.Pod, claimName string) bool {
 	return false
 }
 
-// rclonePlan derives the desired state of the NFS server and whether the session is allowed to run.
+// rcloneDesiredState derives the desired state of the NFS server and whether the session is allowed to run.
 // The NFS server is kept running for as long as a session pod mounts it, regardless of why the
 // session is shutting down (hibernation, deletion or removal of the rclone section from the spec).
 // The session is only started once the NFS server is ready, but a running session is never stopped
 // because the NFS server becomes unready.
-func rclonePlan(cr *amaltheadevv1alpha1.AmaltheaSession, obs rcloneObservation) (childutils.RcloneV2Plan, bool) {
+func rcloneDesiredState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSession, obs rcloneObservation) (nfsState childutils.RcloneNFSDesiredState, sessionMayRun bool) {
 	deleting := cr.GetDeletionTimestamp() != nil
-	wanted := cr.Spec.RcloneDataSource != nil && !deleting
-	plan := childutils.RcloneV2Plan{
-		Manage: cr.Spec.RcloneDataSource != nil || controllerutil.ContainsFinalizer(cr, rcloneNFSFinalizer),
-		Exist:  wanted || obs.nfsInUse,
-		Run:    (wanted && !cr.Spec.Hibernated) || obs.nfsInUse,
+	hibernated := cr.Spec.Hibernated
+	nfsInUse := obs.podsMountNFSVolume
+	nfsConfigured := cr.Spec.RcloneDataSource != nil || controllerutil.ContainsFinalizer(cr, rcloneNFSFinalizer)
+	// NOTE: nfsWanted implies nfsConfigured
+	nfsWanted := cr.Spec.RcloneDataSource != nil && !deleting
+	// NOTE: The cases below should be kept mutually exclusive, so their order does not matter and the intent is clear.
+	switch {
+	case !nfsConfigured:
+		// There is no Rclone NFS server at all
+		nfsState = childutils.RcloneNFSIgnore
+	case nfsWanted && !hibernated:
+		nfsState = childutils.RcloneNFSRun
+	case nfsWanted && hibernated && !nfsInUse:
+		nfsState = childutils.RcloneNFSHibernate
+	case nfsConfigured && nfsInUse && (!nfsWanted || hibernated):
+		nfsState = childutils.RcloneNFSDrain
+	case nfsConfigured && !nfsWanted && !nfsInUse:
+		nfsState = childutils.RcloneNFSDelete
+	default:
+		// Unreachable: the cases above cover every combination. Ignore is the safest fallback
+		// because it neither deletes nor scales down anything.
+		log.FromContext(ctx).Error(
+			nil,
+			"Could not determine the desired state of the rclone NFS server, leaving it untouched",
+			"nfsConfigured", nfsConfigured,
+			"nfsWanted", nfsWanted,
+			"hibernated", hibernated,
+			"inUse", nfsInUse,
+		)
+		nfsState = childutils.RcloneNFSIgnore
 	}
-	sessionMayRun := !cr.Spec.Hibernated && !deleting &&
-		(cr.Spec.RcloneDataSource == nil || obs.nfsReady || obs.sessionUp)
-	return plan, sessionMayRun
+	sessionMayRun = !cr.Spec.Hibernated && !deleting &&
+		(cr.Spec.RcloneDataSource == nil || obs.nfsServerReady || obs.sessionScaledUp)
+	return nfsState, sessionMayRun
 }
 
 const rcloneTransitionRequeue = 5 * time.Second
@@ -109,7 +138,7 @@ const rcloneTransitionRequeue = 5 * time.Second
 // is kept up only because the session pod that is hibernating still mounts it.
 func rcloneTransitioning(cr *amaltheadevv1alpha1.AmaltheaSession, obs rcloneObservation, sessionMayRun bool) bool {
 	waitingForNFS := !sessionMayRun && !cr.Spec.Hibernated && cr.GetDeletionTimestamp() == nil
-	drainingNFS := obs.nfsInUse && cr.Spec.Hibernated
+	drainingNFS := obs.podsMountNFSVolume && cr.Spec.Hibernated
 	return waitingForNFS || drainingNFS
 }
 

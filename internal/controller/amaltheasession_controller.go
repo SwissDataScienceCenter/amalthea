@@ -200,11 +200,11 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			plan, _ := rclonePlan(amaltheasession, obs)
-			if err := childutils.NewRcloneV2Resources(amaltheasession, plan).Reconcile(ctx, r.Client); err != nil {
+			nfsState, _ := rcloneDesiredState(ctx, amaltheasession, obs)
+			if err := childutils.NewRcloneV2Resources(amaltheasession, nfsState).Reconcile(ctx, r.Client); err != nil {
 				return ctrl.Result{}, err
 			}
-			if plan.Exist {
+			if nfsState != childutils.RcloneNFSDelete {
 				// The NFS server is still in use by the session pod
 				return ctrl.Result{RequeueAfter: rcloneTransitionRequeue}, nil
 			}
@@ -256,24 +256,24 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
-	// The startup and shutdown order of the session and the NFS server follows from the plan,
+	// The startup and shutdown order of the session and the NFS server follows from the desired NFS state,
 	// so the session and the rclone resources can be reconciled in any order.
 	rcloneObs, err := observeRclone(ctx, r.Client, amaltheasession)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	nfsPlan, sessionMayRun := rclonePlan(amaltheasession, rcloneObs)
+	nfsState, sessionMayRun := rcloneDesiredState(ctx, amaltheasession, rcloneObs)
 	if !sessionMayRun {
 		holdSession(&children)
 	}
 
-	err = childutils.NewRcloneV2Resources(amaltheasession, nfsPlan).Reconcile(ctx, r.Client)
+	err = childutils.NewRcloneV2Resources(amaltheasession, nfsState).Reconcile(ctx, r.Client)
 	if err != nil {
 		logger.Error(err, "Failed when reconciling rclone data sources")
 		return ctrl.Result{}, err
 	}
 	// The rclone section was removed from the spec and the rclone resources have been cleaned up
-	if amaltheasession.Spec.RcloneDataSource == nil && !nfsPlan.Exist && controllerutil.ContainsFinalizer(amaltheasession, rcloneNFSFinalizer) {
+	if amaltheasession.Spec.RcloneDataSource == nil && nfsState == childutils.RcloneNFSDelete && controllerutil.ContainsFinalizer(amaltheasession, rcloneNFSFinalizer) {
 		controllerutil.RemoveFinalizer(amaltheasession, rcloneNFSFinalizer)
 		if err := r.Update(ctx, amaltheasession); err != nil {
 			return ctrl.Result{}, err

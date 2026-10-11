@@ -114,23 +114,30 @@ func (r *RcloneV2Resources) Reconcile(ctx context.Context, clnt client.Client) e
 func (r *RcloneV2Resources) StatusCallback(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
 }
 
-// RcloneV2Plan is the desired state of the rclone NFS server. It is derived from the session spec and
+// RcloneNFSDesiredState is the desired state of the rclone NFS server. It is derived from the session spec and
 // from the observed state of the session pods, so that the NFS server always outlives the pods that mount it.
 // If the NFS server goes away first the session pod gets stuck in "Terminating" for a long time.
-type RcloneV2Plan struct {
-	// The rclone resources have to be reconciled, when false nothing is done
-	Manage bool
-	// The rclone resources should exist, when false they are deleted
-	Exist bool
-	// The NFS server should be running, when false it is scaled down to 0
-	Run bool
-}
+type RcloneNFSDesiredState string
 
-func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession, plan RcloneV2Plan) ChildResourcer {
-	if !plan.Manage {
+const (
+	// The session does not use rclone, nothing is done
+	RcloneNFSIgnore RcloneNFSDesiredState = ""
+	// The NFS server should be running
+	RcloneNFSRun RcloneNFSDesiredState = "run"
+	// The NFS server should keep running until the session pod that is shutting down
+	// (hibernation, deletion or removal of the rclone section from the spec) stops mounting it
+	RcloneNFSDrain RcloneNFSDesiredState = "drain"
+	// The NFS server should be scaled down to 0 while its service, PV and PVC are kept
+	RcloneNFSHibernate RcloneNFSDesiredState = "hibernate"
+	// The rclone resources should be deleted
+	RcloneNFSDelete RcloneNFSDesiredState = "delete"
+)
+
+func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession, nfsState RcloneNFSDesiredState) ChildResourcer {
+	if nfsState == RcloneNFSIgnore {
 		return &RcloneV2Resources{}
 	}
-	if cr.Spec.RcloneDataSource == nil && plan.Exist {
+	if cr.Spec.RcloneDataSource == nil && nfsState == RcloneNFSDrain {
 		// The rclone section was removed from the spec but the NFS volume is still in use.
 		// The desired state cannot be generated without the spec, so the resources are left untouched.
 		return &RcloneV2Resources{}
@@ -155,7 +162,7 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession, plan RcloneV2
 			return nil
 		}),
 		WithDeleteWhen[*v1.Service](func() bool {
-			return !plan.Exist
+			return nfsState == RcloneNFSDelete
 		}),
 	)
 	ss := NewChildResource(
@@ -169,9 +176,9 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession, plan RcloneV2
 			desired := rcloneV2Statefulset(cr)
 			obj.Labels = CleanWellKnown(obj.Labels, desired.Labels)
 			obj.Annotations = CleanWellKnown(obj.Annotations, desired.Annotations)
-			obj.Spec.Replicas = new(int32(0))
-			if plan.Run {
-				obj.Spec.Replicas = new(int32(1))
+			obj.Spec.Replicas = new(int32(1))
+			if nfsState == RcloneNFSHibernate {
+				obj.Spec.Replicas = new(int32(0))
 			}
 			obj.Spec.Selector = desired.Spec.Selector
 			obj.Spec.Template = desired.Spec.Template
@@ -179,7 +186,7 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession, plan RcloneV2
 			return nil
 		}),
 		WithDeleteWhen[*appsv1.StatefulSet](func() bool {
-			return !plan.Exist
+			return nfsState == RcloneNFSDelete
 		}),
 		WithParent[*appsv1.StatefulSet](service.obj),
 	)
@@ -205,7 +212,7 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession, plan RcloneV2
 			return nil
 		}),
 		WithDeleteWhen[*v1.PersistentVolume](func() bool {
-			return !plan.Exist
+			return nfsState == RcloneNFSDelete
 		}),
 		// In most clusters the operator is not allowed to delete PVs, the PV has to be cleaned up
 		// externally. We should not block the cleanup of the rclone resources because of this.
@@ -232,7 +239,7 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession, plan RcloneV2
 		}),
 		WithParent[*v1.PersistentVolumeClaim](service.obj),
 		WithDeleteWhen[*v1.PersistentVolumeClaim](func() bool {
-			return !plan.Exist
+			return nfsState == RcloneNFSDelete
 		}),
 	)
 	cachePVC := NewChildResource(
@@ -261,7 +268,7 @@ func NewRcloneV2Resources(cr *amaltheadevv1alpha1.AmaltheaSession, plan RcloneV2
 		WithParent[*v1.PersistentVolumeClaim](service.obj),
 		// We dont want to keep the cache and keep paying for storage when the session hibernates.
 		WithDeleteWhen[*v1.PersistentVolumeClaim](func() bool {
-			return !plan.Exist || !plan.Run || !cr.Spec.RcloneDataSource.GetCache().Persisted
+			return nfsState == RcloneNFSDelete || nfsState == RcloneNFSHibernate || !cr.Spec.RcloneDataSource.GetCache().Persisted
 		}),
 	)
 	// NOTE: The pv must be reconciled after the service, because the ClusterIP
@@ -481,7 +488,7 @@ func rcloneV2PVC(cr *amaltheadevv1alpha1.AmaltheaSession) v1.PersistentVolumeCla
 	}
 }
 
-// NOTE: Whether the cache PVC should be deleted (e.g. on hibernation) is decided by the RcloneV2Plan
+// NOTE: Whether the cache PVC should be deleted (e.g. on hibernation) is decided by the RcloneNFSDesiredState
 func rcloneV2CachePVC(cr *amaltheadevv1alpha1.AmaltheaSession) *v1.PersistentVolumeClaim {
 	if cr.Spec.RcloneDataSource == nil {
 		return nil
