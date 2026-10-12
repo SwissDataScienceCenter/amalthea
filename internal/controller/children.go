@@ -755,6 +755,7 @@ func (c ChildResourceUpdates) Status(
 	ctx context.Context,
 	r *AmaltheaSessionReconciler,
 	cr *amaltheadevv1alpha1.AmaltheaSession,
+	rclone rcloneStatus,
 ) amaltheadevv1alpha1.AmaltheaSessionStatus {
 	logger := log.FromContext(ctx)
 
@@ -827,6 +828,11 @@ func (c ChildResourceUpdates) Status(
 		}
 	}
 
+	if rclone.Condition.Reason == amaltheadevv1alpha1.RcloneReasonStarting && rclone.Stuck && state == amaltheadevv1alpha1.NotReady {
+		state = amaltheadevv1alpha1.Failed
+		failMsg = "The Rclone server did not become ready in time"
+	}
+
 	hibernated := cr.Spec.Hibernated
 	hibernatedSince := cr.Status.HibernatedSince
 	if hibernated && hibernatedSince.IsZero() {
@@ -848,7 +854,7 @@ func (c ChildResourceUpdates) Status(
 	hibernationDate := calculateHibernationDate(logger, cr.GetCreationTimestamp(), cr.Status, cr.Spec.Culling)
 
 	status := amaltheadevv1alpha1.AmaltheaSessionStatus{
-		Conditions:            Conditions(state, ctx, r, cr),
+		Conditions:            setCondition(Conditions(state, ctx, r, cr), rclone.Condition),
 		State:                 state,
 		URL:                   cr.GetURLString(),
 		Idle:                  idle,

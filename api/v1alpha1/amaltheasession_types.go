@@ -539,6 +539,15 @@ type AmaltheaSessionConditionType string
 const (
 	AmaltheaSessionReady        AmaltheaSessionConditionType = "Ready"
 	AmaltheaSessionRoutingReady AmaltheaSessionConditionType = "RoutingReady"
+	AmaltheaSessionRcloneReady  AmaltheaSessionConditionType = "RcloneReady"
+)
+
+const (
+	RcloneReasonReady        string = "Ready"
+	RcloneReasonStarting     string = "Starting"
+	RcloneReasonShuttingDown string = "ShuttingDown"
+	RcloneReasonNotRequired  string = "NotRequired"
+	RcloneReasonHibernated   string = "Hibernated"
 )
 
 type AmaltheaSessionCondition struct {

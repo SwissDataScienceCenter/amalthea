@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
@@ -195,4 +196,44 @@ func getIdleState(
 	logger.Info("session idle check", "idle", idle, "session", cr.Name, "cpuUsage", cpuUsage, "cpuUsageThreshold", cpuUsageIdlenessThreshold)
 
 	return idleSince, idle
+}
+
+// setCondition adds the condition or updates the existing one of the same type.
+// The transition time changes when the status or reason of the condition changes.
+func setCondition(
+	conditions []amaltheadevv1alpha1.AmaltheaSessionCondition,
+	newCond amaltheadevv1alpha1.AmaltheaSessionCondition,
+) []amaltheadevv1alpha1.AmaltheaSessionCondition {
+	conditions = slices.Clone(conditions)
+	i := slices.IndexFunc(
+		conditions,
+		func(c amaltheadevv1alpha1.AmaltheaSessionCondition) bool { return c.Type == newCond.Type },
+	)
+	if i == -1 {
+		// The condition to be added does not already exist in the conditions
+		newCond.LastTransitionTime = metav1.NewTime(time.Now())
+		return append(conditions, newCond)
+	}
+	if conditions[i].Status != newCond.Status || conditions[i].Reason != newCond.Reason {
+		conditions[i].LastTransitionTime = metav1.NewTime(time.Now())
+	}
+	conditions[i].Status = newCond.Status
+	conditions[i].Reason = newCond.Reason
+	conditions[i].Message = newCond.Message
+	return conditions
+}
+
+// Get an amalthea condition by type. If the condition cannot be found returns nil.
+func getCondition(
+	conditions []amaltheadevv1alpha1.AmaltheaSessionCondition,
+	condType amaltheadevv1alpha1.AmaltheaSessionConditionType,
+) *amaltheadevv1alpha1.AmaltheaSessionCondition {
+	i := slices.IndexFunc(
+		conditions,
+		func(c amaltheadevv1alpha1.AmaltheaSessionCondition) bool { return c.Type == condType },
+	)
+	if i == -1 {
+		return nil
+	}
+	return &conditions[i]
 }

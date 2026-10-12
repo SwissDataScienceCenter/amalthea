@@ -61,7 +61,6 @@ type AmaltheaSessionReconciler struct {
 
 // finalizers
 const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
-const rcloneNFSFinalizer = "amalthea.dev/rclone-nfs-finalizer"
 
 // +kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=amalthea.dev,resources=amaltheasessions/status,verbs=get;update;patch
@@ -178,8 +177,8 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		// The finalize is used to enforce shutdown order for the NFS server and session.
 		// Without this order the session pod gets perpetually stuck in "Terminating".
 		// It is also used to delete the PV for the NFS server.
-		if amaltheasession.Spec.RcloneDataSource != nil && !controllerutil.ContainsFinalizer(amaltheasession, rcloneNFSFinalizer) {
-			controllerutil.AddFinalizer(amaltheasession, rcloneNFSFinalizer)
+		if amaltheasession.Spec.RcloneDataSource != nil && !controllerutil.ContainsFinalizer(amaltheasession, childutils.RcloneNFSFinalizer) {
+			controllerutil.AddFinalizer(amaltheasession, childutils.RcloneNFSFinalizer)
 			if err := r.Update(ctx, amaltheasession); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -192,7 +191,7 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 			return ctrl.Result{}, err
 		}
 
-		if controllerutil.ContainsFinalizer(amaltheasession, rcloneNFSFinalizer) {
+		if controllerutil.ContainsFinalizer(amaltheasession, childutils.RcloneNFSFinalizer) {
 			if err := deleteSessionWorkload(ctx, r.Client, amaltheasession); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -209,7 +208,7 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 				return ctrl.Result{RequeueAfter: rcloneTransitionRequeue}, nil
 			}
 			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(amaltheasession, rcloneNFSFinalizer)
+			controllerutil.RemoveFinalizer(amaltheasession, childutils.RcloneNFSFinalizer)
 			if err := r.Update(ctx, amaltheasession); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -263,18 +262,15 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 	nfsState, sessionMayRun := rcloneDesiredState(ctx, amaltheasession, rcloneObs)
+	rcloneSt := getRcloneStatus(amaltheasession, rcloneObs, nfsState)
 	if !sessionMayRun {
 		holdSession(&children)
 	}
 
-	err = childutils.NewRcloneV2Resources(amaltheasession, nfsState).Reconcile(ctx, r.Client)
-	if err != nil {
-		logger.Error(err, "Failed when reconciling rclone data sources")
-		return ctrl.Result{}, err
-	}
+	rcloneReconcileError := childutils.NewRcloneV2Resources(amaltheasession, nfsState).Reconcile(ctx, r.Client)
 	// The rclone section was removed from the spec and the rclone resources have been cleaned up
-	if amaltheasession.Spec.RcloneDataSource == nil && nfsState == childutils.RcloneNFSDelete && controllerutil.ContainsFinalizer(amaltheasession, rcloneNFSFinalizer) {
-		controllerutil.RemoveFinalizer(amaltheasession, rcloneNFSFinalizer)
+	if rcloneReconcileError == nil && amaltheasession.Spec.RcloneDataSource == nil && nfsState == childutils.RcloneNFSDelete && controllerutil.ContainsFinalizer(amaltheasession, childutils.RcloneNFSFinalizer) {
+		controllerutil.RemoveFinalizer(amaltheasession, childutils.RcloneNFSFinalizer)
 		if err := r.Update(ctx, amaltheasession); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -286,7 +282,7 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
-	newStatus := updates.Status(ctx, r, amaltheasession)
+	newStatus := updates.Status(ctx, r, amaltheasession, rcloneSt)
 	statusChanged := !reflect.DeepEqual(amaltheasession.Status, newStatus)
 
 	amaltheasession.Status = newStatus
@@ -316,6 +312,11 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 	err = updateHibernationState(ctx, r, amaltheasession)
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+
+	if rcloneReconcileError != nil {
+		logger.Error(err, "Failed when reconciling rclone data sources")
+		return ctrl.Result{}, rcloneReconcileError
 	}
 
 	// Now requeue to make sure we can watch for idleness and other status changes

@@ -47,6 +47,7 @@ const (
 	RcloneV2SecretsMountPath       string = "/secrets"
 	RcloneV2ConfigParentMounthPath string = "/rclone"
 	RcloneV2ConfigPath             string = "/rclone/rclone-config" // This and the above parent path have to be compatible
+	RcloneNFSFinalizer             string = "amalthea.dev/rclone-nfs-finalizer"
 )
 
 func RcloneV2ResourceName(cr *amaltheadevv1alpha1.AmaltheaSession) string {
@@ -112,6 +113,9 @@ func (r *RcloneV2Resources) Reconcile(ctx context.Context, clnt client.Client) e
 }
 
 func (r *RcloneV2Resources) StatusCallback(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+	for _, res := range r.resources {
+		res.StatusCallback(status)
+	}
 }
 
 // RcloneNFSDesiredState is the desired state of the rclone NFS server. It is derived from the session spec and
@@ -368,10 +372,11 @@ done`
 						TCPSocket: &v1.TCPSocketAction{Port: intstr.FromString(rcloneV2NFSPortName)},
 					},
 				},
-				Command:      []string{"rclone"},
-				Args:         args,
-				VolumeMounts: volumeMounts,
-				Lifecycle:    &v1.Lifecycle{PreStop: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"/bin/sh", "-c", preStopCommand}}}},
+				Command:                  []string{"rclone"},
+				Args:                     args,
+				VolumeMounts:             volumeMounts,
+				Lifecycle:                &v1.Lifecycle{PreStop: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"/bin/sh", "-c", preStopCommand}}}},
+				TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 			},
 		},
 	}

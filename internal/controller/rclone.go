@@ -18,6 +18,8 @@ import (
 	childutils "github.com/SwissDataScienceCenter/amalthea/internal/controller/children"
 )
 
+const RcloneStartThreshold time.Duration = 10 * time.Minute
+
 // The observed state of the session and of the rclone NFS server that the startup
 // and shutdown order is derived from.
 type rcloneObservation struct {
@@ -27,11 +29,13 @@ type rcloneObservation struct {
 	nfsServerReady bool
 	// The session statefulset is scaled up or the session job is not suspended
 	sessionScaledUp bool
+	// The NFS server pod exists - regardless of what its state or phase is
+	nfsPodExists bool
 }
 
 func observeRclone(ctx context.Context, clnt client.Reader, cr *amaltheadevv1alpha1.AmaltheaSession) (rcloneObservation, error) {
 	output := rcloneObservation{}
-	if cr.Spec.RcloneDataSource == nil && !controllerutil.ContainsFinalizer(cr, rcloneNFSFinalizer) {
+	if cr.Spec.RcloneDataSource == nil && !controllerutil.ContainsFinalizer(cr, childutils.RcloneNFSFinalizer) {
 		return output, nil
 	}
 
@@ -53,6 +57,13 @@ func observeRclone(ctx context.Context, clnt client.Reader, cr *amaltheadevv1alp
 		return output, err
 	}
 	output.nfsServerReady = nfsSset.Status.ReadyReplicas > 0
+
+	nfsPod := corev1.Pod{}
+	err = clnt.Get(ctx, client.ObjectKey{Name: cr.RcloneV2ResourceName() + "-0", Namespace: cr.Namespace}, &nfsPod)
+	if client.IgnoreNotFound(err) != nil {
+		return output, err
+	}
+	output.nfsPodExists = err == nil
 
 	switch cr.Spec.SessionType {
 	case amaltheadevv1alpha1.SessionTypeNonInteractive:
@@ -98,7 +109,7 @@ func rcloneDesiredState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSes
 	deleting := cr.GetDeletionTimestamp() != nil
 	hibernated := cr.Spec.Hibernated
 	nfsInUse := obs.podsMountNFSVolume
-	nfsConfigured := cr.Spec.RcloneDataSource != nil || controllerutil.ContainsFinalizer(cr, rcloneNFSFinalizer)
+	nfsConfigured := cr.Spec.RcloneDataSource != nil || controllerutil.ContainsFinalizer(cr, childutils.RcloneNFSFinalizer)
 	// NOTE: nfsWanted implies nfsConfigured
 	nfsWanted := cr.Spec.RcloneDataSource != nil && !deleting
 	// NOTE: The cases below should be kept mutually exclusive, so their order does not matter and the intent is clear.
@@ -112,7 +123,7 @@ func rcloneDesiredState(ctx context.Context, cr *amaltheadevv1alpha1.AmaltheaSes
 		nfsState = childutils.RcloneNFSHibernate
 	case nfsConfigured && nfsInUse && (!nfsWanted || hibernated):
 		nfsState = childutils.RcloneNFSDrain
-	case nfsConfigured && !nfsWanted && !nfsInUse:
+	case nfsConfigured && !nfsInUse && !nfsWanted:
 		nfsState = childutils.RcloneNFSDelete
 	default:
 		// Unreachable: the cases above cover every combination. Ignore is the safest fallback
@@ -166,4 +177,50 @@ func deleteSessionWorkload(ctx context.Context, clnt client.Client, cr *amalthea
 		return err
 	}
 	return nil
+}
+
+type rcloneStatus struct {
+	// The NFS server is stuck in starting mode for a long time.
+	Stuck     bool
+	Condition amaltheadevv1alpha1.AmaltheaSessionCondition
+}
+
+func getRcloneStatus(cr *amaltheadevv1alpha1.AmaltheaSession, obs rcloneObservation, desiredState childutils.RcloneNFSDesiredState) rcloneStatus {
+	newCond := func(status metav1.ConditionStatus, reason, msg string) amaltheadevv1alpha1.AmaltheaSessionCondition {
+		return amaltheadevv1alpha1.AmaltheaSessionCondition{
+			Type: amaltheadevv1alpha1.AmaltheaSessionRcloneReady, Status: status, Reason: reason, Message: msg,
+		}
+	}
+
+	var condition amaltheadevv1alpha1.AmaltheaSessionCondition
+	switch desiredState {
+	case childutils.RcloneNFSIgnore:
+		condition = newCond(metav1.ConditionTrue, amaltheadevv1alpha1.RcloneReasonNotRequired, "Rclone is not needed at all.")
+	case childutils.RcloneNFSDelete:
+		condition = newCond(metav1.ConditionFalse, amaltheadevv1alpha1.RcloneReasonShuttingDown, "Starting to shut down the Rclone server.")
+	case childutils.RcloneNFSHibernate:
+		if obs.nfsPodExists {
+			condition = newCond(metav1.ConditionFalse, amaltheadevv1alpha1.RcloneReasonShuttingDown, "Starting to shut down the Rclone server for hibernation.")
+		} else {
+			condition = newCond(metav1.ConditionFalse, amaltheadevv1alpha1.RcloneReasonHibernated, "The Rclone server is hibernated")
+		}
+	case childutils.RcloneNFSDrain:
+		condition = newCond(metav1.ConditionFalse, amaltheadevv1alpha1.RcloneReasonShuttingDown, "The Rclone server is waiting for the session to stop before it can shut down.")
+	case childutils.RcloneNFSRun:
+		if obs.nfsPodExists && obs.nfsServerReady {
+			condition = newCond(metav1.ConditionTrue, amaltheadevv1alpha1.RcloneReasonReady, "The Rclone server is up and running.")
+		} else {
+			condition = newCond(metav1.ConditionFalse, amaltheadevv1alpha1.RcloneReasonStarting, "The Rclone server is starting up.")
+		}
+	}
+
+	stuck := false
+	if condition.Reason == amaltheadevv1alpha1.RcloneReasonStarting {
+		now := time.Now()
+		old := getCondition(cr.Status.Conditions, amaltheadevv1alpha1.AmaltheaSessionRcloneReady)
+		stuck = old != nil && old.Reason == amaltheadevv1alpha1.RcloneReasonStarting &&
+			now.Sub(old.LastTransitionTime.Time) > RcloneStartThreshold
+	}
+
+	return rcloneStatus{Condition: condition, Stuck: stuck}
 }
