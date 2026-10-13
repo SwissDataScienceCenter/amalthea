@@ -173,6 +173,13 @@ func GetProxyHandler(config configLib.GitProxyConfig) *goproxy.ProxyHttpServer {
 			log.Printf("Cannot parse repository URL (%s), skipping proxy setup.", repo.Url)
 			continue
 		}
+		if repo.References == nil {
+			log.Printf("Repository (%s) is read-write.", repo.Url)
+		} else if len(*repo.References) > 0 {
+			log.Printf("Repository (%s) is read-write on branches %q.", repo.Url, *repo.References)
+		} else {
+			log.Printf("Repository (%s) is read-only.", repo.Url)
+		}
 		provider := repo.Provider
 		if provider == "" {
 			log.Printf("Repository (%s) has no provider, skipping proxy setup.", repo.Url)
