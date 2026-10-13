@@ -9,11 +9,8 @@ metadata:
           "kind": "AmaltheaSession",
           "metadata": {
             "labels": {
-              "app.kubernetes.io/created-by": "amalthea",
-              "app.kubernetes.io/instance": "amaltheasession-sample",
               "app.kubernetes.io/managed-by": "kustomize",
-              "app.kubernetes.io/name": "amaltheasession",
-              "app.kubernetes.io/part-of": "amalthea"
+              "app.kubernetes.io/name": "amalthea"
             },
             "name": "amaltheasession-sample"
           },
@@ -21,7 +18,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-07-03T16:02:07Z"
+    createdAt: "2026-10-07T21:20:25Z"
     operators.operatorframework.io/builder: operator-sdk-v1.38.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: amalthea.v0.0.1
@@ -50,6 +47,46 @@ spec:
     spec:
       clusterPermissions:
       - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          - pods
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - persistentvolumeclaims
+          - services
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - persistentvolumes
+          verbs:
+          - create
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - create
+          - delete
+          - list
+          - patch
+          - watch
         - apiGroups:
           - amalthea.dev
           resources:
@@ -88,33 +125,12 @@ spec:
           - update
           - watch
         - apiGroups:
-          - ""
+          - batch
           resources:
-          - events
-          - pods
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - persistentvolumeclaims
-          - services
+          - jobs
           verbs:
           - create
           - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - secrets
-          verbs:
-          - create
-          - delete
           - list
           - patch
           - watch
@@ -153,18 +169,15 @@ spec:
         serviceAccountName: amalthea-controller-manager
       deployments:
       - label:
-          app.kubernetes.io/component: manager
-          app.kubernetes.io/created-by: amalthea
-          app.kubernetes.io/instance: controller-manager
           app.kubernetes.io/managed-by: kustomize
-          app.kubernetes.io/name: deployment
-          app.kubernetes.io/part-of: amalthea
+          app.kubernetes.io/name: amalthea
           control-plane: controller-manager
         name: amalthea-controller-manager
         spec:
           replicas: 1
           selector:
             matchLabels:
+              app.kubernetes.io/name: amalthea
               control-plane: controller-manager
           strategy: {}
           template:
@@ -172,11 +185,11 @@ spec:
               annotations:
                 kubectl.kubernetes.io/default-container: manager
               labels:
+                app.kubernetes.io/name: amalthea
                 control-plane: controller-manager
             spec:
               containers:
               - args:
-                - --metrics-secure
                 - --metrics-bind-address=:8443
                 - --leader-elect
                 - --health-probe-bind-address=:8081
@@ -210,6 +223,8 @@ spec:
                     - ALL
               securityContext:
                 runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
               serviceAccountName: amalthea-controller-manager
               terminationGracePeriodSeconds: 10
       permissions:

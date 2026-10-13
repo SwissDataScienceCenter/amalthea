@@ -1,0 +1,200 @@
+/*
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package children
+
+import (
+	"context"
+	"fmt"
+	"reflect"
+	"strings"
+
+	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	"github.com/labstack/gommon/log"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+type ChildResourceType interface {
+	metav1.Object
+	runtime.Object
+	*v1.Service | *v1.PersistentVolumeClaim | *appsv1.StatefulSet | *v1.Secret | *v1.PersistentVolume
+}
+
+type MutateFn[T ChildResourceType] func(T) error
+type StatusCallback func(*amaltheadevv1alpha1.AmaltheaSessionStatus)
+
+type ChildResource[T ChildResourceType] struct {
+	mutateFn       MutateFn[T]
+	obj            T
+	statusCallback StatusCallback
+	parent         metav1.Object
+	shouldDelete   func() bool
+	// When set, a forbidden error on deletion is logged and ignored
+	ignoreForbiddenDelete bool
+}
+
+func NewChildResource[T ChildResourceType](pt T, opts ...ChildResourceOption[T]) ChildResource[T] {
+	t := reflect.TypeOf(pt)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	obj := reflect.New(t).Interface().(T)
+	output := ChildResource[T]{
+		obj: obj,
+	}
+	for _, opt := range opts {
+		opt(&output)
+	}
+	return output
+}
+
+type ChildResourceOption[T ChildResourceType] func(*ChildResource[T])
+
+func WithName[T ChildResourceType](name string) ChildResourceOption[T] {
+	return func(cr *ChildResource[T]) {
+		cr.obj.SetName(name)
+	}
+}
+
+func WithNamespace[T ChildResourceType](namespace string) ChildResourceOption[T] {
+	return func(cr *ChildResource[T]) {
+		cr.obj.SetNamespace(namespace)
+	}
+}
+
+func WithMutateFn[T ChildResourceType](mutateFn MutateFn[T]) ChildResourceOption[T] {
+	return func(cr *ChildResource[T]) {
+		cr.mutateFn = mutateFn
+	}
+}
+
+func WithStatusCallback[T ChildResourceType](statusCallback StatusCallback) ChildResourceOption[T] {
+	return func(cr *ChildResource[T]) {
+		cr.statusCallback = statusCallback
+	}
+}
+
+func WithParent[T ChildResourceType](parent metav1.Object) ChildResourceOption[T] {
+	return func(cr *ChildResource[T]) {
+		cr.parent = parent
+	}
+}
+
+// WithDeleteWhen makes Reconcile delete the resource (if it exists) instead of
+// creating/patching it whenever the condition returns true.
+func WithDeleteWhen[T ChildResourceType](cond func() bool) ChildResourceOption[T] {
+	return func(cr *ChildResource[T]) {
+		cr.shouldDelete = cond
+	}
+}
+
+// WithIgnoreForbiddenDelete makes Reconcile ignore forbidden errors when deleting the resource.
+func WithIgnoreForbiddenDelete[T ChildResourceType]() ChildResourceOption[T] {
+	return func(cr *ChildResource[T]) {
+		cr.ignoreForbiddenDelete = true
+	}
+}
+
+func (cr *ChildResource[T]) Reconcile(ctx context.Context, clnt client.Client) error {
+	if cr == nil {
+		return nil
+	}
+	if cr.shouldDelete != nil && cr.shouldDelete() {
+		// Only the name and namespace of cr.obj are needed for the deletion
+		err := clnt.Delete(ctx, cr.obj)
+		if cr.ignoreForbiddenDelete && apierrors.IsForbidden(err) {
+			log.Infof("Not allowed to delete %s %s, it has to be cleaned up externally", reflect.TypeOf(cr.obj).Elem().Name(), cr.obj.GetName())
+			return nil
+		}
+		return client.IgnoreNotFound(err)
+	}
+	if cr.mutateFn == nil {
+		log.Warnf("Mutate function not set for type %s with name %s, namespace: %s", cr.obj.GetName(), cr.obj.GetNamespace(), cr.obj.GetObjectKind().GroupVersionKind().String())
+		return nil
+	}
+	// If the resource is still being deleted (e.g. a session was resumed right after hibernation)
+	// we wait for the deletion to complete before recreating it, otherwise we would patch an object
+	// that is about to disappear.
+	current := cr.obj.DeepCopyObject().(T)
+	err := clnt.Get(ctx, client.ObjectKeyFromObject(cr.obj), current)
+	if client.IgnoreNotFound(err) != nil {
+		return err
+	}
+	if err == nil && current.GetDeletionTimestamp() != nil {
+		return fmt.Errorf(
+			"cannot reconcile %s %s/%s because it is still being deleted",
+			reflect.TypeOf(cr.obj).Elem().Name(),
+			cr.obj.GetNamespace(),
+			cr.obj.GetName(),
+		)
+	}
+	_, err = controllerutil.CreateOrPatch(ctx, clnt, cr.obj, func() error {
+		err := cr.mutateFn(cr.obj)
+		if err != nil {
+			return err
+		}
+		if cr.parent != nil && !reflect.ValueOf(cr.parent).IsZero() {
+			err := controllerutil.SetOwnerReference(cr.parent, cr.obj, clnt.Scheme())
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return err
+}
+
+func (cr *ChildResource[T]) StatusCallback(status *amaltheadevv1alpha1.AmaltheaSessionStatus) {
+	if cr.statusCallback == nil {
+		return
+	}
+	cr.statusCallback(status)
+}
+
+type ChildResourcer interface {
+	StatusCallback(status *amaltheadevv1alpha1.AmaltheaSessionStatus)
+	Reconcile(ctx context.Context, clnt client.Client) error
+}
+
+// Returns a map ensuring that the labels/annotations desired do not
+// overwrite well-known values.
+// Reference: https://kubernetes.io/docs/reference/labels-annotations-taints/
+func CleanWellKnown(current map[string]string, desired map[string]string) map[string]string {
+	preserved := map[string]string{}
+	for key, value := range current {
+		domain, _, _ := strings.Cut(key, "/")
+		if domain == "kubernetes.io" || domain == "k8s.io" || strings.HasSuffix(domain, ".kubernetes.io") ||
+			strings.HasSuffix(domain, ".k8s.io") {
+			preserved[key] = value
+		}
+	}
+
+	clean := map[string]string{}
+	for key, value := range desired {
+		clean[key] = value
+	}
+
+	for key, value := range preserved {
+		clean[key] = value
+	}
+	return clean
+}

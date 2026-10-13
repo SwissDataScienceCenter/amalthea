@@ -1247,7 +1247,10 @@ spec:
                     type: string
                 type: object
               dataSources:
-                description: A list of data sources that should be added to the session
+                description: |-
+                  A list of data sources that should be added to the session
+                  Note that for rcloneV2 we support only one data source of this kind.
+                  If you need more than one simply combine the configurations into one.
                 items:
                   properties:
                     accessMode:
@@ -1259,6 +1262,11 @@ spec:
                       description: Path relative to the session working directory
                         where the data should be mounted
                       example: data/storages
+                      type: string
+                    rcloneRemoteName:
+                      default: rclone
+                      description: The name of the source/remote in the rclone config
+                        that should be used to serve
                       type: string
                     secretRef:
                       description: |-
@@ -1285,7 +1293,9 @@ spec:
                       type: object
                     type:
                       default: rclone
-                      description: The data source type
+                      description: |-
+                        The data source type
+                        rclone requires the csi-rclone driver
                       enum:
                       - rclone
                       type: string
@@ -6057,6 +6067,221 @@ spec:
                 description: The name of the priority class assigned to the session
                   Pod.
                 type: string
+              rcloneDataSource:
+                description: Used to mount rclone data sources without needing a CSI
+                  Rclone driver.
+                properties:
+                  cache:
+                    default: {}
+                    properties:
+                      cacheMode:
+                        default: writes
+                        description: |-
+                          The rclone cacheMode to use.
+                          It is not recommended to run without a persistent cache because the disk on the node will be used.
+                        enum:
+                        - writes
+                        - full
+                        type: string
+                      persisted:
+                        default: false
+                        description: |-
+                          If set to true will provision a PVC to back the Rclone cache.
+                          If not persisted then restarting the rclone server will require restarting the session to get the mounts back in the user session.
+                        type: boolean
+                      size:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        default: 1Gi
+                        description: |-
+                          The size of the cache.
+                          When the cache is persisted it is the size of the PVC and the limit for the rclone cache.
+                          When the cache is not persisted it is only used as the limit for the rclone cache.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                        x-kubernetes-validations:
+                        - message: cache size must be a positive quantity
+                          rule: 'type(self) == int ? self > 0 : isQuantity(self) &&
+                            quantity(self).isGreaterThan(quantity(''0''))'
+                      storageClassName:
+                        description: |-
+                          The storage class name to use for the cache.
+                          Used only when the cache is persisted.
+                        type: string
+                    type: object
+                  configPasswordSecret:
+                    description: |-
+                      The secret that contains the key used to decrypt the Rclone configuration.
+                      If omitted it is assumed that the Rclone config is not encrypted.
+                    properties:
+                      adopt:
+                        description: If the secret is adopted then the operator will
+                          delete the secret when the custom resource that uses it
+                          is deleted.
+                        type: boolean
+                      key:
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
+                  extraArgs:
+                    description: Extra args added to the rclone nfs serve command,
+                      can be used to setup caching.
+                    items:
+                      type: string
+                    type: array
+                  image:
+                    default: olevski90/rclone:1.75
+                    description: |-
+                      The image used to run rclone NFS server.
+                      Has to be able to run with any arbitrary non-root user.
+                      Has to run as non-root by default. The default rclone image runs as root by default.
+                    type: string
+                  mountOptions:
+                    description: Mount options to pass to the PV
+                    items:
+                      type: string
+                    type: array
+                    x-kubernetes-validations:
+                    - message: mountOptions is immutable
+                      rule: self == oldSelf
+                  mounts:
+                    description: |-
+                      Paths inside the storage that is served and where they should be mounted.
+                      The paths refer to paths inside the `RemoteName` Rclone remote in the config.
+                    items:
+                      properties:
+                        mountPath:
+                          description: |-
+                            Where the data should be mounted inside the Amalthea session.
+                            If the path is relative, it is simply gets `/` prepended.
+                            If absolute then it is mounted at that exact path.
+                            This is the behaviour from the K8s API - we do not modify it.
+                          minLength: 1
+                          type: string
+                        readOnly:
+                          default: false
+                          description: If set to true the remote will be mounted as
+                            read only in the session
+                          type: boolean
+                        subPath:
+                          description: The path inside the rclone remote that should
+                            be mounted, if omitted the whole remote is mounted at
+                            mountPath.
+                          minLength: 1
+                          type: string
+                      required:
+                      - mountPath
+                      type: object
+                    minItems: 1
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - mountPath
+                    x-kubernetes-list-type: map
+                  remoteName:
+                    description: |-
+                      The name of the remote from the secret that is present in the ini config that will be served by rclone.
+                      In this case rclone uses nfs to serve this remote and only this remote is available in the session.
+                      Users are expected to use combine/union type remotes in the config to make sure multiple different sources are mounted.
+                    maxLength: 128
+                    minLength: 1
+                    pattern: ^[A-Za-z0-9_.][A-Za-z0-9_.-]*$
+                    type: string
+                  resources:
+                    default:
+                      limits:
+                        memory: 500Mi
+                      requests:
+                        cpu: 500m
+                        memory: 500Mi
+                    description: The resources requests and limits for the statefulset
+                      that runs rclone
+                    properties:
+                      claims:
+                        description: |-
+                          Claims lists the names of resources, defined in spec.resourceClaims,
+                          that are used by this container.
+
+                          This is an alpha field and requires enabling the
+                          DynamicResourceAllocation feature gate.
+
+                          This field is immutable. It can only be set for containers.
+                        items:
+                          description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                          properties:
+                            name:
+                              description: |-
+                                Name must match the name of one entry in pod.spec.resourceClaims of
+                                the Pod where this field is used. It makes that resource available
+                                inside a container.
+                              type: string
+                            request:
+                              description: |-
+                                Request is the name chosen for a request in the referenced claim.
+                                If empty, everything from the claim is made available, otherwise
+                                only the result of this request.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                    type: object
+                  secret:
+                    description: The secret containing the rclone configuration (in
+                      ini format) that defines all Rclone remotes.
+                    properties:
+                      adopt:
+                        description: If the secret is adopted then the operator will
+                          delete the secret when the custom resource that uses it
+                          is deleted.
+                        type: boolean
+                      key:
+                        type: string
+                      name:
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
+                required:
+                - mounts
+                - remoteName
+                - secret
+                type: object
+                x-kubernetes-validations:
+                - message: mountOptions cannot be added or removed
+                  rule: has(self.mountOptions) == has(oldSelf.mountOptions)
               reconcileStrategy:
                 default: always
                 description: |-

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"cmp"
 	"fmt"
 	"net/url"
 	"strings"
@@ -49,7 +50,13 @@ type AmaltheaSessionSpec struct {
 
 	// +optional
 	// A list of data sources that should be added to the session
+	// Note that for rcloneV2 we support only one data source of this kind.
+	// If you need more than one simply combine the configurations into one.
 	DataSources []DataSource `json:"dataSources,omitempty"`
+
+	// +optional
+	// Used to mount rclone data sources without needing a CSI Rclone driver.
+	RcloneDataSource *RcloneDataSource `json:"rcloneDataSource,omitempty"`
 
 	// Authentication configuration for the session
 	// +optional
@@ -297,6 +304,7 @@ const Rclone StorageType = "rclone"
 type DataSource struct {
 	// +kubebuilder:default:=rclone
 	// The data source type
+	// rclone requires the csi-rclone driver
 	Type StorageType `json:"type,omitempty"`
 	// +kubebuilder:example:=data/storages
 	// +kubebuilder:default:="data"
@@ -310,6 +318,9 @@ type DataSource struct {
 	// NOTE: define all values in a single key of the Kubernetes secret.
 	// rclone: any valid rclone configuration for a single remote, see the output of `rclone config providers` for validation and format.
 	SecretRef *SessionSecretRef `json:"secretRef,omitempty"`
+	// +kubebuilder:default:=rclone
+	// The name of the source/remote in the rclone config that should be used to serve
+	RcloneRemoteName string `json:"rcloneRemoteName,omitempty"`
 }
 
 type Culling struct {
@@ -528,6 +539,15 @@ type AmaltheaSessionConditionType string
 const (
 	AmaltheaSessionReady        AmaltheaSessionConditionType = "Ready"
 	AmaltheaSessionRoutingReady AmaltheaSessionConditionType = "RoutingReady"
+	AmaltheaSessionRcloneReady  AmaltheaSessionConditionType = "RcloneReady"
+)
+
+const (
+	RcloneReasonReady        string = "Ready"
+	RcloneReasonStarting     string = "Starting"
+	RcloneReasonShuttingDown string = "ShuttingDown"
+	RcloneReasonNotRequired  string = "NotRequired"
+	RcloneReasonHibernated   string = "Hibernated"
 )
 
 type AmaltheaSessionCondition struct {
@@ -651,3 +671,124 @@ const (
 	SessionTypeInteractive    SessionType = "Interactive"
 	SessionTypeNonInteractive SessionType = "NonInteractive"
 )
+
+type Cache struct {
+	// +optional
+	// If set to true a dedicated PVC for the cache will not be created
+	// If set to false then the cache will be located at /tmp
+	CreatePVC bool `json:"createPVC,omitempty"`
+	// +optional
+	// +kubebuilder:default:="1Gi"
+	// The size of the cache, if using PVC it will be the size of the PVC.
+	// If using /tmp then it will only be used to inform rclone of the size constraints
+	// Setting the value to zero means the cache is unlimited.
+	Size resource.Quantity `json:"size,omitempty"`
+	// +optional
+	// The name of the storage class that should be used for the cache, only valid if PVC is used.
+	ClassName *string `json:"className,omitempty"`
+}
+
+// +kubebuilder:validation:XValidation:rule="has(self.mountOptions) == has(oldSelf.mountOptions)",message="mountOptions cannot be added or removed"
+type RcloneDataSource struct {
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9_.][A-Za-z0-9_.-]*$`
+	// The name of the remote from the secret that is present in the ini config that will be served by rclone.
+	// In this case rclone uses nfs to serve this remote and only this remote is available in the session.
+	// Users are expected to use combine/union type remotes in the config to make sure multiple different sources are mounted.
+	RemoteName string `json:"remoteName"`
+	// +required
+	// +listType=map
+	// +listMapKey=mountPath
+	// +kubebuilder:validation:MinItems=1
+	// Paths inside the storage that is served and where they should be mounted.
+	// The paths refer to paths inside the `RemoteName` Rclone remote in the config.
+	Mounts []RcloneMount `json:"mounts"`
+	// +required
+	// The secret containing the rclone configuration (in ini format) that defines all Rclone remotes.
+	Secret SessionSecretKeyRef `json:"secret"`
+	// +optional
+	// Extra args added to the rclone nfs serve command, can be used to setup caching.
+	ExtraArgs []string `json:"extraArgs,omitempty"`
+	// +optional
+	// The secret that contains the key used to decrypt the Rclone configuration.
+	// If omitted it is assumed that the Rclone config is not encrypted.
+	ConfigPasswordSecret *SessionSecretKeyRef `json:"configPasswordSecret,omitempty"`
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="mountOptions is immutable"
+	// Mount options to pass to the PV
+	MountOptions []string `json:"mountOptions,omitempty"`
+	// +optional
+	// +kubebuilder:default:="olevski90/rclone:1.75"
+	// The image used to run rclone NFS server.
+	// Has to be able to run with any arbitrary non-root user.
+	// Has to run as non-root by default. The default rclone image runs as root by default.
+	Image string `json:"image,omitempty"`
+	// +optional
+	// +kubebuilder:default:={requests: {cpu: "500m", memory: "500Mi"}, limits: {memory: "500Mi"}}
+	// The resources requests and limits for the statefulset that runs rclone
+	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
+	// +optional
+	// +kubebuilder:default:={}
+	Cache RcloneCache `json:"cache,omitzero"`
+}
+
+func (ds RcloneDataSource) GetCache() RcloneCache {
+	c := ds.Cache
+	c.CacheMode = cmp.Or(c.CacheMode, CacheWrites)
+	if c.Size.IsZero() {
+		c.Size = resource.MustParse("1Gi")
+	}
+	return c
+}
+
+type RcloneMount struct {
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// Where the data should be mounted inside the Amalthea session.
+	// If the path is relative, it is simply gets `/` prepended.
+	// If absolute then it is mounted at that exact path.
+	// This is the behaviour from the K8s API - we do not modify it.
+	MountPath string `json:"mountPath"`
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// The path inside the rclone remote that should be mounted, if omitted the whole remote is mounted at mountPath.
+	SubPath string `json:"subPath,omitempty"`
+	// +optional
+	// +kubebuilder:default:=false
+	// If set to true the remote will be mounted as read only in the session
+	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// +kubebuilder:validation:Enum={writes,full}
+type RcloneCacheMode string
+
+// There are two more modes available 'off' and 'minimal' but with these
+// you cannot write or append to files. So we simply do not allow them.
+const CacheWrites RcloneCacheMode = "writes"
+const CacheFull RcloneCacheMode = "full"
+
+type RcloneCache struct {
+	// +optional
+	// +kubebuilder:default:="writes"
+	// The rclone cacheMode to use.
+	// It is not recommended to run without a persistent cache because the disk on the node will be used.
+	CacheMode RcloneCacheMode `json:"cacheMode,omitempty"`
+	// +optional
+	// +kubebuilder:default:=false
+	// If set to true will provision a PVC to back the Rclone cache.
+	// If not persisted then restarting the rclone server will require restarting the session to get the mounts back in the user session.
+	Persisted bool `json:"persisted,omitempty"`
+	// +optional
+	// The storage class name to use for the cache.
+	// Used only when the cache is persisted.
+	StorageClassName *string `json:"storageClassName,omitempty"`
+	// +optional
+	// +kubebuilder:default:="1Gi"
+	// +kubebuilder:validation:XValidation:rule="type(self) == int ? self > 0 : isQuantity(self) && quantity(self).isGreaterThan(quantity('0'))",message="cache size must be a positive quantity"
+	// The size of the cache.
+	// When the cache is persisted it is the size of the PVC and the limit for the rclone cache.
+	// When the cache is not persisted it is only used as the limit for the rclone cache.
+	Size resource.Quantity `json:"size,omitzero"`
+}

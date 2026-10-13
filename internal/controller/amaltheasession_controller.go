@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"time"
 
@@ -32,7 +33,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	amaltheadevv1alpha1 "github.com/SwissDataScienceCenter/amalthea/api/v1alpha1"
+	childutils "github.com/SwissDataScienceCenter/amalthea/internal/controller/children"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
 )
 
@@ -62,6 +69,7 @@ const secretCleanupFinalizerName = "amalthea.dev/secrets-finalizer"
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;create;watch;patch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;create;
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch
@@ -126,6 +134,7 @@ func (r *AmaltheaSessionReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return res, err
 }
 
+//nolint:gocyclo
 func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
@@ -164,12 +173,45 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 				return ctrl.Result{}, err
 			}
 		}
+
+		// The finalize is used to enforce shutdown order for the NFS server and session.
+		// Without this order the session pod gets perpetually stuck in "Terminating".
+		// It is also used to delete the PV for the NFS server.
+		if amaltheasession.Spec.RcloneDataSource != nil && !controllerutil.ContainsFinalizer(amaltheasession, childutils.RcloneNFSFinalizer) {
+			controllerutil.AddFinalizer(amaltheasession, childutils.RcloneNFSFinalizer)
+			if err := r.Update(ctx, amaltheasession); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	} else {
 		amaltheasession.Status.State = amaltheadevv1alpha1.NotReady
 		if err := r.updateStatusWithRetry(ctx, amaltheasession, func(cr *amaltheadevv1alpha1.AmaltheaSession) {
 			cr.Status.State = amaltheadevv1alpha1.NotReady
 		}); err != nil {
 			return ctrl.Result{}, err
+		}
+
+		if controllerutil.ContainsFinalizer(amaltheasession, childutils.RcloneNFSFinalizer) {
+			if err := deleteSessionWorkload(ctx, r.Client, amaltheasession); err != nil {
+				return ctrl.Result{}, err
+			}
+			obs, err := observeRclone(ctx, r.Client, amaltheasession)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			nfsState, _ := rcloneDesiredState(ctx, amaltheasession, obs)
+			if err := childutils.NewRcloneV2Resources(amaltheasession, nfsState).Reconcile(ctx, r.Client); err != nil {
+				return ctrl.Result{}, err
+			}
+			if nfsState != childutils.RcloneNFSDelete {
+				// The NFS server is still in use by the session pod
+				return ctrl.Result{RequeueAfter: rcloneTransitionRequeue}, nil
+			}
+			// remove our finalizer from the list and update it.
+			controllerutil.RemoveFinalizer(amaltheasession, childutils.RcloneNFSFinalizer)
+			if err := r.Update(ctx, amaltheasession); err != nil {
+				return ctrl.Result{}, err
+			}
 		}
 
 		// The object is being deleted
@@ -213,13 +255,34 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
+	// The startup and shutdown order of the session and the NFS server follows from the desired NFS state,
+	// so the session and the rclone resources can be reconciled in any order.
+	rcloneObs, err := observeRclone(ctx, r.Client, amaltheasession)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	nfsState, sessionMayRun := rcloneDesiredState(ctx, amaltheasession, rcloneObs)
+	rcloneSt := getRcloneStatus(amaltheasession, rcloneObs, nfsState)
+	if !sessionMayRun {
+		holdSession(&children)
+	}
+
+	rcloneReconcileError := childutils.NewRcloneV2Resources(amaltheasession, nfsState).Reconcile(ctx, r.Client)
+	// The rclone section was removed from the spec and the rclone resources have been cleaned up
+	if rcloneReconcileError == nil && amaltheasession.Spec.RcloneDataSource == nil && nfsState == childutils.RcloneNFSDelete && controllerutil.ContainsFinalizer(amaltheasession, childutils.RcloneNFSFinalizer) {
+		controllerutil.RemoveFinalizer(amaltheasession, childutils.RcloneNFSFinalizer)
+		if err := r.Update(ctx, amaltheasession); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	updates, err := children.Reconcile(ctx, r.Client, amaltheasession)
 	if err != nil {
 		logger.Error(err, "Failed when reconciling children")
 		return ctrl.Result{}, err
 	}
 
-	newStatus := updates.Status(ctx, r, amaltheasession)
+	newStatus := updates.Status(ctx, r, amaltheasession, rcloneSt)
 	statusChanged := !reflect.DeepEqual(amaltheasession.Status, newStatus)
 
 	amaltheasession.Status = newStatus
@@ -251,11 +314,19 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
+	if rcloneReconcileError != nil {
+		logger.Error(err, "Failed when reconciling rclone data sources")
+		return ctrl.Result{}, rcloneReconcileError
+	}
+
 	// Now requeue to make sure we can watch for idleness and other status changes
 	requeueAfter := time.Second * 10
 	if statusChanged {
 		// If the status is evolving we should requeue faster
 		requeueAfter = 0
+	} else if rcloneTransitioning(amaltheasession, rcloneObs, sessionMayRun) {
+		// Waiting for the session pod to shut down or for the NFS server to start
+		requeueAfter = rcloneTransitionRequeue
 	} else if !amaltheasession.Status.HibernatedSince.IsZero() {
 		// If hibernated requeue a bit slower -> once a minute
 		requeueAfter = time.Minute
@@ -307,6 +378,36 @@ func (r *AmaltheaSessionReconciler) deleteSecrets(ctx context.Context, cr *amalt
 	return errorList
 }
 
+func operatorNamespace() string {
+	return os.Getenv("OPERATOR_NAMESPACE")
+}
+
+func containsRcloneLabels(obj client.Object) bool {
+	clusterScoped := len(operatorNamespace()) == 0
+	labels := obj.GetLabels()
+	ns, nsFound := labels[childutils.RcloneV2LabelSessionNamespaceKey]
+	_, nameFound := labels[childutils.RcloneV2LabelSessionNameKey]
+	rcloneFound := labels[childutils.RcloneV2LabelKey] == childutils.RcloneV2LabelValue
+	// In the cluster-scoped case we can reconcile the resources created in any namespace.
+	// When not cluster scoped we have to make sure the resources were created in the same namespace as the operator.
+	if clusterScoped {
+		return nsFound && nameFound && rcloneFound
+	}
+	return nsFound && nameFound && rcloneFound && operatorNamespace() == ns
+}
+
+func generateRcloneEvent(ctx context.Context, obj client.Object) []reconcile.Request {
+	labels := obj.GetLabels()
+	if !containsRcloneLabels(obj) {
+		return nil
+	}
+	ns := labels[childutils.RcloneV2LabelSessionNamespaceKey]
+	name := labels[childutils.RcloneV2LabelSessionNameKey]
+	return []reconcile.Request{
+		{NamespacedName: types.NamespacedName{Namespace: ns, Name: name}},
+	}
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -316,5 +417,30 @@ func (r *AmaltheaSessionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&networkingv1.Ingress{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&corev1.Secret{}).
+		Watches(
+			&corev1.PersistentVolume{},
+			handler.EnqueueRequestsFromMapFunc(generateRcloneEvent),
+			builder.WithPredicates(predicate.NewPredicateFuncs(containsRcloneLabels)),
+		).
+		Watches(
+			&appsv1.StatefulSet{},
+			handler.EnqueueRequestsFromMapFunc(generateRcloneEvent),
+			builder.WithPredicates(predicate.NewPredicateFuncs(containsRcloneLabels)),
+		).
+		Watches(
+			&corev1.Service{},
+			handler.EnqueueRequestsFromMapFunc(generateRcloneEvent),
+			builder.WithPredicates(predicate.NewPredicateFuncs(containsRcloneLabels)),
+		).
+		Watches(
+			&corev1.PersistentVolumeClaim{},
+			handler.EnqueueRequestsFromMapFunc(generateRcloneEvent),
+			builder.WithPredicates(predicate.NewPredicateFuncs(containsRcloneLabels)),
+		).
+		Watches(
+			&corev1.Pod{},
+			handler.EnqueueRequestsFromMapFunc(generateRcloneEvent),
+			builder.WithPredicates(predicate.NewPredicateFuncs(containsRcloneLabels)),
+		).
 		Complete(r)
 }
