@@ -8,5 +8,6 @@ spec:
     matchLabels:
       app.kubernetes.io/name: AmaltheaSession
     matchExpressions:
-      - key: batch.kubernetes.io/job-name
-        operator: DoesNotExist
+      - key: renku.io/preemptible
+        operator: NotIn
+        values: ["true"]
