@@ -129,7 +129,7 @@ func rcloneArgsFromJSON(raw string, flags map[string]string) (string, error) {
 				args = append(args, fmt.Sprintf("%s=%v", flag, item))
 			}
 		default:
-			slog.Warn("ignoring rclone option with unsupported value", "option", key, "value", opts[key])
+			slog.Warn("ignoring rclone option with unsupported value", "option", key, "value", value)
 		}
 	}
 	// a value containing spaces (e.g. a FUSE option) would split into separate args.
@@ -220,8 +220,8 @@ func (dc *DataConnector) ConfigFiles() (map[string][]byte, error) {
 	configFiles["configData"] = buffer.Bytes()
 	configFiles["remote"] = []byte(dc.Remote)
 	configFiles["remotePath"] = []byte(dc.RemotePath)
-	// A malformed options secret must not abort the whole session: log it and
-	// mount the connector without those options instead.
+	// If an options secret contains malformed JSON data, do not abort: log the issue
+	// and mount the connector anyway without them.
 	if args, err := rcloneArgsFromJSON(dc.MountOpt, mountOptFlags); err != nil {
 		slog.Warn("ignoring malformed mount options for data connector", "dataConnector", dc.Name, "error", err)
 	} else if args != "" {
