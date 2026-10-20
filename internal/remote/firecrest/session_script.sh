@@ -59,28 +59,6 @@ rm -rf "${SESSION_DIR}/secrets/"
 # Load the wstunnel secret
 export WSTUNNEL_SECRET="$(cat "${SECRETS_DIR}/wstunnel_secret")"
 
-# CamelCase to kebab-case conversion
-#
-# Usage:
-#     kebab_cased="$(to_kebab_case "[cC]amelCaseInput")"
-to_kebab_case() {
-    echo "${1:?"to_kebab_case: input string missing"}" | sed 's/\([A-Z]\)/-\1/g' | tr '[:upper:]' '[:lower:]'
-}
-
-# Convert camelCased key - value pairs stored in a flat json struct to command line arguments.
-#
-# WARNING: Whitespace and json reserved characters are stripped, so they cannot appear in keys nor values.
-#
-# Usage:
-#     arguments_string="$(to_rclone_mount_arguments "file_path" ["argument_prefix"])"
-to_rclone_mount_arguments() {
-    local filename=${1:?"to_rclone_mount_arguments: input file missing"}
-    local prefix=${2}
-    cat "${filename}" | tr -d '{} \t\r\n' | sed -e 's/","/"\n"/g' -e 's/":"/": "/g' | while IFS=': ' read -r key value; do
-        printf "%s%s=%s " "${prefix}" "$(to_kebab_case "${key}")" "${value}"
-    done
-}
-
 # Installs rclone
 #
 # Usage:
@@ -242,12 +220,12 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
                 rm -f "${pass}" || true
             fi
 
-            if [ -f "${dc}/vfsOpt" ]; then
-                vfs_options="$(to_rclone_mount_arguments "${dc}/vfsOpt" "--vfs")"
+            if [ -f "${dc}/vfsArgs" ]; then
+                vfs_options="$(cat "${dc}/vfsArgs")"
             fi
 
-            if [ -f "${dc}/mountOpt" ]; then
-                mount_options="$(to_rclone_mount_arguments "${dc}/mountOpt" "-")"
+            if [ -f "${dc}/mountArgs" ]; then
+                mount_options="$(cat "${dc}/mountArgs")"
             fi
 
             if [ -f "${dc}/extraArgs" ]; then
@@ -270,6 +248,7 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             ${rclone} mount \
                 --daemon \
                 --allow-non-empty \
+                --vfs-cache-mode=writes \
                 ${mount_options} \
                 --log-file="${log_file}" \
                 --cache-dir="${CACHE_DIR}/$n" \

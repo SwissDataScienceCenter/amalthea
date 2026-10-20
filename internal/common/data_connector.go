@@ -132,6 +132,8 @@ func rcloneArgsFromJSON(raw string, flags map[string]string) (string, error) {
 			slog.Warn("ignoring rclone option with unsupported value", "option", key, "value", opts[key])
 		}
 	}
+	// a value containing spaces (e.g. a FUSE option) would split into separate args.
+	// Upgrade to array expansion if such values become supported.
 	return strings.Join(args, " "), nil
 }
 
@@ -218,11 +220,17 @@ func (dc *DataConnector) ConfigFiles() (map[string][]byte, error) {
 	configFiles["configData"] = buffer.Bytes()
 	configFiles["remote"] = []byte(dc.Remote)
 	configFiles["remotePath"] = []byte(dc.RemotePath)
-	if len(dc.MountOpt) > 0 {
-		configFiles["mountOpt"] = []byte(dc.MountOpt)
+	// A malformed options secret must not abort the whole session: log it and
+	// mount the connector without those options instead.
+	if args, err := rcloneArgsFromJSON(dc.MountOpt, mountOptFlags); err != nil {
+		slog.Warn("ignoring malformed mount options for data connector", "dataConnector", dc.Name, "error", err)
+	} else if args != "" {
+		configFiles["mountArgs"] = []byte(args)
 	}
-	if len(dc.VfsOpt) > 0 {
-		configFiles["vfsOpt"] = []byte(dc.VfsOpt)
+	if args, err := rcloneArgsFromJSON(dc.VfsOpt, vfsOptFlags); err != nil {
+		slog.Warn("ignoring malformed vfs options for data connector", "dataConnector", dc.Name, "error", err)
+	} else if args != "" {
+		configFiles["vfsArgs"] = []byte(args)
 	}
 	if len(dc.ExtraArgs) > 0 {
 		configFiles["extraArgs"] = []byte(strings.Join(dc.ExtraArgs, " "))
