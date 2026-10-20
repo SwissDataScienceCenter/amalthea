@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/fernet/fernet-go"
@@ -27,6 +30,109 @@ type DataConnector struct {
 	VfsOpt     string
 
 	ExtraArgs []string
+}
+
+// vfsOptFlags maps the JSON field names of csi-rclone's VfsOpt struct to the
+// rclone CLI flags they correspond to. The mapping is not derivable from the
+// field name: several VFS options have no "vfs" prefix and some differ from the
+// flag name entirely (e.g. ChunkSize -> --vfs-read-chunk-size).
+// See csi-rclone/pkg/rclone/rclone.go and rclone's vfs/vfscommon/options.go.
+var vfsOptFlags = map[string]string{
+	"NoSeek":             "--no-seek",
+	"NoChecksum":         "--no-checksum",
+	"ReadOnly":           "--read-only",
+	"NoModTime":          "--no-modtime",
+	"DirCacheTime":       "--dir-cache-time",
+	"Refresh":            "--vfs-refresh",
+	"PollInterval":       "--poll-interval",
+	"Umask":              "--umask",
+	"UID":                "--uid",
+	"GID":                "--gid",
+	"DirPerms":           "--dir-perms",
+	"FilePerms":          "--file-perms",
+	"ChunkSize":          "--vfs-read-chunk-size",
+	"ChunkSizeLimit":     "--vfs-read-chunk-size-limit",
+	"ChunkStreams":       "--vfs-read-chunk-streams",
+	"CacheMode":          "--vfs-cache-mode",
+	"CacheMaxAge":        "--vfs-cache-max-age",
+	"CacheMaxSize":       "--vfs-cache-max-size",
+	"CacheMinFreeSpace":  "--vfs-cache-min-free-space",
+	"CachePollInterval":  "--vfs-cache-poll-interval",
+	"CaseInsensitive":    "--vfs-case-insensitive",
+	"WriteWait":          "--vfs-write-wait",
+	"ReadWait":           "--vfs-read-wait",
+	"WriteBack":          "--vfs-write-back",
+	"ReadAhead":          "--vfs-read-ahead",
+	"UsedIsSize":         "--vfs-used-is-size",
+	"FastFingerprint":    "--vfs-fast-fingerprint",
+	"DiskSpaceTotalSize": "--vfs-disk-space-total-size",
+}
+
+// mountOptFlags maps the JSON field names of csi-rclone's MountOpt struct to the
+// rclone CLI flags they correspond to.
+// See csi-rclone/pkg/rclone/rclone.go and rclone's cmd/mountlib/mount.go.
+var mountOptFlags = map[string]string{
+	"DebugFUSE":          "--debug-fuse",
+	"AllowNonEmpty":      "--allow-non-empty",
+	"AllowRoot":          "--allow-root",
+	"AllowOther":         "--allow-other",
+	"DefaultPermissions": "--default-permissions",
+	"WritebackCache":     "--write-back-cache",
+	"DaemonWait":         "--daemon-wait",
+	"MaxReadAhead":       "--max-read-ahead",
+	"ExtraOptions":       "--option",
+	"ExtraFlags":         "--fuse-flag",
+	"AttrTimeout":        "--attr-timeout",
+	"DeviceName":         "--devname",
+	"VolumeName":         "--volname",
+	"NoAppleDouble":      "--noappledouble",
+	"NoAppleXattr":       "--noapplexattr",
+	"AsyncRead":          "--async-read",
+	"CaseInsensitive":    "--mount-case-insensitive",
+}
+
+// rcloneArgsFromJSON converts a flat JSON object of rclone options (the format
+// of the csi-rclone `vfsOpt`/`mountOpt` secrets) into rclone CLI arguments.
+// Unknown keys are logged and skipped so a typo never becomes a bogus flag.
+func rcloneArgsFromJSON(raw string, flags map[string]string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	dec := json.NewDecoder(strings.NewReader(raw))
+	dec.UseNumber()
+	var opts map[string]any
+	if err := dec.Decode(&opts); err != nil {
+		return "", fmt.Errorf("could not parse rclone options %q: %w", raw, err)
+	}
+	keys := make([]string, 0, len(opts))
+	for key := range opts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	args := make([]string, 0, len(opts))
+	for _, key := range keys {
+		flag, ok := flags[key]
+		if !ok {
+			slog.Warn("ignoring unknown rclone option", "option", key)
+			continue
+		}
+		switch value := opts[key].(type) {
+		case bool:
+			args = append(args, fmt.Sprintf("%s=%t", flag, value))
+		case string:
+			args = append(args, fmt.Sprintf("%s=%s", flag, value))
+		case json.Number:
+			args = append(args, fmt.Sprintf("%s=%s", flag, value.String()))
+		case []any:
+			for _, item := range value {
+				args = append(args, fmt.Sprintf("%s=%v", flag, item))
+			}
+		default:
+			slog.Warn("ignoring rclone option with unsupported value", "option", key, "value", opts[key])
+		}
+	}
+	return strings.Join(args, " "), nil
 }
 
 func (dc *DataConnector) fernetKey() (*fernet.Key, error) {
