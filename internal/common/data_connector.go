@@ -6,9 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/fernet/fernet-go"
@@ -105,11 +106,7 @@ func rcloneArgsFromJSON(raw string, flags map[string]string) (string, error) {
 	if err := dec.Decode(&opts); err != nil {
 		return "", fmt.Errorf("could not parse rclone options %q: %w", raw, err)
 	}
-	keys := make([]string, 0, len(opts))
-	for key := range opts {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(opts))
 	args := make([]string, 0, len(opts))
 	for _, key := range keys {
 		flag, ok := flags[key]
