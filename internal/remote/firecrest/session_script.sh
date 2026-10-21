@@ -243,12 +243,10 @@ if [ -d  "${SECRETS_DATA_CONNECTORS_DIR}" ]; then
             sleep 1 # Let the state stabilise before mounting something there
 
             # We do our best to make sure we do not leave around bad rclone
-            # state, but sometimes there is still something lingering on...
-            # so we have to add --allow-non-empty.
+            # state, but sometimes there is still something lingering on,
+            # which is why the mount defaults include --allow-non-empty.
             ${rclone} mount \
                 --daemon \
-                --allow-non-empty \
-                --vfs-cache-mode=writes \
                 ${mount_options} \
                 --log-file="${log_file}" \
                 --cache-dir="${CACHE_DIR}/$n" \

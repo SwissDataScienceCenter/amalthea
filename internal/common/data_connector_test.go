@@ -30,7 +30,31 @@ func TestRcloneArgsFromJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := rcloneArgsFromJSON(tt.raw, tt.flags)
+			got, err := rcloneArgsFromJSON(tt.raw, tt.flags, nil)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestRcloneArgsFromJSONAppliesDefaults(t *testing.T) {
+	tests := []struct {
+		name     string
+		raw      string
+		flags    map[string]string
+		defaults map[string]any
+		expected string
+	}{
+		{"vfs default when absent", `{}`, vfsOptFlags, vfsOptDefaults, "--vfs-cache-mode=writes"},
+		{"vfs default on empty input", ``, vfsOptFlags, vfsOptDefaults, "--vfs-cache-mode=writes"},
+		{"user value overrides default without repeating", `{"CacheMode": "full"}`, vfsOptFlags, vfsOptDefaults, "--vfs-cache-mode=full"},
+		{"default combined with user options", `{"ReadOnly": true}`, vfsOptFlags, vfsOptDefaults, "--vfs-cache-mode=writes --read-only=true"},
+		{"mount default when absent", `{}`, mountOptFlags, mountOptDefaults, "--allow-non-empty=true"},
+		{"user mount value overrides default", `{"AllowNonEmpty": false}`, mountOptFlags, mountOptDefaults, "--allow-non-empty=false"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := rcloneArgsFromJSON(tt.raw, tt.flags, tt.defaults)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
@@ -38,12 +62,12 @@ func TestRcloneArgsFromJSON(t *testing.T) {
 }
 
 func TestRcloneArgsFromJSONInvalid(t *testing.T) {
-	_, err := rcloneArgsFromJSON(`not json`, vfsOptFlags)
+	_, err := rcloneArgsFromJSON(`not json`, vfsOptFlags, nil)
 	require.Error(t, err)
 }
 
 func TestRcloneArgsFromJSONMountCaseInsensitive(t *testing.T) {
-	got, err := rcloneArgsFromJSON(`{"CaseInsensitive": true}`, mountOptFlags)
+	got, err := rcloneArgsFromJSON(`{"CaseInsensitive": true}`, mountOptFlags, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "--mount-case-insensitive=true", got)
 }
@@ -68,11 +92,11 @@ func TestConfigFilesEmitsRcloneArgs(t *testing.T) {
 	}
 	files, err := dc.ConfigFiles()
 	require.NoError(t, err)
-	assert.Equal(t, "--attr-timeout=41s", string(files["mountArgs"]))
+	assert.Equal(t, "--allow-non-empty=true --attr-timeout=41s", string(files["mountArgs"]))
 	assert.Equal(t, "--vfs-cache-mode=full", string(files["vfsArgs"]))
 }
 
-func TestConfigFilesOmitsArgsWhenEmptyOrMalformed(t *testing.T) {
+func TestConfigFilesAppliesDefaultsWhenEmptyOrMalformed(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
 		mountOpt string
@@ -88,8 +112,8 @@ func TestConfigFilesOmitsArgsWhenEmptyOrMalformed(t *testing.T) {
 			dc := &DataConnector{Root: root, Name: "dc", Remote: "my-s3", RemotePath: "projectname", MountOpt: tt.mountOpt, VfsOpt: tt.vfsOpt}
 			files, err := dc.ConfigFiles()
 			require.NoError(t, err)
-			assert.NotContains(t, files, "mountArgs")
-			assert.NotContains(t, files, "vfsArgs")
+			assert.Equal(t, "--allow-non-empty=true", string(files["mountArgs"]))
+			assert.Equal(t, "--vfs-cache-mode=writes", string(files["vfsArgs"]))
 		})
 	}
 }

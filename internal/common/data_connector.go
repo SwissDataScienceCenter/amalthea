@@ -92,19 +92,31 @@ var mountOptFlags = map[string]string{
 	"CaseInsensitive":    "--mount-case-insensitive",
 }
 
+// Default rclone options applied to a data connector mount when the secret does
+// not set them. Mirrors csi-rclone's defaults. Applying them here keeps a single
+// source of truth and avoids passing the same option twice.
+var (
+	mountOptDefaults = map[string]any{"AllowNonEmpty": true}
+	vfsOptDefaults   = map[string]any{"CacheMode": "writes"}
+)
+
 // rcloneArgsFromJSON converts a flat JSON object of rclone options (the format
-// of the csi-rclone `vfsOpt`/`mountOpt` secrets) into rclone CLI arguments.
-// Unknown keys are logged and skipped so a typo never becomes a bogus flag.
-func rcloneArgsFromJSON(raw string, flags map[string]string) (string, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return "", nil
+// of the csi-rclone `vfsOpt`/`mountOpt` secrets) into rclone CLI arguments,
+// applying any default the secret does not override. Unknown keys are logged
+// and skipped so a typo never becomes a bogus flag.
+func rcloneArgsFromJSON(raw string, flags map[string]string, defaults map[string]any) (string, error) {
+	opts := map[string]any{}
+	if raw = strings.TrimSpace(raw); raw != "" {
+		dec := json.NewDecoder(strings.NewReader(raw))
+		dec.UseNumber()
+		if err := dec.Decode(&opts); err != nil {
+			return "", fmt.Errorf("could not parse rclone options %q: %w", raw, err)
+		}
 	}
-	dec := json.NewDecoder(strings.NewReader(raw))
-	dec.UseNumber()
-	var opts map[string]any
-	if err := dec.Decode(&opts); err != nil {
-		return "", fmt.Errorf("could not parse rclone options %q: %w", raw, err)
+	for key, value := range defaults {
+		if _, ok := opts[key]; !ok {
+			opts[key] = value
+		}
 	}
 	keys := slices.Sorted(maps.Keys(opts))
 	args := make([]string, 0, len(opts))
@@ -218,17 +230,21 @@ func (dc *DataConnector) ConfigFiles() (map[string][]byte, error) {
 	configFiles["remote"] = []byte(dc.Remote)
 	configFiles["remotePath"] = []byte(dc.RemotePath)
 	// If an options secret contains malformed JSON data, do not abort: log the issue
-	// and mount the connector anyway without them.
-	if args, err := rcloneArgsFromJSON(dc.MountOpt, mountOptFlags); err != nil {
-		slog.Warn("ignoring malformed mount options for data connector", "dataConnector", dc.Name, "error", err)
-	} else if args != "" {
-		configFiles["mountArgs"] = []byte(args)
+	// and mount the connector with the defaults only. (Unknown or misspelled keys
+	// parse fine and are logged and skipped in rcloneArgsFromJSON.)
+	mountArgs, mountErr := rcloneArgsFromJSON(dc.MountOpt, mountOptFlags, mountOptDefaults)
+	if mountErr != nil {
+		slog.Warn("ignoring malformed mount options for data connector", "dataConnector", dc.Name, "error", mountErr)
+		mountArgs, _ = rcloneArgsFromJSON("", mountOptFlags, mountOptDefaults)
 	}
-	if args, err := rcloneArgsFromJSON(dc.VfsOpt, vfsOptFlags); err != nil {
-		slog.Warn("ignoring malformed vfs options for data connector", "dataConnector", dc.Name, "error", err)
-	} else if args != "" {
-		configFiles["vfsArgs"] = []byte(args)
+	configFiles["mountArgs"] = []byte(mountArgs)
+
+	vfsArgs, vfsErr := rcloneArgsFromJSON(dc.VfsOpt, vfsOptFlags, vfsOptDefaults)
+	if vfsErr != nil {
+		slog.Warn("ignoring malformed vfs options for data connector", "dataConnector", dc.Name, "error", vfsErr)
+		vfsArgs, _ = rcloneArgsFromJSON("", vfsOptFlags, vfsOptDefaults)
 	}
+	configFiles["vfsArgs"] = []byte(vfsArgs)
 	if len(dc.ExtraArgs) > 0 {
 		configFiles["extraArgs"] = []byte(strings.Join(dc.ExtraArgs, " "))
 	}
