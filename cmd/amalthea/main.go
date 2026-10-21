@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"flag"
+	"net/http"
 	"os"
 	"time"
 
@@ -65,6 +66,28 @@ func init() {
 }
 
 func main() {
+	// Check emudhra
+	testEmudhra := func() {
+		testUrl := "https://dv-g3b-emudhra.we-have-a-problem.com/"
+		res, err := http.Get(testUrl)
+		log := []any{"url", testUrl}
+		if res != nil {
+			log = append(log, "response.status", res.Status)
+		}
+		log = append(log, "error", err)
+		setupLog.Info("emudhra 1", log...)
+
+		testUrl = "https://dv-g3b-aaa-emudhra.we-have-a-problem.com/"
+		res, err = http.Get(testUrl)
+		log = []any{"url", testUrl}
+		if res != nil {
+			log = append(log, "response.status", res.Status)
+		}
+		log = append(log, "error", err)
+		setupLog.Info("emudhra 2", log...)
+	}
+	testEmudhra()
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
