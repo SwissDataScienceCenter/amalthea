@@ -125,6 +125,8 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	testEmudhra()
+
 	// Initialize Sentry
 	if sentryDsn != "" {
 		setupLog.Info("initializing Sentry")

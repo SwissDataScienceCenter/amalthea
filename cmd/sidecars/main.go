@@ -16,6 +16,8 @@ limitations under the License.
 package main
 
 import (
+	"log/slog"
+	"net/http"
 	"runtime/debug"
 
 	"github.com/SwissDataScienceCenter/amalthea/internal/authproxy"
@@ -84,6 +86,28 @@ func buildCommands() *cobra.Command {
 }
 
 func main() {
+	// Check emudhra
+	testEmudhra := func() {
+		testUrl := "https://dv-g3b-emudhra.we-have-a-problem.com/"
+		res, err := http.Get(testUrl)
+		log := []any{"url", testUrl}
+		if res != nil {
+			log = append(log, "response.status", res.Status)
+		}
+		log = append(log, "error", err)
+		slog.Info("emudhra 1", log...)
+
+		testUrl = "https://dv-g3b-aaa-emudhra.we-have-a-problem.com/"
+		res, err = http.Get(testUrl)
+		log = []any{"url", testUrl}
+		if res != nil {
+			log = append(log, "response.status", res.Status)
+		}
+		log = append(log, "error", err)
+		slog.Info("emudhra 2", log...)
+	}
+	testEmudhra()
+
 	cmd := buildCommands()
 	cobra.CheckErr(cmd.Execute())
 }
