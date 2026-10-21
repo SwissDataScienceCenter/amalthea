@@ -4,17 +4,20 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"maps"
 	"net/url"
 	"os"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/SwissDataScienceCenter/amalthea/internal/common"
 	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
 	"gopkg.in/yaml.v3"
 	appsv1 "k8s.io/api/apps/v1"
@@ -329,13 +332,13 @@ func (cr *AmaltheaSession) Service() v1.Service {
 
 // The path prefix for the session
 func (cr *AmaltheaSession) urlPath() string {
-	path := cr.Spec.Session.URLPath
+	sessionPath := cr.Spec.Session.URLPath
 	// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
 	// and does not proxy subpaths
-	if !strings.HasSuffix(path, "/") {
-		path = path + "/"
+	if !strings.HasSuffix(sessionPath, "/") {
+		sessionPath = sessionPath + "/"
 	}
-	return path
+	return sessionPath
 }
 
 // The path prefix from the ingress spec for the session
@@ -343,13 +346,13 @@ func (cr *AmaltheaSession) ingressPathPrefix() string {
 	if cr.Spec.Ingress == nil {
 		return "/"
 	}
-	path := cr.Spec.Ingress.PathPrefix
+	ingressPath := cr.Spec.Ingress.PathPrefix
 	// NOTE: If the url does not end with "/" then the oauth2proxy proxies only the exact path
 	// and does not proxy subpaths
-	if !strings.HasSuffix(path, "/") {
-		path = path + "/"
+	if !strings.HasSuffix(ingressPath, "/") {
+		ingressPath = ingressPath + "/"
 	}
-	return path
+	return ingressPath
 }
 
 // Ingress returns a AmaltheaSession Ingress object
@@ -669,11 +672,92 @@ func (cr *AmaltheaSession) AdoptedSecrets() v1.SecretList {
 // Assuming that the csi-rclone driver from https://github.com/SwissDataScienceCenter/csi-rclone
 // is installed, this will generate PVCs for the data sources that have the rclone type.
 func (as *AmaltheaSession) DataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
-	// TODO: Configure this for remote sessions
 	if as.Spec.SessionLocation == Remote {
-		return []v1.PersistentVolumeClaim{}, []v1.Volume{}, []v1.VolumeMount{}
+		return as.RemoteSessionDataSources()
+	}
+	// as.Spec.SessionLocation == Local
+	return as.LocalSessionDataSources()
+}
+
+func (as *AmaltheaSession) RemoteSessionDataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
+	// NOTE: we add the session secrets as mounted volumes so that the remote session controller can handle them
+	pvcs := []v1.PersistentVolumeClaim{}
+	vols := []v1.Volume{
+		{
+			Name: fmt.Sprintf("%s%s", prefix, as.Name),
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName:  as.InternalSecretName(),
+					Optional:    ptr.To(false),
+					DefaultMode: ptr.To(int32(0400)), // chmod: r-- --- ---
+				},
+			},
+		},
+	}
+	volMounts := []v1.VolumeMount{
+		{
+			Name:      fmt.Sprintf("%s%s", prefix, as.Name),
+			ReadOnly:  true,
+			MountPath: common.LocalSessionSecretsPath,
+		},
 	}
 
+	for ids, ds := range as.Spec.DataSources {
+		// Only handle 'rclone' data sources for now
+		if ds.Type != Rclone {
+			continue
+		}
+		volName := fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)
+		vols = append(
+			vols,
+			v1.Volume{
+				Name: volName,
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName:  ds.SecretRef.Name,
+						Optional:    ptr.To(false),
+						DefaultMode: ptr.To(int32(0400)), // chmod: r-- --- ---
+					},
+				},
+			},
+		)
+		volMounts = append(
+			volMounts,
+			v1.VolumeMount{
+				Name:      volName,
+				ReadOnly:  true,
+				MountPath: path.Join(common.LocalDataConnectorPath, volName),
+			},
+		)
+		// If there is a user secret linked to the data connector, mount it as it contains required credentials
+		userSecretName := fmt.Sprintf("%s-secrets", ds.SecretRef.Name)
+		volNameSecret := fmt.Sprintf("%s-secrets", volName)
+		vols = append(
+			vols,
+			v1.Volume{
+				Name: volNameSecret,
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName:  userSecretName,
+						Optional:    ptr.To(true),
+						DefaultMode: ptr.To(int32(0400)), // chmod: r-- --- ---
+					},
+				},
+			},
+		)
+		volMounts = append(
+			volMounts,
+			v1.VolumeMount{
+				Name:      volNameSecret,
+				ReadOnly:  true,
+				MountPath: path.Join(common.LocalDataConnectorSecretPath, volName),
+			},
+		)
+	}
+	return pvcs, vols, volMounts
+}
+
+func (as *AmaltheaSession) LocalSessionDataSources() ([]v1.PersistentVolumeClaim, []v1.Volume, []v1.VolumeMount) {
 	pvcs := []v1.PersistentVolumeClaim{}
 	vols := []v1.Volume{}
 	volMounts := []v1.VolumeMount{}
@@ -784,93 +868,92 @@ func (as *AmaltheaSession) Secret() v1.Secret {
 			Labels:      as.childLabels(),
 			Annotations: as.Spec.Template.Metadata.Annotations,
 		},
+		StringData: map[string]string{},
 	}
-	// Secret used to secure the tunnel for remote sessions
-	tunnelSecret := ""
+
 	if as.Spec.SessionLocation == Remote {
-		var err error
-		tunnelSecret, err = makeTunnelSecret(16)
+		// Secret used to secure the tunnel for remote sessions
+		tunnelSecret, err := makeTunnelSecret(16)
 		if err != nil {
 			panic(err)
 		}
-	}
+		secret.StringData["wstunnel_secret"] = tunnelSecret
 
-	if as.Spec.Authentication == nil || as.Spec.Authentication.Type != Oidc {
-		// In this case we do not need the 'oidc' configuration in the secret,
-		// we just return an empty one, or one populated with the tunnel secret.
-		if tunnelSecret != "" {
-			secret.StringData = map[string]string{
-				"WSTUNNEL_SECRET": tunnelSecret,
+		// Add the Datasources Specifications so that the proxy container can write them out to the HPC cluster
+		for ids, ds := range as.Spec.DataSources {
+			var content []byte
+			content, err = json.Marshal(ds)
+			if err != nil {
+				panic(err)
 			}
+			secret.StringData[fmt.Sprintf("%s%s-ds-%d", prefix, as.Name, ids)] = string(content)
 		}
-		return secret
 	}
 
-	pathPrefix := as.ingressPathPrefix()
-	sessionURL := as.GetURL()
-	pathPrefixURL := url.URL{Host: sessionURL.Host, Path: pathPrefix, Scheme: sessionURL.Scheme}
-	cookieSecret := make([]byte, 32)
-	_, err := rand.Read(cookieSecret)
-	if err != nil {
-		// NOTE: Read cannot panic except for on legacy Linux systems
-		// See: https://pkg.go.dev/crypto/rand#Read
-		panic(err)
-	}
-	oldConfigLines := []string{
-		"session_cookie_minimal = true",
-		"skip_provider_button = true",
-		fmt.Sprintf("redirect_url = \"%s\"", pathPrefixURL.JoinPath("oauth2/callback").String()),
-		fmt.Sprintf("cookie_path = \"%s\"", pathPrefix),
-		fmt.Sprintf("proxy_prefix = \"%soauth2\"", pathPrefix),
-		"authenticated_emails_file = \"/authorized_emails\"",
-		fmt.Sprintf("cookie_secret = \"%s\"", base64.URLEncoding.EncodeToString(cookieSecret)),
-	}
-	upstreamPort := secondProxyPort
-	upstreamConfig := map[string]any{
-		"upstreams": []map[string]any{
-			{
-				"id":                    "amalthea-upstream",
-				"path":                  pathPrefix,
-				"uri":                   fmt.Sprintf("http://127.0.0.1:%d", upstreamPort),
-				"insecureSkipTLSVerify": true,
-				"passHostHeader":        true,
-				"proxyWebSockets":       true,
-			},
-		},
-	}
-	newConfig := map[string]any{
-		"providers": []map[string]any{
-			{
-				"clientID":     "${OIDC_CLIENT_ID}",
-				"clientSecret": "${OIDC_CLIENT_SECRET}",
-				"id":           "amalthea-oidc",
-				"provider":     "oidc",
-				"oidcConfig": map[string]any{
-					"insecureSkipNonce":            false,
-					"issuerURL":                    "${OIDC_ISSUER_URL}",
-					"insecureAllowUnverifiedEmail": "${ALLOW_UNVERIFIED_EMAILS}",
-					"emailClaim":                   "email",
-					"audienceClaims":               []string{"aud"},
+	// Add the 'oidc' configuration if requested
+	if as.Spec.Authentication != nil && as.Spec.Authentication.Type == Oidc {
+		pathPrefix := as.ingressPathPrefix()
+		sessionURL := as.GetURL()
+		pathPrefixURL := url.URL{Host: sessionURL.Host, Path: pathPrefix, Scheme: sessionURL.Scheme}
+		cookieSecret := make([]byte, 32)
+		_, err := rand.Read(cookieSecret)
+		if err != nil {
+			// NOTE: Read cannot panic except for on legacy Linux systems
+			// See: https://pkg.go.dev/crypto/rand#Read
+			panic(err)
+		}
+		oldConfigLines := []string{
+			"session_cookie_minimal = true",
+			"skip_provider_button = true",
+			fmt.Sprintf("redirect_url = \"%s\"", pathPrefixURL.JoinPath("oauth2/callback").String()),
+			fmt.Sprintf("cookie_path = \"%s\"", pathPrefix),
+			fmt.Sprintf("proxy_prefix = \"%soauth2\"", pathPrefix),
+			"authenticated_emails_file = \"/authorized_emails\"",
+			fmt.Sprintf("cookie_secret = \"%s\"", base64.URLEncoding.EncodeToString(cookieSecret)),
+		}
+		upstreamPort := secondProxyPort
+		upstreamConfig := map[string]any{
+			"upstreams": []map[string]any{
+				{
+					"id":                    "amalthea-upstream",
+					"path":                  pathPrefix,
+					"uri":                   fmt.Sprintf("http://127.0.0.1:%d", upstreamPort),
+					"insecureSkipTLSVerify": true,
+					"passHostHeader":        true,
+					"proxyWebSockets":       true,
 				},
 			},
-		},
-		"server": map[string]string{
-			"bindAddress": fmt.Sprintf("0.0.0.0:%d", authenticatedPort),
-		},
-		"upstreamConfig": upstreamConfig,
-	}
-	newConfigStr, err := yaml.Marshal(newConfig)
-	if err != nil {
-		panic(err)
+		}
+		newConfig := map[string]any{
+			"providers": []map[string]any{
+				{
+					"clientID":     "${OIDC_CLIENT_ID}",
+					"clientSecret": "${OIDC_CLIENT_SECRET}",
+					"id":           "amalthea-oidc",
+					"provider":     "oidc",
+					"oidcConfig": map[string]any{
+						"insecureSkipNonce":            false,
+						"issuerURL":                    "${OIDC_ISSUER_URL}",
+						"insecureAllowUnverifiedEmail": "${ALLOW_UNVERIFIED_EMAILS}",
+						"emailClaim":                   "email",
+						"audienceClaims":               []string{"aud"},
+					},
+				},
+			},
+			"server": map[string]string{
+				"bindAddress": fmt.Sprintf("0.0.0.0:%d", authenticatedPort),
+			},
+			"upstreamConfig": upstreamConfig,
+		}
+		newConfigStr, err := yaml.Marshal(newConfig)
+		if err != nil {
+			panic(err)
+		}
+
+		secret.StringData["oauth2-proxy-alpha-config.yaml"] = string(newConfigStr)
+		secret.StringData["oauth2-proxy-config.yaml"] = strings.Join(oldConfigLines, "\n")
 	}
 
-	secret.StringData = map[string]string{
-		"oauth2-proxy-alpha-config.yaml": string(newConfigStr),
-		"oauth2-proxy-config.yaml":       strings.Join(oldConfigLines, "\n"),
-	}
-	if tunnelSecret != "" {
-		secret.StringData["WSTUNNEL_SECRET"] = tunnelSecret
-	}
 	return secret
 }
 
@@ -1039,15 +1122,6 @@ func (cr *AmaltheaSession) sessionContainerRemote(volumeMounts []v1.VolumeMount)
 			Name:  "RSC_READINESS_PROBE_TYPE",
 			Value: string(cr.Spec.Session.ReadinessProbe.Type),
 		},
-		v1.EnvVar{
-			Name: "RSC_WSTUNNEL_SECRET",
-			ValueFrom: ptr.To(v1.EnvVarSource{
-				SecretKeyRef: ptr.To(v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
-					Key:                  "WSTUNNEL_SECRET",
-				}),
-			}),
-		},
 	)
 
 	resources := session.Resources
@@ -1140,7 +1214,7 @@ func (cr *AmaltheaSession) tunnelContainer() v1.Container {
 				ValueFrom: ptr.To(v1.EnvVarSource{
 					SecretKeyRef: ptr.To(v1.SecretKeySelector{
 						LocalObjectReference: v1.LocalObjectReference{Name: cr.InternalSecretName()},
-						Key:                  "WSTUNNEL_SECRET",
+						Key:                  "wstunnel_secret",
 					}),
 				}),
 			},

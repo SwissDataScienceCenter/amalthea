@@ -148,3 +148,35 @@ func TestSessionContainerRemoteResources(t *testing.T) {
 		})
 	}
 }
+
+func TestRemoteSessionSecretKeysResolve(t *testing.T) {
+	cr := &AmaltheaSession{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+		Spec: AmaltheaSessionSpec{
+			SessionLocation: Remote,
+			Session:         Session{Image: "my-image"},
+		},
+	}
+	secret := cr.Secret()
+
+	containers := []v1.Container{
+		cr.sessionContainerRemote(nil),
+		cr.tunnelContainer(),
+	}
+	checked := 0
+	for _, container := range containers {
+		for _, env := range container.Env {
+			if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+				continue
+			}
+			ref := env.ValueFrom.SecretKeyRef
+			if ref.Name != cr.InternalSecretName() {
+				continue
+			}
+			checked++
+			_, ok := secret.StringData[ref.Key]
+			assert.Truef(t, ok, "container %q env %q references missing key %q in secret %q", container.Name, env.Name, ref.Key, ref.Name)
+		}
+	}
+	assert.Positive(t, checked)
+}
