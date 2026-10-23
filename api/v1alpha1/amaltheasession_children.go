@@ -537,9 +537,12 @@ func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Reader) (*v1.
 		return pod, nil
 	} else {
 		pod := v1.Pod{}
-		podName := cr.PodName()
+		podName, err := cr.PodName()
+		if err != nil {
+			return nil, err
+		}
 		key := types.NamespacedName{Name: podName, Namespace: cr.GetNamespace()}
-		err := clnt.Get(ctx, key, &pod)
+		err = clnt.Get(ctx, key, &pod)
 		if err != nil {
 			return nil, err
 		}
@@ -603,7 +606,11 @@ func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*
 		}
 		podName = pod.Name
 	} else {
-		podName = as.PodName()
+		name, err := as.PodName()
+		if err != nil {
+			return nil, err
+		}
+		podName = name
 	}
 	logger.Info("Getting event list for pod", "pod", podName)
 	err := c.List(ctx,

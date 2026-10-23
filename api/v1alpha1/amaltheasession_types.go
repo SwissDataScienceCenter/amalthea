@@ -596,8 +596,11 @@ func (a *AmaltheaSession) GetHealthcheckURL() *url.URL {
 
 // Return the name of the pod of an interactive session.
 // The StatefulSet has only one pod, so the `-0` suffix is used.
-func (as *AmaltheaSession) PodName() string {
-	return fmt.Sprintf("%s-0", as.Name)
+func (as *AmaltheaSession) PodName() (string, error) {
+	if as.Spec.SessionType == SessionTypeNonInteractive {
+		return "", fmt.Errorf("the pod name of the non-interactive session %s is not known", as.Name)
+	}
+	return fmt.Sprintf("%s-0", as.Name), nil
 }
 
 // Return the job name derived from the session spec.
