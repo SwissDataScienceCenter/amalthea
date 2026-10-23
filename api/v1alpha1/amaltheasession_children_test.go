@@ -66,6 +66,17 @@ func TestGetPodEventsSorted(t *testing.T) {
 	assert.Equal(t, res.Items, []v1.Event{ev3, ev2, ev1})
 }
 
+func TestPodName(t *testing.T) {
+	session := AmaltheaSession{ObjectMeta: metav1.ObjectMeta{Name: "session"}}
+	name, err := session.PodName()
+	assert.Nil(t, err)
+	assert.Equal(t, "session-0", name)
+
+	session.Spec.SessionType = SessionTypeNonInteractive
+	_, err = session.PodName()
+	assert.NotNil(t, err)
+}
+
 func TestSessionContainerRemoteResources(t *testing.T) {
 	cases := []struct {
 		name string
