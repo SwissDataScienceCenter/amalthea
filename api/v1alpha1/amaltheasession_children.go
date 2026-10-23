@@ -207,6 +207,7 @@ func (cr *AmaltheaSession) Job(cfg config.AmaltheaSessionConfiguration) (batchv1
 			Parallelism:  ptr.To(int32(1)),
 			Completions:  ptr.To(int32(1)),
 			BackoffLimit: ptr.To(int32(0)),
+			// Ignore pod failures due to pod disruption (preemption): scheduling disruptions do not count as a pod failure.
 			PodFailurePolicy: &batchv1.PodFailurePolicy{
 				Rules: []batchv1.PodFailurePolicyRule{
 					{
@@ -548,16 +549,15 @@ func (cr *AmaltheaSession) GetPod(ctx context.Context, clnt client.Reader) (*v1.
 
 func currentJobPod(pods []v1.Pod) *v1.Pod {
 	var newest, newestActive *v1.Pod
-	for i := range pods {
-		pod := &pods[i]
+	for _, pod := range pods {
 		if newest == nil || newest.CreationTimestamp.Before(&pod.CreationTimestamp) {
-			newest = pod
+			newest = &pod
 		}
 		if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 			continue
 		}
 		if newestActive == nil || newestActive.CreationTimestamp.Before(&pod.CreationTimestamp) {
-			newestActive = pod
+			newestActive = &pod
 		}
 	}
 	if newestActive != nil {
@@ -592,7 +592,7 @@ func eventTimestamp(ev v1.Event) time.Time {
 func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*v1.EventList, error) {
 	logger := log.FromContext(ctx)
 	events := v1.EventList{}
-	podName := as.PodName()
+	var podName string
 	if as.Spec.SessionType == SessionTypeNonInteractive {
 		pod, err := as.GetPod(ctx, c)
 		if err != nil {
@@ -602,6 +602,8 @@ func (as *AmaltheaSession) GetPodEvents(ctx context.Context, c client.Reader) (*
 			return nil, nil
 		}
 		podName = pod.Name
+	} else {
+		podName = as.PodName()
 	}
 	logger.Info("Getting event list for pod", "pod", podName)
 	err := c.List(ctx,

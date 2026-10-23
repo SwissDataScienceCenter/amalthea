@@ -49,14 +49,14 @@ func podIsDisrupted(pod *v1.Pod) bool {
 	return false
 }
 
-func podFailureReason(pod *v1.Pod, isJob bool) string {
+func podFailureReason(pod *v1.Pod, isNonInteractive bool) string {
 	if pod == nil {
 		return ""
 	}
 	if pod.GetDeletionTimestamp() != nil {
 		return ""
 	}
-	if isJob && podIsDisrupted(pod) {
+	if isNonInteractive && podIsDisrupted(pod) {
 		return ""
 	}
 	// NOTE: Checking the pod phase is not useful because it will still say "Running" when a container

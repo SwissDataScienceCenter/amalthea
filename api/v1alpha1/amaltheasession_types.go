@@ -594,8 +594,8 @@ func (a *AmaltheaSession) GetHealthcheckURL() *url.URL {
 	return healthcheckURL
 }
 
-// Return the name of the pod associated to the session.
-// There will be always only one pod, so the `-0` suffix is used.
+// Return the name of the pod of an interactive session.
+// The StatefulSet has only one pod, so the `-0` suffix is used.
 func (as *AmaltheaSession) PodName() string {
 	return fmt.Sprintf("%s-0", as.Name)
 }
