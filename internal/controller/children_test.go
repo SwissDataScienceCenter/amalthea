@@ -165,3 +165,17 @@ func TestEventsInferredStateWhereFailedAfterScheduled(t *testing.T) {
 	assert.Equal(t, EisrInitiallyFailed, result)
 	assert.Nil(t, err)
 }
+
+func TestPreserveTunnelSecretKeepsExistingValue(t *testing.T) {
+	desired := map[string]string{"wstunnel_secret": "rotated", "other": "kept"}
+	current := map[string][]byte{"wstunnel_secret": []byte("original")}
+	got := preserveTunnelSecret(desired, current)
+	assert.Equal(t, "original", got["wstunnel_secret"])
+	assert.Equal(t, "kept", got["other"])
+}
+
+func TestPreserveTunnelSecretWithoutExistingValue(t *testing.T) {
+	desired := map[string]string{"wstunnel_secret": "fresh"}
+	got := preserveTunnelSecret(desired, nil)
+	assert.Equal(t, "fresh", got["wstunnel_secret"])
+}
