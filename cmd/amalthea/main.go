@@ -113,7 +113,6 @@ func main() {
 		)
 		err := sentry.Init(sentry.ClientOptions{
 			Dsn:              sentryDsn,
-			SendDefaultPII:   false,
 			Environment:      sentryEnvironment,
 			Release:          sentryRelease,
 			EnableTracing:    sentryTracesSampleRate > 0,
