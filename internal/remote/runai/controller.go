@@ -105,13 +105,13 @@ func (c *RunaiRemoteSessionController) Start(ctx context.Context) error {
 	}
 
 	c.jobName = fmt.Sprintf("amalthea-%s-%s", c.project, time.Now().Format("20060102-15-04-05"))
-	slog.Info("starting remote session", "project", c.project, "jobName", c.jobName, "env", os.Environ())
+	slog.Info("starting remote session", "project", c.project, "jobName", c.jobName)
 
 	remoteSessionImage := os.Getenv("REMOTE_SESSION_IMAGE")
 
 	// do not do anything if `fakeStart` is true
 	if c.fakeStart {
-		slog.Info("fake start", "jobName", c.jobName, "env", os.Environ())
+		slog.Info("fake start", "jobName", c.jobName)
 		return nil
 	}
 
