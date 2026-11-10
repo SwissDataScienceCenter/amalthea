@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,11 +19,16 @@ type GitCli struct {
 	repoDirectory string
 	username      string
 	password      string
+	credentialURL string
 }
 
-func (g *GitCli) SetCredentials(username string, password string) {
+func (g *GitCli) SetCredentials(username string, password string, repositoryURL string) {
 	g.username = username
 	g.password = password
+	g.credentialURL = ""
+	if u, err := url.Parse(repositoryURL); err == nil && u.Scheme != "" && u.Host != "" {
+		g.credentialURL = u.Scheme + "://" + u.Host
+	}
 }
 
 func (g *GitCli) execute(cmd string, args []string) (string, error) {
@@ -39,14 +45,14 @@ func (g *GitCli) execute(cmd string, args []string) (string, error) {
 		env = append(env, fmt.Sprintf("GIT_PASSWORD=%v", g.password))
 	}
 
-	if g.username != "" && g.password != "" {
+	if g.username != "" && g.password != "" && g.credentialURL != "" {
 		path, err := os.Getwd()
 		if err != nil {
 			return "", err
 		}
 
 		askpassPath := fmt.Sprintf("GIT_ASKPASS=%v", filepath.Join(path, askpass))
-		env = append(env, askpassPath)
+		env = append(env, askpassPath, fmt.Sprintf("GIT_CREDENTIAL_URL=%v", g.credentialURL))
 	}
 
 	git.Env = env
@@ -144,5 +150,5 @@ func NewGitCli(repoDirectory string) *GitCli {
 		log.Fatal(err)
 	}
 
-	return &GitCli{repoDirectory, "", ""}
+	return &GitCli{repoDirectory: repoDirectory}
 }

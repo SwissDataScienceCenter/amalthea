@@ -63,7 +63,7 @@ func (c *Cloner) execute(repository Repository) error {
 		gitUser = ""
 	}
 
-	repository.Cli.SetCredentials(gitUser, gitAccessToken)
+	repository.Cli.SetCredentials(gitUser, gitAccessToken, repository.URL)
 
 	err = c.clone(repository)
 	if err != nil {
