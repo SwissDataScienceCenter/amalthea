@@ -148,3 +148,23 @@ func TestStreamsToFetch(t *testing.T) {
 		})
 	}
 }
+
+func TestWstunnelPathPrefix(t *testing.T) {
+	tests := []struct {
+		name             string
+		renkuBaseURLPath string
+		want             string
+	}{
+		{"leading slash", "/sessions/my-session", "sessions/my-session/__amalthea__/tunnel"},
+		{"no leading slash", "sessions/my-session", "sessions/my-session/__amalthea__/tunnel"},
+		{"trailing slash", "/sessions/my-session/", "sessions/my-session/__amalthea__/tunnel"},
+		{"doubled leading slash", "//sessions/my-session", "sessions/my-session/__amalthea__/tunnel"},
+	}
+	// wstunnel's client prepends a "/" when it builds the upgrade request, so a prefix with a leading
+	// slash produces a "//sessions/..." request path that strict path-matching proxies do not route.
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, wstunnelPathPrefix(tt.renkuBaseURLPath))
+		})
+	}
+}

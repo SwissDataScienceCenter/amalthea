@@ -449,8 +449,8 @@ func (c *FirecrestRemoteSessionController) Start(ctx context.Context) error {
 			return err
 		}
 		env["WSTUNNEL_SERVICE_ADDRESS"] = renkuBaseURL.Hostname()
-		env["WSTUNNEL_SERVICE_PORT"] = fmt.Sprintf("%d", 443)                                   // wss port (same as https)
-		env["WSTUNNEL_PATH_PREFIX"] = renkuBaseURLPath + "/" + v1alpha1.TunnelIngressPathSuffix // session path with tunnel
+		env["WSTUNNEL_SERVICE_PORT"] = fmt.Sprintf("%d", 443)              // wss port (same as https)
+		env["WSTUNNEL_PATH_PREFIX"] = wstunnelPathPrefix(renkuBaseURLPath) // session path with tunnel
 	}
 	// Setup environment variables for git repositories
 	repos := []string{}
@@ -1054,4 +1054,10 @@ func getPreferredScratch(fileSystems *[]FileSystem) *FileSystem {
 		}
 	}
 	return scratch
+}
+
+// wstunnelPathPrefix returns the -P value for the remote wstunnel client. wstunnel prepends a "/" to
+// it when building the upgrade request, so the prefix must not carry one itself.
+func wstunnelPathPrefix(renkuBaseURLPath string) string {
+	return strings.TrimPrefix(path.Join(renkuBaseURLPath, v1alpha1.TunnelIngressPathSuffix), "/")
 }
