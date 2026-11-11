@@ -237,7 +237,7 @@ func serve(cmd *cobra.Command, args []string) {
 		rules := map[string]string{
 			fmt.Sprintf("%s*", stripPathPrefix): "/$1",
 		}
-		e.Logger.Info("Will use path rewrite rules %+v", rules)
+		e.Logger.Infof("Will use path rewrite rules %+v", rules)
 		proxyMWs = append(proxyMWs, removeForwardedHeader)
 		proxyMWs = append(proxyMWs, middleware.Rewrite(rules))
 	} else {
