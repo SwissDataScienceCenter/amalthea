@@ -1,5 +1,18 @@
 components:
   schemas:
+    AccountsModel:
+      properties:
+        default:
+          title: Default
+          type: boolean
+        name:
+          title: Name
+          type: string
+      required:
+      - name
+      - default
+      title: AccountsModel
+      type: object
     ApResponseErrorType:
       enum:
       - error
@@ -8,6 +21,14 @@ components:
       type: string
     ApiResponseError:
       properties:
+        causedBy:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          nullable: true
+          title: Causedby
         data:
           anyOf:
           - additionalProperties: true
@@ -31,6 +52,16 @@ components:
       - message
       title: ApiResponseError
       type: object
+    BackendServiceType:
+      description: Types of services that can be health-checked.
+      enum:
+      - s3
+      - filesystem
+      - ssh
+      - scheduler
+      - exception
+      title: BackendServiceType
+      type: string
     Body_post_upload_filesystem__system_name__ops_upload_post:
       properties:
         file:
@@ -459,7 +490,7 @@ components:
           nullable: true
           title: Path
         serviceType:
-          $ref: '#/components/schemas/HealthCheckType'
+          $ref: '#/components/schemas/BackendServiceType'
           description: Type of the service being checked.
       required:
       - serviceType
@@ -711,22 +742,12 @@ components:
           nullable: true
           title: Message
         serviceType:
-          $ref: '#/components/schemas/HealthCheckType'
+          $ref: '#/components/schemas/BackendServiceType'
           description: Type of the service being checked.
       required:
       - serviceType
       title: HealthCheckException
       type: object
-    HealthCheckType:
-      description: Types of services that can be health-checked.
-      enum:
-      - scheduler
-      - filesystem
-      - ssh
-      - s3
-      - exception
-      title: HealthCheckType
-      type: string
     JobDescriptionModel:
       properties:
         account:
@@ -763,6 +784,20 @@ components:
           description: Name for the job
           nullable: true
           title: Name
+        partition:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Partition to be used for the job
+          nullable: true
+          title: Partition
+        reservation:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Reservation to be used for the job
+          nullable: true
+          title: Reservation
         script:
           description: Script for the job
           title: Script
@@ -990,6 +1025,15 @@ components:
           title: Suspended
       title: JobTime
       type: object
+    JobsTimeWindow:
+      enum:
+      - 1h
+      - 8h
+      - 24h
+      - 3d
+      - 7d
+      title: JobsTimeWindow
+      type: string
     MoveRequest:
       examples:
       - account: group
@@ -1134,12 +1178,10 @@ components:
           nullable: true
           title: Sockets
         state:
-          anyOf:
-          - type: string
-          - items:
-              type: string
-            type: array
+          items:
+            $ref: '#/components/schemas/NodeState'
           title: State
+          type: array
         threads:
           anyOf:
           - type: integer
@@ -1158,6 +1200,22 @@ components:
       - state
       title: NodeModel
       type: object
+    NodeState:
+      enum:
+      - IDLE
+      - ALLOCATED
+      - MIXED
+      - DOWN
+      - DRAIN
+      - OFFLINE
+      - RESERVED
+      - COMPLETING
+      - BUSY
+      - POWERING_DOWN
+      - POWERING_UP
+      - UNKNOWN
+      title: NodeState
+      type: string
     PartitionModel:
       properties:
         cpus:
@@ -1184,6 +1242,23 @@ components:
       - name
       - partition
       title: PartitionModel
+      type: object
+    PosixGroupIdentified:
+      properties:
+        default:
+          title: Default
+          type: boolean
+        id:
+          title: Id
+          type: string
+        name:
+          title: Name
+          type: string
+      required:
+      - id
+      - name
+      - default
+      title: PosixGroupIdentified
       type: object
     PosixIdentified:
       properties:
@@ -1395,6 +1470,8 @@ components:
             LD_LIBRARY_PATH: /path/to/library
             PATH: /path/to/bin
           name: Example with inline script
+          partition: partition_a
+          reservation: myreservation
           script: '#!/bin/bash
 
             --partition=part01
@@ -1418,6 +1495,8 @@ components:
             LD_LIBRARY_PATH: /path/to/library
             PATH: /path/to/bin
           name: Example with script path
+          partition: partition_a
+          reservation: myreservation
           script_path: /path/to/batch_file.sh
           standardError: count_to_100.err
           standardInput: /dev/null
@@ -1488,6 +1567,8 @@ components:
           anyOf:
           - additionalProperties:
               $ref: '#/components/schemas/ProbingService'
+            propertyNames:
+              $ref: '#/components/schemas/BackendServiceType'
             type: object
           - type: 'null'
           description: Services to be checked.
@@ -1582,6 +1663,12 @@ components:
         startTime:
           title: Starttime
           type: integer
+        state:
+          anyOf:
+          - type: string
+          - type: 'null'
+          nullable: true
+          title: State
       required:
       - name
       - nodeList
@@ -1689,7 +1776,7 @@ components:
           nullable: true
           title: Message
         serviceType:
-          $ref: '#/components/schemas/HealthCheckType'
+          $ref: '#/components/schemas/BackendServiceType'
           description: Type of the service being checked.
       required:
       - serviceType
@@ -1757,7 +1844,8 @@ components:
           type: string
         maxClients:
           default: 100
-          description: Maximum number of concurrent SSH clients.
+          description: Maximum number of concurrent SSH clients (not a hard limit,
+            might be temporarily exceeded under heavy load).
           title: Maxclients
           type: integer
         port:
@@ -1818,7 +1906,7 @@ components:
           nullable: true
           title: Message
         serviceType:
-          $ref: '#/components/schemas/HealthCheckType'
+          $ref: '#/components/schemas/BackendServiceType'
           description: Type of the service being checked.
       required:
       - serviceType
@@ -1935,7 +2023,7 @@ components:
           nullable: true
           title: Message
         serviceType:
-          $ref: '#/components/schemas/HealthCheckType'
+          $ref: '#/components/schemas/BackendServiceType'
           description: Type of the service being checked.
       required:
       - serviceType
@@ -2100,18 +2188,22 @@ components:
       type: object
     UserInfoResponse:
       properties:
-        group:
-          $ref: '#/components/schemas/PosixIdentified'
+        accounts:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/AccountsModel'
+            type: array
+          - type: 'null'
+          title: Accounts
         groups:
           items:
-            $ref: '#/components/schemas/PosixIdentified'
+            $ref: '#/components/schemas/PosixGroupIdentified'
           title: Groups
           type: array
         user:
           $ref: '#/components/schemas/PosixIdentified'
       required:
       - user
-      - group
       - groups
       title: UserInfoResponse
       type: object
@@ -2186,7 +2278,7 @@ components:
       type: http
 info:
   title: FirecREST
-  version: 2.5.0
+  version: 2.6.0
 openapi: 3.1.0
 paths:
   /compute/{system_name}/jobs:
@@ -2221,6 +2313,33 @@ paths:
           - type: 'null'
           description: If specified, filter jobs by account name
           title: Account
+      - description: If specified, filter jobs by name
+        in: query
+        name: name
+        required: false
+        schema:
+          anyOf:
+          - maxLength: 235
+            type: string
+          - type: 'null'
+          description: If specified, filter jobs by name
+          title: Name
+      - description: 'Time window used to look back for historical (completed, failed,
+          cancelled...) jobs. Does not affect currently pending or running jobs, which
+          are always returned. Not supported for PBS clusters: the parameter is accepted
+          but has no effect, and job history visibility there is bounded by the scheduler''s
+          own configuration instead'
+        in: query
+        name: time_window
+        required: false
+        schema:
+          $ref: '#/components/schemas/JobsTimeWindow'
+          default: 24h
+          description: 'Time window used to look back for historical (completed, failed,
+            cancelled...) jobs. Does not affect currently pending or running jobs,
+            which are always returned. Not supported for PBS clusters: the parameter
+            is accepted but has no effect, and job history visibility there is bounded
+            by the scheduler''s own configuration instead'
       responses:
         '200':
           content:
@@ -3709,6 +3828,15 @@ paths:
         schema:
           title: System Name
           type: string
+      - description: Show hidden partitions (only applies to Slurm scheduler).
+        in: query
+        name: show_hidden
+        required: false
+        schema:
+          default: false
+          description: Show hidden partitions (only applies to Slurm scheduler).
+          title: Show Hidden
+          type: boolean
       responses:
         '200':
           content:
