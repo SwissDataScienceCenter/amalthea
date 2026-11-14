@@ -48,28 +48,29 @@ func TestCheckAuthConfig(t *testing.T) {
 }
 
 func TestEnableAuthnFromFlagEnvAndConfig(t *testing.T) {
-	for name, setup := range map[string]func(t *testing.T) []string{
-		"flag": func(t *testing.T) []string { return []string{"--enable_authn"} },
-		"env": func(t *testing.T) []string {
-			t.Setenv("AUTHPROXY_ENABLE_AUTHN", "true")
-			return nil
-		},
-		"config file": func(t *testing.T) []string {
-			cfgPath := filepath.Join(t.TempDir(), "config.yaml")
-			require.NoError(t, os.WriteFile(cfgPath, []byte("enable_authn: true\n"), 0o600))
-			return []string{"--config", cfgPath}
-		},
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(cfgPath, []byte("enable_authn: true\n"), 0o600))
+
+	for name, tc := range map[string]struct {
+		args []string
+		env  string
+	}{
+		"flag":        {args: []string{"--enable_authn"}},
+		"env":         {env: "true"},
+		"config file": {args: []string{"--config", cfgPath}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			viper.Reset()
 			t.Cleanup(func() { viper.Reset(); config = ""; enableAuthn = false; token = "" })
 			enableAuthn = false
 			token = ""
+			if tc.env != "" {
+				t.Setenv("AUTHPROXY_ENABLE_AUTHN", tc.env)
+			}
 
-			args := setup(t)
 			cmd, err := Command()
 			require.NoError(t, err)
-			require.NoError(t, cmd.ParseFlags(args))
+			require.NoError(t, cmd.ParseFlags(tc.args))
 			require.NoError(t, loadConfig(cmd, nil))
 
 			require.True(t, enableAuthn)
