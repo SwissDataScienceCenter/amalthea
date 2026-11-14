@@ -46,6 +46,7 @@ const cookieKeyFlag = "cookie_key"
 const verboseFlag = "verbose"
 const configFlag = "config"
 const stripPathPrefixFlag = "strip_path_prefix"
+const enableAuthnFlag = "enable_authn"
 
 var remote string
 var port int
@@ -55,6 +56,7 @@ var cookieKey string
 var verbose bool
 var config string
 var stripPathPrefix string
+var enableAuthn bool
 
 const prefix = "authproxy"
 
@@ -129,6 +131,16 @@ func Command() (*cobra.Command, error) {
 		return nil, err
 	}
 
+	serveCmd.PersistentFlags().BoolVar(&enableAuthn, enableAuthnFlag, false, "require token authentication, the proxy refuses to start if this is set and the token is blank")
+	err = viper.BindPFlag(prefix+"."+enableAuthnFlag, serveCmd.PersistentFlags().Lookup(enableAuthnFlag))
+	if err != nil {
+		return nil, err
+	}
+	err = viper.BindEnv(prefix+"."+enableAuthnFlag, strings.ToUpper(prefix+"_"+enableAuthnFlag))
+	if err != nil {
+		return nil, err
+	}
+
 	serveCmd.PersistentFlags().BoolVar(&verbose, verboseFlag, false, "make the proxy verbose")
 	err = viper.BindPFlag(prefix+"."+verboseFlag, serveCmd.PersistentFlags().Lookup(verboseFlag))
 	if err != nil {
@@ -177,13 +189,10 @@ func (l *RequestStats) Handle(c echo.Context) error {
 	return c.JSON(http.StatusOK, RequestStatsResponse{LastRequestTime: l.LastRequest})
 }
 
-// checkAuthConfig fails closed when token authentication is enabled but the
-// resolved token is empty. A config file is only passed by the operator for
-// token authenticated sessions, so an empty token there means the proxy would
-// otherwise run without any authentication.
+// checkAuthConfig refuses to start without authentication when it was asked for.
 func checkAuthConfig() error {
-	if config != "" && len(token) == 0 {
-		return fmt.Errorf("token authentication is enabled but the resolved token is empty, refusing to start without authentication")
+	if enableAuthn && len(token) == 0 {
+		return fmt.Errorf("%s is set but the token is empty, refusing to start without authentication", enableAuthnFlag)
 	}
 	return nil
 }

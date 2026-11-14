@@ -116,6 +116,7 @@ func (as *AmaltheaSession) auth() (manifests, error) {
 			"serve",
 			"--config",
 			fmt.Sprintf("/etc/authproxy/%s", auth.SecretRef.Key),
+			"--enable_authn",
 		}
 		authContainer.VolumeMounts = append(
 			[]v1.VolumeMount{
