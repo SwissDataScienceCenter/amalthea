@@ -32,17 +32,48 @@ func TestLoadConfigTopLevelKeys(t *testing.T) {
 	require.Equal(t, "my-cookie", cookieKey)
 }
 
-func TestCheckAuthConfigFailsClosed(t *testing.T) {
-	t.Cleanup(func() { config = ""; token = "" })
+func TestCheckAuthConfig(t *testing.T) {
+	t.Cleanup(func() { enableAuthn = false; token = "" })
 
-	config = "/etc/authproxy/config"
+	enableAuthn = true
 	token = ""
 	require.Error(t, checkAuthConfig())
 
 	token = "super-secret"
 	require.NoError(t, checkAuthConfig())
 
-	config = ""
+	enableAuthn = false
 	token = ""
 	require.NoError(t, checkAuthConfig())
+}
+
+func TestEnableAuthnFromFlagEnvAndConfig(t *testing.T) {
+	for name, setup := range map[string]func(t *testing.T) []string{
+		"flag": func(t *testing.T) []string { return []string{"--enable_authn"} },
+		"env": func(t *testing.T) []string {
+			t.Setenv("AUTHPROXY_ENABLE_AUTHN", "true")
+			return nil
+		},
+		"config file": func(t *testing.T) []string {
+			cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+			require.NoError(t, os.WriteFile(cfgPath, []byte("enable_authn: true\n"), 0o600))
+			return []string{"--config", cfgPath}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(func() { viper.Reset(); config = ""; enableAuthn = false; token = "" })
+			enableAuthn = false
+			token = ""
+
+			args := setup(t)
+			cmd, err := Command()
+			require.NoError(t, err)
+			require.NoError(t, cmd.ParseFlags(args))
+			require.NoError(t, loadConfig(cmd, nil))
+
+			require.True(t, enableAuthn)
+			require.Error(t, checkAuthConfig())
+		})
+	}
 }
