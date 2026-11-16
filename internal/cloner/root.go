@@ -26,38 +26,11 @@ func Command() (*cobra.Command, error) {
 		Short: "Cloning utilities",
 	}
 
-	cmd := &cobra.Command{
-		Use:   "clone",
-		Short: "A small utility to clone repositories",
-		Long:  `cloner is a helper to Amalthea to clone project related repositories`,
-		Run:   clone,
-	}
-	preCloningStrategy := newEnum(PreCloningStrategies, NoStrategy)
-	cmd.Flags().StringVar(&configPath, ConfigFlag, "", "Path to configuration file")
-
-	cmd.Flags().StringVar(&remote, RemoteFlag, "", "remote URL to proxy to")
-	err := cmd.MarkFlagRequired(RemoteFlag)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd.Flags().StringVar(&revision, RevisionFlag, "", "remote revision (branch, tag, etc.)")
-
-	cmd.Flags().StringVar(&path, PathFlag, "", "clone path")
-	err = cmd.MarkFlagRequired(PathFlag)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd.Flags().BoolVar(&verbose, VerboseFlag, false, "make the command verbose")
-	cmd.Flags().VarP(preCloningStrategy, StrategyFlag, "", "the pre cloning strategy")
-
 	shellCloneCmd := &cobra.Command{
 		Use: "shellclone",
 		Run: shellClone,
 	}
 
-	clonerRoot.AddCommand(cmd)
 	clonerRoot.AddCommand(shellCloneCmd)
 	return clonerRoot, nil
 }

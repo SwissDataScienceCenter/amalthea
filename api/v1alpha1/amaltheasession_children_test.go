@@ -66,6 +66,17 @@ func TestGetPodEventsSorted(t *testing.T) {
 	assert.Equal(t, res.Items, []v1.Event{ev3, ev2, ev1})
 }
 
+func TestPodName(t *testing.T) {
+	session := AmaltheaSession{ObjectMeta: metav1.ObjectMeta{Name: "session"}}
+	name, err := session.PodName()
+	assert.Nil(t, err)
+	assert.Equal(t, "session-0", name)
+
+	session.Spec.SessionType = SessionTypeNonInteractive
+	_, err = session.PodName()
+	assert.NotNil(t, err)
+}
+
 func TestSessionContainerRemoteResources(t *testing.T) {
 	cases := []struct {
 		name string
@@ -147,4 +158,36 @@ func TestSessionContainerRemoteResources(t *testing.T) {
 			assert.Equal(t, tc.gpus, envMap["RSC_SESSION_GPUS"])
 		})
 	}
+}
+
+func TestRemoteSessionSecretKeysResolve(t *testing.T) {
+	cr := &AmaltheaSession{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+		Spec: AmaltheaSessionSpec{
+			SessionLocation: Remote,
+			Session:         Session{Image: "my-image"},
+		},
+	}
+	secret := cr.Secret()
+
+	containers := []v1.Container{
+		cr.sessionContainerRemote(nil),
+		cr.tunnelContainer(),
+	}
+	checked := 0
+	for _, container := range containers {
+		for _, env := range container.Env {
+			if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+				continue
+			}
+			ref := env.ValueFrom.SecretKeyRef
+			if ref.Name != cr.InternalSecretName() {
+				continue
+			}
+			checked++
+			_, ok := secret.StringData[ref.Key]
+			assert.Truef(t, ok, "container %q env %q references missing key %q in secret %q", container.Name, env.Name, ref.Key, ref.Name)
+		}
+	}
+	assert.Positive(t, checked)
 }
