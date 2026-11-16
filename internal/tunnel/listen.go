@@ -123,7 +123,7 @@ func listen(cmd *cobra.Command, args []string) error {
 
 	wstunnelAddr := fmt.Sprintf("ws://0.0.0.0:%s", wstunnelPort)
 
-	workerThreads := uint(viper.GetUint(wstunnelPrefix + "." + wstunnelWorkerThreadsFlag))
+	workerThreads := viper.GetUint(wstunnelPrefix + "." + wstunnelWorkerThreadsFlag)
 
 	wsArgs := wstunnelArgs(tmpFile.Name(), wstunnelAddr, wstunnelLogLevel, workerThreads)
 
