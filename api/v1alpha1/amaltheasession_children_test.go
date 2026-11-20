@@ -191,3 +191,18 @@ func TestRemoteSessionSecretKeysResolve(t *testing.T) {
 	}
 	assert.Positive(t, checked)
 }
+
+func TestTunnelContainerBoundsThreads(t *testing.T) {
+	cr := &AmaltheaSession{ObjectMeta: metav1.ObjectMeta{Name: "t", Namespace: "t"},
+		Spec: AmaltheaSessionSpec{SessionLocation: Remote, Session: Session{Image: "img"}}}
+	c := cr.tunnelContainer()
+	env := map[string]string{}
+	for _, e := range c.Env {
+		env[e.Name] = e.Value
+	}
+	assert.Equal(t, "2", env["WSTUNNEL_WORKER_THREADS"])
+	assert.Equal(t, resource.MustParse("64Mi"), c.Resources.Limits[v1.ResourceMemory])
+	assert.Equal(t, resource.MustParse("64Mi"), c.Resources.Requests[v1.ResourceMemory])
+	_, hasCPULimit := c.Resources.Limits[v1.ResourceCPU]
+	assert.False(t, hasCPULimit, "a CPU limit would throttle bursts even when the node is idle")
+}
