@@ -185,6 +185,8 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 			}
 		}
 
+		// SA1019: although deprecated, examples are still using Requeue
+		//nolint:staticcheck
 		return ctrl.Result{Requeue: true}, nil
 	}
 
@@ -264,6 +266,8 @@ func (r *AmaltheaSessionReconciler) reconcileInner(ctx context.Context, req ctrl
 	if requeueAfter > 0 {
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
+	// SA1019: although deprecated, examples are still using Requeue
+	//nolint:staticcheck
 	return ctrl.Result{Requeue: true}, nil
 }
 
