@@ -1252,6 +1252,9 @@ func (cr *AmaltheaSession) tunnelContainer() v1.Container {
 		},
 		Env: []v1.EnvVar{
 			{Name: "WSTUNNEL_PORT", Value: fmt.Sprintf("%d", TunnelPort)},
+			// wstunnel otherwise starts one worker thread per CPU it can see, and each costs memory:
+			// ~70Mi on an 8-CPU node against this container's 64Mi limit, which is what OOMKills it.
+			{Name: "WSTUNNEL_WORKER_THREADS", Value: "2"},
 			{
 				Name: "WSTUNNEL_SECRET",
 				ValueFrom: ptr.To(v1.EnvVarSource{
