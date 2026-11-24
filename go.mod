@@ -6,18 +6,18 @@ tool fybrik.io/crdoc
 
 require (
 	github.com/distribution/reference v0.6.0
-	github.com/elazarl/goproxy v1.9.3
+	github.com/elazarl/goproxy v1.9.4
 	github.com/fernet/fernet-go v0.0.0-20240119011108-303da6aec611
 	github.com/getkin/kin-openapi v0.153.0
 	github.com/getsentry/sentry-go v0.50.0
 	github.com/go-logr/logr v1.4.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/joho/godotenv v1.5.1
-	github.com/labstack/echo/v4 v4.16.3
+	github.com/labstack/echo/v4 v4.16.6
 	github.com/labstack/gommon v0.5.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/oapi-codegen/oapi-codegen/v2 v2.8.2
-	github.com/oapi-codegen/runtime v1.8.0
+	github.com/oapi-codegen/runtime v1.9.1
 	github.com/oasdiff/yaml v0.1.3
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/onsi/ginkgo/v2 v2.23.4
@@ -28,7 +28,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/sys v0.50.0
-	gopkg.in/ini.v1 v1.67.3
+	gopkg.in/ini.v1 v1.68.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.33.13
 	k8s.io/apimachinery v0.33.13
