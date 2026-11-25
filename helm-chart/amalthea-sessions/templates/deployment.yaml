@@ -47,6 +47,8 @@ spec:
           value: {{ .Values.rcloneStorageClass | quote }}
         - name: SIDECARS_IMAGE
           value: {{ .Values.sidecars.image.repository }}:{{ .Values.sidecars.image.tag }}
+        - name: OAUTH2_PROXY_IMAGE
+          value: {{ .Values.oauth2Proxy.image.repository }}:{{ .Values.oauth2Proxy.image.tag }}
         - name: USE_NONE_SAME_SITE_SESSION_COOKIE
           value: {{ .Values.useNoneSameSiteSessionCookie | quote }}
         - name: HTTPS_SESSION_INGRESS

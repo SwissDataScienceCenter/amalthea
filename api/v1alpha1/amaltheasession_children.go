@@ -53,6 +53,7 @@ const RemoteSessionControllerPort int32 = 65532
 const TunnelPort int32 = 65531
 
 var sidecarsImage string = getSidecarsImage()
+var authproxyImage string = getAuthproxyImage()
 var rcloneStorageClass string = getStorageClass()
 var rcloneDefaultStorage resource.Quantity = resource.MustParse("1Gi")
 var useNoneSameSiteSessionCookie = getUseNoneSameSiteSessionCookie()
@@ -874,6 +875,14 @@ func getSidecarsImage() string {
 		sc = "renku/sidecars:latest"
 	}
 	return sc
+}
+
+func getAuthproxyImage() string {
+	img := os.Getenv("OAUTH2_PROXY_IMAGE")
+	if img == "" {
+		img = "quay.io/oauth2-proxy/oauth2-proxy:v7.6.0"
+	}
+	return img
 }
 
 func getUseNoneSameSiteSessionCookie() bool {
