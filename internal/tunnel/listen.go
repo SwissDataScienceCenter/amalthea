@@ -38,10 +38,11 @@ type Config struct {
 }
 
 const (
-	wstunnelSecretFlag   = "secret"
-	wstunnelPortFlag     = "port"
-	wstunnelLogLevelFlag = "log-level"
-	wstunnelPrefix       = "wstunnel"
+	wstunnelSecretFlag        = "secret"
+	wstunnelPortFlag          = "port"
+	wstunnelLogLevelFlag      = "log-level"
+	wstunnelWorkerThreadsFlag = "worker-threads"
+	wstunnelPrefix            = "wstunnel"
 )
 
 func listen(cmd *cobra.Command, args []string) error {
@@ -122,16 +123,13 @@ func listen(cmd *cobra.Command, args []string) error {
 
 	wstunnelAddr := fmt.Sprintf("ws://0.0.0.0:%s", wstunnelPort)
 
-	wstunnelArgs := []string{
-		"server",
-		"--restrict-config", tmpFile.Name(),
-		"--log-lvl", wstunnelLogLevel,
-		wstunnelAddr,
-	}
+	workerThreads := viper.GetUint(wstunnelPrefix + "." + wstunnelWorkerThreadsFlag)
 
-	cmd.Printf("Executing wstunnel: %s %s\n", wstunnelBin, strings.Join(wstunnelArgs, " "))
+	wsArgs := wstunnelArgs(tmpFile.Name(), wstunnelAddr, wstunnelLogLevel, workerThreads)
 
-	wCmd := exec.Command(wstunnelBin, wstunnelArgs...)
+	cmd.Printf("Executing wstunnel: %s %s\n", wstunnelBin, strings.Join(wsArgs, " "))
+
+	wCmd := exec.Command(wstunnelBin, wsArgs...)
 	wCmd.Stdout = os.Stdout
 	wCmd.Stderr = os.Stderr
 
@@ -140,4 +138,22 @@ func listen(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// wstunnelArgs builds the wstunnel server command line. wstunnel sizes its worker pool from the
+// CPU count it can see, so workerThreads > 0 is what keeps its memory footprint independent of
+// the node it lands on; 0 leaves wstunnel's default (one worker per CPU) in place.
+func wstunnelArgs(restrictConfigPath, addr, logLevel string, workerThreads uint) []string {
+	args := []string{
+		"server",
+		"--restrict-config", restrictConfigPath,
+		"--log-lvl", logLevel,
+		addr,
+	}
+
+	if workerThreads > 0 {
+		args = append(args, "--nb-worker-threads", fmt.Sprintf("%d", workerThreads))
+	}
+
+	return args
 }

@@ -2,7 +2,7 @@
 FROM golang:1.26 AS builder
 ARG TARGETOS
 ARG TARGETARCH
-ARG WSTUNNEL_VERSION="10.4.4"
+ARG WSTUNNEL_VERSION="11.1.0"
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
