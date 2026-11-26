@@ -64,5 +64,16 @@ func Command() (*cobra.Command, error) {
 		return nil, err
 	}
 
+	tunnelCmd.PersistentFlags().Uint(wstunnelWorkerThreadsFlag, 0, "number of wstunnel worker threads; 0 lets wstunnel use the CPU count")
+	err = viper.BindPFlag(wstunnelPrefix+"."+wstunnelWorkerThreadsFlag, tunnelCmd.PersistentFlags().Lookup(wstunnelWorkerThreadsFlag))
+	if err != nil {
+		return nil, err
+	}
+	// Underscore form on purpose: the dashed WSTUNNEL_LOG-LEVEL env name above is a wart, not a pattern.
+	err = viper.BindEnv(wstunnelPrefix+"."+wstunnelWorkerThreadsFlag, "WSTUNNEL_WORKER_THREADS")
+	if err != nil {
+		return nil, err
+	}
+
 	return tunnelCmd, nil
 }
