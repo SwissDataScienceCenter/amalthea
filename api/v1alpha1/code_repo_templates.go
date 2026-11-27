@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 )
 
 type manifests struct {
@@ -59,8 +60,10 @@ func (as *AmaltheaSession) cloneInit() manifests {
 			WorkingDir:   as.Spec.Session.Storage.MountPath,
 			Env:          envVars,
 			SecurityContext: &v1.SecurityContext{
-				RunAsUser:  &as.Spec.Session.RunAsUser,
-				RunAsGroup: &as.Spec.Session.RunAsGroup,
+				AllowPrivilegeEscalation: ptr.To(false),
+				RunAsNonRoot:             ptr.To(as.Spec.Session.RunAsUser != 0),
+				RunAsUser:                &as.Spec.Session.RunAsUser,
+				RunAsGroup:               &as.Spec.Session.RunAsGroup,
 				Capabilities: &v1.Capabilities{
 					Drop: []v1.Capability{"ALL"},
 				},

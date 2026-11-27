@@ -154,15 +154,20 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 		ServiceAccountName:           cr.Spec.ServiceAccountName,
 		EnableServiceLinks:           ptr.To(false),
 		AutomountServiceAccountToken: ptr.To(false),
-		SecurityContext:              &v1.PodSecurityContext{FSGroup: &cr.Spec.Session.RunAsGroup},
-		Containers:                   containers,
-		InitContainers:               initContainers,
-		Volumes:                      volumes,
-		Tolerations:                  cr.Spec.Tolerations,
-		NodeSelector:                 cr.Spec.NodeSelector,
-		Affinity:                     cr.Spec.Affinity,
-		PriorityClassName:            cr.Spec.PriorityClassName,
-		ImagePullSecrets:             imagePullSecrets,
+		SecurityContext: &v1.PodSecurityContext{
+			FSGroup: &cr.Spec.Session.RunAsGroup,
+			// Required by the "restricted" Pod Security Standard. Containers that set their own
+			// seccomp profile (e.g. user-provided extra containers) still override this.
+			SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault},
+		},
+		Containers:        containers,
+		InitContainers:    initContainers,
+		Volumes:           volumes,
+		Tolerations:       cr.Spec.Tolerations,
+		NodeSelector:      cr.Spec.NodeSelector,
+		Affinity:          cr.Spec.Affinity,
+		PriorityClassName: cr.Spec.PriorityClassName,
+		ImagePullSecrets:  imagePullSecrets,
 	}
 
 	if cfg.ClusterType == config.OpenShift {
@@ -1078,9 +1083,10 @@ func (cr *AmaltheaSession) sessionContainerLocal(volumeMounts []v1.VolumeMount, 
 	}
 	// Assign security context
 	securityContext := &v1.SecurityContext{
-		RunAsNonRoot: ptr.To(true),
-		RunAsUser:    ptr.To(session.RunAsUser),
-		RunAsGroup:   ptr.To(session.RunAsGroup),
+		AllowPrivilegeEscalation: ptr.To(false),
+		RunAsNonRoot:             ptr.To(true),
+		RunAsUser:                ptr.To(session.RunAsUser),
+		RunAsGroup:               ptr.To(session.RunAsGroup),
 		Capabilities: &v1.Capabilities{
 			Drop: []v1.Capability{"ALL"},
 		},
