@@ -6057,6 +6057,29 @@ spec:
                 description: The name of the priority class assigned to the session
                   Pod.
                 type: string
+              proxy:
+                description: |-
+                  Outgoing HTTP proxy for the session. When set, HTTP_PROXY, HTTPS_PROXY and NO_PROXY
+                  (in upper and lower case) are added to every container and init container of the session pod,
+                  including the extra containers and init containers from this spec. A container that already
+                  defines one of these variables keeps its own value for that variable.
+                properties:
+                  httpProxy:
+                    description: The proxy URL used for http:// requests, e.g. http://proxy.example.com:3128.
+                    pattern: ^https?://
+                    type: string
+                  httpsProxy:
+                    description: The proxy URL used for https:// requests. Defaults
+                      to httpProxy when empty.
+                    pattern: ^https?://
+                    type: string
+                  noProxy:
+                    description: Comma separated list of hosts, domain suffixes and
+                      IP addresses that bypass the proxy.
+                    type: string
+                required:
+                - httpProxy
+                type: object
               reconcileStrategy:
                 default: always
                 description: |-

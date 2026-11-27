@@ -145,6 +145,9 @@ func (cr *AmaltheaSession) Pod(cfg config.AmaltheaSessionConfiguration) (*v1.Pod
 	}
 	containers = append(containers, cr.Spec.ExtraContainers...)
 
+	containers = withProxyEnv(cr.Spec.Proxy, containers)
+	initContainers = withProxyEnv(cr.Spec.Proxy, initContainers)
+
 	imagePullSecrets := []v1.LocalObjectReference{}
 	for _, sec := range cr.Spec.ImagePullSecrets {
 		imagePullSecrets = append(imagePullSecrets, v1.LocalObjectReference{Name: sec.Name})
