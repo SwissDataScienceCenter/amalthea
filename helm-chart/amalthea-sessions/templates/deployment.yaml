@@ -78,5 +78,7 @@ spec:
           | nindent 10 }}
       securityContext:
         runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: {{ include "amalthea-sessions.fullname" . }}-controller-manager
       terminationGracePeriodSeconds: 10

@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/SwissDataScienceCenter/amalthea/internal/controller/config"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -205,4 +207,58 @@ func TestTunnelContainerBoundsThreads(t *testing.T) {
 	assert.Equal(t, resource.MustParse("64Mi"), c.Resources.Requests[v1.ResourceMemory])
 	_, hasCPULimit := c.Resources.Limits[v1.ResourceCPU]
 	assert.False(t, hasCPULimit, "a CPU limit would throttle bursts even when the node is idle")
+}
+
+// TestPodMeetsRestrictedPodSecurity checks the containers amalthea itself generates against the
+// container-level requirements of the "restricted" Pod Security Standard, which some clusters
+// enforce on the session namespace. Without them the StatefulSet cannot create the pod.
+func TestPodMeetsRestrictedPodSecurity(t *testing.T) {
+	cases := []struct {
+		name     string
+		location SessionLocation
+		authType AuthenticationType
+	}{
+		{"local token", Local, Token},
+		{"local oauth2proxy", Local, OauthProxy},
+		{"local oidc", Local, Oidc},
+		{"remote oauth2proxy", Remote, OauthProxy},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cr := &AmaltheaSession{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+				Spec: AmaltheaSessionSpec{
+					SessionLocation: tc.location,
+					Session:         Session{Image: "my-image", RunAsUser: 1000, RunAsGroup: 1000, Port: 8888},
+					CodeRepositories: []CodeRepository{
+						{Remote: "https://github.com/SwissDataScienceCenter/renku"},
+					},
+					Authentication: &Authentication{
+						Enabled:   true,
+						Type:      tc.authType,
+						SecretRef: SessionSecretRef{Name: "auth", Key: "auth"},
+					},
+				},
+			}
+			pod, err := cr.Pod(config.AmaltheaSessionConfiguration{})
+			assert.NoError(t, err)
+
+			if assert.NotNil(t, pod.SecurityContext) && assert.NotNil(t, pod.SecurityContext.SeccompProfile) {
+				assert.Equal(t, v1.SeccompProfileTypeRuntimeDefault, pod.SecurityContext.SeccompProfile.Type)
+			}
+			all := append(append([]v1.Container{}, pod.InitContainers...), pod.Containers...)
+			assert.NotEmpty(t, all)
+			for _, c := range all {
+				sc := c.SecurityContext
+				if !assert.NotNilf(t, sc, "container %q has no securityContext", c.Name) {
+					continue
+				}
+				assert.Equalf(t, ptr.To(false), sc.AllowPrivilegeEscalation, "container %q must set allowPrivilegeEscalation=false", c.Name)
+				assert.Equalf(t, ptr.To(true), sc.RunAsNonRoot, "container %q must set runAsNonRoot=true", c.Name)
+				if assert.NotNilf(t, sc.Capabilities, "container %q must drop capabilities", c.Name) {
+					assert.Containsf(t, sc.Capabilities.Drop, v1.Capability("ALL"), "container %q must drop ALL capabilities", c.Name)
+				}
+			}
+		})
+	}
 }
