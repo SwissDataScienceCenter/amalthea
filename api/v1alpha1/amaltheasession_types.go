@@ -135,6 +135,29 @@ type AmaltheaSessionSpec struct {
 	// terminates, the resources are cleaned up. Non-interactive sessions are implemented as jobs and won't
 	// have ingress or authentication enabled.
 	SessionType SessionType `json:"sessionType,omitempty"`
+
+	// +optional
+	// Outgoing HTTP proxy for the session. When set, HTTP_PROXY, HTTPS_PROXY and NO_PROXY
+	// (in upper and lower case) are added to every container and init container of the session pod,
+	// including the extra containers and init containers from this spec. A container that already
+	// defines one of these variables keeps its own value for that variable.
+	Proxy *HTTPProxy `json:"proxy,omitempty"`
+}
+
+// HTTPProxy is the outgoing HTTP proxy configuration for a session.
+type HTTPProxy struct {
+	// +kubebuilder:validation:Pattern=`^https?://`
+	// The proxy URL used for http:// requests, e.g. http://proxy.example.com:3128.
+	HTTPProxy string `json:"httpProxy"`
+
+	// +optional
+	// +kubebuilder:validation:Pattern=`^https?://`
+	// The proxy URL used for https:// requests. Defaults to httpProxy when empty.
+	HTTPSProxy string `json:"httpsProxy,omitempty"`
+
+	// +optional
+	// Comma separated list of hosts, domain suffixes and IP addresses that bypass the proxy.
+	NoProxy string `json:"noProxy,omitempty"`
 }
 
 type Session struct {
