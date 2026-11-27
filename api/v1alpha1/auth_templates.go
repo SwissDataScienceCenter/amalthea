@@ -9,8 +9,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-const authproxyImage string = "harbor.renkulab.io/bitnami-mirror/oauth2-proxy:7.6.0"
-
 func (as *AmaltheaSession) auth() (manifests, error) {
 	output := manifests{}
 	volumeMounts := []v1.VolumeMount{}

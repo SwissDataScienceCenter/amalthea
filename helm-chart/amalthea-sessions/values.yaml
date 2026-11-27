@@ -64,6 +64,11 @@ sidecars:
     repository: renku/sidecars
     tag: latest
 
+oauth2Proxy:
+  image:
+    repository: quay.io/oauth2-proxy/oauth2-proxy
+    tag: v7.6.0
+
 cloner:
   image:
     repository: renku/cloner
