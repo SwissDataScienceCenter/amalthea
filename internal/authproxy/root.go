@@ -43,8 +43,13 @@ func loadConfig(cmd *cobra.Command, args []string) error {
 	// https://github.com/spf13/viper/issues/397#issuecomment-1304749092
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		vname := prefix + "." + f.Name
-		if viper.IsSet(vname) {
+		switch {
+		case viper.IsSet(vname) && viper.GetString(vname) != "":
 			err := cmd.Flags().Set(f.Name, viper.GetString(vname))
+			cobra.CheckErr(err)
+		case viper.IsSet(f.Name):
+			// The documented secret format uses top-level keys (e.g. token, cookie_key)
+			err := cmd.Flags().Set(f.Name, viper.GetString(f.Name))
 			cobra.CheckErr(err)
 		}
 	})
